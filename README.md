@@ -1,22 +1,18 @@
-# Odds Desktop Prototype
+# OddsMoni Desktop (Prototype)
 
-Minimal Electron scaffold co-existing inside the extension repo.
+Minimal Electron-based desktop application for monitoring sports betting odds and integrating a League of Legends statistics / stream helper module.
 
-## Structure
-- main.js: Electron main process, creates main window + broker BrowserViews
-- preload.js: Exposes limited API to renderer
-- brokerPreload.js: Injected into each broker view, will host adapted extractors
-- renderer/index.html: Simple UI table showing incoming odds
+Fonts used: Inter (variable + regular/semi-bold fallback) with system fallbacks (system-ui, Segoe UI, Roboto, Helvetica Neue, Arial). Font files are git-ignored — only the CSS references remain.
 
-## Run (after installing dependencies)
-```
-npm install
-npm run dev
-```
+## What it does (current / planned core capabilities)
+- Open multiple bookmaker (broker) sites in managed BrowserViews
+- Inject extraction scripts to scrape live odds
+- Normalize & display odds in a compact dashboard UI
+- Collect and show League of Legends match statistics (LoL stats module)
+- Provide a convenient layout for watching streams alongside data panels
 
-## Next steps
-1. Port real extract* functions from extension into brokerPreload (domain detection + per-site logic)
-2. Replace naive layout with dynamic grid + resize/drag persistence
-3. Implement MID + arbitrage calculations in renderer
-4. Add persistent storage (SQLite) for history
-5. Auto-updater config (electron-builder) once logic stabilizes
+
+This README intentionally kept short for now. More developer & build details will be added later.
+
+—
+Work in progress.

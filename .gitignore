@@ -1,0 +1,65 @@
+# Node / Electron basics
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# Build outputs
+dist/
+release/
+*.asar
+*.asar.unpacked/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+*.iml
+
+# Logs
+logs/
+*.log
+log-*.txt
+
+# Coverage / test outputs
+coverage/
+*.lcov
+
+# Env / credentials
+.env
+.env.*
+!.env.example
+
+# Cache
+.cache/
+.tmp/
+.eslintcache
+
+# Electron specific
+*.pid
+
+electron-builder.yml
+electron-builder-debug.yml
+
+# Archives / portable bundles
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# Models / large binaries suggestion (consider Git LFS)
+*.onnx
+!modules/upscaler/Real-ESRGAN_x2plus.onnx
+
+# Fonts (removed from source control)
+renderer/fonts/
+
+# Misc
+*.swp
+*.swo
