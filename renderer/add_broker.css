@@ -1,0 +1,40 @@
+/* --------------------------------------------------------- */
+/* Add Broker dialog                                         */
+/* --------------------------------------------------------- */
+body {
+	margin: 0;
+	background: #1a1a1a;
+	color: #eee;
+	font: 14px system-ui;
+	padding: 12px;
+}
+h1 {
+	font-size: 18px;
+	margin: 0 0 12px;
+}
+ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	max-height: 270px;
+	overflow: auto;
+}
+li { margin: 4px 0; }
+/* Broker list buttons use full width styling */
+ul button {
+	width: 100%;
+	font-size: 16px;
+	padding: 8px 10px;
+}
+ul button[disabled] {
+	opacity: .45;
+	cursor: not-allowed;
+}
+footer {
+	margin-top: 8px;
+	text-align: right;
+}
+.empty {
+	padding: 12px 4px;
+	color: #888;
+}

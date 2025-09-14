@@ -1,0 +1,56 @@
+/* Team activity heat bar overlay (modular CSS) */
+/* Positioned over the LoL stats table columns; uses transform scaleY for efficient animation */
+
+#stats .lolTableWrap { position: relative; }
+
+.teamActivityLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 10; /* Above default cell z-index; pop animations set z-index:1 so this stays visible */
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.teamActivityLayer.hidden { display: none; }
+
+ .teamActivityLayer .teamActivity {
+  position: absolute;
+  bottom: 0;
+  /* Sharper multi-stop gradient for clearer edge */
+  background: linear-gradient(to top,
+    rgba(60,120,255,.90) 0%,
+    rgba(60,120,255,.82) 46%,
+    rgba(60,120,255,.40) 78%,
+    rgba(60,120,255,0) 100%);
+  mix-blend-mode: screen;
+  transform-origin: bottom center;
+  transform: translateZ(0) scaleY(0);
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow:
+    inset 0 0 4px rgba(255,255,255,.18),
+    0 0 6px -2px rgba(60,120,255,.55);
+  filter: saturate(1.05) brightness(1.03);
+  opacity: .92;
+  background-clip: padding-box;
+  will-change: transform, opacity;
+  transition: box-shadow 180ms ease, opacity 160ms linear;
+}
+
+.teamActivityLayer .teamActivity.team2 {
+  background: linear-gradient(to top,
+    rgba(255,70,70,.90) 0%,
+    rgba(255,70,70,.80) 46%,
+    rgba(255,70,70,.42) 78%,
+    rgba(255,70,70,0) 100%);
+  box-shadow:
+    inset 0 0 4px rgba(255,255,255,.16),
+    0 0 6px -2px rgba(255,70,70,.55);
+  filter: saturate(1.08) brightness(1.05);
+}
+
+.teamActivityLayer .teamActivity.fadingLow { opacity: .55; box-shadow: inset 0 0 3px rgba(255,255,255,.12); }
+
+.teamActivityLayer .teamActivity.boostGlow {
+  box-shadow: 0 0 0 1px rgba(255,255,255,.18), 0 0 10px 4px rgba(255,255,255,.08);
+}

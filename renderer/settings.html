@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>Settings</title>
+	<link rel="stylesheet" href="common.css" />
+	<link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+	<div id="backdrop"></div>
+	<div class="panel" role="dialog" aria-modal="true" aria-labelledby="title">
+		<div class="head">
+			<h1 id="title">Interface</h1>
+			<button id="close" class="x">✕</button>
+		</div>
+		<div class="content">
+			<section>
+				<h2 class="sectionTitle">Game Stats Theme</h2>
+				<div class="grid formGrid">
+					<label for="gs-bg">Cell background</label><input id="gs-bg" type="color" />
+					<label for="gs-border">Border color</label><input id="gs-border" type="color" />
+					<label for="gs-head">Header background</label><input id="gs-head" type="color" />
+					<label for="gs-win">Win color</label><input id="gs-win" type="color" />
+					<label for="gs-lose">Loss color</label><input id="gs-lose" type="color" />
+					<label for="gs-intensity">Intensity (%)</label><input id="gs-intensity" type="range" min="0" max="100" step="1" />
+								<label for="gs-animColor">Animation color</label><input id="gs-animColor" type="color" />
+								  <label for="gs-animIntensity">Animation brightness (%)</label><input id="gs-animIntensity" type="range" min="50" max="400" step="1" />
+								<label for="gs-animDurSec">Animation duration (sec)</label><input id="gs-animDurSec" type="number" min="0.5" max="10" step="0.1" />
+				</div>
+				<div class="hint">Changes apply instantly. Save persists them; Reset restores defaults.</div>
+			</section>
+			<section>
+				<h2 class="sectionTitle">Activity Heat Bar</h2>
+				<div class="grid formGrid">
+					<label for="hb-enabled">Enabled</label><input id="hb-enabled" type="checkbox" />
+					<label for="hb-decay">Decay (/sec)</label><input id="hb-decay" type="number" min="0.01" max="2" step="0.01" />
+					<label for="hb-bump">Bump (+)</label><input id="hb-bump" type="number" min="0.01" max="1" step="0.01" />
+					<label for="hb-color1">Team 1 color</label><input id="hb-color1" type="color" />
+					<label for="hb-color2">Team 2 color</label><input id="hb-color2" type="color" />
+				</div>
+				<div class="hint">Activity bar: increases on events, decays over time. Colors blend via mix mode.</div>
+			</section>
+			<hr class="sepLine" />
+			<label class="row">Contrast (stub): <span id="cVal"></span>
+				<input id="contrast" type="range" min="70" max="130" step="1" />
+			</label>
+			<div class="hint">Contrast feature is disabled.</div>
+		</div>
+		<div class="foot">
+			<button id="reset">Reset</button>
+			<button id="save" class="primary">Save</button>
+		</div>
+	</div>
+	<script src="settings.js"></script>
+</body>
+</html>

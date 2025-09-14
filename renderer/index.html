@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odds Desktop</title>
+<link rel="stylesheet" href="common.css" />
+<link rel="stylesheet" href="main.css" />
+<link rel="stylesheet" href="toolbar.css" />
+<link rel="stylesheet" href="index.css" />
+</head>
+<body>
+  <div id="toolbar" class="toolbar-groups">
+    <div class="group" data-group="brokers">
+      <select id="addBrokerSelect" title="Add broker">
+        <option value="">＋ Broker</option>
+      </select>
+      <select id="layoutPreset" title="Layout">
+    <option value="">--preset--</option>
+    <optgroup label="Horizontal Monitor">
+      <option value="2x2">2 x 2</option>
+      <option value="2x3">2 x 3</option>
+      <option value="1x2">1 x 2 (1 / 2)</option>
+      <option value="1x2x2">1 x 2 x 2 (1 / 2 / 2)</option>
+      <option value="2">1 x 1 (horizontal split)</option>
+    </optgroup>
+    <optgroup label="Vertical Monitor">
+      <option value="1x1">1 x 1 (vertical stack 2)</option>
+      <option value="1x1x1">1 x 1 x 1 (3 stacked)</option>
+      <option value="1x1x2">1 x 1 x 2 (1 / 1 / 2)</option>
+      <option value="2x2x2">2 x 2 x 2 (3 rows of 2)</option>
+    </optgroup>
+      </select>
+  <button id="refreshAll" title="Refresh all brokers">Refresh</button>
+    </div>
+    <div class="group" data-group="board">
+      <button id="boardToggle" title="Show/Hide Board">Board</button>
+  <button id="boardSide" title="Move Board Left/Right" class="hidden">Side</button>
+  <button id="boardDetach" title="Detach Board" class="hidden">Detach</button>
+  <button id="boardAttach" title="Attach Board" class="hidden">Attach</button>
+      <label class="autoReload" title="Toggle odds auto reload"><input type="checkbox" id="autoReloadToggle" /> Auto Reload</label>
+    </div>
+    <div class="group" data-group="stats">
+      <button id="statsToggle" title="Show Stats">Stats</button>
+  <button id="statsDetach" class="hidden" title="Detach Stats window">Detach</button>
+  <button id="statsAttach" class="hidden" title="Embed Stats back">Attach</button>
+    </div>
+    <div class="group" data-group="system">
+      <button id="openSettings" title="Interface settings">⚙️</button>
+    </div>
+  </div>
+  <div id="stageOutline"></div>
+<div id="boardSplitter"></div>
+<script src="index.js"></script>
+</body>
+</html>

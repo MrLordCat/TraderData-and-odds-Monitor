@@ -1,0 +1,18 @@
+/* Embedded LoL Live Stats (standalone window) */
+body { font-family: system-ui, Arial, sans-serif; margin:0; padding:6px; background:#111; color:#eee; }
+h2 { margin:4px 0 8px; font-size:14px; }
+table { border-collapse:collapse; width:100%; font-size:12px; }
+th, td { border:1px solid #333; padding:2px 4px; text-align:center; }
+th.metric { text-align:left; }
+tr:nth-child(even) { background:#181818; }
+tr:nth-child(odd) { background:#141414; }
+.win { background:#163a16 !important; }
+.lose { background:#3a1616 !important; }
+td.win { color:#5ff579; }
+td.lose { color:#f58a8a; }
+.highlight { animation:flash 1.2s ease; }
+@keyframes flash { from { box-shadow:0 0 0 0 #4caf50; } to { box-shadow:0 0 0 8px rgba(76,175,80,0); } }
+.diff { font-weight:bold; }
+#status { font-size:11px; opacity:.7; margin:4px 0 6px; }
+#controls { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:4px; }
+/* Button styles removed; using shared .btn classes from common.css */

@@ -1,0 +1,201 @@
+/* Extracted from inline <style> in board.html */
+/* ================= Theme Tokens (mirrors common) ================ */
+:root {
+  --bg: #0d0f17;
+  --panel: #161b28;
+  --panel-alt: #1f2535;
+  --accent: #2f7cf6;
+  --accent-glow: #3aa9ff;
+  --good: #15c25a;
+  --good-glow: #34ff8d;
+  --text: #e4e7ef;
+  --muted: #6b7486;
+  --danger: #ff3d5e;
+  --radius: 8px;
+  --transition: 120ms;
+}
+
+/* ================= Base Layout ================= */
+body {
+  margin: 0;
+  font: 14px var(--font-sans);
+  background: linear-gradient(135deg, #0b0e15, #141b29);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header */
+#header {
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, #1b2434, #141b29);
+  align-items: center;
+  border-bottom: 1px solid #1f2a3c;
+  box-shadow: 0 2px 6px rgba(0,0,0,.55);
+  font-size: 14px;
+}
+
+/* Buttons & Select */
+button {
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid #2c3649;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: .4px;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+button:hover { background: #2a3344; border-color: #3a4960; }
+button:active { transform: translateY(1px); }
+
+select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #2c3649;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+/* ================= Table Structure ================= */
+#table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+  font-size: 13px;
+  padding: 6px 10px;
+  table-layout: fixed;
+}
+
+.c-broker { width: 44%; }
+.c-odds { width: 28%; }
+
+#table tbody td,
+#table thead th,
+#table tfoot td,
+#table tfoot th {
+  height: 34px;
+  vertical-align: middle;
+  padding: 4px 8px;
+}
+
+/* Broker row layout */
+.brokerCell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.brokerCell .bName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  flex: 1;
+}
+
+/* Swap button */
+.swapBtn {
+  background: #243045;
+  border: 1px solid #314058;
+  border-radius: 5px;
+  color: #93a6c3;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  min-width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.swapBtn:hover { background: #2d3a4e; color: #cfe2ff; }
+.swapBtn.on { background: #36517a; color: #fff; border-color: #4870a8; box-shadow: 0 0 0 1px #4870a8 inset; }
+
+/* Table header cells */
+#table thead th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 4px 8px;
+  text-align: center;
+}
+
+/* Table body + footer cells */
+#table tbody td,
+#table tfoot td,
+#table tfoot th {
+  background: var(--panel);
+  border: 1px solid #222c3a;
+  border-left: none;
+  border-right: none;
+  padding: 8px 10px;
+  text-align: center;
+  position: relative;
+}
+
+#table tbody tr {
+  transition: background var(--transition), transform var(--transition);
+  position: relative;
+}
+
+#table tbody tr::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  mix-blend-mode: overlay;
+}
+
+#table tbody tr:hover { background: var(--panel-alt); }
+
+#table tbody td:first-child,
+#table tfoot th:first-child {
+  border-top-left-radius: var(--radius);
+  border-bottom-left-radius: var(--radius);
+}
+
+#table tbody td:last-child,
+#table tfoot td:last-child {
+  border-top-right-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+}
+
+/* State modifiers */
+.frozen { opacity: .35; filter: grayscale(.4); }
+.best { color: var(--good); font-weight: 600; text-shadow: 0 0 6px var(--good-glow), 0 0 12px rgba(52,255,141,.35); }
+
+/* Footer rows */
+tfoot tr#arbRow td,
+tfoot tr#arbRow th { background: #162024; }
+
+tfoot tr#midRow td,
+tfoot tr#midRow th { background: #1d2330; }
+
+#table tfoot td { font-weight: 600; }
+
+/* Arbitrage coloring */
+.arb-positive { color: var(--good); }
+.arb-negative { color: var(--danger); }
+
+/* Tag badge */
+.tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #243045;
+  color: var(--muted);
+  margin-left: 6px;
+  letter-spacing: .5px;
+}
+
+/* Header inline extras */
+.boardTitle { flex: 1; font-weight: 600; letter-spacing: .5px; }
+.mapLabel { display: flex; align-items: center; gap: 4px; }

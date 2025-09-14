@@ -1,0 +1,155 @@
+/* --------------------------------------------------------------
+   NEW MINIMAL TOOLBAR (gaming-inspired)
+   Requirements:
+   - Centered block (not left/right aligned inside window)
+   - Buttons fill available height (edge-to-edge vertically)
+   - Full width usage horizontally (groups share width)
+   - Clear separation between groups (no labels)
+   - Modern minimal, subtle neon accent
+-------------------------------------------------------------- */
+
+/* Root bar */
+/* Square / percent-based layout adjustments (user request) */
+#toolbar.toolbar-groups {
+  --bar-height: 56px; /* a bit taller for perfect squares */
+
+  --accent-faint: #ffffff;
+  --text: #ffffff;
+  --gap: 20px;
+
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: var(--gap);
+  height: var(--bar-height);
+
+  margin: 6px auto 4px;
+  width: clamp(780px, 92vw, 1680px);
+  background: linear-gradient(145deg,#2b79d3,#306fa7 55%, #2573bb);
+  border: px solid #4181a7;
+
+}
+html .overlay-blur #toolbar { filter:none; }
+
+/* Groups */
+#toolbar .group {
+  flex: 1 1 0;
+  display: flex;
+  align-items: stretch;
+
+  position: relative;
+  isolation: isolate;
+}
+/* Remove group visual separators for clean grid */
+#toolbar .group::before { display:none; }
+
+/* Controls base */
+/* Base control style (square look) */
+#toolbar button,
+#toolbar select,
+#toolbar label.autoReload {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0; /* square = no horizontal padding; width derives from flex */
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--text);
+  background: #182631;
+  border: 1px solid #253b4a;
+  border-radius: 0; /* square corners */
+  cursor: pointer;
+  position: relative;
+  text-shadow: 0 0 4px rgba(0,0,0,.6);
+  box-shadow: 0 0 0 1px rgba(0,150,255,.12) inset;
+  transition: background .2s, border-color .2s, color .2s, transform .15s;
+}
+#toolbar select { padding: 0 10px; }
+label.autoReload { cursor:pointer; }
+label.autoReload input { margin-right:6px; accent-color: var(--accent); }
+
+/* Interactive states */
+#toolbar button:hover,
+#toolbar select:hover,
+#toolbar label.autoReload:hover {
+  background: #1f3342;
+  border-color: #2c5871;
+}
+#toolbar button:active,
+#toolbar select:active,
+#toolbar label.autoReload:active {
+  transform: scale(.96);
+  background: #142420;
+}
+#toolbar button:focus-visible,
+#toolbar select:focus-visible,
+#toolbar label.autoReload:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Subtle glowing edge when hovered */
+/* Remove glow overlay for flat style */
+#toolbar button::after,
+#toolbar select::after,
+#toolbar label.autoReload::after { display:none; }
+
+/* Compact icons (gear etc.) */
+/* System icons keep square footprint */
+#toolbar .group[data-group="system"] button { flex: 1 1 0; font-size:16px; }
+
+/* Equal percentage mode: each button inside all groups becomes equal fractional width.
+  By default buttons already flex equally; to force strict grid of N columns across entire bar,
+  we can flatten groups: add class .toolbar-grid on #toolbar in HTML if needed. */
+#toolbar.toolbar-grid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:6px; }
+#toolbar.toolbar-grid .group { display:contents; }
+#toolbar.toolbar-grid button,
+#toolbar.toolbar-grid select,
+#toolbar.toolbar-grid label.autoReload { width:100%; }
+
+/* Force perfectly square cells (height == width) in grid mode */
+#toolbar.toolbar-grid.square-cells { grid-auto-rows: var(--bar-height); }
+#toolbar.toolbar-grid.square-cells button,
+#toolbar.toolbar-grid.square-cells select,
+#toolbar.toolbar-grid.square-cells label.autoReload { aspect-ratio:1 / 1; }
+
+/* STRICT 4-per-row layout ("quarters" ≈ 1/4 each) enable with class .quarters */
+#toolbar.quarters { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+#toolbar.quarters .group { display:contents; }
+#toolbar.quarters button,
+#toolbar.quarters select,
+#toolbar.quarters label.autoReload { width:100%; }
+
+
+/* Embedded stats mode: hide some groups */
+body.stats-embedded #toolbar .group[data-group="brokers"],
+body.stats-embedded #toolbar .group[data-group="board"] { display:none !important; }
+
+/* Board splitter kept (unchanged logic) */
+#boardSplitter {
+  position: fixed;
+  top: 0; /* align to very top now */
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 8;
+  display: none;
+  background: linear-gradient(180deg, rgba(0,170,255,.15), rgba(0,120,190,.05));
+}
+#boardSplitter.dragging { background: linear-gradient(180deg, rgba(0,170,255,.45), rgba(0,120,190,.25)); }
+body.board-docked-left #boardSplitter { left:0; }
+body.board-docked-right #boardSplitter { right:0; }
+
+/* Utility: reduced motion respects */
+@media (prefers-reduced-motion: reduce) {
+  #toolbar button, #toolbar select, #toolbar label.autoReload { transition:none; }
+  #toolbar button::after, #toolbar select::after, #toolbar label.autoReload::after { transition:none; }
+}
+
+/* Add broker select styling */
+#addBrokerSelect { min-width:150px; }
+

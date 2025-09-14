@@ -1,0 +1,30 @@
+// Map logic extracted from stats_panel.js
+// Depends on globals: currentGame, currentLiveGame, liveDataset, cachedLive, manualData
+// Provides: initLolMap (called by stats_boot.js)
+let mapViewEl, mapGameLabel; // collapse handled by unified system
+const MAP_LS_KEY_STATE='lolMapState';
+const MAP_LS_KEY_POS='lolMapMarkerPositions';
+const DEFAULT_MARKERS = { b_bot_inhib:{x:28.5,y:87.5,label:'I',type:'inhib'}, b_bot_base:{x:34,y:87.5,label:'T3',type:'tower'}, b_bot_inner:{x:47.5,y:87.5,label:'T2',type:'tower'}, b_bot_outer:{x:70,y:90.5,label:'T1',type:'tower'}, b_mid_inhib:{x:26,y:78,label:'I',type:'inhib'}, b_mid_base:{x:30,y:72,label:'T3',type:'tower'}, b_mid_inner:{x:36.5,y:64,label:'T2',type:'tower'}, b_mid_outer:{x:43,y:56,label:'T1',type:'tower'}, b_top_inhib:{x:18,y:72,label:'I',type:'inhib'}, b_top_base:{x:18,y:67,label:'T3',type:'tower'}, b_top_inner:{x:18,y:52,label:'T2',type:'tower'}, b_top_outer:{x:18,y:27.5,label:'T1',type:'tower'}, b_base_tower1:{x:21,y:79,label:'T1',type:'tower'}, b_base_tower2:{x:24,y:83,label:'T2',type:'tower'}, r_top_inhib:{x:70,y:12,label:'I',type:'inhib'}, r_top_base:{x:63,y:12,label:'T3',type:'tower'}, r_top_inner:{x:52,y:12,label:'T2',type:'tower'}, r_top_outer:{x:33,y:12,label:'T1',type:'tower'}, r_mid_inhib:{x:72,y:23,label:'I',type:'inhib'}, r_mid_base:{x:68.5,y:27,label:'T3',type:'tower'}, r_mid_inner:{x:62,y:34,label:'T2',type:'tower'}, r_mid_outer:{x:57,y:45,label:'T1',type:'tower'}, r_bot_inhib:{x:81,y:26,label:'I',type:'inhib'}, r_bot_base:{x:81,y:30,label:'T3',type:'tower'}, r_bot_inner:{x:81,y:45,label:'T2',type:'tower'}, r_bot_outer:{x:84,y:72,label:'T1',type:'tower'}, r_base_tower1:{x:78,y:21,label:'T1',type:'tower'}, r_base_tower2:{x:75,y:17,label:'T2',type:'tower'} };
+let markerPositions = JSON.parse(JSON.stringify(DEFAULT_MARKERS));
+try { const savedPos = JSON.parse(localStorage.getItem(MAP_LS_KEY_POS)||'{}'); Object.entries(savedPos).forEach(([k,v])=>{ if(markerPositions[k]&&v.x!=null&&v.y!=null){ markerPositions[k].x=v.x; markerPositions[k].y=v.y; } }); } catch(_){ }
+let mapState={}; try { mapState=JSON.parse(localStorage.getItem(MAP_LS_KEY_STATE)||'{}'); } catch(_){ mapState={}; }
+function persistMap(){ try { localStorage.setItem(MAP_LS_KEY_STATE, JSON.stringify(mapState)); } catch(_){} }
+function persistPos(){ try { localStorage.setItem(MAP_LS_KEY_POS, JSON.stringify(markerPositions)); } catch(_){} }
+function currentGameNumber(){ if(document.getElementById('lolManualMode').checked) return Number(currentGame||'1'); if(typeof currentLiveGame==='number') return currentLiveGame; return NaN; }
+function buildMap(){ if(!mapViewEl) return; mapViewEl.innerHTML=''; Object.entries(markerPositions).forEach(([id,cfg])=>{ const sideClass = id.startsWith('b_') ? ' blue-side' : (id.startsWith('r_') ? ' red-side' : ''); const el=document.createElement('div'); el.className='map-structure'+(cfg.type==='inhib'?' inhib':' tower')+sideClass; el.style.left=cfg.x+'%'; el.style.top=cfg.y+'%'; el.textContent=cfg.label; el.dataset.sid=id; el.title=id.replace(/_/g,' '); el.addEventListener('pointerdown', (e)=>{ if(e.button!==0) return; e.preventDefault(); el.setPointerCapture(e.pointerId); const startX=e.clientX, startY=e.clientY; let dragged=false; const startPos={x:cfg.x,y:cfg.y}; function move(ev){ const dx=Math.abs(ev.clientX-startX); const dy=Math.abs(ev.clientY-startY); if(dx>2||dy>2) dragged=true; if(dragged){ if(!el.classList.contains('dragging')) el.classList.add('dragging'); const rect=mapViewEl.getBoundingClientRect(); const px=((ev.clientX-rect.left)/rect.width)*100; const py=((ev.clientY-rect.top)/rect.height)*100; cfg.x=Math.max(0,Math.min(100,px)); cfg.y=Math.max(0,Math.min(100,py)); el.style.left=cfg.x+'%'; el.style.top=cfg.y+'%'; } } function up(){ el.releasePointerCapture(e.pointerId); el.removeEventListener('pointermove',move); el.removeEventListener('pointerup',up); el.classList.remove('dragging'); if(dragged){ if(startPos.x!==cfg.x||startPos.y!==cfg.y) persistPos(); } else { const g=currentGameNumber(); if(!g){ return; } const gs=(mapState[g]=mapState[g]||{}); const willDestroy=!gs[id]; if(gs[id]) delete gs[id]; else gs[id]=true; renderMap(); persistMap(); if(willDestroy){ el.classList.add('explode'); for(let i=0;i<5;i++){ const sp=document.createElement('div'); sp.className='spark'; const angle=Math.random()*Math.PI*2; const dist=20+Math.random()*30; sp.style.setProperty('--dx', (Math.cos(angle)*dist)+'%'); sp.style.setProperty('--dy', (Math.sin(angle)*dist)+'%'); el.appendChild(sp); setTimeout(()=> sp.remove(), 700); } setTimeout(()=> el.classList.remove('explode'), 750); } } } el.addEventListener('pointermove',move); el.addEventListener('pointerup',up,{once:true}); }); mapViewEl.appendChild(el); }); renderMap(); }
+function renderMap(){ const g=currentGameNumber(); if(mapGameLabel) mapGameLabel.textContent='Game '+(isNaN(g)?'-':g); if(!mapViewEl) return; const state= mapState[g]||{}; mapViewEl.querySelectorAll('.map-structure').forEach(el=>{ const id=el.dataset.sid; if(state[id]) el.classList.add('destroyed'); else el.classList.remove('destroyed'); }); }
+function onGameChange(){ renderMap(); }
+function initLolMap(){
+  mapViewEl=document.getElementById('map-view'); mapGameLabel=document.getElementById('mapGameLabel');
+  if(!mapViewEl) return; // map section absent
+  setTimeout(()=>{ buildMap(); },10);
+  // Hook into existing game add/select logic if elements exist
+  try {
+    const addBtn = document.querySelector('#stats button'); // relies on order; acceptable fallback
+    const gameSelect = document.querySelector('#stats select');
+    if(addBtn){ addBtn.onclick = (function(orig){ return function(e){ if(orig) orig(e); onGameChange(); }; })(addBtn.onclick); }
+    if(gameSelect){ gameSelect.onchange = (function(orig){ return function(e){ if(orig) orig(e); onGameChange(); }; })(gameSelect.onchange); }
+  } catch(_){ }
+  document.getElementById('lolManualMode')?.addEventListener('change', ()=>{ renderMap(); });
+}
+window.initLolMap = initLolMap;

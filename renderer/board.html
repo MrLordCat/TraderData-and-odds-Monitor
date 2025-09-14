@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Odds Board</title>
+<link rel="stylesheet" href="common.css" />
+<link rel="stylesheet" href="board.css" />
+</head>
+<body>
+  <div id="header">
+  <span class="boardTitle">Aggregated Odds</span>
+  <label class="mapLabel">Map
+      <select id="mapSelect">
+        <option value="0">Match</option>
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+    </label>
+  </div>
+  <table id="table">
+    <thead>
+      <tr>
+        <th class="c-broker">Broker</th>
+        <th id="side1Header" class="c-odds">Side 1</th>
+        <th id="side2Header" class="c-odds">Side 2</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+    <tfoot>
+      <tr id="midRow"><th>Mid</th><td colspan="2">-</td></tr>
+      <tr id="arbRow"><th>Arb</th><td colspan="2">-</td></tr>
+    </tfoot>
+  </table>
+  <script src="devcss-reload.js"></script>
+  <script src="board.js"></script>
+</body>
+</html>

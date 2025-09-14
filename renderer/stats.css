@@ -1,0 +1,549 @@
+/* ==========================================
+	 League Stats Panel Styles (stats.css)
+	 Expanded from previous minified form
+	 ========================================== */
+
+/* Theme Tokens */
+:root {
+	--bg: #0d0f17;
+	--panel: #161b28;
+	--panel-alt: #1f2535;
+	--accent: #2f7cf6;
+	--accent-glow: #3aa9ff;
+	--good: #15c25a;
+	--good-glow: #34ff8d;
+	--text: #e4e7ef;
+	--muted: #6b7486;
+	--danger: #ff3d5e;
+	--radius: 8px;
+	--transition: 120ms;
+}
+
+/* Base Layout */
+body {
+	margin: 0;
+	font: 13px var(--font-sans);
+	background: var(--panel);
+	color: var(--text);
+	-webkit-font-smoothing: antialiased;
+	/* Reserve space for vertical scrollbar to prevent horizontal layout shift */
+	scrollbar-gutter: stable both-edges;
+}
+
+/* Embedded Odds Board */
+#embeddedOddsSection { border:1px solid #27313d; background:#1b232c; border-radius:6px; overflow:hidden; }
+#embeddedOddsSection.collapsed #embeddedOddsBody { max-height:0; padding:0; }
+#embeddedOddsBody { max-height:340px; overflow:auto; transition:max-height .25s ease; padding:6px 8px 10px; }
+.embeddedOddsHeader { display:flex; align-items:center; gap:8px; font-size:13px; margin:0; padding:6px 8px; background:#212b35; border-bottom:1px solid #27313d; }
+.embeddedOddsHeader .accent { font-weight:600; }
+.embeddedOddsTable { width:100%; border-collapse:collapse; font-size:11px; }
+.embeddedOddsTable th, .embeddedOddsTable td { padding:3px 6px; border-bottom:1px solid #24303b; text-align:center; }
+.embeddedOddsTable tbody tr:last-child td { border-bottom:none; }
+.embeddedOddsTable th.eo-broker { text-align:left; }
+.embeddedOddsTable td.frozen { opacity:.55; }
+/* Also handle class applied on <tr> (current render logic) */
+.embeddedOddsTable tr.frozen td { opacity:.45; filter: grayscale(.4); position:relative; }
+.embeddedOddsTable tr.frozen td:first-child .eo-broker-label::after{ content:' (susp)'; font-weight:400; opacity:.8; font-size:10px; margin-left:4px; color:#f8d774; }
+.embeddedOddsTable tr.frozen td.best { box-shadow:none; }
+.embeddedOddsTable td.best { color:#d4b14a; font-weight:600; }
+#embeddedMidRow th { text-align:left; font-weight:500; }
+#embeddedMidCell { text-align:center; font-size:11px; }
+.dragHandleSec { cursor:grab; background:transparent; border:none; color:#8899aa; font-size:14px; line-height:1; padding:0 4px; }
+.dragHandleSec:active { cursor:grabbing; }
+.reorderGhost { opacity:.4 !important; }
+.dropIndicator { outline:2px dashed #4d89ff; outline-offset:2px; }
+
+/* Generic reorder wrappers (applied dynamically) */
+.reorderableSection { position:relative; }
+
+
+header {
+	padding: 10px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	background: linear-gradient(180deg, #1b2434, #141b29);
+	border-bottom: 1px solid #1f2a3c;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, .5);
+}
+
+/* ================= Unified Section System ================= */
+/* Goals: Every top-level block (Dev Tools, Sources, Game Stats header, Map, Odds) shares spacing, border rhythm */
+.sectionGroup { display:flex; flex-direction:column; gap:14px; }
+.sectionCard { position:relative; border:1px solid #253041; background:#182230; border-radius:10px; padding:10px 12px 12px; }
+.sectionHeader { display:flex; align-items:center; gap:10px; margin:0 0 10px; font:600 13px var(--font-sans); letter-spacing:.3px; color:#d5deea; }
+.sectionHeader .accent { color:var(--accent); }
+.sectionHeader .right { margin-left:auto; display:flex; gap:6px; align-items:center; }
+.sectionBody { display:flex; flex-direction:column; gap:10px; }
+.sectionCondensed { padding:8px 10px 10px; }
+.inlineBadges { display:flex; gap:6px; }
+.badge { background:#253143; color:#7fa5d4; font-size:10px; padding:2px 6px; border-radius:12px; line-height:1; text-transform:uppercase; letter-spacing:.5px; }
+
+/* Light divider line reused */
+.rule { height:1px; background:#253041; margin:4px 0 8px; }
+
+/* Collapse affordance standard */
+.collapseBtn { background:#1c2533; border:1px solid #2c3649; color:#9bb2ce; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; font-size:11px; cursor:pointer; }
+.collapseBtn:hover { background:#253242; }
+.collapseBtn:active { transform:translateY(1px); }
+
+/* Harmonize existing fieldsets with unified look */
+fieldset.statBlock { border-radius:10px; background:#182230; border:1px solid #253041; }
+fieldset.statBlock legend { display:flex; align-items:center; gap:8px; font:600 13px var(--font-sans); letter-spacing:.3px; color:#d5deea; padding:0 2px; text-transform:none; }
+fieldset.statBlock legend .accent { color:var(--accent); }
+fieldset.statBlock[data-sec="devtools"] .dragHandleSec { display:none !important; }
+#sourcesSection { margin-bottom:12px; }
+
+/* DevTools buttons uniform */
+#btnOpenPanelDevTools,#btnOpenSlotADevTools,#btnOpenSlotBDevTools { min-width:58px; }
+
+fieldset {
+	border: 1px solid #2c3649;
+	padding: 10px 12px;
+	border-radius: 10px;
+	background: var(--panel-alt);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+
+legend {
+	padding: 0 6px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .8px;
+	color: var(--muted);
+}
+
+/* Collapsible Sections */
+fieldset.collapser legend {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+}
+
+.secToggle {
+	background: #1c2533;
+	border: 1px solid #2c3649;
+	color: #89a2c4;
+	font-size: 11px;
+	padding: 2px 6px;
+	border-radius: 6px;
+	cursor: pointer;
+	line-height: 1;
+	min-width: 28px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+
+.secToggle:hover {
+	background: #253242;
+	color: #cfe2ff;
+}
+
+.secToggle:active {
+	transform: translateY(1px);
+}
+
+fieldset.collapser .secBody {
+	overflow: hidden;
+	transition: max-height 300ms cubic-bezier(.4, .12, .25, 1), opacity 240ms ease;
+	max-height: 600px;
+	opacity: 1;
+}
+
+fieldset.collapser.collapsed .secBody {
+	max-height: 0 !important;
+	opacity: 0;
+}
+
+fieldset.collapser {
+	transition: background 160ms ease, border-color 160ms ease;
+}
+
+fieldset.collapser.collapsed {
+	background: linear-gradient(180deg, #182130, #151b27);
+}
+
+/* Form Elements */
+select,
+button,
+input {
+	background: var(--panel);
+	color: var(--text);
+	border: 1px solid #2c3649;
+	border-radius: 6px;
+	padding: 6px 8px;
+	font: 12px var(--font-sans);
+	transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+
+button {
+	cursor: pointer;
+	font-weight: 500;
+	letter-spacing: .4px;
+}
+
+button:hover {
+	background: #2a3344;
+	border-color: #3a4960;
+}
+
+button:active {
+	transform: translateY(1px);
+}
+
+input:focus,
+select:focus {
+	outline: 1px solid #3a4960;
+}
+
+/* Utility Layout */
+.row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: nowrap;
+}
+
+.grow {
+	flex: 1;
+}
+
+/* Stats Container */
+#stats {
+	flex:1;
+	overflow:auto;
+	padding:12px 14px;
+	font:12px/1.45 var(--font-sans);
+	background:#182230; /* unify with sectionCard */
+	border:1px solid #253041;
+	border-radius:10px;
+	display:flex;
+	flex-direction:column;
+	box-sizing:border-box;
+}
+
+/* Generic collapsible card (stats, sources) */
+.collapsible .sectionBody { overflow:hidden; transition:max-height 300ms cubic-bezier(.4,.12,.25,1), opacity 240ms ease; max-height:1000px; }
+.collapsible.collapsed .sectionBody { max-height:0 !important; opacity:0; }
+
+/* Slight inner padding to offset potential scrollbar overlay (fallback) */
+body { padding-right:2px; }
+
+h1.statsHeader {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* Normalize header look (Game Stats / Map / Odds) */
+h1.statsHeader, .mapHeader, .embeddedOddsHeader {
+	font-size:13px;
+	font-weight:600;
+}
+h1.statsHeader { text-shadow:none; }
+
+/* Compact small button baseline */
+.btn-sm { padding:4px 8px; font-size:11px; line-height:1.15; }
+
+/* Controls strip visual container */
+.statsControls {
+	background:#1d2635;
+	border:1px solid #253041;
+	padding:6px 10px 6px 8px;
+	border-radius:8px;
+	gap:10px;
+	box-shadow:0 1px 2px rgba(0,0,0,.35) inset;
+}
+
+/* Tighten Game Stats header spacing */
+h1.statsHeader { margin:0 0 10px; }
+
+/* Map / Odds spacing alignment */
+.mapSection, #embeddedOddsSection { margin-top:16px; }
+
+/* Collapse arrow buttons unified */
+.btn-icon-xs { background:#1c2533; border:1px solid #2c3649; border-radius:6px; }
+.btn-icon-xs:hover { background:#253242; }
+.btn-icon-xs:active { transform:translateY(1px); }
+
+/* Details summary styling */
+details > summary.metricSummary { list-style:none; }
+details > summary.metricSummary::-webkit-details-marker { display:none; }
+details[open] > summary.metricSummary { color:var(--accent); }
+
+/* Add Game button stabilization */
+.addGameBtn {
+	min-width: 70px;
+	text-align: center;
+	padding: 4px 10px;
+	line-height: 1.1;
+}
+.addGameBtn[aria-disabled="true"] {
+	opacity: .35;
+	cursor: default;
+}
+
+h1 {
+	margin: 0 0 8px;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--accent);
+	text-shadow: 0 0 4px rgba(63, 134, 255, .35);
+}
+
+small {
+	opacity: .6;
+	font-size: 11px;
+	display: block;
+	margin-top: 10px;
+}
+
+/* Grouped Blocks */
+.groupRow {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.groupRow .statBlock {
+	width: 300px;
+	min-width: 300px;
+	flex: 0 0 300px;
+}
+
+@media (max-width: 980px) {
+	.groupRow .statBlock {
+		width: 100%;
+		min-width: 0;
+		flex: 1 1 100%;
+	}
+}
+
+/* Mode Buttons */
+.modeButtons button {
+	flex: 1;
+}
+
+.modeButtons {
+	display: flex;
+	gap: 6px;
+}
+
+.panelSideBtn {
+	width: 100%;
+}
+
+/* Sources Grid */
+.sourcesGrid {
+	display: grid;
+	grid-template-columns: 28px 1fr;
+	align-items: center;
+	gap: 6px;
+}
+
+.sourcesGrid label {
+	font-size: 11px;
+	color: var(--muted);
+	text-align: right;
+}
+
+.divider {
+	height: 1px;
+	background: #253041;
+	margin: 4px 0;
+}
+
+.note {
+	font-size: 11px;
+	color: var(--muted);
+}
+
+/* Extracted Inline Styles (Legacy) */
+.authSecBody {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.authRow {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+
+.font-11 { font-size: 11px; }
+.pad-sq-xs { padding: 2px 4px; }
+.pad-sq-sm { padding: 3px 6px; }
+.pad-btn-xs { padding: 4px 8px; }
+.note-tight { font-size: 10px; line-height: 1.2; }
+.break-all { word-break: break-all; }
+.op-70 { opacity: .7; }
+
+/* Stats Controls */
+/* (Merged definition above; keep layout behavior separated for clarity) */
+.statsControls { display:flex; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+
+/* Tables */
+.tblCompact {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 11px;
+	table-layout: fixed; /* stabilize widths */
+}
+
+.tblHeadSticky thead {
+	background: #1d2635;
+	position: sticky;
+	top: 0;
+}
+
+.thLeft {
+	text-align: left;
+	padding: 4px 6px;
+}
+
+.thCell {
+	padding: 4px 6px;
+	user-select: none;
+    cursor: default; /* prevent whole cell from showing pointer */
+}
+
+/* Team name truncation wrapper to prevent table stretch */
+.thCell .teamNameWrap {
+		/* inline-block so cursor only over actual text width, not whole cell */
+		display: inline-block;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		line-height: 1.2;
+		cursor: pointer;
+}
+
+/* New adaptive column rules
+	- Team columns have fixed base width (variable), can shrink on narrow screens (JS adjusts var)
+	- Metric column takes remaining space */
+:root { --team-col-width: 120px; --team-col-min: 90px; }
+#lolTable col.colTeam { width: var(--team-col-width); }
+/* Metric width = remaining: 100% - 2 * team */
+#lolTable col.colMetric { width: calc(100% - (var(--team-col-width) * 2)); }
+#lolTable th.thCell, #lolTable td { overflow: hidden; }
+
+@media (max-width: 880px){ :root { --team-col-width: 110px; } }
+@media (max-width: 760px){ :root { --team-col-width: 100px; } }
+
+.lolTableWrap {
+	border: 1px solid #253041;
+	border-radius: 8px;
+	/* removed max-height & inner scroll to let outer container scroll */
+}
+
+/* Metric Toggles */
+.metricsToggleGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+	gap: 4px;
+	padding: 6px 4px 2px;
+	max-width: 340px;
+}
+
+.mt-14 { margin-top: 14px; }
+
+/* Map Section */
+.mapHeader {
+	margin: 0 0 6px;
+	font-size: 13px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.mapHeader span.accent { color: #2f7cf6; }
+
+.btn-icon-xs { padding: 2px 8px; font-size: 11px; }
+.statusSmall { font-size: 11px; opacity: .65; }
+.metricSummary { cursor: pointer; font-size: 11px; opacity: .8; }
+
+.mapBody {
+	max-height: 0;
+	overflow: hidden;
+	transition: max-height .35s ease;
+}
+
+.mapLegendHint {
+	font-size: 10px;
+	opacity: .55;
+	margin-top: 6px;
+	line-height: 1.3;
+}
+
+/* Metric Rows */
+.metricLabel {
+	padding: 3px 6px;
+	text-align: left;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 500;
+	user-select: none;
+}
+
+.metricLabel .dragHandle {
+	cursor: grab;
+	display: inline-block;
+	padding: 0 4px;
+	font-size: 13px;
+	opacity: .55;
+	transition: opacity var(--transition);
+}
+
+.metricLabel .dragHandle:hover { opacity: .9; }
+tr.dragging .metricLabel { opacity: .6; }
+tr.drop-target { outline: 1px dashed #346199; }
+
+/* Editable Cells */
+.editable {
+	padding: 3px 6px;
+	text-align: center;
+	min-width: 58px;
+	user-select: none;
+	/* default: no pointer cursor (looks like plain cell) */
+}
+body.manual-mode .editable { cursor: pointer; }
+
+.editable.pressing { background: #1f2a3b; }
+.editable.win { background: var(--good); color: #082612; font-weight: 600; }
+.editable.lose { background: #3a1616; color: #f7b4b4; }
+
+/* Metric Toggle Items */
+.metricToggle {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	line-height: 1.2;
+	padding: 2px 4px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.metricToggle:hover { background: #1d2635; }
+.markMetric { margin-right: 4px; }
+
+/* Reorder Flash */
+.reorderFlash { animation: reorderFlash 0.4s ease; }
+
+@keyframes reorderFlash {
+	from { background: #244d7d; }
+	to { background: transparent; }
+}
+
+/* Stable status width to prevent control row shifting on reset */
+.lolStatusWrap { display:inline-block; min-width:140px; white-space:nowrap; padding-left:6px; }
+@media (max-width:1100px){ .lolStatusWrap { min-width:110px; } }
