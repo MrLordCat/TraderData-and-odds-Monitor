@@ -32,6 +32,31 @@ function createBrokerManager(ctx){
     const view = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','brokerPreload.js'), partition:'persist:'+brokerDef.id, nodeIntegration:false, contextIsolation:true, sandbox:false, javascript:true, backgroundThrottling:false } });
     views[brokerDef.id] = view;
     mainWindow.addBrowserView(view);
+    // DevTools Network Conditions: принудительно имитируем снятую галочку "Use browser default" через CDP override.
+    try {
+      let chromeVer = (process.versions && process.versions.chrome) ? process.versions.chrome : '140.0.0.0';
+      const major = chromeVer.split('.')[0]||'140';
+      const ua = `Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+      view.webContents.setUserAgent(ua);
+      view.webContents.debugger.attach('1.3');
+      view.webContents.debugger.sendCommand('Emulation.setUserAgentOverride', {
+        userAgent: ua,
+        userAgentMetadata: {
+          brands:[
+            { brand:'Not A;Brand', version:'99' },
+            { brand:'Chromium', version:major },
+            { brand:'Google Chrome', version:major }
+          ],
+          fullVersion: chromeVer,
+          fullVersionList:[
+            { brand:'Not A;Brand', version:'99.0.0.0' },
+            { brand:'Chromium', version:chromeVer },
+            { brand:'Google Chrome', version:chromeVer }
+          ],
+          platform:'Windows', platformVersion:'10.0', architecture:'x86', bitness:'64', model:'', mobile:false
+        }
+      });
+    } catch(_){ }
     // Capture keyboard shortcuts inside broker views
     try {
       view.webContents.on('before-input-event', (event, input) => {
@@ -73,8 +98,7 @@ function createBrokerManager(ctx){
     brokerHealth[brokerDef.id] = { lastChange:Date.now(), lastOdds:null, lastRefresh:0 };
     broadcastPlaceholderOdds(brokerDef.id);
     try { view.webContents.setBackgroundThrottling(false); } catch(_){}
-  // Apply a consistent modern Chrome UA (without Electron) for all brokers to minimize detection differences
-  try { view.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'); } catch(_){ }
+    // (UA уже задан выше через setUserAgent + CDP override)
     const vb = layoutManager.sanitizeInitialBounds(existingBounds, cursorX);
     view.setBounds(vb);
     view.setAutoResize({ width:false, height:false });
