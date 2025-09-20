@@ -29,7 +29,9 @@ function createBrokerManager(ctx){
   }
 
   function createSingleInternal(brokerDef, existingBounds, startUrl, cursorX){
-    const view = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','brokerPreload.js'), partition:'persist:'+brokerDef.id, nodeIntegration:false, contextIsolation:true, sandbox:false, javascript:true, backgroundThrottling:false } });
+  const extraArgs = [];
+  if(brokerDef.id === 'dataservices') extraArgs.push('--forced-broker-id=dataservices');
+  const view = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','brokerPreload.js'), partition:'persist:'+brokerDef.id, nodeIntegration:false, contextIsolation:true, sandbox:false, javascript:true, backgroundThrottling:false, additionalArguments: extraArgs } });
     views[brokerDef.id] = view;
     mainWindow.addBrowserView(view);
     // DevTools Network Conditions: принудительно имитируем снятую галочку "Use browser default" через CDP override.
@@ -74,6 +76,12 @@ function createBrokerManager(ctx){
             event.preventDefault();
             return;
           }
+          // F12 opens DevTools for THIS broker view explicitly
+          if (input.key === 'F12') {
+            try { view.webContents.openDevTools({ mode:'detach' }); } catch(_) {}
+            event.preventDefault();
+            return;
+          }
           // Space toggles stats unless focus is editable
           if (input.key === ' ') {
           // Defer to page context to decide if focus is in an editable control
@@ -104,6 +112,9 @@ function createBrokerManager(ctx){
     view.setAutoResize({ width:false, height:false });
     layoutManager.clampViewToStage(brokerDef.id);
     view.webContents.loadURL(startUrl);
+    if(brokerDef.id==='dataservices'){
+      try { view.webContents.executeJavaScript(`window.__FORCED_BROKER_ID='dataservices';`, true).catch(()=>{}); } catch(_){ }
+    }
     view.webContents.on('did-finish-load', ()=>{ try { view.webContents.insertCSS(ctx.BROKER_FRAME_CSS); } catch(_){} scheduleMapReapply(view); });
     view.webContents.on('did-fail-load', (e, errorCode, errorDesc, validatedURL, isMainFrame)=>{
       if(errorCode === -3) return;
@@ -121,14 +132,39 @@ function createBrokerManager(ctx){
     view.webContents.on('did-navigate-in-page', (e,url,isMainFrame)=>{ if(!isMainFrame) return; try { const lu=store.get('lastUrls',{}); lu[brokerDef.id]=url; store.set('lastUrls', lu); } catch(_){} scheduleMapReapply(view); });
   }
 
-  function addBroker(id){
-    if(views[id]) return;
-    const def = BROKERS.find(b=>b.id===id); if(!def) return;
+  function addBroker(id, startUrlOverride){
+    if(views[id]){ // If dataservices exists and new URL override provided -> navigate
+      if(id==='dataservices' && startUrlOverride){
+        try { const cur=views[id].webContents.getURL(); if(cur!==startUrlOverride) views[id].webContents.loadURL(startUrlOverride); } catch(_){ }
+      }
+      return;
+    }
+    let def = BROKERS.find(b=>b.id===id);
+    if(!def){
+      if(id==='dataservices'){
+        def = { id:'dataservices', url: startUrlOverride || 'about:blank' };
+      } else return; // unknown broker
+    }
     const dis = store.get('disabledBrokers', []);
     if(dis.includes(id)) store.set('disabledBrokers', dis.filter(d=>d!==id));
     activeBrokerIdsRef.value = activeBrokerIdsRef.value.concat(id);
     if(onActiveListChanged) onActiveListChanged(activeBrokerIdsRef.value.slice());
-    createSingleInternal(def, null, def.url, stageBoundsRef.value.x);
+    // If there is at least one slot-* placeholder view, reuse its bounds for consistent layout placement
+    let slotBounds = null;
+    let claimedSlotId = null;
+    for(const [vid,v] of Object.entries(views)){
+      if(vid.startsWith('slot-')){ try { slotBounds = v.getBounds(); } catch(_){} claimedSlotId = vid; break; }
+    }
+    createSingleInternal(def, slotBounds, startUrlOverride || def.url, stageBoundsRef.value.x);
+    // Remove the claimed slot after adding broker (so layout manager won't think it's still available)
+    if(claimedSlotId){
+      const sv = views[claimedSlotId];
+      if(sv){
+        try { mainWindow.removeBrowserView(sv); } catch(_){ }
+        try { sv.webContents.destroy(); } catch(_){ }
+        delete views[claimedSlotId];
+      }
+    }
     if(layoutManager.getCurrentPresetId()) layoutManager.applyLayoutPreset(layoutManager.getCurrentPresetId()); else layoutManager.relayoutAll();
     syncBoard();
   }

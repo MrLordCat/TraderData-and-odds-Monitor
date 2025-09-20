@@ -1,10 +1,13 @@
 // Preload for each broker BrowserView (clean refactored version)
 const { ipcRenderer } = require('electron');
-let desiredMap = 1;
+let desiredMap = 1; // user selected map number (raw)
+let isLast = false; // global flag from main indicating final map should use match market for certain brokers
 const HOST = location.host;
 const { collectOdds: collectOddsExt, getBrokerId } = require('./brokers/extractors');
 const { triggerMapChange } = require('./brokers/mapNav');
-const BROKER_ID = getBrokerId(HOST);
+// Allow main process to inject a forced broker id (e.g. dataservices) before DOM load
+let BROKER_ID = (window.__FORCED_BROKER_ID || '').trim();
+if(!BROKER_ID) BROKER_ID = getBrokerId(HOST);
 function safe(fn){ try { return fn(); } catch(e){} }
 const safeSend = (channel, payload) => safe(()=> ipcRenderer.send(channel, payload));
 
@@ -29,7 +32,16 @@ ipcRenderer.on('zoom-indicator', (_evt, factor)=>{
 });
 
 // Odds collection wrapper
-function getCurrentOdds(){ return collectOddsExt(HOST, desiredMap); }
+function effectiveMap(){
+  // For brokers that represent final map as match market (currently only bet365) -> if isLast enabled and desiredMap>0 use 0
+  if(isLast && BROKER_ID==='bet365' && desiredMap>0) return 0;
+  return desiredMap;
+}
+function getCurrentOdds(){
+  const data = collectOddsExt(HOST, effectiveMap());
+  try { if(BROKER_ID && data && typeof data==='object') data.broker = BROKER_ID; } catch(_){ }
+  return data;
+}
 ipcRenderer.on('collect-now', ()=> safe(()=> safeSend('bv-odds-update', getCurrentOdds())));
 
 // Map change listener
@@ -37,6 +49,9 @@ ipcRenderer.on('set-map', (_e, mapVal)=>{
   const n=parseInt(mapVal,10); desiredMap=Number.isNaN(n)?1:n;
   triggerMapChange(HOST, desiredMap);
   [600,1500,3000].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap)), d));
+});
+ipcRenderer.on('set-is-last', (_e, flag)=>{
+  try { isLast = !!flag; } catch(_){ }
 });
 
 // Periodic odds loop

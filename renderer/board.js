@@ -21,7 +21,8 @@ function computeDerived(){
   if(!midRow || !arbRow) return;
   const midCell=midRow.children[1];
   const arbCell=arbRow.children[1];
-  const active = Object.values(boardData).filter(r=>!r.frozen && r.odds.every(o=>!isNaN(parseFloat(o))));
+  // Exclude dataservices from aggregated mid/arb calculations per requirement
+  const active = Object.values(boardData).filter(r=> r.broker!=='dataservices' && !r.frozen && r.odds.every(o=>!isNaN(parseFloat(o))));
   if (!active.length){ midCell.textContent='-'; arbCell.textContent='-'; return; }
   const s1=active.map(r=>parseFloat(r.odds[0]));
   const s2=active.map(r=>parseFloat(r.odds[1]));
@@ -41,17 +42,36 @@ function computeDerived(){
 function renderBoard(){
   const tb = document.getElementById('rows');
   if(!tb) return;
-  const vals=Object.values(boardData);
-  const parsed1=vals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
-  const parsed2=vals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
+  const excelRow = document.getElementById('excelRow');
+  const excelRecord = boardData['dataservices'];
+  // Filter out dataservices from main list
+  const vals=Object.values(boardData).filter(r=>r.broker!=='dataservices').sort((a,b)=> a.broker.localeCompare(b.broker));
+  // Best values consider only non-frozen brokers
+  const liveVals = vals.filter(r=>!r.frozen);
+  const parsed1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
+  const parsed2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
   const best1=parsed1.length?Math.max(...parsed1):NaN;
   const best2=parsed2.length?Math.max(...parsed2):NaN;
   tb.innerHTML = vals.map(r=>{
     const o1=parseFloat(r.odds[0]);
     const o2=parseFloat(r.odds[1]);
     const isSwapped = swapped.has(r.broker);
-    return `<tr class="${r.frozen?'frozen':''}"><td><div class="brokerCell"><span class="bName" title="${r.broker}">${r.broker}</span><button class="swapBtn ${isSwapped?'on':''}" data-broker="${r.broker}" title="Swap sides">⇄</button></div></td><td class="${o1===best1?'best':''}">${r.odds[0]}</td><td class="${o2===best2?'best':''}">${r.odds[1]}</td></tr>`;
+    const bestCls1 = (!r.frozen && o1===best1)?'best':'';
+    const bestCls2 = (!r.frozen && o2===best2)?'best':'';
+    return `<tr class="${r.frozen?'frozen':''}"><td><div class="brokerCell"><span class="bName" title="${r.broker}">${r.broker}</span><button class="swapBtn ${isSwapped?'on':''}" data-broker="${r.broker}" title="Swap sides">⇄</button></div></td><td class="${bestCls1}">${r.odds[0]}</td><td class="${bestCls2}">${r.odds[1]}</td></tr>`;
   }).join('');
+  // Update Excel row
+  if(excelRow){
+    if(excelRecord && Array.isArray(excelRecord.odds)){
+      const o1=excelRecord.odds[0];
+      const o2=excelRecord.odds[1];
+      excelRow.children[1].textContent = `${o1} / ${o2}`;
+      excelRow.classList.toggle('frozen', !!excelRecord.frozen);
+    } else {
+      excelRow.children[1].textContent='-';
+      excelRow.classList.remove('frozen');
+    }
+  }
   computeDerived();
 }
 
@@ -120,6 +140,27 @@ async function restoreMapAndBroadcast(){
       }
     }
   } catch(e) {}
+}
+
+// --- isLast flag support ---
+let isLastFlag = false;
+async function restoreIsLast(){
+  try {
+    if(!window.desktopAPI || !window.desktopAPI.getIsLast) return;
+    const val = await window.desktopAPI.getIsLast();
+    isLastFlag = !!val;
+    const chk=document.getElementById('isLastChk');
+    if(chk) chk.checked = isLastFlag;
+  } catch(_){}
+}
+document.getElementById('isLastChk')?.addEventListener('change', e=>{
+  try {
+    const v=!!e.target.checked; isLastFlag=v;
+    if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(v); }
+  } catch(_){ }
+});
+if(window.desktopAPI && window.desktopAPI.onIsLast){
+  window.desktopAPI.onIsLast(v=>{ try { isLastFlag=!!v; const chk=document.getElementById('isLastChk'); if(chk) chk.checked=isLastFlag; } catch(_){ } });
 }
 
 document.getElementById('mapSelect')?.addEventListener('change', e=>{

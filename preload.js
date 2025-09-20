@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   applyLayoutPreset: (id) => ipcRenderer.send('apply-layout-preset', id),
   getLayoutPreset: () => ipcRenderer.invoke('get-layout-preset'),
   getLastMap: () => ipcRenderer.invoke('get-last-map')
+  ,getIsLast: () => ipcRenderer.invoke('get-is-last')
+  ,setIsLast: (v) => ipcRenderer.send('set-is-last', !!v)
+  ,onIsLast: (cb) => withUnsub('set-is-last', cb)
   ,requestAddBroker: () => ipcRenderer.send('global-open-broker-picker')
   ,getAutoRefreshEnabled: () => ipcRenderer.invoke('get-auto-refresh-enabled')
   ,setAutoRefreshEnabled: (v) => ipcRenderer.send('set-auto-refresh-enabled', !!v)
@@ -64,4 +67,8 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // Broker picker API
   ,getBrokersForPicker: () => ipcRenderer.invoke('picker-list-brokers')
   ,addBroker: (id) => ipcRenderer.send('add-broker-selected', { id })
+  ,getLastDataservicesUrl: () => ipcRenderer.invoke('get-setting', 'lastDataservicesUrl')
+  ,openDataservicesPrompt: () => ipcRenderer.send('open-dataservices-url-prompt')
+  ,dataservicesPromptSubmit: (url) => ipcRenderer.send('dataservices-url-submit', { url })
+  ,dataservicesPromptCancel: () => ipcRenderer.send('dataservices-url-cancel')
 });

@@ -5,19 +5,8 @@ const { deepQuery } = require('./extractors');
 function triggerMapChange(host, map){
   try {
     if(/rivalry\.com$/.test(host)) {
-      if(map>0){
-        const tryClick=()=>{
-          let span = deepQuery('span').find(s=>s.textContent.trim()==='Map '+map);
-            if(!span){
-              const ord=['First','Second','Third','Fourth','Fifth'];
-              const label=ord[map-1]+' map';
-              span = deepQuery('span').find(s=>s.textContent.trim()===label);
-            }
-            if(span){ ['mousedown','mouseup','click'].forEach(t=>span.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true}))); return true; }
-            return false;
-        };
-        if(!tryClick()){ setTimeout(tryClick,800); }
-      }
+      // Rivalry: авто-клик по карте отключён. Экстрактор сам выбирает нужный рынок по mapNum.
+      return; // no-op
     } else if(/gg199\.bet$/.test(host)||/gg\.bet$/.test(host)) {
       // no-op (dynamic markets)
     } else if(/thunderpick\.io$/.test(host)) {

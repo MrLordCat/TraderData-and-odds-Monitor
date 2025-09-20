@@ -11,16 +11,41 @@ function updateEmbeddedMapTag(){
 function initEmbeddedMapSync(){
   try {
     if(window.desktopAPI && window.desktopAPI.onMap){
-      window.desktopAPI.onMap(mapVal=>{ try { currentMap = mapVal; window.__embeddedCurrentMap = currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); } catch(_){} });
+  window.desktopAPI.onMap(mapVal=>{ try { currentMap = mapVal; window.__embeddedCurrentMap = currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } catch(_){} });
     } else {
       const { ipcRenderer } = require('electron');
-      ipcRenderer.on('set-map', (_e, mapVal)=>{ try { currentMap = mapVal; window.__embeddedCurrentMap = currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); } catch(_){} });
+  ipcRenderer.on('set-map', (_e, mapVal)=>{ try { currentMap = mapVal; window.__embeddedCurrentMap = currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } catch(_){} });
     }
     // Initial fetch
     if(window.desktopAPI && window.desktopAPI.getLastMap){
-      window.desktopAPI.getLastMap().then(v=>{ if(typeof v!=='undefined'){ currentMap=v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); } }).catch(()=>{});
+  window.desktopAPI.getLastMap().then(v=>{ if(typeof v!=='undefined'){ currentMap=v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } }).catch(()=>{});
     }
     bindEmbeddedMapSelect();
+    // Inject isLast checkbox if not present
+    try {
+      if(!document.getElementById('embeddedIsLast')){
+        const mapSection = document.getElementById('mapSection') || document.body;
+        const lbl = document.createElement('label');
+        lbl.style.cssText='margin-left:8px;font:12px system-ui;cursor:pointer;';
+        lbl.title='Use match market for final map brokers (bet365)';
+        lbl.innerHTML = '<input type="checkbox" id="embeddedIsLast" style="vertical-align:middle;margin-right:4px;"/> Last';
+        mapSection.appendChild(lbl);
+        const chk = lbl.querySelector('input');
+        chk.addEventListener('change', e=>{
+          try {
+            const v=!!e.target.checked;
+            if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(v); }
+          } catch(_){ }
+        });
+        // Initial fetch of isLast
+        if(window.desktopAPI && window.desktopAPI.getIsLast){
+          window.desktopAPI.getIsLast().then(v=>{ try { chk.checked=!!v; } catch(_){ } }).catch(()=>{});
+        }
+        if(window.desktopAPI && window.desktopAPI.onIsLast){
+          window.desktopAPI.onIsLast(v=>{ try { chk.checked=!!v; } catch(_){ } });
+        }
+      }
+    } catch(_){ }
   } catch(_){ }
 }
 function syncEmbeddedMapSelect(){
@@ -64,20 +89,38 @@ const { ipcRenderer: ipcRendererEmbedded } = require('electron');
 const embeddedOddsData = {}; let embeddedBest1=NaN, embeddedBest2=NaN;
 function renderEmbeddedOdds(){
   const rowsEl=document.getElementById('embeddedOddsRows'); if(!rowsEl) return;
-  const vals=Object.values(embeddedOddsData);
-  const p1=vals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
-  const p2=vals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
+  const excelRec = embeddedOddsData['dataservices'];
+  const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='dataservices');
+  const liveVals = vals.filter(r=>!r.frozen);
+  const p1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
+  const p2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
   embeddedBest1=p1.length?Math.max(...p1):NaN; embeddedBest2=p2.length?Math.max(...p2):NaN;
   rowsEl.innerHTML = vals.map(r=>{
     const o1=parseFloat(r.odds[0]); const o2=parseFloat(r.odds[1]);
     const frozenCls = r.frozen ? 'frozen' : '';
     const suspTag = r.frozen ? ' eo-broker-label' : ' eo-broker-label';
+    const bestCls1 = (!r.frozen && o1===embeddedBest1)?'best':'';
+    const bestCls2 = (!r.frozen && o2===embeddedBest2)?'best':'';
     return `<tr class="${frozenCls}">`+
       `<td class="eo-broker"><span class="${suspTag}" title="${r.frozen?'Suspended / stale':''}">${r.broker}</span></td>`+
-      `<td class="${o1===embeddedBest1?'best':''} ${frozenCls}">${r.odds[0]}</td>`+
-      `<td class="${o2===embeddedBest2?'best':''} ${frozenCls}">${r.odds[1]}</td>`+
+      `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
+      `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td>`+
       `</tr>`;
   }).join('');
+  // Excel row update
+  try {
+    const excelCell=document.getElementById('embeddedExcelCell');
+    const excelRow=document.getElementById('embeddedExcelRow');
+    if(excelCell && excelRow){
+      if(excelRec && Array.isArray(excelRec.odds)){
+        excelCell.textContent = `${excelRec.odds[0]} / ${excelRec.odds[1]}`;
+        excelRow.classList.toggle('frozen', !!excelRec.frozen);
+      } else {
+        excelCell.textContent='-';
+        excelRow.classList.remove('frozen');
+      }
+    }
+  } catch(_){ }
   const midCell=document.getElementById('embeddedMidCell');
   if(midCell){
     if(!p1.length||!p2.length){ midCell.textContent='-'; }
@@ -98,7 +141,7 @@ function handleEmbeddedOdds(p){ try {
   if(!p||!p.broker) return;
   // If map not initialized yet and payload carries map, adopt it
   if((currentMap===undefined || currentMap===null) && (p.map!==undefined && p.map!==null)){
-    currentMap = p.map; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag();
+    currentMap = p.map; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue();
   }
   embeddedOddsData[p.broker]=p; renderEmbeddedOdds(); } catch(_){ } }
 function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSection'); if(!root) return; // collapse handled globally
@@ -106,12 +149,44 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   try { if(window.desktopAPI && window.desktopAPI.onTeamNames){ window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } else { ipcRendererEmbedded.on('lol-team-names-update', ()=> renderEmbeddedOdds()); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.getTeamNames){ window.desktopAPI.getTeamNames().then(()=>renderEmbeddedOdds()).catch(()=>{}); } } catch(_){ }
 }
-function initSectionReorder(){ const ORDER_KEY='statsPanelSectionOrder'; const container=document.body; if(!container) return; const blocks=collectBlocks(); restoreOrder(blocks, ORDER_KEY); blocks.forEach(b=> ensureHandle(b)); let dragging=null; let placeholder=null; let startY=0; function ensureHandle(block){ if(block.dataset.handleReady) return; block.dataset.handleReady='1'; let handle=block.querySelector('.dragHandleSec'); if(!handle){ handle=document.createElement('button'); handle.className='dragHandleSec'; handle.type='button'; handle.textContent='≡'; handle.title='Move section'; if(block.id==='stats'){ const hdr=block.querySelector('.sectionHeader'); if(hdr) hdr.prepend(handle); else block.prepend(handle); } else if(block.matches('fieldset')){ const lg=block.querySelector('legend'); if(lg) lg.prepend(handle); else block.prepend(handle); } else { block.prepend(handle); } } handle.addEventListener('pointerdown', e=>{ e.preventDefault(); dragging=block; startY=e.clientY; block.classList.add('reorderGhost'); placeholder=document.createElement('div'); placeholder.style.height=block.getBoundingClientRect().height+'px'; placeholder.className='dropIndicator'; block.parentNode.insertBefore(placeholder, block.nextSibling); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp, { once:true }); }); }
-  function collectBlocks(){ const arr=[]; const sources=document.getElementById('sourcesSection'); if(sources) arr.push(sources); const stats=document.getElementById('stats'); if(stats) arr.push(stats); const map=document.getElementById('mapSection'); if(map) arr.push(map); const odds=document.getElementById('embeddedOddsSection'); if(odds) arr.push(odds); return arr; }
+function initSectionReorder(){
+  const ORDER_KEY='statsPanelSectionOrder';
+  const container=document.body; if(!container) return;
+  const ipc = (window.require? window.require('electron').ipcRenderer: (window.ipcRenderer||null));
+  const blocks=collectBlocks();
+  // Attempt async restore via IPC first; fallback to localStorage legacy
+  let restored=false; let appliedOrder=null; let pendingStoreOrder=null;
+  function debug(msg, extra){ try { console.debug('[stats-reorder]', msg, extra||''); } catch(_){ } }
+  // Apply order with id validation only once unless forced
+  function applyIfValid(order, source){ if(!Array.isArray(order) || !order.length) return; const ids=collectBlocks().map(b=>b.id); const filtered=order.filter(id=>ids.includes(id)); if(!filtered.length) return; appliedOrder=filtered; applyOrder(filtered); restored=true; debug('applied from '+source, filtered); }
+  // Request from store
+  if(ipc && ipc.invoke){
+    try { ipc.invoke('stats-section-order-get').then(order=>{ pendingStoreOrder=order; if(!restored) applyIfValid(order,'store'); }); } catch(_){ /* ignore */ }
+  }
+  // Legacy localStorage immediate attempt
+  try { if(!restored){ const legacy = readLegacy(ORDER_KEY); applyIfValid(legacy,'localStorage-initial'); } } catch(_){ }
+  // Fallback timer if store slower
+  setTimeout(()=>{ if(!restored){ if(pendingStoreOrder) applyIfValid(pendingStoreOrder,'store-timeout'); else { const legacy=readLegacy(ORDER_KEY); applyIfValid(legacy,'localStorage-timeout'); } } }, 400);
+  // Re-apply on window load (after all other scripts) to defeat late DOM mods
+  window.addEventListener('load', ()=>{ if(appliedOrder){ applyOrder(appliedOrder); debug('re-applied on load'); } });
+  blocks.forEach(b=> ensureHandle(b));
+  let dragging=null; let placeholder=null; let startY=0;
+  function ensureHandle(block){ if(block.dataset.handleReady) return; block.dataset.handleReady='1'; let handle=block.querySelector('.dragHandleSec'); if(!handle){ handle=document.createElement('button'); handle.className='dragHandleSec'; handle.type='button'; handle.textContent='≡'; handle.title='Move section'; if(block.id==='stats'){ const hdr=block.querySelector('.sectionHeader'); if(hdr) hdr.prepend(handle); else block.prepend(handle); } else if(block.matches('fieldset')){ const lg=block.querySelector('legend'); if(lg) lg.prepend(handle); else block.prepend(handle); } else { block.prepend(handle); } }
+    handle.addEventListener('pointerdown', e=>{ e.preventDefault(); dragging=block; startY=e.clientY; block.classList.add('reorderGhost'); placeholder=document.createElement('div'); placeholder.style.height=block.getBoundingClientRect().height+'px'; placeholder.className='dropIndicator'; block.parentNode.insertBefore(placeholder, block.nextSibling); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp, { once:true }); }); }
+  function collectBlocks(){
+    // Dynamic order: querySelectorAll returns in DOM order, so we reflect user drag result
+    const nodes = document.querySelectorAll('#sourcesSection,#devtoolsSection,#stats,#mapSection,#embeddedOddsSection');
+    return Array.from(nodes);
+  }
   function onMove(e){ if(!dragging || !placeholder) return; const dy=e.clientY-startY; dragging.style.transform=`translateY(${dy}px)`; const blocksNow=collectBlocks().filter(b=>b!==dragging); const mid=e.clientY; let inserted=false; for(const blk of blocksNow){ const r=blk.getBoundingClientRect(); const midLine=r.top + r.height/2; if(mid < midLine){ blk.parentNode.insertBefore(placeholder, blk); inserted=true; break; } } if(!inserted){ const last=blocksNow[blocksNow.length-1]; if(last) last.parentNode.appendChild(placeholder); } }
-  function onUp(){ if(!dragging) return; dragging.style.transform=''; dragging.classList.remove('reorderGhost'); if(placeholder){ placeholder.parentNode.insertBefore(dragging, placeholder); placeholder.remove(); placeholder=null; } saveOrder(ORDER_KEY); dragging=null; }
-  function saveOrder(key){ try { const order=collectBlocks().map(b=>b.id); localStorage.setItem(key, JSON.stringify(order)); } catch(_){ } }
-  function restoreOrder(blocks,key){ try { const raw=localStorage.getItem(key); if(!raw) return; const order=JSON.parse(raw); if(!Array.isArray(order)) return; const parent=document.body; const idToEl={}; blocks.forEach(b=> idToEl[b.id]=b); order.forEach(id=>{ const el=idToEl[id]; if(el && el.parentNode){ parent.appendChild(el); } }); } catch(_){ } }
+  function onUp(){ if(!dragging) return; dragging.style.transform=''; dragging.classList.remove('reorderGhost'); if(placeholder){ placeholder.parentNode.insertBefore(dragging, placeholder); placeholder.remove(); placeholder=null; } saveOrder(); dragging=null; }
+  function saveOrder(){ const order=collectBlocks().map(b=>b.id); appliedOrder=order;
+    try { if(ipc){ ipc.send('stats-section-order-set', order); } } catch(_){ }
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(order)); } catch(_){ }
+    debug('saved', order);
+  }
+  function applyOrder(order){ const parent=document.body; const idToEl={}; collectBlocks().forEach(b=> idToEl[b.id]=b); order.forEach(id=>{ const el=idToEl[id]; if(el){ parent.appendChild(el); } }); }
+  function readLegacy(key){ try { const raw=localStorage.getItem(key); if(!raw) return []; const order=JSON.parse(raw); return Array.isArray(order)? order: []; } catch(_){ return []; } }
 }
 window.initEmbeddedOdds = initEmbeddedOdds;
 window.initSectionReorder = initSectionReorder;

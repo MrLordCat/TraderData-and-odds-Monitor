@@ -7,6 +7,12 @@ const constants = require('./modules/utils/constants');
 // Local constants (some consumed by modularized managers)
 const SNAP = constants.SNAP_DISTANCE; // snap threshold for drag/resize logic (needed by brokerManager ctx)
 
+// Global safety nets for unexpected errors (prevent silent crashes)
+try {
+  process.on('unhandledRejection', (reason, p)=>{ try { console.warn('[unhandledRejection]', reason); } catch(_){} });
+  process.on('uncaughtException', (err)=>{ try { console.error('[uncaughtException]', err); } catch(_){} });
+} catch(_){}
+
 // Placeholder odds broadcaster now uses shared util factory
 const { makePlaceholderOdds } = require('./modules/utils/odds');
 function broadcastPlaceholderOdds(id){
@@ -54,9 +60,57 @@ const BROKERS = [
   { id: 'betboom', url: 'https://betboom.ru/esport/league-of-legends?type=live' },
   { id: 'pari', url: 'https://pari.ru/esports/category/lol?dateInterval=2' },
   { id: 'marathon', url: 'https://www.marathonbet.dk/en/live/1372932' },
-  { id: 'bet365', url: 'https://www.bet365.com/' }
+  { id: 'bet365', url: 'https://www.bet365.ee/?_h=YWr28275L1TkpH0FsQpP8g%3D%3D&btsffd=1#/IP/B151' }
 ];
 const INITIAL_URLS = BROKERS.reduce((acc,b)=>{acc[b.id]=b.url;return acc;},{});
+
+// DataServices URL prompt overlay BrowserView ref
+let dsPromptView = null;
+
+function openDsPrompt(){
+  if(!mainWindow || mainWindow.isDestroyed()) return;
+  if(dsPromptView) return; // already open
+  const last = store.get('lastDataservicesUrl') || '';
+  dsPromptView = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'preload.js'), nodeIntegration:false, contextIsolation:true } });
+  try { mainWindow.addBrowserView(dsPromptView); } catch(_){ }
+  try {
+    const mb = mainWindow.getBounds();
+    dsPromptView.setBounds({ x:0,y:0,width:mb.width,height:mb.height });
+    dsPromptView.setAutoResize({ width:true, height:true });
+  } catch(_){ }
+  const filePath = path.join(__dirname,'renderer','ds_url.html');
+  try { dsPromptView.webContents.loadFile(filePath, { query:{ last:last } }); } catch(e){ console.warn('ds prompt load failed', e); }
+  // Blur brokers (reuse settings overlay blur logic simplified: inject CSS into each broker view)
+  try {
+    const css='html,body{filter:blur(18px) brightness(.7) saturate(1.1)!important;transition:filter .18s ease;}';
+    Object.entries(views).forEach(([id,v])=>{ try { 
+      if(!v.__dsBlurKeys) v.__dsBlurKeys = [];
+      const p = v.webContents.insertCSS(css).then(k=>{ v.__dsBlurKeys.push(k); return k; });
+      v.__dsBlurKeyPromise = p; // keep last promise reference
+    } catch(_){ } });
+  } catch(_){ }
+}
+function closeDsPrompt(){
+  if(!dsPromptView) return;
+  try { mainWindow.removeBrowserView(dsPromptView); } catch(_){ }
+  try { dsPromptView.webContents.destroy(); } catch(_){ }
+  dsPromptView=null;
+  // Clear blur; wait for any pending insertCSS promises so late resolutions don't re-apply
+  const all = Object.values(views);
+  all.forEach(v=>{
+    const clearAll = ()=>{
+      if(Array.isArray(v.__dsBlurKeys)){
+        for(const k of v.__dsBlurKeys){ try { v.webContents.removeInsertedCSS(k); } catch(_){} }
+      } else if(v.__dsBlurKey){ // legacy single key
+        try { v.webContents.removeInsertedCSS(v.__dsBlurKey); } catch(_){}
+      }
+      v.__dsBlurKeys=[]; v.__dsBlurKey=null; v.__dsBlurKeyPromise=null;
+    };
+    if(v.__dsBlurKeyPromise && typeof v.__dsBlurKeyPromise.then==='function'){
+      v.__dsBlurKeyPromise.then(()=>{ clearAll(); }).catch(()=>{ clearAll(); });
+    } else clearAll();
+  });
+}
 
 // Subtle frame CSS injected into each broker view for consistent visual borders
 const BROKER_FRAME_CSS = `body::after{content:"";position:fixed;inset:0;pointer-events:none;border:1px solid rgba(255,255,255,0.08);border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset;}body{background-clip:padding-box !important;}`;
@@ -234,6 +288,8 @@ const { initLayoutIpc } = require('./modules/ipc/layout');
 
 function bootstrap() {
   createMainWindow();
+  // Remove application menu (hidden UI footprint)
+  try { Menu.setApplicationMenu(null); } catch(_){}
   settingsOverlay = createSettingsOverlay({ mainWindow, views, store });
   // Initialize settings-related IPC now (requires settingsOverlay)
   initSettingsIpc({ ipcMain, store, settingsOverlay, forwardGsTheme, statsManager });
@@ -242,34 +298,31 @@ function bootstrap() {
     broadcastPlaceholderOdds, SNAP, GAP, stageBoundsRef, activeBrokerIdsRef,
     brokerHealth, loadFailures, BROKER_FRAME_CSS,
     mainWindow,
-    onActiveListChanged: (list)=>{ activeBrokerIds = list; activeBrokerIdsRef.value = list; }
+  onActiveListChanged: (list)=>{ activeBrokerIds = list; activeBrokerIdsRef.value = list; }
   });
   // Initialize broker-related IPC now that brokerManager exists
   const boardManagerRef = { value: null };
   initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, boardWindowRef:{ value: boardWindow }, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef });
   // Layout IPC (needs layoutManager + refs ready)
   initLayoutIpc({ ipcMain, store, layoutManager, views, stageBoundsRef, boardManager, statsManager });
-  // One-time default: keep Marathon disabled only on fresh profiles; thereafter respect user's last state
-  try {
-    const migrationKey = 'marathonDisabledDefaultApplied';
-    const applied = !!store.get(migrationKey);
-    if (!applied) {
-      const dis = store.get('disabledBrokers', []);
-      if (!dis.includes('marathon')) { dis.push('marathon'); store.set('disabledBrokers', dis); }
-      store.set(migrationKey, true);
-    }
-    // If user had Marathon active last session (layout or url present), ensure it's enabled now
-    const layout = store.get('layout', {});
-    const lastUrls = store.get('lastUrls', {});
-    const wasActive = !!(layout['marathon'] || lastUrls['marathon']);
-    if (wasActive) {
-      const dis = store.get('disabledBrokers', []);
-      if (Array.isArray(dis) && dis.includes('marathon')) {
-        const nd = dis.filter(d=>d!=='marathon');
-        store.set('disabledBrokers', nd);
+  // DataServices prompt IPC
+  ipcMain.on('open-dataservices-url-prompt', ()=> openDsPrompt());
+  ipcMain.on('dataservices-url-submit', (e,{ url })=>{
+    // Close prompt first to prevent blur race affecting new view
+    closeDsPrompt();
+    try {
+      if(typeof url === 'string'){
+        let u = url.trim();
+        if(!/^https?:\/\//i.test(u) && /[.]/.test(u)) u = 'https://'+u;
+        if(/^https?:\/\//i.test(u)){
+          try { store.set('lastDataservicesUrl', u); } catch(_){}
+          if(brokerManager && brokerManager.addBroker){ brokerManager.addBroker('dataservices', u); }
+        }
       }
-    }
-  } catch(_) {}
+    } catch(_){ }
+  });
+  ipcMain.on('dataservices-url-cancel', ()=> closeDsPrompt());
+  // (Legacy Marathon migration logic removed – Marathon now treated like any other broker)
   brokerManager.createAll();
   // Board manager (docking system)
   const { createBoardManager } = require('./modules/board');
@@ -316,8 +369,11 @@ function bootstrap() {
       }
     }, 1200);
   }
+  // Menu intentionally suppressed (user prefers F12 only)
   // Removed broker-id partition probing to avoid creating unused persistent profiles
 }
+
+// buildAppMenu removed per user request (F12 hotkey only)
 
 function toggleStatsEmbedded(){
   if(!mainWindow || mainWindow.isDestroyed()) return;
@@ -343,7 +399,6 @@ function toggleStatsEmbedded(){
 // (duplicate early IPC init block removed; handled in bootstrap())
 
 app.whenReady().then(()=>{
-  Menu.setApplicationMenu(null);
   bootstrap();
   initDevCssWatcher({ app, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, baseDir: __dirname });
   // Register global shortcut for opening Stats Log window
@@ -374,6 +429,19 @@ app.on('browser-window-created', (_e, win)=>{
           if(now - lastStatsToggleTs < 500) return; // throttle 500ms
           lastStatsToggleTs = now;
           toggleStatsEmbedded();
+          return;
+        }
+        // F12 -> open devtools (active broker if possible else main window)
+        if(input.key==='F12'){
+          try {
+            // Prefer first in activeBrokerIds order; fallback to any view; then main window.
+            const active = (activeBrokerIds.find(id=>views[id]) || Object.keys(views).find(id=>!id.startsWith('slot-')));
+            if(active && views[active]){
+              views[active].webContents.openDevTools({ mode:'detach' });
+            } else if(mainWindow){
+              mainWindow.webContents.openDevTools({ mode:'detach' });
+            }
+          } catch(e){ console.warn('[hotkey][F12] failed', e); }
           return;
         }
         // Ctrl+Alt+L opens (or focuses) the Stats Log window (fallback if global shortcut unavailable)

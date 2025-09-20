@@ -3,7 +3,7 @@
 // refs: { statsState, savedBoardMode, lastStatsToggleTs }
 
 function initStatsIpc(ctx){
-  const { ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs } = ctx;
+  const { ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs, store } = ctx;
   if(!ipcMain || !statsManager) return;
   const { statsState, savedBoardMode, lastStatsToggleTs } = refs;
   ipcMain.handle('get-stats-state', ()=> statsState);
@@ -31,6 +31,18 @@ function initStatsIpc(ctx){
   });
   ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings'].forEach(ch=>{
     ipcMain.on(ch, (e,p)=>{ try { statsManager.handleIpc(ch, p); } catch(_){ } });
+  });
+
+  // ===== Persistent section order (stats panel) =====
+  // Renderer (stats_embedded.js) previously used localStorage. We centralize in main store for portability.
+  ipcMain.handle('stats-section-order-get', ()=>{
+    try { return store && store.get ? (store.get('statsSectionOrder')||[]) : []; } catch(_){ return []; }
+  });
+  ipcMain.on('stats-section-order-set', (_e, order)=>{
+    try {
+      if(!Array.isArray(order)) return;
+      if(store && store.set) store.set('statsSectionOrder', order);
+    } catch(_){ }
   });
 }
 

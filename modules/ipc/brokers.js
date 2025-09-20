@@ -113,6 +113,13 @@ function initBrokerIpc(ctx){
     } catch(err){ console.error('request-add-broker-data failed', err); }
   });
   ipcMain.on('add-broker-selected', (e,{ id })=> brokerManager.addBroker(id));
+  // DataServices dynamic pseudo-broker
+  ipcMain.on('add-broker-dataservices', (e,{ url })=>{
+    try {
+      if(!url || !/^https?:\/\//i.test(url)) return;
+      brokerManager.addBroker('dataservices', url);
+    } catch(err){ console.warn('add-broker-dataservices failed', err); }
+  });
 
   // Global toolbar trigger: open first empty slot picker (or force layout to create one if none)
   ipcMain.on('global-open-broker-picker', ()=>{

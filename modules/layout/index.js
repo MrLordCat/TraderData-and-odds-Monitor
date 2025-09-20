@@ -101,7 +101,19 @@ function createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBounds
     if (!mainWindowRef.value) { // window not ready yet
       return; }
     const activeBrokerIds = activeBrokerIdsRef.value;
-    const activeBrokers = activeBrokerIds.map(id => BROKERS.find(b => b.id === id)).filter(Boolean);
+    // Support dynamic/pseudo brokers (e.g. dataservices) that are not present in static BROKERS list
+    const activeBrokers = activeBrokerIds.map(id => {
+      const def = BROKERS.find(b=>b.id===id);
+      if(def) return def;
+      // Create minimal stub so layout can size it
+      if(views[id]){
+        try {
+          const vb = views[id].getBounds();
+          return { id, url: 'about:blank', width: vb.width, height: vb.height };
+        } catch(_) { return { id, url:'about:blank' }; }
+      }
+      return null;
+    }).filter(Boolean);
     // Allow zero active brokers: still render slot placeholders so user can add
     const rowPattern = preset.pattern ? preset.pattern.slice() : [];
     const rows = rowPattern.length;

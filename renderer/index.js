@@ -125,6 +125,12 @@ async function populateAddBrokerSelect(){
   sel.innerHTML=''; sel.appendChild(first || Object.assign(document.createElement('option'),{value:'',textContent:'＋ Broker'}));
   const { brokers=[], active=[] } = await window.desktopAPI.getBrokersForPicker();
   const activeSet = new Set(active);
+  // Inject pseudo-broker (Excel) entry before real brokers
+  const dsOpt=document.createElement('option');
+  dsOpt.value='dataservices';
+  dsOpt.textContent = activeSet.has('dataservices') ? 'Excel (added)' : 'Excel';
+  if(activeSet.has('dataservices')) dsOpt.disabled = true;
+  sel.appendChild(dsOpt);
   brokers.forEach(b=>{
     const opt=document.createElement('option');
     opt.value=b.id; opt.textContent = activeSet.has(b.id) ? `${b.id} (added)` : b.id;
@@ -137,7 +143,19 @@ const addSelect = document.getElementById('addBrokerSelect');
 if(addSelect){
   addSelect.addEventListener('focus', populateAddBrokerSelect);
   addSelect.addEventListener('mousedown', ()=>{ populateAddBrokerSelect(); });
-  addSelect.addEventListener('change', ()=>{ const v=addSelect.value; if(v){ window.desktopAPI.addBroker(v); setTimeout(()=> populateAddBrokerSelect(), 150); addSelect.value=''; } });
+  addSelect.addEventListener('change', async ()=>{
+    const v=addSelect.value; if(!v) return;
+    if(v==='dataservices'){
+      // Use dedicated BrowserView overlay prompt (main process) instead of in-DOM modal
+      window.desktopAPI.openDataservicesPrompt();
+      addSelect.value='';
+      setTimeout(()=> populateAddBrokerSelect(), 150);
+      return;
+    }
+    window.desktopAPI.addBroker(v);
+    setTimeout(()=> populateAddBrokerSelect(), 150);
+    addSelect.value='';
+  });
 }
 document.getElementById('layoutPreset').onchange = (e) => { if(e.target.value) window.desktopAPI.applyLayoutPreset(e.target.value); };
 const autoReloadCb = document.getElementById('autoReloadToggle');
@@ -152,3 +170,5 @@ window.desktopAPI.onContrastPreview?.(v=> applyContrast(+v));
 window.desktopAPI.onContrastSaved?.(v=> applyContrast(+v));
 window.desktopAPI.onUIBlurOn?.(()=> document.body.classList.add('overlay-blur'));
 window.desktopAPI.onUIBlurOff?.(()=> document.body.classList.remove('overlay-blur'));
+
+// (Excel URL modal logic moved to dedicated BrowserView overlay)
