@@ -5,7 +5,23 @@
   let activityModule = null; try { activityModule = require('./stats_activity'); } catch(_){ }
   const styleId='gs-theme-style';
   function ensureStyle(){ let el=document.getElementById(styleId); if(!el){ el=document.createElement('style'); el.id=styleId; document.head.appendChild(el);} return el; }
-  function applyTheme(t){ if(!t) return; const intensity=Math.min(100,Math.max(0,parseInt(t.intensity||0,10))); function mix(aHex,bHex,p){ function hexToRgb(h){ h=h.replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); return { r:(n>>16)&255,g:(n>>8)&255,b:n&255 }; } function rgbToHex(r,g,b){ return '#'+[r,g,b].map(v=>{ const s=v.toString(16); return s.length===1?'0'+s:s; }).join(''); } const a=hexToRgb(aHex), b=hexToRgb(bHex); const r=Math.round(a.r+(b.r-a.r)*p); const g=Math.round(a.g+(b.g-a.g)*p); const bl=Math.round(a.b+(b.b-a.b)*p); return rgbToHex(r,g,bl);} const blendP=intensity/100; const winBase=t.win||'#286650'; const loseBase=t.lose||'#8a4646'; const bg=t.bg||'#181f27'; const winMix=mix(bg,winBase,blendP); const loseMix=mix(bg,loseBase,blendP); const head=t.head||'#1d252f'; const border=t.border||'#27313d'; const animColor=t.animColor||'#d4b14a'; const animIntensityPct=Math.max(50,Math.min(400,parseInt(t.animIntensity||130,10))); const animDurSec=Math.max(.5,Math.min(10,Number(t.animDurSec||3))); const css=`:root{ --gs-bg:${bg};--gs-border:${border};--gs-head:${head};--gs-win:${winMix};--gs-lose:${loseMix};--gs-gold:${animColor};--gs-animDur:${animDurSec}s;--gs-animIntensity:${animIntensityPct}%;}`; ensureStyle().textContent=css; const tbl=document.getElementById('lolTable'); if(tbl){ tbl.style.background='var(--gs-bg)'; tbl.style.borderColor='var(--gs-border)'; const thead=tbl.querySelector('thead'); if(thead) thead.style.background='var(--gs-head)'; } document.querySelectorAll('#lolTable td.win').forEach(td=> td.style.background='var(--gs-win)'); document.querySelectorAll('#lolTable td.lose').forEach(td=> td.style.background='var(--gs-lose)'); try { const root=document.getElementById('stats'); root&&root.style.setProperty('--gs-animDur',(animDurSec*1000)+'ms'); const mult=Math.max(0.5,Math.min(4.0,animIntensityPct/100)); document.documentElement.style.setProperty('--intensity',String(mult)); document.documentElement.style.setProperty('--gs-gold',animColor);} catch(_){ }}
+  function applyTheme(t){
+    // Ultra-minimal theme: only base structural colors
+    if(!t) return;
+    const bg=t.bg||'#181f27';
+    const border=t.border||'#27313d';
+    const head=t.head||'#1d252f';
+    // Merge global config (if loaded) for animation + heat bar vars
+    const cfg = (window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get()) || {};
+    const css=`:root{ --gs-bg:${bg};--gs-border:${border};--gs-head:${head};`+
+      (cfg.animationDurationMs?`--gs-anim-dur:${cfg.animationDurationMs}ms;`:'')+
+      (cfg.animationScale!=null?`--gs-anim-scale:${cfg.animationScale};`:'')+
+      (cfg.animationPrimaryColor?`--gs-anim-color1:${cfg.animationPrimaryColor};`:'')+
+      (cfg.animationSecondaryColor?`--gs-anim-color2:${cfg.animationSecondaryColor};`:'')+
+      (cfg.heatBarOpacity!=null?`--gs-heatbar-alpha:${cfg.heatBarOpacity};`:'')+
+      (cfg.animationsEnabled===false?`--gs-anim-enabled:0;`:`--gs-anim-enabled:1;`)+` }`;
+    ensureStyle().textContent=css;
+  }
   if(ipcRenderer){ ipcRenderer.on('gs-theme-apply', (_e,theme)=> applyTheme(theme)); }
   // Heat bar configuration listener
   if(ipcRenderer) ipcRenderer.on('gs-heatbar-apply', (_e, hb)=>{

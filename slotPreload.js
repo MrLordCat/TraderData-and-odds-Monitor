@@ -1,4 +1,4 @@
-// Simplified slot placeholder: the plus button is passive now.
+// Slot placeholder: just shows outline + preset tag (no add button).
 window.addEventListener('DOMContentLoaded', () => {
   try {
     const params = new URLSearchParams(location.search);

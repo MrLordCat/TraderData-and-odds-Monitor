@@ -389,71 +389,19 @@ small {
 /* (Merged definition above; keep layout behavior separated for clarity) */
 .statsControls { display:flex; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
 
-/* Tables */
-.tblCompact {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 11px;
-	table-layout: fixed; /* stabilize widths */
+/* == RESET: LoL Stats Table styles removed intentionally for redesign == */
+#lolTable {
+  width:100%;
+  border-collapse:collapse;
+  font:11px var(--font-sans, system-ui, sans-serif);
 }
-
-.tblHeadSticky thead {
-	background: #1d2635;
-	position: sticky;
-	top: 0;
-}
-
-.thLeft {
-	text-align: left;
-	padding: 4px 6px;
-}
-
-.thCell {
-	padding: 4px 6px;
-	user-select: none;
-    cursor: default; /* prevent whole cell from showing pointer */
-}
-
-/* Team name truncation wrapper to prevent table stretch */
-.thCell .teamNameWrap {
-		/* inline-block so cursor only over actual text width, not whole cell */
-		display: inline-block;
-		max-width: 100%;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		line-height: 1.2;
-		cursor: pointer;
-}
-
-/* New adaptive column rules
-	- Team columns have fixed base width (variable), can shrink on narrow screens (JS adjusts var)
-	- Metric column takes remaining space */
-:root { --team-col-width: 120px; --team-col-min: 90px; }
-#lolTable col.colTeam { width: var(--team-col-width); }
-/* Metric width = remaining: 100% - 2 * team */
-#lolTable col.colMetric { width: calc(100% - (var(--team-col-width) * 2)); }
-#lolTable th.thCell, #lolTable td { overflow: hidden; }
-
-@media (max-width: 880px){ :root { --team-col-width: 110px; } }
-@media (max-width: 760px){ :root { --team-col-width: 100px; } }
-
-.lolTableWrap {
-	border: 1px solid #253041;
-	border-radius: 8px;
-	/* removed max-height & inner scroll to let outer container scroll */
-}
-
-/* Metric Toggles */
-.metricsToggleGrid {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-	gap: 4px;
-	padding: 6px 4px 2px;
-	max-width: 340px;
-}
-
-.mt-14 { margin-top: 14px; }
+#lolTable th, #lolTable td { padding:4px 6px; border:1px solid #283240; }
+#lolTable thead th { background:#15202b; font-weight:600; text-align:left; }
+/* Minimal placeholder widths (will be replaced in new design) */
+#lolTable th:nth-child(1), #lolTable td:nth-child(1){ width:40%; }
+#lolTable th:nth-child(2), #lolTable td:nth-child(2){ width:30%; }
+#lolTable th:nth-child(3), #lolTable td:nth-child(3){ width:30%; }
+/* End reset block */
 
 /* Map Section */
 .mapHeader {
@@ -483,67 +431,6 @@ small {
 	line-height: 1.3;
 }
 
-/* Metric Rows */
-.metricLabel {
-	padding: 3px 6px;
-	text-align: left;
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	font-weight: 500;
-	user-select: none;
-}
-
-.metricLabel .dragHandle {
-	cursor: grab;
-	display: inline-block;
-	padding: 0 4px;
-	font-size: 13px;
-	opacity: .55;
-	transition: opacity var(--transition);
-}
-
-.metricLabel .dragHandle:hover { opacity: .9; }
-tr.dragging .metricLabel { opacity: .6; }
-tr.drop-target { outline: 1px dashed #346199; }
-
-/* Editable Cells */
-.editable {
-	padding: 3px 6px;
-	text-align: center;
-	min-width: 58px;
-	user-select: none;
-	/* default: no pointer cursor (looks like plain cell) */
-}
-body.manual-mode .editable { cursor: pointer; }
-
-.editable.pressing { background: #1f2a3b; }
-.editable.win { background: var(--good); color: #082612; font-weight: 600; }
-.editable.lose { background: #3a1616; color: #f7b4b4; }
-
-/* Metric Toggle Items */
-.metricToggle {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	font-size: 11px;
-	line-height: 1.2;
-	padding: 2px 4px;
-	border-radius: 4px;
-	cursor: pointer;
-}
-
-.metricToggle:hover { background: #1d2635; }
-.markMetric { margin-right: 4px; }
-
-/* Reorder Flash */
-.reorderFlash { animation: reorderFlash 0.4s ease; }
-
-@keyframes reorderFlash {
-	from { background: #244d7d; }
-	to { background: transparent; }
-}
-
-/* Stable status width to prevent control row shifting on reset */
-.lolStatusWrap { display:inline-block; min-width:140px; white-space:nowrap; padding-left:6px; }
-@media (max-width:1100px){ .lolStatusWrap { min-width:110px; } }
+/* Removed: metric rows, drag handles, editable states, toggle animations, reorder effects */
+/* Keep status width container for now */
+.lolStatusWrap { display:inline-block; min-width:120px; white-space:nowrap; padding-left:6px; }

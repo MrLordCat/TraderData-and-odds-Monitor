@@ -5,7 +5,7 @@
 function initBrokerIpc(ctx){
   const { ipcMain, store, views, brokerManager, statsManager, boardWindowRef, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef } = ctx;
   const latestOdds = latestOddsRef.value;
-  const dragState = { current: null };
+  // (Drag state removed – broker window dragging disabled)
 
   ipcMain.on('bv-odds-update', (e, data) => {
     try {
@@ -49,43 +49,7 @@ function initBrokerIpc(ctx){
     } catch(err){ console.error('capture-credentials failed', err); }
   });
 
-  function handleDragDelta(id, dx, dy){
-    const mv = views[id]; if (!mv) return;
-    const stageBounds = stageBoundsRef.value;
-    const b0 = mv.getBounds();
-    const nb = { x: b0.x + dx, y: b0.y + dy, width: b0.width, height: b0.height };
-    nb.x = Math.max(stageBounds.x, Math.min(stageBounds.x + stageBounds.width - nb.width, nb.x));
-    nb.y = Math.max(stageBounds.y, Math.min(stageBounds.y + stageBounds.height - nb.height, nb.y));
-    for (const [oid, ov] of Object.entries(views)) {
-      if (oid === id) continue;
-      try {
-        const ob = ov.getBounds();
-        if (Math.abs((nb.x + nb.width) - ob.x) < SNAP) nb.x = ob.x - nb.width;
-        if (Math.abs(nb.x - (ob.x + ob.width)) < SNAP) nb.x = ob.x + ob.width;
-        if (Math.abs((nb.y + nb.height) - ob.y) < SNAP) nb.y = ob.y - nb.height;
-        if (Math.abs(nb.y - (ob.y + ob.height)) < SNAP) nb.y = ob.y + ob.height;
-        if (Math.abs(nb.y - ob.y) < SNAP) nb.y = ob.y;
-        if (Math.abs(nb.x - ob.x) < SNAP) nb.x = ob.x;
-      } catch(_){ }
-    }
-    if (Math.abs(nb.x - stageBounds.x) < SNAP) nb.x = stageBounds.x;
-    if (Math.abs(nb.y - stageBounds.y) < SNAP) nb.y = stageBounds.y;
-    if (Math.abs((nb.x + nb.width) - (stageBounds.x + stageBounds.width)) < SNAP) nb.x = stageBounds.x + stageBounds.width - nb.width;
-    if (Math.abs((nb.y + nb.height) - (stageBounds.y + stageBounds.height)) < SNAP) nb.y = stageBounds.y + stageBounds.height - nb.height;
-    mv.setBounds(nb);
-  }
-  ipcMain.on('bv-drag-start', (e, { id }) => { dragState.current = { id }; });
-  ipcMain.on('bv-drag-delta', (e, { id, dx, dy }) => { if (!dragState.current || dragState.current.id !== id) return; handleDragDelta(id, dx, dy); });
-  ipcMain.on('bv-drag-end', (e, { id }) => {
-    if (dragState.current && dragState.current.id === id) {
-      const mv = views[id]; if (mv) {
-        const layout = store.get('layout', {});
-        layout[id] = mv.getBounds();
-        store.set('layout', layout);
-      }
-    }
-    dragState.current = null;
-  });
+  // Drag-related IPC removed.
 
   ipcMain.on('bv-zoom-wheel', (e, { deltaY }) => {
     try {

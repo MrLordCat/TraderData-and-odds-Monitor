@@ -6,6 +6,7 @@
 
 const path = require('path');
 const { BrowserView, BrowserWindow, screen } = require('electron');
+const { ensureSingleClosedListener, hideView } = require('../utils/views');
 
 function ensureVisibleBounds(b){
   if(!b) return null;
@@ -29,6 +30,8 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   const MIN_W = 240; const MAX_W = 800;
   let dockView = null; // BrowserView when docked
   let win = null; // BrowserWindow when detached
+
+  // ensureSingleClosedListener now imported from utils/views.js
 
   function persist(){ try { store.set('boardMode', state.mode); store.set('boardSide', state.side); store.set('boardWidth', state.width); } catch(_){} }
   function getState(){ return { ...state }; }
@@ -68,14 +71,22 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
     dockView.webContents.on('did-finish-load', ()=> replayOdds());
   }
   function destroyDockView(){ if(!dockView) return; try { mainWindow.removeBrowserView(dockView); } catch(_){} try { dockView.webContents.destroy(); } catch(_){} dockView=null; }
+  function hideDockView(){ if(!dockView) return; hideView(dockView); }
+  function ensureDockViewAttached(){
+    if(!dockView) return;
+    try {
+      const attached = mainWindow.getBrowserViews().includes(dockView);
+      if(!attached) mainWindow.addBrowserView(dockView);
+    } catch(_){}
+  }
 
   function createWindow(){
     if(win && !win.isDestroyed()) return;
     const saved = ensureVisibleBounds(store.get('boardBounds'));
     win = new BrowserWindow({ width: saved? saved.width:520, height: saved? saved.height:820, x: saved? saved.x:undefined, y: saved? saved.y:undefined, title:'Odds Board', autoHideMenuBar:true, webPreferences:{ preload: path.join(__dirname,'..','..','preload.js') } });
     win.on('close', ()=>{ try { store.set('boardBounds', win.getBounds()); } catch(_){} });
-    win.on('closed', ()=>{ win=null; if(state.mode==='window'){ // window closed by user -> treat as hidden
-      state.mode='hidden'; persist(); broadcast(); }
+    ensureSingleClosedListener(win, 'boardWindow-reset', ()=>{
+      win=null; if(state.mode==='window'){ state.mode='hidden'; persist(); broadcast(); }
     });
     win.loadFile(path.join(__dirname,'..','..','renderer','board.html'));
     win.webContents.on('did-finish-load', ()=> replayOdds());
@@ -99,12 +110,27 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
     } catch(_){}
   }
 
-  function enterDocked(){ destroyDockView(); if(win){ try { win.close(); } catch(_){} }
-    createDockView(); state.mode='docked'; persist(); broadcast(); setImmediate(applyDockLayout); }
-  function enterHidden(){ destroyDockView(); if(win){ try { win.close(); } catch(_){} } state.mode='hidden'; persist(); broadcast(); if(layoutManager && layoutManager.setDockOffsets) layoutManager.setDockOffsets(null); }
+  function enterDocked(){
+    // If window mode active, close separate window first.
+    if(win){ try { win.close(); } catch(_){} }
+    // Reuse existing dockView if present; otherwise create once.
+    if(!dockView) createDockView(); else ensureDockViewAttached();
+    state.mode='docked'; persist(); broadcast(); setImmediate(applyDockLayout);
+  }
+  function enterHidden(){
+    // Do NOT destroy dockView to avoid repeated addBrowserView (leads to internal 'closed' listener accumulation).
+    hideDockView();
+    if(win){ try { win.close(); } catch(_){} }
+    state.mode='hidden'; persist(); broadcast();
+    if(layoutManager && layoutManager.setDockOffsets) layoutManager.setDockOffsets(null);
+  }
   function enterWindow(){ destroyDockView(); createWindow(); state.mode='window'; persist(); broadcast(); if(layoutManager && layoutManager.setDockOffsets) layoutManager.setDockOffsets(null); }
 
-  function toggle(){ if(state.mode==='hidden') enterDocked(); else if(state.mode==='docked') enterHidden(); else if(state.mode==='window') enterHidden(); }
+  function toggle(){
+    if(state.mode==='hidden') enterDocked();
+    else if(state.mode==='docked') enterHidden();
+    else if(state.mode==='window') enterHidden(); // window -> hidden
+  }
   function detach(){ if(state.mode==='docked') enterWindow(); }
   function attach(){ if(state.mode==='window' || state.mode==='hidden') enterDocked(); }
   function setSide(side){ if(side!=='left'&&side!=='right') return; state.side=side; persist(); if(state.mode==='docked'){ applyDockLayout(); broadcast(); } }

@@ -4,36 +4,37 @@
 <meta charset="UTF-8" />
 <title>Excel URL</title>
 <link rel="stylesheet" href="common.css" />
-<link rel="stylesheet" href="main.css" />
 <style>
-body { background: rgba(14,18,26,0.78); backdrop-filter: blur(18px) saturate(1.25); margin:0; font:13px var(--font-sans); color:var(--text); }
-#wrap { position:absolute; inset:0; }
-.panel { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:520px; max-width:92%; background:linear-gradient(155deg,#1e2533,#141b24 70%); border:1px solid #3d5172; border-radius:14px; padding:22px 24px 20px; box-shadow:0 12px 42px -8px #000c,0 0 0 1px rgba(255,255,255,0.05); display:flex; flex-direction:column; gap:16px; }
+html,body { height:100%; margin:0; font:13px var(--font-sans); color:var(--text); overflow:hidden; background:transparent; }
+#backdrop { position:fixed; inset:0; background:rgba(15,20,30,.55); backdrop-filter:blur(18px) saturate(1.25); animation:fadeIn .25s ease; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.panel { position:relative; z-index:2; width:480px; max-width:calc(100% - 40px); margin:60px auto; background:linear-gradient(160deg,#1d2736,#121922 70%); border:1px solid #3b4d63; border-radius:18px; box-shadow:0 10px 38px -6px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.04); display:flex; flex-direction:column; gap:18px; padding:22px 24px 20px; animation:pop .35s cubic-bezier(.4,.12,.2,1); }
+@keyframes pop { 0%{ transform:translateY(14px) scale(.94); opacity:0;} 60%{ transform:translateY(-2px) scale(1); opacity:1;} 100%{ transform:translateY(0) scale(1);} }
 .panel h1 { margin:0; font-size:17px; font-weight:600; letter-spacing:.6px; }
-.field label { display:block; font-size:12px; text-transform:uppercase; opacity:.75; margin-bottom:4px; letter-spacing:1px; }
-.field input { width:100%; padding:10px 12px; background:#0d121b; border:1px solid #2d3a4c; border-radius:8px; color:#e4e8f0; font:13px monospace; }
+.field { display:flex; flex-direction:column; gap:6px; }
+.field label { font-size:11px; text-transform:uppercase; opacity:.75; letter-spacing:1px; }
+.field input { width:100%; padding:10px 12px; background:#0d121b; border:1px solid #2d3a4c; border-radius:10px; color:#e4e8f0; font:13px monospace; }
 .field input:focus { outline:2px solid #2f7cf6; }
 .err { color:#ff6170; font-size:12px; display:none; }
 .actions { display:flex; justify-content:flex-end; gap:12px; }
-.actions button { padding:8px 18px; border-radius:8px; border:1px solid #2d3a4c; background:#202b3a; color:#e6ecf4; cursor:pointer; font:12px var(--font-sans); font-weight:600; letter-spacing:.7px; }
-.actions button.primary { background:#2f7cf6; border-color:#2f7cf6; color:#fff; }
+.actions button { padding:9px 18px; border-radius:10px; border:1px solid #2d3a4c; background:#202b3a; color:#e6ecf4; cursor:pointer; font:12px var(--font-sans); font-weight:600; letter-spacing:.7px; }
+.actions button.primary { background:#2f7cf6; border-color:#2f7cf6; color:#fff; box-shadow:0 0 0 1px #2f7cf6,0 0 10px -3px rgba(47,124,246,.6); }
 .actions button.primary:hover { background:#3c85fb; }
 .actions button:hover { background:#273241; }
 </style>
 </head>
 <body>
-<div id="wrap">
-  <div class="panel">
-  <h1>Excel URL</h1>
-    <div class="field">
-      <label for="dsInput">Enter DataServices page URL</label>
-      <input id="dsInput" type="text" placeholder="https://..." />
-      <div class="err" id="err">Invalid URL (must start with http/https)</div>
-    </div>
-    <div class="actions">
-      <button id="cancelBtn">Cancel</button>
-      <button id="addBtn" class="primary">Add</button>
-    </div>
+<div id="backdrop"></div>
+<div class="panel" role="dialog" aria-modal="true" aria-labelledby="title">
+  <h1 id="title">Excel URL</h1>
+  <div class="field">
+    <label for="dsInput">Enter DataServices page URL</label>
+    <input id="dsInput" type="text" placeholder="https://..." />
+    <div class="err" id="err">Invalid URL (must start with http/https)</div>
+  </div>
+  <div class="actions">
+    <button id="cancelBtn">Cancel</button>
+    <button id="addBtn" class="primary">Add</button>
   </div>
 </div>
 <script src="ds_url.js"></script>

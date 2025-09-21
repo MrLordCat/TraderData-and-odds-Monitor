@@ -33,7 +33,8 @@ function createBrokerManager(ctx){
   if(brokerDef.id === 'dataservices') extraArgs.push('--forced-broker-id=dataservices');
   const view = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','brokerPreload.js'), partition:'persist:'+brokerDef.id, nodeIntegration:false, contextIsolation:true, sandbox:false, javascript:true, backgroundThrottling:false, additionalArguments: extraArgs } });
     views[brokerDef.id] = view;
-    mainWindow.addBrowserView(view);
+  mainWindow.addBrowserView(view);
+  try { if(ctx.statsManager && ctx.statsManager.ensureTopmost) ctx.statsManager.ensureTopmost(); } catch(_){ }
     // DevTools Network Conditions: принудительно имитируем снятую галочку "Use browser default" через CDP override.
     try {
       let chromeVer = (process.versions && process.versions.chrome) ? process.versions.chrome : '140.0.0.0';
@@ -115,7 +116,21 @@ function createBrokerManager(ctx){
     if(brokerDef.id==='dataservices'){
       try { view.webContents.executeJavaScript(`window.__FORCED_BROKER_ID='dataservices';`, true).catch(()=>{}); } catch(_){ }
     }
-    view.webContents.on('did-finish-load', ()=>{ try { view.webContents.insertCSS(ctx.BROKER_FRAME_CSS); } catch(_){} scheduleMapReapply(view); });
+    view.webContents.on('did-finish-load', ()=>{
+      try { view.webContents.insertCSS(ctx.BROKER_FRAME_CSS); } catch(_){}
+      scheduleMapReapply(view);
+      // Apply stored credentials (auto-fill) if available
+      try {
+        const credsAll = store.get('siteCredentials') || {};
+        const curUrl = view.webContents.getURL();
+        const host = new URL(curUrl).hostname;
+        const creds = credsAll[host];
+        if(creds){
+          try { console.log('[cred][brokerManager] apply creds host', host, 'user='+creds.username); } catch(_){ }
+          view.webContents.send('apply-credentials', { hostname: host, username: creds.username, password: creds.password });
+        }
+      } catch(_){ }
+    });
     view.webContents.on('did-fail-load', (e, errorCode, errorDesc, validatedURL, isMainFrame)=>{
       if(errorCode === -3) return;
       if(!isMainFrame) return;

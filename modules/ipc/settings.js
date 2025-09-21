@@ -1,12 +1,10 @@
 // Settings & theme IPC extracted from main.js
-// initSettingsIpc({ ipcMain, store, settingsOverlay, forwardGsTheme, statsManager })
+// initSettingsIpc({ ipcMain, store, settingsOverlay, statsManager })
 
 function initSettingsIpc(ctx){
-  const { ipcMain, store, settingsOverlay, forwardGsTheme, statsManager } = ctx;
+  const { ipcMain, store, settingsOverlay, statsManager } = ctx;
   ipcMain.on('open-settings', ()=> settingsOverlay.open());
   ipcMain.on('close-settings', ()=> settingsOverlay.close());
-  ipcMain.on('gs-theme-preview', (_e, theme)=>{ forwardGsTheme(theme); });
-  ipcMain.on('gs-theme-save', (_e, theme)=>{ try { store.set('gsTheme', theme); } catch(_){} forwardGsTheme(theme); });
   function forwardHeatBar(cfg){
     try { if(statsManager && statsManager.views && statsManager.views.panel){ statsManager.views.panel.webContents.send('gs-heatbar-apply', cfg); } } catch(_){ }
   }

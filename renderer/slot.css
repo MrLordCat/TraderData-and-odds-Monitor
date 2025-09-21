@@ -1,53 +1,7 @@
-html, body {
-	margin: 0;
-	height: 100%;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	background: transparent;
-	color: var(--muted);
-}
-.wrap {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 86%;
-	height: 76%;
-	max-width: 520px;
-	max-height: 340px;
-}
-button {
-	aspect-ratio: 1/1;
-	width: 100%;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 56px;
-	font-weight: 500;
-	line-height: 1;
-	border: 1px dashed #2c3649;
-	border-radius: var(--radius);
-	background: var(--panel-alt);
-	color: var(--good);
-	cursor: pointer;
-	position: relative;
-	transition: background .18s, border-color .18s, color .18s, box-shadow .25s, transform .18s;
-	letter-spacing: .5px;
-}
-@supports not (aspect-ratio:1/1) { button { height:100%; } }
-button:hover { background:#233041; border-color:#3a4960; color:var(--good-glow); box-shadow:0 0 0 1px #2c3649,0 0 18px -2px rgba(63,134,255,.4); }
-button:active { transform:translateY(1px); }
-small {
-	position: absolute;
-	bottom: 6px;
-	right: 10px;
-	font: 10px/1.1 monospace;
-	color: #364559;
-	letter-spacing: .5px;
-	opacity: .7;
-}
-/* Inline picker styles removed */
-
-@media (max-width:480px){
-	.brokerList { grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); }
-}
+html,body { margin:0; height:100%; background:transparent; font:12px var(--font-sans); color:var(--muted); }
+.slotOutline { position:absolute; inset:0; padding:6px; box-sizing:border-box; display:flex; }
+.slotInner { flex:1; border:1px dashed #2d3a4c; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(22,27,40,0.35); backdrop-filter:blur(4px) saturate(1.1); position:relative; transition:border-color .25s, background .25s; }
+.slotInner:hover { border-color:#3d4f63; background:rgba(26,32,46,0.42); }
+.placeholderLabel { font-size:11px; letter-spacing:.8px; text-transform:uppercase; opacity:.55; }
+.presetTag { position:absolute; bottom:4px; right:6px; font:10px/1.2 monospace; color:#41576f; opacity:.8; }
+@media (max-width:800px){ .placeholderLabel { font-size:10px; } }

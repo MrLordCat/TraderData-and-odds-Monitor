@@ -1,7 +1,15 @@
 /* Embedded LoL Live Stats (standalone window) */
 body { font-family: system-ui, Arial, sans-serif; margin:0; padding:6px; background:#111; color:#eee; }
 h2 { margin:4px 0 8px; font-size:14px; }
-table { border-collapse:collapse; width:100%; font-size:12px; }
+table { border-collapse:collapse; width:100%; font-size:12px; table-layout:fixed; }
+/* Column width specification: Metric 40%, Team1 27%, Team2 27% (remaining 6% absorbed by borders/padding) */
+table#lolStatsTbl colgroup col:nth-child(1) { width:40%; }
+table#lolStatsTbl colgroup col:nth-child(2) { width:27%; }
+table#lolStatsTbl colgroup col:nth-child(3) { width:27%; }
+/* Fallback if colgroup not present: apply to th/td */
+table#lolStatsTbl th:nth-child(1), table#lolStatsTbl td:nth-child(1) { width:40%; }
+table#lolStatsTbl th:nth-child(2), table#lolStatsTbl td:nth-child(2) { width:27%; }
+table#lolStatsTbl th:nth-child(3), table#lolStatsTbl td:nth-child(3) { width:27%; }
 th, td { border:1px solid #333; padding:2px 4px; text-align:center; }
 th.metric { text-align:left; }
 tr:nth-child(even) { background:#181818; }

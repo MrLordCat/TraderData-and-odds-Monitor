@@ -29,7 +29,8 @@ function initStatsIpc(ctx){
       try { mainWindow.webContents.send('stats-state-updated', statsState); } catch(_){ }
     }
   });
-  ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings'].forEach(ch=>{
+  // Forward common stats panel control channels + config/persistence updates to statsManager
+  ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings','stats-config-set'].forEach(ch=>{
     ipcMain.on(ch, (e,p)=>{ try { statsManager.handleIpc(ch, p); } catch(_){ } });
   });
 

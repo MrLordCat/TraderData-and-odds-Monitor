@@ -65,23 +65,18 @@ try {
   }).observe(document, { subtree:true, childList:true });
 } catch(_){ }
 
-// Drag bar injection
-function injectDragBar(){
-  if(document.getElementById('__broker_drag_bar')) return;
-  const bar=document.createElement('div');
-  bar.id='__broker_drag_bar';
-  bar.style.cssText='position:fixed;top:0;left:0;right:0;height:18px;background:rgba(20,20,20,.55);z-index:999999;cursor:move;font:10px sans-serif;color:#ccc;display:flex;align-items:center;padding:0 6px;user-select:none;-webkit-user-select:none;backdrop-filter:blur(2px);';
-  bar.textContent=' drag '+BROKER_ID+' ';
-  const closeBtn=document.createElement('span'); closeBtn.textContent='✕'; closeBtn.style.cssText='margin-left:auto;padding:0 6px;cursor:pointer;color:#aaa;font-weight:bold;';
-  closeBtn.addEventListener('click', (e)=>{ e.stopPropagation(); safeSend('close-broker', BROKER_ID); });
-  bar.appendChild(closeBtn);
-  document.documentElement.appendChild(bar);
-  let dragging=false,lx=0,ly=0;
-  bar.addEventListener('mousedown', e=>{dragging=true;lx=e.screenX;ly=e.screenY;safeSend('bv-drag-start',{id:BROKER_ID});});
-  window.addEventListener('mousemove', e=>{ if(!dragging) return; const dx=e.screenX-lx; const dy=e.screenY-ly; lx=e.screenX; ly=e.screenY; safeSend('bv-drag-delta',{dx,dy,id:BROKER_ID}); });
-  window.addEventListener('mouseup', ()=>{ if(dragging){ dragging=false; safeSend('bv-drag-end',{id:BROKER_ID}); }});
+// Minimal close button (drag removed per requirement)
+function injectCloseButton(){
+  if(document.getElementById('__broker_close_btn')) return;
+  const btn=document.createElement('button');
+  btn.id='__broker_close_btn';
+  btn.textContent='✕';
+  btn.title='Close broker';
+  btn.style.cssText='position:fixed;top:4px;right:6px;z-index:999999;background:rgba(20,20,25,.65);color:#cfd6e0;border:1px solid #334150;padding:2px 6px;font:11px system-ui;border-radius:6px;cursor:pointer;backdrop-filter:blur(3px);line-height:1;';
+  btn.addEventListener('click', (e)=>{ e.stopPropagation(); safeSend('close-broker', BROKER_ID); });
+  document.documentElement.appendChild(btn);
 }
-document.addEventListener('DOMContentLoaded', injectDragBar);
+document.addEventListener('DOMContentLoaded', injectCloseButton);
 
 // Reload helper button support
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -91,25 +86,44 @@ document.addEventListener('DOMContentLoaded', ()=>{
 // Light ping so main can replay last map/placeholder odds promptly
 window.addEventListener('DOMContentLoaded', ()=>{ try { ipcRenderer.send('bv-odds-update', { broker:'_ping' }); } catch(_){} });
 
-// --- Drag handle injection for moving BrowserView ---
-function injectDragBar(){
-  if (document.getElementById('__broker_drag_bar')) return;
-  const bar = document.createElement('div');
-  bar.id='__broker_drag_bar';
-  bar.style.cssText='position:fixed;top:0;left:0;right:0;height:18px;background:rgba(20,20,20,0.55);z-index:999999;cursor:move;font:10px sans-serif;color:#ccc;display:flex;align-items:center;padding:0 6px;user-select:none;-webkit-user-select:none;backdrop-filter:blur(2px);';
-  bar.textContent=' drag '+BROKER_ID+' ';
-  const closeBtn=document.createElement('span');
-  closeBtn.textContent='✕';
-  closeBtn.style.cssText='margin-left:auto;padding:0 6px;cursor:pointer;color:#aaa;font-weight:bold;';
-  closeBtn.addEventListener('click', (e)=>{ e.stopPropagation(); safeSend('close-broker', BROKER_ID); });
-  bar.appendChild(closeBtn);
-  document.documentElement.appendChild(bar);
-  let dragging=false, lx=0, ly=0;
-  bar.addEventListener('mousedown', e=>{dragging=true;lx=e.screenX;ly=e.screenY;safeSend('bv-drag-start',{id:BROKER_ID});});
-  window.addEventListener('mousemove', e=>{if(!dragging) return; const dx=e.screenX-lx; const dy=e.screenY-ly; lx=e.screenX; ly=e.screenY; safeSend('bv-drag-delta',{dx,dy,id:BROKER_ID});});
-  window.addEventListener('mouseup', ()=>{ if(dragging){ dragging=false; safeSend('bv-drag-end',{id:BROKER_ID}); }});
+// (Removed legacy BrowserView drag bar injection)
+
+// ================= Credential Auto-Fill & Capture (Added) =================
+let __lastCreds = null;
+function __applyVal(el, val){
+  if(!el) return; try { const d=Object.getOwnPropertyDescriptor(el.__proto__,'value'); if(d&&d.set) d.set.call(el,val); else el.value=val; } catch(_){ el.value=val; }
+  try { el.dispatchEvent(new Event('input',{bubbles:true})); } catch(_){ }
+  try { el.dispatchEvent(new Event('change',{bubbles:true})); } catch(_){ }
 }
-document.addEventListener('DOMContentLoaded', injectDragBar);
+ipcRenderer.on('apply-credentials', (_e, creds)=>{
+  __lastCreds = creds;
+  let attempts=0; const MAX=40; // ~8s @200ms
+  const tryFill=()=>{
+    attempts++;
+    try {
+      if(!__lastCreds) return;
+      const doc = window.document;
+      const user = doc.querySelector('input[type=email],input[type=text][name*=user],input[type=text][name*=login],input[name*=username],input[name*=email]') || doc.querySelector('form input[type=text], form input:not([type])');
+      const pass = doc.querySelector('input[type=password]');
+      let ok=false;
+      if(user && __lastCreds.username){ __applyVal(user, __lastCreds.username); ok=true; }
+      if(pass && __lastCreds.password){ __applyVal(pass, __lastCreds.password); ok=true; }
+      if(ok){ try { console.log('[cred][brokerPreload] filled credentials attempt', attempts, 'host=', location.hostname); } catch(_){ } return; }
+    } catch(err){ }
+    if(attempts<MAX) setTimeout(tryFill,200);
+  };
+  tryFill();
+});
+// Re-play if late inputs appear
+const credMO = new MutationObserver(()=>{ if(__lastCreds){ const pass=document.querySelector('input[type=password]'); if(pass && !pass.value){ try { ipcRenderer.emit('apply-credentials', {}, __lastCreds); } catch(_){ } } } });
+try { credMO.observe(document.documentElement,{subtree:true,childList:true}); } catch(_){ }
+// Capture on submit
+window.addEventListener('DOMContentLoaded', ()=>{
+  try {
+    const forms=[...document.querySelectorAll('form')].slice(0,25);
+    forms.forEach(f=>{ if(f.__credHooked) return; f.__credHooked=true; f.addEventListener('submit', ()=>{ try { const user=f.querySelector('input[type=email],input[type=text][name*=user],input[type=text][name*=login],input[name*=username],input[name*=email]'); const pass=f.querySelector('input[type=password]'); const username=user&&user.value&&user.value.length<90? user.value.trim():null; const password=pass&&pass.value&&pass.value.length<256? pass.value:null; if(username && password){ ipcRenderer.send('capture-credentials',{ broker:BROKER_ID, hostname:location.hostname, username, password }); } } catch(_){ } }, { capture:true }); });
+  } catch(_){ }
+});
 
 // --- Resize handles injection (edges & corners) ---
 // (Resize handles removed: layout managed centrally; kept out to reduce preload surface)

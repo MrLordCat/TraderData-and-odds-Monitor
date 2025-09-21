@@ -1,7 +1,78 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen, Menu, globalShortcut } = require('electron');
+// Adjust default max listeners (prevent benign warnings after intentional layering). Allow override via MAX_LISTENERS env.
+try {
+  const EventEmitter = require('events');
+  const base = Number(process.env.MAX_LISTENERS)||15;
+  if(EventEmitter.defaultMaxListeners < base) EventEmitter.defaultMaxListeners = base;
+} catch(_){ }
 const path = require('path');
 const Store = require('electron-store');
 const store = new Store({ name: 'prefs' });
+// Diagnostic hook for investigating MaxListenersExceededWarning on BrowserWindow 'closed'
+// Enable with: DEBUG_CLOSED_LISTENERS=1
+// Extra options:
+//   DEBUG_CLOSED_LISTENERS_THRESHOLD=8  (change threshold)
+//   DEBUG_CLOSED_LISTENERS_RAISE=1      (raise defaultMaxListeners to 30)
+//   DEBUG_CLOSED_LISTENERS_CLEAN=1      (attempt to remove surplus anonymous duplicates heuristically)
+try {
+  if (process.env.DEBUG_CLOSED_LISTENERS) {
+    const EventEmitter = require('events');
+    const origOn = BrowserWindow.prototype.on;
+    const origOnce = BrowserWindow.prototype.once;
+    function wrapAttach(methodName, origFn){
+      return function(ev, listener){
+        if(ev === 'closed'){
+          const win = this;
+          const before = typeof win.listenerCount === 'function' ? win.listenerCount('closed') : undefined;
+          // Capture stack at registration site (exclude this wrapper frames later)
+          const attachStack = (new Error('[diag][closed-listener] attach site')).stack;
+          const ret = origFn.call(win, ev, listener);
+          setImmediate(()=>{ // after internal adjustments
+            try {
+              const after = win.listenerCount('closed');
+              const id = (win && win.id) || 'unknown';
+              const THRESH = Number(process.env.DEBUG_CLOSED_LISTENERS_THRESHOLD)||10;
+              const verbose = !!process.env.DEBUG_CLOSED_LISTENERS_VERBOSE;
+              const delta = (typeof before==='number' && typeof after==='number') ? (after-before) : 0;
+              // Suppress noise: a single +1 (delta===1) below threshold is expected when adding a BrowserView.
+              if(!(delta===1 && after<=THRESH && !verbose)){
+                console.log(`[diag][closed-listener] method=${methodName} winId=${id} before=${before} after=${after} delta=${delta}`);
+              }
+              if(after > THRESH){
+                console.log(attachStack);
+                if(process.env.DEBUG_CLOSED_LISTENERS_CLEAN){
+                  try {
+                    const listeners = win.rawListeners ? win.rawListeners('closed') : win.listeners('closed');
+                    if(Array.isArray(listeners) && listeners.length>THRESH){
+                      const seen = new Set();
+                      for(let i=listeners.length-1;i>=0;i--){
+                        const fn = listeners[i];
+                        const sig = fn && fn.toString().slice(0,120);
+                        if(seen.has(sig)){
+                          try { win.removeListener('closed', fn); } catch(_){ }
+                        } else seen.add(sig);
+                      }
+                      if(verbose) console.log('[diag][closed-listener] cleanup attempted; newCount=', win.listenerCount('closed'));
+                    }
+                  } catch(_){ }
+                }
+              }
+            } catch(e){ }
+          });
+          return ret;
+        }
+        return origFn.call(this, ev, listener);
+      };
+    }
+    BrowserWindow.prototype.on = wrapAttach('on', origOn);
+    BrowserWindow.prototype.once = wrapAttach('once', origOnce);
+    // Optionally raise default max listeners to reduce noise while diagnosing (not required)
+    if(process.env.DEBUG_CLOSED_LISTENERS_RAISE){
+      try { EventEmitter.defaultMaxListeners = Math.max(EventEmitter.defaultMaxListeners, 30); } catch(_){}
+    }
+    console.log('[diag] BrowserWindow closed-listener instrumentation active');
+  }
+} catch(_){ /* ignore diagnostic setup errors */ }
 // Centralized shared constants (direct import to avoid circular barrel dependency)
 const constants = require('./modules/utils/constants');
 // Local constants (some consumed by modularized managers)
@@ -74,9 +145,13 @@ function openDsPrompt(){
   dsPromptView = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'preload.js'), nodeIntegration:false, contextIsolation:true } });
   try { mainWindow.addBrowserView(dsPromptView); } catch(_){ }
   try {
-    const mb = mainWindow.getBounds();
+    // Use content bounds (excludes window frame) for more accurate centering
+    const mb = (typeof mainWindow.getContentBounds === 'function') ? mainWindow.getContentBounds() : mainWindow.getBounds();
     dsPromptView.setBounds({ x:0,y:0,width:mb.width,height:mb.height });
     dsPromptView.setAutoResize({ width:true, height:true });
+    // Ensure prompt is on top of other BrowserViews (z-order). addBrowserView puts it last, but
+    // if future logic re-adds broker views after, explicitly re-append prompt to top.
+    try { if(mainWindow.getBrowserViews){ const all = mainWindow.getBrowserViews(); if(all[all.length-1]!==dsPromptView){ mainWindow.removeBrowserView(dsPromptView); mainWindow.addBrowserView(dsPromptView); } } } catch(_){ }
   } catch(_){ }
   const filePath = path.join(__dirname,'renderer','ds_url.html');
   try { dsPromptView.webContents.loadFile(filePath, { query:{ last:last } }); } catch(e){ console.warn('ds prompt load failed', e); }
@@ -88,6 +163,7 @@ function openDsPrompt(){
       const p = v.webContents.insertCSS(css).then(k=>{ v.__dsBlurKeys.push(k); return k; });
       v.__dsBlurKeyPromise = p; // keep last promise reference
     } catch(_){ } });
+    try { mainWindow.webContents.send('ui-blur-on'); } catch(_){ }
   } catch(_){ }
 }
 function closeDsPrompt(){
@@ -110,6 +186,7 @@ function closeDsPrompt(){
       v.__dsBlurKeyPromise.then(()=>{ clearAll(); }).catch(()=>{ clearAll(); });
     } else clearAll();
   });
+  try { mainWindow.webContents.send('ui-blur-off'); } catch(_){ }
 }
 
 // Subtle frame CSS injected into each broker view for consistent visual borders
@@ -149,7 +226,8 @@ const zoom = createZoomManager({ store, views });
 const { createStatsManager } = require('./modules/stats'); // modules/stats/index.js
 let statsManager; // temporary undefined until after stageBoundsRef creation
 let statsState = { mode: 'hidden' }; // 'hidden' | 'embedded' | 'window'
-let savedBoardMode = null;
+// (savedBoardMode no longer needed: board stays docked when stats embed)
+let savedBoardMode = null; // retained for backward compatibility but unused now
 let lastStatsToggleTs = 0; // throttle for space hotkey
 // Dedicated stats log window (detached) - lightweight
 let statsLogWindow = null;
@@ -164,14 +242,7 @@ const stageBoundsRef = { value: stageBounds };
 const quittingRef = { value:false };
 statsManager = createStatsManager({ store, mainWindow: null, stageBoundsRef, quittingRef, upscalerManager });
 
-// Helper to forward Game Stats theme to stats panel if open (used by settings IPC)
-function forwardGsTheme(theme){
-  try {
-    if(statsManager && statsManager.views && statsManager.views.panel){
-      statsManager.views.panel.webContents.send('gs-theme-apply', theme);
-    }
-  } catch(e){ }
-}
+// (Removed) forwardGsTheme – theme customization for stats table deprecated
 
 // Layout manager (needs refs defined above)
 const { createLayoutManager } = require('./modules/layout');
@@ -292,7 +363,7 @@ function bootstrap() {
   try { Menu.setApplicationMenu(null); } catch(_){}
   settingsOverlay = createSettingsOverlay({ mainWindow, views, store });
   // Initialize settings-related IPC now (requires settingsOverlay)
-  initSettingsIpc({ ipcMain, store, settingsOverlay, forwardGsTheme, statsManager });
+  initSettingsIpc({ ipcMain, store, settingsOverlay, statsManager });
   brokerManager = createBrokerManager({
     BROKERS, store, views, zoom, layoutManager, scheduleMapReapply,
     broadcastPlaceholderOdds, SNAP, GAP, stageBoundsRef, activeBrokerIdsRef,
@@ -378,16 +449,19 @@ function bootstrap() {
 function toggleStatsEmbedded(){
   if(!mainWindow || mainWindow.isDestroyed()) return;
   if(statsState.mode==='hidden'){
-    Object.values(views).forEach(v=>{ try { mainWindow.removeBrowserView(v); } catch(_){} });
-    if(boardManager && boardManager.getState().mode==='docked') { savedBoardMode='docked'; try { boardManager.detach && boardManager.detach(); } catch(_){} }
+    // NOTE: Раньше мы удаляли ВСЕ broker BrowserView (removeBrowserView) и потом добавляли обратно,
+    // что вызывало многократное накопление внутренних служебных 'closed' listeners в Electron.
+    // Теперь мы НЕ снимаем брокерские вью — просто кладём поверх них stats BrowserViews (они добавятся последними).
+    // При необходимости скрытия CPU нагрузки можно позже добавить shrink/restore bounds, но сейчас главное – остановить listener leak.
+  // Removed auto-detach of docked board: it now remains docked under stats views.
     const offsetY = stageBoundsRef && stageBoundsRef.value ? Number(stageBoundsRef.value.y) : 0;
     try { console.log('[stats][toggle] createEmbedded with offsetY', offsetY); } catch(_){ }
   statsManager.createEmbedded(offsetY);
   statsState.mode='embedded'; // (log window no longer auto-opens)
   } else if(statsState.mode==='embedded') {
     statsManager.destroyEmbedded();
-    Object.entries(views).forEach(([id,v])=>{ if(v){ try { mainWindow.addBrowserView(v); } catch(_){} } });
-    if(savedBoardMode==='docked'){ try { boardManager.attach && boardManager.attach(); } catch(_){} savedBoardMode=null; }
+    // Брокерские вью никогда не удалялись -> не нужно addBrowserView, иначе снова накопим listeners.
+  // No reattach needed (we never detached board for stats embed).
     statsState.mode='hidden';
   } else if(statsState.mode==='window') {
     // If window is open, focus instead of embedding (explicit detach path remains)

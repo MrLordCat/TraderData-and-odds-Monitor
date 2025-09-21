@@ -2,9 +2,11 @@
 // Supports layout modes: split, focusA, focusB and panel side left/right.
 
 const { BrowserWindow, BrowserView } = require('electron');
+const { ensureSingleClosedListener, hideView } = require('../utils/views');
 const path = require('path');
 
 function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, upscalerManager }) {
+  // (ensureSingleClosedListener now imported from utils/views.js)
   function canonicalHost(h){
     try {
       if(!h) return h;
@@ -17,7 +19,10 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
   let statsWindow = null; // detached window
   let embedded = { active:false, container:null }; // embedded BrowserViews in main window
   let embedOffsetY = 0; // locked toolbar offset when entering embedded mode
-  const views = { A: null, B: null, panel: null }; // content views + control panel
+  let views = { A: null, B: null, panel: null }; // CURRENT active view set (embedded or window)
+  const embeddedViews = views; // persistent embedded set
+  let embeddedInitialized = false; // tracks initial addBrowserView of embedded set
+  let windowViews = null; // { A,B,panel } when in window mode
   const DEFAULT_URLS = { A: 'https://portal.grid.gg', B: 'https://www.twitch.tv' };
   const urls = Object.assign({}, DEFAULT_URLS, store.get('statsUrls', {}));
   let mode = store.get('statsLayoutMode', 'split'); // 'split' | 'focusA' | 'focusB' | 'vertical'
@@ -30,9 +35,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
   let lolManualMode = store.get('lolManualMode', false);
   let lolMetricVisibility = store.get('lolMetricVisibility', {}); // metric -> true (visible)
   let lolMetricOrder = store.get('lolMetricOrder', null); // array or null
-  // LoL panel animation settings
-  let lolAnimEnabled = store.get('lolAnimEnabled', true);
-  let lolAnimDurationMs = store.get('lolAnimDurationMs', 3000);
+  // (Removed legacy LoL panel animation settings)
+  const DEFAULT_STATS_CONFIG = { animationsEnabled:true, animationDurationMs:450, animationScale:1, animationPrimaryColor:'#3b82f6', animationSecondaryColor:'#f59e0b', heatBarOpacity:0.55, winLoseEnabled:true };
+  let statsConfig = Object.assign({}, DEFAULT_STATS_CONFIG, store.get('statsConfig', {}));
 
   function persist() {
     store.set('statsUrls', urls);
@@ -41,9 +46,15 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
     store.set('lolManualMode', lolManualMode);
   store.set('lolMetricVisibility', lolMetricVisibility);
   if(lolMetricOrder) store.set('lolMetricOrder', lolMetricOrder);
-  store.set('lolAnimEnabled', !!lolAnimEnabled);
-  store.set('lolAnimDurationMs', Number(lolAnimDurationMs)||3000);
+  store.set('statsConfig', statsConfig);
+  // (Animation settings no longer persisted)
   }
+
+  // One-time legacy key purge (animation settings removed)
+  try {
+    if(store.has && store.has('lolAnimEnabled')) { try { store.delete('lolAnimEnabled'); } catch(_){} }
+    if(store.has && store.has('lolAnimDurationMs')) { try { store.delete('lolAnimDurationMs'); } catch(_){} }
+  } catch(_){}
 
   function layout() {
     if (!statsWindow) return;
@@ -227,16 +238,15 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
       const q = quittingRef && quittingRef.value;
       if(!q){ try { e.preventDefault(); } catch(_){ } try { statsWindow.hide(); } catch(_){ } return; }
     });
-    statsWindow.on('closed', ()=>{ statsWindow=null; });
+  ensureSingleClosedListener(statsWindow, 'statsWindow-null-reset', ()=>{ statsWindow=null; });
     views.panel = new BrowserView({ webPreferences: { partition: 'persist:statsPanel', contextIsolation: false, nodeIntegration: true } });
     statsWindow.addBrowserView(views.panel);
     try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ }
     views.panel.webContents.on('did-finish-load', ()=>{
       try {
         const hb = store.get('gsHeatBar');
-        views.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, lolAnimEnabled, lolAnimDurationMs, gsHeatBar: hb });
-        const t = store.get('gsTheme'); if(t) views.panel.webContents.send('gs-theme-apply', t);
-        if(hb) views.panel.webContents.send('gs-heatbar-apply', hb);
+  views.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar: hb, statsConfig });
+  if(hb) views.panel.webContents.send('gs-heatbar-apply', hb);
         // Inject lightweight console tap to pipe logs through stats-debug channel
         try { views.panel.webContents.executeJavaScript(`(function(){ if(window.__logTapInstalled) return; window.__logTapInstalled=true; const origLog=console.log, origErr=console.error, origWarn=console.warn; function wrap(kind, fn){ return function(){ try { const args=[...arguments].map(a=> typeof a==='object'? JSON.stringify(a): String(a)); require('electron').ipcRenderer.send('stats-debug',{ tap:kind, msg: args.join(' ')}); } catch(_){ } try { return fn.apply(this, arguments); } catch(_2){ } }; } console.log=wrap('log',origLog); console.warn=wrap('warn',origWarn); console.error=wrap('err',origErr); console.log('[logTap] installed'); })();`).catch(()=>{}); } catch(_){ }
         // Sentinel diagnostics
@@ -304,12 +314,17 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
         if(Array.isArray(payload.metricOrder)) {
           lolMetricOrder = payload.metricOrder.slice();
         }
-        if(typeof payload.animEnabled === 'boolean') lolAnimEnabled = payload.animEnabled;
-        if(payload.animDurationMs!=null) {
-          const v = Number(payload.animDurationMs);
-          if(!isNaN(v) && v>0 && v<60000) lolAnimDurationMs = v;
-        }
+        // (animation settings ignored)
         persist();
+        break;
+      case 'stats-config-set':
+        try {
+          if(payload && typeof payload==='object'){
+            Object.keys(payload).forEach(k=>{ if(k in statsConfig) statsConfig[k]=payload[k]; });
+            persist();
+            if(views.panel){ try { views.panel.webContents.send('stats-config-applied', statsConfig); } catch(_){} }
+          }
+        } catch(_){}
         break;
       case 'stats-open-devtools':
         try {
@@ -324,51 +339,60 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
   }
 
   function createEmbedded(offsetYOverride){
+    // If already embedded, nothing to do
     if(embedded.active) return;
     if(!mainWindow || mainWindow.isDestroyed()) return;
-    // If we have a real statsWindow with existing views (window mode) move them instead of rebuilding
-    let transferringFromWindow = false;
-    if(statsWindow && !statsWindow.isDestroyed() && views.panel && views.A && views.B){
-      transferringFromWindow = true;
-      try { statsWindow.removeBrowserView(views.panel); } catch(_){ }
-      try { statsWindow.removeBrowserView(views.A); } catch(_){ }
-      try { statsWindow.removeBrowserView(views.B); } catch(_){ }
-      // Destroy the empty window (will not destroy views)
-      try { statsWindow.destroy(); } catch(_){ }
+    // If currently in window mode (windowViews active), tear it down and restore embedded set
+    if(windowViews){
+      try { if(statsWindow && !statsWindow.isDestroyed()) statsWindow.close(); } catch(_){}
       statsWindow = null;
+      windowViews = null;
+      views = embeddedViews;
+      // Restore bounds of embedded views (they may be shrunk)
+      Object.values(embeddedViews).forEach(v=>{ if(v){ try { v.setBounds({ x:0, y:0, width:10, height:10 }); } catch(_){} } });
+      embedded.active = true;
+      layout();
+      setTimeout(layout,40);
+      return;
     }
-    const fresh = !(views.panel && views.A && views.B) || transferringFromWindow===false && !(views.panel && views.A && views.B);
+    // Standard path: embedded views not yet created
+    // If we have a real statsWindow with existing views (window mode) move them instead of rebuilding
+  const fresh = !(embeddedViews.panel && embeddedViews.A && embeddedViews.B);
     // Lock current stage.y as offset (or override); if reusing keep previous unless new provided
     try { embedOffsetY = (typeof offsetYOverride === 'number') ? offsetYOverride : ((stageBoundsRef && stageBoundsRef.value && Number(stageBoundsRef.value.y)) || embedOffsetY || 0); } catch(_) { embedOffsetY = 0; }
     try { console.log('[stats][embed] init offsetY', embedOffsetY, 'fresh=', fresh); } catch(_){ }
-  if(fresh){
-      views.panel = new BrowserView({ webPreferences: { partition: 'persist:statsPanel', contextIsolation: false, nodeIntegration: true } });
-      views.A = new BrowserView({ webPreferences: { partition: 'persist:statsA', contextIsolation: true, sandbox: false, preload: path.join(__dirname,'..','..','statsContentPreload.js') } });
-      views.B = new BrowserView({ webPreferences: { partition: 'persist:statsB', contextIsolation: true, sandbox: false, preload: path.join(__dirname,'..','..','statsContentPreload.js') } });
-      mainWindow.addBrowserView(views.panel);
-      mainWindow.addBrowserView(views.A);
-      mainWindow.addBrowserView(views.B);
-      try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ }
-      views.panel.webContents.on('did-finish-load', ()=>{
+    if(fresh){
+      embeddedViews.panel = new BrowserView({ webPreferences: { partition: 'persist:statsPanel', contextIsolation: false, nodeIntegration: true } });
+      embeddedViews.A = new BrowserView({ webPreferences: { partition: 'persist:statsA', contextIsolation: true, sandbox: false, preload: path.join(__dirname,'..','..','statsContentPreload.js') } });
+      embeddedViews.B = new BrowserView({ webPreferences: { partition: 'persist:statsB', contextIsolation: true, sandbox: false, preload: path.join(__dirname,'..','..','statsContentPreload.js') } });
+      try { mainWindow.addBrowserView(embeddedViews.panel); } catch(_){ }
+      try { mainWindow.addBrowserView(embeddedViews.A); } catch(_){ }
+      try { mainWindow.addBrowserView(embeddedViews.B); } catch(_){ }
+      embeddedInitialized = true;
+      try { embeddedViews.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ }
+      embeddedViews.panel.webContents.on('did-finish-load', ()=>{
         try {
           const hb = store.get('gsHeatBar');
-          views.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, lolAnimEnabled, lolAnimDurationMs, gsHeatBar: hb });
-          const t = store.get('gsTheme'); if(t) views.panel.webContents.send('gs-theme-apply', t);
-          if(hb) views.panel.webContents.send('gs-heatbar-apply', hb);
+          embeddedViews.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar: hb, statsConfig });
+          if(hb) embeddedViews.panel.webContents.send('gs-heatbar-apply', hb);
         } catch(_){ }
       });
-      resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B);
-  // Attach tracking for new views
-  attachNavTracking('A', views.A); attachNavTracking('B', views.B);
+      resolveAndLoad(embeddedViews.A, urls.A); resolveAndLoad(embeddedViews.B, urls.B);
+      attachNavTracking('A', embeddedViews.A); attachNavTracking('B', embeddedViews.B);
     } else {
-      // Reattach cached views (no reload)
-      try { mainWindow.addBrowserView(views.panel); } catch(_){ }
-      try { mainWindow.addBrowserView(views.A); } catch(_){ }
-      try { mainWindow.addBrowserView(views.B); } catch(_){ }
-  // Ensure tracking attached if not yet
-  attachNavTracking('A', views.A); attachNavTracking('B', views.B);
+      // On reuse: DO NOT re-add if already attached. Just restore bounds.
+      try {
+        const existing = mainWindow.getBrowserViews();
+        if(!embeddedInitialized){
+          // First reuse after some force-destroy path: attach only missing
+          ['panel','A','B'].forEach(k=>{ const v=embeddedViews[k]; if(v && !existing.includes(v)){ try { mainWindow.addBrowserView(v); } catch(_){} } });
+          embeddedInitialized = true;
+        }
+      } catch(_){ }
+      Object.values(embeddedViews).forEach(v=>{ if(v){ try { v.setBounds({ x:0, y:0, width:10, height:10 }); } catch(_){} } });
     }
     embedded.active = true;
+    views = embeddedViews; // switch active set
     statsWindow = { getContentBounds: ()=> mainWindow.getContentBounds(), isDestroyed:()=>false };
     layout();
     [60,120,240,480].forEach(d=> setTimeout(()=>{ if(embedded.active){
@@ -382,20 +406,22 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
   function destroyEmbedded(force){
     if(!embedded.active && !force) return;
     if(embedded.active){
-      ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v){ try { mainWindow.removeBrowserView(v); } catch(_){} } });
+      // Instead of removing BrowserViews (что порождает новые internal listeners при повторном add) — схлопываем их.
+  ['A','B','panel'].forEach(k=>{ const v=embeddedViews[k]; if(v){ hideView(v); } });
     }
     if(force){
-      // Full destroy (detach / app shutdown)
-      ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v){ try { v.webContents.destroy(); } catch(_){} views[k]=null; } });
+      ['A','B','panel'].forEach(k=>{ const v=embeddedViews[k]; if(v){ try { v.webContents.destroy(); } catch(_){} embeddedViews[k]=null; } });
     }
     embedded.active=false; statsWindow=null;
   }
 
   // Move existing embedded BrowserViews into a new detached BrowserWindow without reloading
   function detachToWindow(){
-    if(!embedded.active) return open(); // fallback
-    if(!views.panel || !views.A || !views.B) return open();
-    // Create window first (no new views yet)
+    if(!embedded.active) return; // only detach from embedded
+    if(!embeddedViews.panel || !embeddedViews.A || !embeddedViews.B) return;
+    // Shrink embedded views instead of removing
+  ['panel','A','B'].forEach(k=>{ const v=embeddedViews[k]; if(v){ hideView(v); } });
+    // Create window & separate view set
     const saved = store.get('statsBounds');
     statsWindow = new BrowserWindow({ width: saved?.width || 1400, height: saved?.height || 900, x: saved?.x, y: saved?.y, title: 'Game Stats', autoHideMenuBar: true, webPreferences: { preload: path.join(__dirname,'..','..','preload.js') } });
     statsWindow.on('close', (e)=>{
@@ -403,22 +429,32 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
       const q = quittingRef && quittingRef.value;
       if(!q){ try { e.preventDefault(); } catch(_){ } try { statsWindow.hide(); } catch(_){ } return; }
     });
-    statsWindow.on('closed', ()=>{ statsWindow=null; });
-    // Remove from main window and attach to statsWindow (Electron allows addBrowserView on new window after removal)
-    ['panel','A','B'].forEach(k=>{ const v=views[k]; if(!v) return; try { mainWindow.removeBrowserView(v); } catch(_){ } try { statsWindow.addBrowserView(v); } catch(_){ } });
-    embedded.active=false; // now in window mode
-    // When moving panel view we must ensure it already had loaded (embedded did). Re-send init only if still loading
-    try {
-      if(views.panel && views.panel.webContents && views.panel.webContents.isLoading && views.panel.webContents.isLoading()){
-        views.panel.webContents.once('did-finish-load', ()=>{ try { views.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, lolAnimEnabled, lolAnimDurationMs }); } catch(_){ } });
-      } else if(views.panel){
-        views.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, lolAnimEnabled, lolAnimDurationMs });
-      }
-    } catch(_){ }
-    // Reassign layout context: statsWindow is real now
+    ensureSingleClosedListener(statsWindow, 'statsWindow-null-reset', ()=>{ statsWindow=null; });
+    windowViews = {
+      panel: new BrowserView({ webPreferences: { partition: 'persist:statsPanelWin', contextIsolation: false, nodeIntegration: true } }),
+      A: new BrowserView({ webPreferences: { partition: 'persist:statsAWin', contextIsolation: true, sandbox:false, preload: path.join(__dirname,'..','..','statsContentPreload.js') } }),
+      B: new BrowserView({ webPreferences: { partition: 'persist:statsBWin', contextIsolation: true, sandbox:false, preload: path.join(__dirname,'..','..','statsContentPreload.js') } })
+    };
+    try { statsWindow.addBrowserView(windowViews.panel); } catch(_){ }
+    try { statsWindow.addBrowserView(windowViews.A); } catch(_){ }
+    try { statsWindow.addBrowserView(windowViews.B); } catch(_){ }
+    try { windowViews.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ }
+    windowViews.panel.webContents.on('did-finish-load', ()=>{
+      try {
+        const hb = store.get('gsHeatBar');
+        windowViews.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar: hb, statsConfig });
+        if(hb) windowViews.panel.webContents.send('gs-heatbar-apply', hb);
+      } catch(_){ }
+    });
+    resolveAndLoad(windowViews.A, urls.A); resolveAndLoad(windowViews.B, urls.B);
+    attachNavTracking('A', windowViews.A); attachNavTracking('B', windowViews.B);
+    // Switch active set to window views
+    views = windowViews;
+    embedded.active = false;
     embedOffsetY = 0;
+    // Layout now based on statsWindow instead of mainWindow shim
     layout();
-    setTimeout(layout, 50);
+    setTimeout(layout,50);
   }
 
   function handleStageResized(){
@@ -431,7 +467,18 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
     }
   }
 
-  return { open, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized };
+  // Ensure stats embedded views are top-most (above any newly added broker view)
+  function ensureTopmost(){
+    if(!embedded.active) return; // only relevant when embedded
+    if(!mainWindow || mainWindow.isDestroyed()) return;
+    const hasSetter = typeof mainWindow.setTopBrowserView === 'function';
+    if(!hasSetter) return; // graceful noop if Electron version lacks API
+    try {
+      ['panel','A','B'].forEach(k=>{ const v = embeddedViews[k]; if(v) { try { mainWindow.setTopBrowserView(v); } catch(_){ } } });
+    } catch(_){ }
+  }
+
+  return { open, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost };
 }
 
 module.exports = { createStatsManager };

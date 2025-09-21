@@ -14,21 +14,27 @@
 			<button id="close" class="x">✕</button>
 		</div>
 		<div class="content">
+			<!-- Game Stats Theme section removed (LoL table theme controls deprecated) -->
 			<section>
-				<h2 class="sectionTitle">Game Stats Theme</h2>
+				<h2 class="sectionTitle">Stats Table</h2>
 				<div class="grid formGrid">
-					<label for="gs-bg">Cell background</label><input id="gs-bg" type="color" />
-					<label for="gs-border">Border color</label><input id="gs-border" type="color" />
-					<label for="gs-head">Header background</label><input id="gs-head" type="color" />
-					<label for="gs-win">Win color</label><input id="gs-win" type="color" />
-					<label for="gs-lose">Loss color</label><input id="gs-lose" type="color" />
-					<label for="gs-intensity">Intensity (%)</label><input id="gs-intensity" type="range" min="0" max="100" step="1" />
-								<label for="gs-animColor">Animation color</label><input id="gs-animColor" type="color" />
-								  <label for="gs-animIntensity">Animation brightness (%)</label><input id="gs-animIntensity" type="range" min="50" max="400" step="1" />
-								<label for="gs-animDurSec">Animation duration (sec)</label><input id="gs-animDurSec" type="number" min="0.5" max="10" step="0.1" />
+					<label for="st-winlose">Win/Lose highlight</label><input id="st-winlose" type="checkbox" />
 				</div>
-				<div class="hint">Changes apply instantly. Save persists them; Reset restores defaults.</div>
+				<div class="hint">Win/Lose highlight updates instantly.</div>
 			</section>
+			<hr class="sepLine" />
+			<section>
+				<h2 class="sectionTitle">Table Animations</h2>
+				<div class="grid formGrid">
+					<label for="anim-enabled">Animations enabled</label><input id="anim-enabled" type="checkbox" />
+					<label for="anim-duration">Duration (ms)</label><input id="anim-duration" type="number" min="50" max="5000" step="10" />
+					<label for="anim-scale">Scale</label><input id="anim-scale" type="range" min="0.25" max="2" step="0.05" />
+					<label for="anim-color1">Primary color</label><input id="anim-color1" type="color" />
+					<label for="anim-color2">Secondary color</label><input id="anim-color2" type="color" />
+				</div>
+				<div class="hint">Анимации пока минимальны (фреймворк заложен). Параметры сохраняются для будущих эффектов.</div>
+			</section>
+			<hr class="sepLine" />
 			<section>
 				<h2 class="sectionTitle">Activity Heat Bar</h2>
 				<div class="grid formGrid">
@@ -37,8 +43,9 @@
 					<label for="hb-bump">Bump (+)</label><input id="hb-bump" type="number" min="0.01" max="1" step="0.01" />
 					<label for="hb-color1">Team 1 color</label><input id="hb-color1" type="color" />
 					<label for="hb-color2">Team 2 color</label><input id="hb-color2" type="color" />
+					<label for="hb-opacity">Opacity</label><input id="hb-opacity" type="range" min="0" max="1" step="0.01" />
 				</div>
-				<div class="hint">Activity bar: increases on events, decays over time. Colors blend via mix mode.</div>
+				<div class="hint">Activity bar: increases on events, decays over time. Colors blend; opacity scales max intensity.</div>
 			</section>
 			<hr class="sepLine" />
 			<label class="row">Contrast (stub): <span id="cVal"></span>

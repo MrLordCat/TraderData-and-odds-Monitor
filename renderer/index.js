@@ -118,42 +118,51 @@ window.desktopAPI.getStatsState().then(applyStatsState);
 window.desktopAPI.onStatsState(applyStatsState);
 
 // Add broker via select dropdown mirroring layout behavior
-async function populateAddBrokerSelect(){
+let __populatingAddSelect = false;
+async function populateAddBrokerSelect(force=false){
+  if(__populatingAddSelect) return; // debounce concurrent triggers
   const sel = document.getElementById('addBrokerSelect'); if(!sel) return;
-  // Clear everything except first placeholder option
-  const first = sel.querySelector('option[value=""]');
-  sel.innerHTML=''; sel.appendChild(first || Object.assign(document.createElement('option'),{value:'',textContent:'＋ Broker'}));
-  const { brokers=[], active=[] } = await window.desktopAPI.getBrokersForPicker();
-  const activeSet = new Set(active);
-  // Inject pseudo-broker (Excel) entry before real brokers
-  const dsOpt=document.createElement('option');
-  dsOpt.value='dataservices';
-  dsOpt.textContent = activeSet.has('dataservices') ? 'Excel (added)' : 'Excel';
-  if(activeSet.has('dataservices')) dsOpt.disabled = true;
-  sel.appendChild(dsOpt);
-  brokers.forEach(b=>{
-    const opt=document.createElement('option');
-    opt.value=b.id; opt.textContent = activeSet.has(b.id) ? `${b.id} (added)` : b.id;
-    if(b.inactive){ opt.disabled=true; opt.textContent = `${b.id} (inactive)`; }
-    else if(activeSet.has(b.id)){ opt.disabled=true; }
-    sel.appendChild(opt);
-  });
+  // If not forced and we already have more than placeholder+1 Excel option, assume list already built
+  if(!force){
+    const existingOpts = sel.querySelectorAll('option');
+    if(existingOpts.length > 2) return; // already populated
+  }
+  __populatingAddSelect = true;
+  try {
+    const placeholder = Object.assign(document.createElement('option'),{value:'',textContent:'＋ Broker'});
+    sel.innerHTML=''; sel.appendChild(placeholder);
+    const { brokers=[], active=[] } = await window.desktopAPI.getBrokersForPicker();
+    const activeSet = new Set(active);
+    const dsOpt=document.createElement('option');
+    dsOpt.value='dataservices';
+    dsOpt.textContent = activeSet.has('dataservices') ? 'Excel (added)' : 'Excel';
+    if(activeSet.has('dataservices')) dsOpt.disabled = true;
+    sel.appendChild(dsOpt);
+    for(const b of brokers){
+      // Skip pseudo-broker duplication just in case
+      if(b.id === 'dataservices') continue;
+      const opt=document.createElement('option');
+      opt.value=b.id; opt.textContent = activeSet.has(b.id) ? `${b.id} (added)` : b.id;
+      if(b.inactive){ opt.disabled=true; opt.textContent = `${b.id} (inactive)`; }
+      else if(activeSet.has(b.id)){ opt.disabled=true; }
+      sel.appendChild(opt);
+    }
+  } catch(_){ } finally { __populatingAddSelect = false; }
 }
 const addSelect = document.getElementById('addBrokerSelect');
 if(addSelect){
-  addSelect.addEventListener('focus', populateAddBrokerSelect);
-  addSelect.addEventListener('mousedown', ()=>{ populateAddBrokerSelect(); });
+  addSelect.addEventListener('focus', ()=> populateAddBrokerSelect());
   addSelect.addEventListener('change', async ()=>{
     const v=addSelect.value; if(!v) return;
     if(v==='dataservices'){
       // Use dedicated BrowserView overlay prompt (main process) instead of in-DOM modal
       window.desktopAPI.openDataservicesPrompt();
       addSelect.value='';
-      setTimeout(()=> populateAddBrokerSelect(), 150);
+      setTimeout(()=> populateAddBrokerSelect(true), 150);
       return;
     }
     window.desktopAPI.addBroker(v);
-    setTimeout(()=> populateAddBrokerSelect(), 150);
+    setTimeout(()=> populateAddBrokerSelect(true), 150);
     addSelect.value='';
   });
 }

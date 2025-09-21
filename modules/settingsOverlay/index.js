@@ -1,8 +1,10 @@
 const { BrowserView } = require('electron');
+const { hideView } = require('../utils/views');
 const path = require('path');
 
 function createSettingsOverlay(ctx){
   let settingsView = null;
+  let attached = false; // track if attached to mainWindow
   const overlayBlur = { active:false, cssKeys:{} };
 
   function applyBlurToBrokers(){
@@ -21,28 +23,37 @@ function createSettingsOverlay(ctx){
     overlayBlur.cssKeys={};
   }
 
-  function open(){
+  function ensureCreated(){
     if(settingsView) return;
     settingsView = new BrowserView({ webPreferences:{ nodeIntegration:true, contextIsolation:false, backgroundThrottling:false } });
-    try { ctx.mainWindow.addBrowserView(settingsView); } catch(e){ }
-    const mb = ctx.mainWindow.getBounds();
-    settingsView.setBounds({ x:0,y:0,width:mb.width,height:mb.height });
-    settingsView.setAutoResize({ width:true, height:true });
-    try { settingsView.webContents.loadFile(path.join(__dirname,'..','..','renderer','settings.html')); } catch(e){}
+    try { ctx.mainWindow.addBrowserView(settingsView); attached=true; } catch(_){ }
+    try {
+      const mb = ctx.mainWindow.getBounds();
+      settingsView.setBounds({ x:0,y:0,width:mb.width,height:mb.height });
+      settingsView.setAutoResize({ width:true, height:true });
+    } catch(_){ }
+    try { settingsView.webContents.loadFile(path.join(__dirname,'..','..','renderer','settings.html')); } catch(_){ }
     settingsView.webContents.on('did-finish-load', ()=>{ try {
-      const gsTheme = ctx.store ? ctx.store.get('gsTheme') : null;
       const gsHeatBar = ctx.store ? ctx.store.get('gsHeatBar') : null;
-      settingsView.webContents.send('settings-init', { contrast:100, gsTheme, gsHeatBar });
+      const statsConfig = ctx.store ? ctx.store.get('statsConfig') : null;
+      settingsView.webContents.send('settings-init', { contrast:100, gsHeatBar, statsConfig });
     } catch(_){ } });
+  }
+  function open(){
+    ensureCreated();
+    // Reattach if detached (should not normally happen)
+    if(!attached){ try { ctx.mainWindow.addBrowserView(settingsView); attached=true; } catch(_){ } }
+    try {
+      const mb = ctx.mainWindow.getBounds();
+      settingsView.setBounds({ x:0,y:0,width:mb.width,height:mb.height });
+    } catch(_){ }
     applyBlurToBrokers();
     try { ctx.mainWindow.webContents.send('ui-blur-on'); } catch(_){ }
   }
   function close(){
     if(!settingsView) return;
-    try { ctx.mainWindow.removeBrowserView(settingsView); } catch(_){ }
-    try { settingsView.webContents.removeAllListeners(); } catch(_){ }
-    try { settingsView.destroy(); } catch(_){ }
-    settingsView=null;
+    // Instead of destroying (вызывало повторные addBrowserView), просто схлопываем.
+  hideView(settingsView);
     clearBlurFromBrokers();
     try { ctx.mainWindow.webContents.send('ui-blur-off'); } catch(_){ }
   }

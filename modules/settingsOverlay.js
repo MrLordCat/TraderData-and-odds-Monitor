@@ -30,10 +30,10 @@ function createSettingsOverlay(ctx){
     settingsView.setAutoResize({ width:true, height:true });
     try { settingsView.webContents.loadFile(path.join(__dirname,'..','renderer','settings.html')); } catch(e){}
     settingsView.webContents.on('did-finish-load', ()=>{ try {
-      const gsTheme = ctx.store ? ctx.store.get('gsTheme') : null;
       const gsHeatBar = ctx.store ? ctx.store.get('gsHeatBar') : null;
-      try { console.log('[settingsOverlay] init theme+heatbar', gsHeatBar); } catch(_){ }
-      settingsView.webContents.send('settings-init', { contrast:100, gsTheme, gsHeatBar });
+      const statsConfig = ctx.store ? ctx.store.get('statsConfig') : null;
+      try { console.log('[settingsOverlay] init heatbar', gsHeatBar, 'statsConfig', statsConfig); } catch(_){ }
+      settingsView.webContents.send('settings-init', { contrast:100, gsHeatBar, statsConfig });
     } catch(_){ } });
     applyBlurToBrokers();
     try { ctx.mainWindow.webContents.send('ui-blur-on'); } catch(_){ }

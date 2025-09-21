@@ -126,7 +126,10 @@ function loop(){
       if(el){
         const lvl = state.levels[i];
         el.style.transform = `translateZ(0) scaleY(${lvl.toFixed(4)})`;
-        el.style.opacity = (0.35 + 0.65*lvl).toFixed(3);
+  // Opacity base curve scaled by global heatbar alpha variable (default 1 if missing)
+  const alphaVar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gs-heatbar-alpha'));
+  const alphaMul = isFinite(alphaVar)? alphaVar : 1;
+  el.style.opacity = Math.min(1, (0.35 + 0.65*lvl) * alphaMul).toFixed(3);
         if(lvl < 0.2) el.classList.add('fadingLow'); else el.classList.remove('fadingLow');
       }
     }
