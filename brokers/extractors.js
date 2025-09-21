@@ -76,77 +76,26 @@ function extractRivalry(mapNum=0){
       return raw.replace(',','.');
     };
     const odds = plates.map(extractPrice);
-    // Style-based suspension detection (no dynamic class names):
-    // Strategy:
-    //  1. Extract the numeric price span (last numeric span).
-    //  2. Consider a plate ACTIVE if:
-    //       - price span and ancestors (up to depth 4) are pointer-events != none
-    //       - AND (cursor pointer observed OR elementFromPoint hits the span OR opacity >= 0.75)
-    //  3. Consider a plate HARD-BLOCKED if price span or ancestor has pointer-events:none OR opacity < 0.35.
-    //  4. Market frozen only if ALL plates are NOT active AND at least one is hard-blocked.
-    function plateState(plate){
+    // Simplified suspension detection (previous heuristic produced false positives):
+    //  Plate considered ACTIVE iff it has a numeric odds value AND (pointer-events != none) AND opacity >= 0.45.
+    //  Market frozen ONLY if every plate is inactive by that rule.
+    function isActivePlate(plate){
       try {
         const spans=[...plate.querySelectorAll('span')];
-        const numeric = spans.filter(s=>/\d+(?:[.,]\d+)?/.test((s.textContent||'').trim()));
-        const last = numeric[numeric.length-1] || spans[spans.length-1];
-        if(!last) return {active:false, hard:true, info:{reason:'noSpan'}};
-        const cs=getComputedStyle(last);
-        const op=parseFloat(cs.opacity||'1');
-        let hard=false; let cursorPointer=false; let peBlocked=false; let anyPointerAncestor=false;
-        if(cs.pointerEvents==='none') { hard=true; peBlocked=true; }
-        if(!isNaN(op) && op<0.35) hard=true;
-        // Scan deeper ancestors (up to 10) including plate itself to find pointer/cursor state
-        let cur=last; let depth=0; const chain=[];
-        while(cur && depth<10){
-          chain.push(cur);
-            try {
-              const ccs=getComputedStyle(cur);
-              if(ccs.cursor==='pointer') cursorPointer=true;
-              if(ccs.pointerEvents && ccs.pointerEvents!=='auto' && ccs.pointerEvents!=='visible' && ccs.pointerEvents!=='visiblePainted'){
-                hard=true; peBlocked=true; // treat anything not auto/visible as block
-              }
-              if(ccs.pointerEvents==='auto') anyPointerAncestor=true;
-              if(ccs.pointerEvents==='none'){ hard=true; peBlocked=true; }
-            } catch(_){ }
-          cur=cur.parentElement; depth++;
-        }
-        // Plate center & multi-point probing (detect overlay intercepts)
-        let probeHits=0; let probePoints=0; let overlayIntercept=false;
-        try {
-          const pr = plate.getBoundingClientRect();
-          const pts=[
-            [pr.left+pr.width/2, pr.top+pr.height/2], // center
-            [pr.left+4, pr.top+4],
-            [pr.right-4, pr.top+4],
-            [pr.left+4, pr.bottom-4],
-            [pr.right-4, pr.bottom-4]
-          ];
-          for(const [x,y] of pts){
-            if(x<0||y<0) continue; // offscreen
-            probePoints++;
-            const el=document.elementFromPoint(x,y);
-            if(el && (el===plate || plate.contains(el))){ probeHits++; }
-            else overlayIntercept=true;
-          }
-        } catch(_){ }
-        // Additional grayscale (desaturation) heuristic on price color
-        let grayish=false; let colorStr='';
-        try { colorStr=cs.color||''; const m=colorStr.match(/rgba?\(([^)]+)\)/); if(m){ const parts=m[1].split(',').map(v=>parseFloat(v)); if(parts.length>=3){ const [r,g,b]=parts; const max=Math.max(r,g,b), min=Math.min(r,g,b); if(max-min < 26){ grayish=true; } if((r+g+b)/3 < 90) grayish=true; } } } catch(_){ }
-        // Active criteria broadened: need pointer ancestor OR (sufficient opacity + majority probe hits)
-        const probeRatio = probePoints? (probeHits/probePoints):0;
-        const active = !peBlocked && (cursorPointer || (probeRatio>=0.6 && (isNaN(op)||op>=0.6))) && !grayish;
-        if(!active && probeRatio<0.4) hard=true; // heavy overlay
-        return {active, hard, info:{cursorPointer, probeRatio, op, grayish, anyPointerAncestor, peBlocked}};
-      } catch(_){ return {active:false, hard:true, info:{error:true}}; }
+        const numeric = spans.map(s=>s.textContent.trim()).filter(t=>/^\d+(?:[.,]\d+)?$/.test(t));
+        if(!numeric.length) return false;
+        const lastSpan = spans.find(s=>s.textContent && s.textContent.trim()===numeric[numeric.length-1]) || spans[spans.length-1];
+        const cs = lastSpan? getComputedStyle(lastSpan): null;
+        if(!cs) return false;
+        if(cs.pointerEvents==='none') return false;
+        const op = parseFloat(cs.opacity||'1');
+        if(!isNaN(op) && op < 0.45) return false;
+        return true;
+      } catch(_){ return false; }
     }
-    const states = plates.map(plateState);
-    const allInactive = states.every(s=>!s.active);
-    const anyHard = states.some(s=>s.hard);
-  const frozen = allInactive && anyHard;
-  if(debug){ try { console.log('[RIVALRY][debug]', { mapNum, odds, states, allInactive, anyHard, frozen }); } catch(_){ } }
-    if(debug){
-      // above block already logs detailed state
-    }
+    const plateStates = plates.map(p=>({ active:isActivePlate(p) }));
+    const frozen = plateStates.every(s=>!s.active);
+    if(debug){ try { console.log('[RIVALRY][debug]', { mapNum, odds, plateStates, frozen }); } catch(_){ } }
     return { odds: odds.length===2?odds:['-','-'], frozen };
   } catch(_){ return { odds:['-','-'], frozen:false }; }
 }

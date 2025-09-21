@@ -29,8 +29,19 @@ function initSettingsIpc(ctx){
       const v = payload && typeof payload.tolerancePct==='number'? clampTol(payload.tolerancePct): null;
       if(v){
         store.set('autoTolerancePct', v);
-        // Broadcast to all renderers (board + embedded stats). We reuse generic channel.
-        try { const bw = require('electron').BrowserWindow.getAllWindows(); bw.forEach(w=>{ try { w.webContents.send('auto-tolerance-updated', v); } catch(_){} }); } catch(_){ }
+        // Broadcast to all BrowserWindows AND their BrowserViews (board & embedded stats are BrowserViews when docked)
+        try {
+          const { BrowserWindow } = require('electron');
+          const bw = BrowserWindow.getAllWindows();
+            bw.forEach(w=>{
+              try { w.webContents.send('auto-tolerance-updated', v); } catch(_){ }
+              try {
+                if(typeof w.getBrowserViews === 'function'){
+                  w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-tolerance-updated', v); } catch(_){ } });
+                }
+              } catch(_){ }
+            });
+        } catch(_){ }
       }
     } catch(_){ }
   });

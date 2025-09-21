@@ -353,6 +353,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
       embedded.active = true;
       layout();
       setTimeout(layout,40);
+      // Reassert z-order after window -> embedded transition
+      try { ensureTopmost(); } catch(_){ }
+      ;[30,120,300].forEach(d=> setTimeout(()=>{ if(embedded.active) try { ensureTopmost(); } catch(_){ } }, d));
       return;
     }
     // Standard path: embedded views not yet created
@@ -395,6 +398,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
     views = embeddedViews; // switch active set
     statsWindow = { getContentBounds: ()=> mainWindow.getContentBounds(), isDestroyed:()=>false };
     layout();
+  // Immediate and delayed z-order enforcement so any broker added just before embed doesn't cover panel
+  try { ensureTopmost(); } catch(_){ }
+  ;[10,60,180,360].forEach(d=> setTimeout(()=>{ if(embedded.active) try { ensureTopmost(); } catch(_){ } }, d));
     [60,120,240,480].forEach(d=> setTimeout(()=>{ if(embedded.active){
       try {
         const sy = stageBoundsRef && stageBoundsRef.value ? Number(stageBoundsRef.value.y) : embedOffsetY;
