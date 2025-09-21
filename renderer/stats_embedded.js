@@ -137,10 +137,13 @@ function renderEmbeddedOdds(){
     if(eo1) eo1.textContent=h1; if(eo2) eo2.textContent=h2;
   } catch(_){ }
 
-  // Embedded auto row visibility update
+  // Embedded auto rows (indicators + status) visibility update
   try {
-    const autoRow=document.getElementById('embeddedExcelAutoRow');
-    if(autoRow) autoRow.style.display = embeddedAutoSim.active ? '' : 'none';
+    const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow');
+    const stRow=document.getElementById('embeddedExcelAutoStatusRow');
+    const vis = embeddedAutoSim.active ? '' : 'none';
+    if(indRow) indRow.style.display = vis;
+    if(stRow) stRow.style.display = vis;
   } catch(_){ }
 }
 function handleEmbeddedOdds(p){ try {
@@ -218,7 +221,7 @@ function embeddedParseMid(){ return embeddedParsePair('embeddedMidCell'); }
 function embeddedParseExcel(){ return embeddedParsePair('embeddedExcelCell'); }
 function embeddedSetExcel(){ /* placeholder for future real integration; not used in simulation */ }
 function embeddedStatus(msg){ const el=document.getElementById('embeddedAutoStatus'); if(el) el.textContent=msg||''; }
-function embeddedFlash(idx){ const dot=document.querySelector('#embeddedExcelAutoRow .autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), embeddedAutoSim.stepMs-80); } }
+function embeddedFlash(idx){ const dot=document.querySelector('#embeddedExcelAutoIndicatorsRow .autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), embeddedAutoSim.stepMs-80); } }
 function embeddedSchedule(){ if(!embeddedAutoSim.active) return; clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=setTimeout(embeddedStep, embeddedAutoSim.stepMs); }
 function embeddedStep(){
   if(!embeddedAutoSim.active) return;
@@ -240,7 +243,8 @@ function embeddedStep(){
 function embeddedToggleAuto(){
   embeddedAutoSim.active=!embeddedAutoSim.active;
   const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.toggle('on', embeddedAutoSim.active);
-  const row=document.getElementById('embeddedExcelAutoRow'); if(row) row.style.display=embeddedAutoSim.active? '' : 'none';
+  const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow'); if(indRow) indRow.style.display=embeddedAutoSim.active? '' : 'none';
+  const stRow=document.getElementById('embeddedExcelAutoStatusRow'); if(stRow) stRow.style.display=embeddedAutoSim.active? '' : 'none';
   embeddedStatus(embeddedAutoSim.active? `Start (tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%)` : 'Stopped');
   if(embeddedAutoSim.active){ embeddedStep(); } else { clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=null; }
 }

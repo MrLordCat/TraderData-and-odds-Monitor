@@ -36,32 +36,44 @@ function extractRivalry(mapNum=0){
   //   mapNum>=1 -> strict "{Ordinal} map - winner" (ordinal English words)
   try {
   const debug = !!window.__RIVALRY_DEBUG;
-  const wrappers = deepQuery('[data-editor-id="tableMarketWrapper"]');
+    const wrappers = deepQuery('[data-editor-id="tableMarketWrapper"]');
     if(!wrappers.length) return { odds:['-','-'], frozen:false };
     const ORD=['First','Second','Third','Fourth','Fifth'];
     const norm = (s)=> (s||'').replace(/\s+/g,' ').trim().toLowerCase();
     let target=null;
     if(mapNum===0){
-      // Scan each wrapper: take first non-empty line (or first heading-like element text)
+      // Prefer explicit header elements first (legacy extension logic)
       for(const w of wrappers){
-        let headerCandidates=[];
-        // first line of text
-        const firstLine = (w.textContent||'').split('\n').map(l=>norm(l)).find(l=>l.length>0) || '';
-        if(firstLine) headerCandidates.push(firstLine);
-        // direct child div/ span short texts
-        headerCandidates.push(...Array.from(w.children).slice(0,3).map(c=>norm(c.textContent||'')));
-        if(headerCandidates.some(t=>/^winner$/.test(t))){ target=w; break; }
+        const header = w.querySelector('div.bt323, div.bt341');
+        if(header && /^winner$/i.test(header.textContent.trim())){ target=w; break; }
+      }
+      // Fallback to broad text scan
+      if(!target){
+        for(const w of wrappers){
+          let headerCandidates=[];
+          const firstLine = (w.textContent||'').split('\n').map(l=>norm(l)).find(l=>l.length>0) || '';
+          if(firstLine) headerCandidates.push(firstLine);
+          headerCandidates.push(...Array.from(w.children).slice(0,3).map(c=>norm(c.textContent||'')));
+          if(headerCandidates.some(t=>/^winner$/.test(t))){ target=w; break; }
+        }
       }
     } else {
       const idx=mapNum-1; if(idx<0||idx>=ORD.length) return { odds:['-','-'], frozen:false };
-      const pattern = new RegExp('^'+ORD[idx].toLowerCase().replace(/([.*+?^${}()|\[\]\\])/g,'\\$1')+'\\s+map\\s*-?\\s*winner$');
-      outer: for(const w of wrappers){
-        const lines = (w.textContent||'').split('\n').map(l=>norm(l)).filter(l=>l.length);
-        for(const line of lines){ if(pattern.test(line)){ target=w; break outer; } }
-        if(!target){
-          // Consider short child nodes text
-          const childTexts = Array.from(w.children).slice(0,5).map(c=>norm(c.textContent||''));
-          if(childTexts.some(t=>pattern.test(t))){ target=w; break; }
+      const pattern = new RegExp('^'+ORD[idx].toLowerCase().replace(/([.*+?^${}()|\[\]\\])/g,'\\$1')+'\\s+map'); // loosen to match 'First map' header variants
+      // Try header-based first
+      for(const w of wrappers){
+        const header = w.querySelector('div.bt323, div.bt341');
+        if(header && pattern.test(norm(header.textContent||''))){ target=w; break; }
+      }
+      // Fallback broad scan
+      if(!target){
+        outer: for(const w of wrappers){
+          const lines = (w.textContent||'').split('\n').map(l=>norm(l)).filter(l=>l.length);
+          for(const line of lines){ if(pattern.test(line)){ target=w; break outer; } }
+          if(!target){
+            const childTexts = Array.from(w.children).slice(0,5).map(c=>norm(c.textContent||''));
+            if(childTexts.some(t=>pattern.test(t))){ target=w; break; }
+          }
         }
       }
     }
@@ -75,27 +87,61 @@ function extractRivalry(mapNum=0){
       const raw = numeric[numeric.length-1] || (spans.length? spans[spans.length-1].textContent.trim(): '-');
       return raw.replace(',','.');
     };
-    const odds = plates.map(extractPrice);
-    // Simplified suspension detection (previous heuristic produced false positives):
-    //  Plate considered ACTIVE iff it has a numeric odds value AND (pointer-events != none) AND opacity >= 0.45.
-    //  Market frozen ONLY if every plate is inactive by that rule.
+  const odds = plates.map(extractPrice);
+    // Enhanced suspension detection:
+    // A plate is ACTIVE if:
+    //  - Has a numeric odds value AND
+    //  - Not explicitly disabled (aria-disabled/disabled) AND
+    //  - Not visually fully dimmed (opacity <0.35) AND
+    //  - Pointer events not removed AND
+    //  - No lock icon inside AND
+    //  - Computed color not overly greyed (#777+ range) unless high opacity + pointer-events
+    // Market frozen if ALL plates inactive OR wrapper contains textual suspension cues.
     function isActivePlate(plate){
       try {
+        // Lock / disabled attributes
+        if(plate.matches('[disabled],[aria-disabled="true"],[data-disabled="true"]')) return false;
+        if(plate.querySelector('[data-editor-id="LockIcon"],svg[data-editor-id*="Lock" i]')) return false;
         const spans=[...plate.querySelectorAll('span')];
         const numeric = spans.map(s=>s.textContent.trim()).filter(t=>/^\d+(?:[.,]\d+)?$/.test(t));
-        if(!numeric.length) return false;
+        if(!numeric.length) return false; // no price visible
         const lastSpan = spans.find(s=>s.textContent && s.textContent.trim()===numeric[numeric.length-1]) || spans[spans.length-1];
         const cs = lastSpan? getComputedStyle(lastSpan): null;
         if(!cs) return false;
         if(cs.pointerEvents==='none') return false;
-        const op = parseFloat(cs.opacity||'1');
-        if(!isNaN(op) && op < 0.45) return false;
+        const op = parseFloat(cs.opacity||'1'); if(!isNaN(op) && op < 0.35) return false;
+        const color = cs.color || '';
+        // crude grey detection (#777-#aaa or rgb with similar channels) – indicates disabled style sometimes
+        if(/#7[0-9a-f]{1}|#8[0-9a-f]{1}|#9[0-9a-f]{1}|#aaa/i.test(color)){ if(op < 0.9) return false; }
+        if(/^rgb\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\)/i.test(color)){
+          const m=color.match(/(\d+)/g)||[]; if(m.length>=3){ const [r,g,b]=m.slice(0,3).map(Number); const delta=Math.max(r,g,b)-Math.min(r,g,b); if(delta<8 && r<150){ if(op<0.9) return false; } }
+        }
         return true;
       } catch(_){ return false; }
     }
     const plateStates = plates.map(p=>({ active:isActivePlate(p) }));
-    const frozen = plateStates.every(s=>!s.active);
-    if(debug){ try { console.log('[RIVALRY][debug]', { mapNum, odds, plateStates, frozen }); } catch(_){ } }
+    let heuristicAllInactive = plateStates.every(s=>!s.active);
+
+    // Old extension heuristic: mark frozen if ANY plate's last span has pointerEvents none OR cursor default/not-allowed OR opacity <1
+    let legacyFrozen = false;
+    try {
+      plates.forEach(plate=>{
+        if(legacyFrozen) return;
+        const spans=plate.querySelectorAll('span');
+        const last=spans[spans.length-1];
+        if(!last) return;
+        const cs=getComputedStyle(last);
+        const op=parseFloat(cs.opacity||'1');
+        if(cs.pointerEvents==='none' || cs.cursor==='default' || cs.cursor==='not-allowed' || (!isNaN(op) && op<1)) legacyFrozen=true;
+      });
+    } catch(_){ }
+
+    // Wrapper text cues
+    let textCueFrozen=false;
+    try { const txt=norm(target.textContent||''); if(/suspend|suspens|closed|settled|unavailable/.test(txt)) textCueFrozen=true; } catch(_){ }
+
+    const frozen = heuristicAllInactive || legacyFrozen || textCueFrozen;
+    if(debug){ try { console.log('[RIVALRY][debug]', { mapNum, odds, plateStates, heuristicAllInactive, legacyFrozen, textCueFrozen, frozen }); } catch(_){ } }
     return { odds: odds.length===2?odds:['-','-'], frozen };
   } catch(_){ return { odds:['-','-'], frozen:false }; }
 }
