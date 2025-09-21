@@ -1,11 +1,11 @@
 // Stats (panel / embedded) IPC extracted from main.js
 // initStatsIpc({ ipcMain, store, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs })
-// refs: { statsState, savedBoardMode, lastStatsToggleTs }
+// refs: { statsState, lastStatsToggleTs }
 
 function initStatsIpc(ctx){
   const { ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs, store } = ctx;
   if(!ipcMain || !statsManager) return;
-  const { statsState, savedBoardMode, lastStatsToggleTs } = refs;
+  const { statsState, lastStatsToggleTs } = refs;
   ipcMain.handle('get-stats-state', ()=> statsState);
   ipcMain.on('stats-toggle', ()=> toggleStatsEmbedded());
   ipcMain.on('stats-detach', ()=>{

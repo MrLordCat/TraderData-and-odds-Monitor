@@ -218,3 +218,79 @@ if(window.desktopAPI && window.desktopAPI.onTeamNames){
 }
 
 // Backward compatibility: if older localStorage labels exist, ignore them now.
+
+// ================= Auto alignment helper (simulate button presses only – no virtual odds) =================
+// We no longer create or apply any virtual Excel odds; we only observe current Excel values
+// and indicate which side would be "pressed" toward the Mid reference until within tolerance.
+const autoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null };
+// Load stored tolerance
+try {
+  if(window.desktopAPI && window.desktopAPI.invoke){
+    window.desktopAPI.invoke('auto-tolerance-get').then(v=>{
+      if(typeof v==='number' && !isNaN(v)) autoSim.tolerancePct = v;
+      try { console.log('[autoSim][board] tolerance loaded', autoSim.tolerancePct); } catch(_){ }
+    }).catch(()=>{});
+  } else if(window.ipcRenderer){
+    window.ipcRenderer.invoke('auto-tolerance-get').then(v=>{ if(typeof v==='number') autoSim.tolerancePct=v; }).catch(()=>{});
+  }
+} catch(_){ }
+
+function parsePairRow(id){
+  const row=document.getElementById(id); if(!row) return null;
+  const cell=row.children[1]; if(!cell) return null; const txt=(cell.textContent||'').trim();
+  if(!/\d/.test(txt)) return null; const parts=txt.split('/').map(s=>parseFloat(s.trim())).filter(n=>!isNaN(n));
+  return parts.length===2?parts:null;
+}
+function parseMid(){ return parsePairRow('midRow'); }
+function parseExcel(){ return parsePairRow('excelRow'); }
+// setExcelOdds previously mutated the visible Excel odds during simulation; removed from auto flow.
+function setExcelOdds(n1,n2){ /* retained for future real integration but unused by auto simulation */ }
+function autoStatus(msg){ const el=document.getElementById('autoStatus'); if(el) el.textContent=msg||''; }
+function flashDot(idx){ const dot=document.querySelector('.autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), autoSim.stepMs-80); } }
+function scheduleAuto(){ if(!autoSim.active) return; clearTimeout(autoSim.timer); autoSim.timer=setTimeout(autoStep, autoSim.stepMs); }
+function autoStep(){
+  if(!autoSim.active) return;
+  const mid=parseMid(); const ex=parseExcel();
+  if(!mid || !ex){ autoStatus('Нет данных'); return scheduleAuto(); }
+  const key=mid.join('|'); if(autoSim.lastMidKey && autoSim.lastMidKey!==key){ autoStatus('Mid changed'); }
+  autoSim.lastMidKey=key;
+  const midMinIdx = mid[0] <= mid[1] ? 0:1; const midMin = mid[midMinIdx];
+  const exMinIdx = ex[0] <= ex[1] ? 0:1; const exMin = ex[exMinIdx];
+  const diffPct = Math.abs(exMin - midMin)/midMin*100;
+  if(diffPct <= autoSim.tolerancePct){
+    autoStatus('Aligned');
+    return scheduleAuto();
+  }
+  // Decide which side would be virtually pressed (the min side toward midMin)
+  flashDot(exMinIdx);
+  autoStatus(`Aligning ${diffPct.toFixed(2)}% S${exMinIdx+1}`);
+  scheduleAuto();
+}
+function toggleAuto(){
+  autoSim.active=!autoSim.active;
+  const btn=document.getElementById('autoBtn'); if(btn) btn.classList.toggle('on', autoSim.active);
+  const row=document.getElementById('excelAutoRow'); if(row) row.style.display=autoSim.active? '' : 'none';
+  autoStatus(autoSim.active? `Start (tol ${autoSim.tolerancePct.toFixed(2)}%)` : 'Stopped');
+  if(autoSim.active){ autoStep(); } else { clearTimeout(autoSim.timer); autoSim.timer=null; }
+}
+document.addEventListener('click', e=>{ if(e.target && e.target.id==='autoBtn'){ toggleAuto(); }});
+window.__autoSim = autoSim;
+
+// Live update tolerance when settings saved
+try {
+  const subscribe = (ch)=>{
+    if(window.desktopAPI && window.desktopAPI.onAutoToleranceUpdated){ /* future API */ }
+    if(window.desktopAPI && window.desktopAPI.onOdds){ /* just to ensure desktopAPI exists */ }
+    const { ipcRenderer } = window.require? window.require('electron'): {};
+    if(ipcRenderer){
+      ipcRenderer.on('auto-tolerance-updated', (_e, v)=>{
+        if(typeof v==='number' && !isNaN(v)){
+          autoSim.tolerancePct = v;
+          try { console.log('[autoSim][board] tolerance updated ->', v); } catch(_){ }
+          if(autoSim.active){ autoStatus(`Tol ${autoSim.tolerancePct.toFixed(2)}%`); }
+        }
+      });
+    }
+  };
+  subscribe();
+} catch(_){ }

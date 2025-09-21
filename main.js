@@ -1,78 +1,17 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen, Menu, globalShortcut } = require('electron');
-// Adjust default max listeners (prevent benign warnings after intentional layering). Allow override via MAX_LISTENERS env.
+// Raise EventEmitter listener cap to 15 (requested) unconditionally (was env-gated before)
 try {
   const EventEmitter = require('events');
-  const base = Number(process.env.MAX_LISTENERS)||15;
-  if(EventEmitter.defaultMaxListeners < base) EventEmitter.defaultMaxListeners = base;
+  const desired = 15;
+  if (EventEmitter.defaultMaxListeners < desired) {
+    EventEmitter.defaultMaxListeners = desired;
+  }
+  // Also patch setMaxListeners shortcut for any new emitters created before modules import
+  try { process.setMaxListeners && process.setMaxListeners(desired); } catch(_){ }
 } catch(_){ }
 const path = require('path');
 const Store = require('electron-store');
 const store = new Store({ name: 'prefs' });
-// Diagnostic hook for investigating MaxListenersExceededWarning on BrowserWindow 'closed'
-// Enable with: DEBUG_CLOSED_LISTENERS=1
-// Extra options:
-//   DEBUG_CLOSED_LISTENERS_THRESHOLD=8  (change threshold)
-//   DEBUG_CLOSED_LISTENERS_RAISE=1      (raise defaultMaxListeners to 30)
-//   DEBUG_CLOSED_LISTENERS_CLEAN=1      (attempt to remove surplus anonymous duplicates heuristically)
-try {
-  if (process.env.DEBUG_CLOSED_LISTENERS) {
-    const EventEmitter = require('events');
-    const origOn = BrowserWindow.prototype.on;
-    const origOnce = BrowserWindow.prototype.once;
-    function wrapAttach(methodName, origFn){
-      return function(ev, listener){
-        if(ev === 'closed'){
-          const win = this;
-          const before = typeof win.listenerCount === 'function' ? win.listenerCount('closed') : undefined;
-          // Capture stack at registration site (exclude this wrapper frames later)
-          const attachStack = (new Error('[diag][closed-listener] attach site')).stack;
-          const ret = origFn.call(win, ev, listener);
-          setImmediate(()=>{ // after internal adjustments
-            try {
-              const after = win.listenerCount('closed');
-              const id = (win && win.id) || 'unknown';
-              const THRESH = Number(process.env.DEBUG_CLOSED_LISTENERS_THRESHOLD)||10;
-              const verbose = !!process.env.DEBUG_CLOSED_LISTENERS_VERBOSE;
-              const delta = (typeof before==='number' && typeof after==='number') ? (after-before) : 0;
-              // Suppress noise: a single +1 (delta===1) below threshold is expected when adding a BrowserView.
-              if(!(delta===1 && after<=THRESH && !verbose)){
-                console.log(`[diag][closed-listener] method=${methodName} winId=${id} before=${before} after=${after} delta=${delta}`);
-              }
-              if(after > THRESH){
-                console.log(attachStack);
-                if(process.env.DEBUG_CLOSED_LISTENERS_CLEAN){
-                  try {
-                    const listeners = win.rawListeners ? win.rawListeners('closed') : win.listeners('closed');
-                    if(Array.isArray(listeners) && listeners.length>THRESH){
-                      const seen = new Set();
-                      for(let i=listeners.length-1;i>=0;i--){
-                        const fn = listeners[i];
-                        const sig = fn && fn.toString().slice(0,120);
-                        if(seen.has(sig)){
-                          try { win.removeListener('closed', fn); } catch(_){ }
-                        } else seen.add(sig);
-                      }
-                      if(verbose) console.log('[diag][closed-listener] cleanup attempted; newCount=', win.listenerCount('closed'));
-                    }
-                  } catch(_){ }
-                }
-              }
-            } catch(e){ }
-          });
-          return ret;
-        }
-        return origFn.call(this, ev, listener);
-      };
-    }
-    BrowserWindow.prototype.on = wrapAttach('on', origOn);
-    BrowserWindow.prototype.once = wrapAttach('once', origOnce);
-    // Optionally raise default max listeners to reduce noise while diagnosing (not required)
-    if(process.env.DEBUG_CLOSED_LISTENERS_RAISE){
-      try { EventEmitter.defaultMaxListeners = Math.max(EventEmitter.defaultMaxListeners, 30); } catch(_){}
-    }
-    console.log('[diag] BrowserWindow closed-listener instrumentation active');
-  }
-} catch(_){ /* ignore diagnostic setup errors */ }
 // Centralized shared constants (direct import to avoid circular barrel dependency)
 const constants = require('./modules/utils/constants');
 // Local constants (some consumed by modularized managers)
@@ -226,8 +165,6 @@ const zoom = createZoomManager({ store, views });
 const { createStatsManager } = require('./modules/stats'); // modules/stats/index.js
 let statsManager; // temporary undefined until after stageBoundsRef creation
 let statsState = { mode: 'hidden' }; // 'hidden' | 'embedded' | 'window'
-// (savedBoardMode no longer needed: board stays docked when stats embed)
-let savedBoardMode = null; // retained for backward compatibility but unused now
 let lastStatsToggleTs = 0; // throttle for space hotkey
 // Dedicated stats log window (detached) - lightweight
 let statsLogWindow = null;
@@ -417,7 +354,7 @@ function bootstrap() {
   try { initUpscalerIpc({ ipcMain, upscalerManager, statsManager }); } catch(e){ console.warn('initUpscalerIpc failed', e); }
   try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
   try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: boardWindow }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
-  try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, savedBoardMode, lastStatsToggleTs } }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
+  try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs } }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
   // Expose mutable refs for diagnostic / future module hot-swap
   try { Object.defineProperty(global, '__oddsMoniSync', { value:{ autoRefreshEnabledRef, lolTeamNamesRef }, enumerable:false }); } catch(_){}
   staleMonitor = createStaleMonitor({ intervalMs: HEALTH_CHECK_INTERVAL, staleMs: STALE_MS, brokerHealth, views, enabledRef:{ value:autoRefreshEnabled }, onReload:(id)=>{ try { views[id].webContents.reloadIgnoringCache(); } catch(e){} } });

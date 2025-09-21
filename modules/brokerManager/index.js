@@ -145,6 +145,13 @@ function createBrokerManager(ctx){
     });
     view.webContents.on('did-navigate', (e,url)=>{ try { const lu=store.get('lastUrls',{}); lu[brokerDef.id]=url; store.set('lastUrls', lu); } catch(_){} scheduleMapReapply(view); });
     view.webContents.on('did-navigate-in-page', (e,url,isMainFrame)=>{ if(!isMainFrame) return; try { const lu=store.get('lastUrls',{}); lu[brokerDef.id]=url; store.set('lastUrls', lu); } catch(_){} scheduleMapReapply(view); });
+
+    // If stats embedded panel is active, newly added broker might overlap z-order; re-assert panel topmost.
+    try {
+      if(ctx.statsManager && typeof ctx.statsManager.ensureTopmost === 'function'){
+        [0,60,180,360].forEach(delay=> setTimeout(()=>{ try { ctx.statsManager.ensureTopmost(); } catch(_){ } }, delay));
+      }
+    } catch(_){ }
   }
 
   function addBroker(id, startUrlOverride){

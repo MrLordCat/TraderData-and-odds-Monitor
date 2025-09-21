@@ -474,7 +474,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
     const hasSetter = typeof mainWindow.setTopBrowserView === 'function';
     if(!hasSetter) return; // graceful noop if Electron version lacks API
     try {
-      ['panel','A','B'].forEach(k=>{ const v = embeddedViews[k]; if(v) { try { mainWindow.setTopBrowserView(v); } catch(_){ } } });
+      // Order matters: set A and B first, then panel last so panel always stays above broker views.
+      ['A','B','panel'].forEach(k=>{ const v = embeddedViews[k]; if(v) { try { mainWindow.setTopBrowserView(v); } catch(_){ } } });
     } catch(_){ }
   }
 

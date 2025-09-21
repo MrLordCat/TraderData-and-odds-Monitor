@@ -14,6 +14,26 @@ function initSettingsIpc(ctx){
   ipcMain.on('set-setting', (e,{key,value})=>{ store.set(key,value); });
   ipcMain.on('settings-contrast-preview', ()=>{});
   ipcMain.on('settings-contrast-save', ()=>{});
+
+  // Auto odds tolerance (percent). Persist under key 'autoTolerancePct'.
+  function clampTol(v){ return Math.max(0.01, Math.min(5, v)); }
+  ipcMain.handle('auto-tolerance-get', ()=>{
+    try {
+      const v = store.get('autoTolerancePct');
+      if(typeof v === 'number' && !isNaN(v)) return clampTol(v);
+    } catch(_){ }
+    return 0.15; // default
+  });
+  ipcMain.on('auto-tolerance-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.tolerancePct==='number'? clampTol(payload.tolerancePct): null;
+      if(v){
+        store.set('autoTolerancePct', v);
+        // Broadcast to all renderers (board + embedded stats). We reuse generic channel.
+        try { const bw = require('electron').BrowserWindow.getAllWindows(); bw.forEach(w=>{ try { w.webContents.send('auto-tolerance-updated', v); } catch(_){} }); } catch(_){ }
+      }
+    } catch(_){ }
+  });
 }
 
 module.exports = { initSettingsIpc };

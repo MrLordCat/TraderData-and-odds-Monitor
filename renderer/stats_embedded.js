@@ -136,6 +136,12 @@ function renderEmbeddedOdds(){
     const eo1=document.getElementById('eo-side1'); const eo2=document.getElementById('eo-side2');
     if(eo1) eo1.textContent=h1; if(eo2) eo2.textContent=h2;
   } catch(_){ }
+
+  // Embedded auto row visibility update
+  try {
+    const autoRow=document.getElementById('embeddedExcelAutoRow');
+    if(autoRow) autoRow.style.display = embeddedAutoSim.active ? '' : 'none';
+  } catch(_){ }
 }
 function handleEmbeddedOdds(p){ try {
   if(!p||!p.broker) return;
@@ -194,3 +200,63 @@ initEmbeddedMapSync();
 updateEmbeddedMapTag();
 // Fallback: after full DOM ready, re-sync in case elements mounted after initial code ran
 window.addEventListener('DOMContentLoaded', ()=>{ try { syncEmbeddedMapSelect(); updateEmbeddedMapTag(); forceMapSelectValue(); } catch(_){ } });
+
+// ================= Embedded Auto alignment helper (simulate only, no virtual odds) =================
+const embeddedAutoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null };
+// Load stored tolerance (shared with board)
+try {
+  const ipc = (window.require? window.require('electron').ipcRenderer: (window.ipcRenderer||null));
+  if(ipc && ipc.invoke){
+    ipc.invoke('auto-tolerance-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) embeddedAutoSim.tolerancePct = v; try { console.log('[autoSim][embedded] tolerance loaded', embeddedAutoSim.tolerancePct); } catch(_){ } }).catch(()=>{});
+  }
+} catch(_){ }
+function embeddedParsePair(cellId){
+  const el=document.getElementById(cellId); if(!el) return null; const txt=(el.textContent||'').trim(); if(!/\d/.test(txt)) return null;
+  const parts=txt.split('/').map(s=>parseFloat(s.trim())).filter(n=>!isNaN(n)); return parts.length===2?parts:null;
+}
+function embeddedParseMid(){ return embeddedParsePair('embeddedMidCell'); }
+function embeddedParseExcel(){ return embeddedParsePair('embeddedExcelCell'); }
+function embeddedSetExcel(){ /* placeholder for future real integration; not used in simulation */ }
+function embeddedStatus(msg){ const el=document.getElementById('embeddedAutoStatus'); if(el) el.textContent=msg||''; }
+function embeddedFlash(idx){ const dot=document.querySelector('#embeddedExcelAutoRow .autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), embeddedAutoSim.stepMs-80); } }
+function embeddedSchedule(){ if(!embeddedAutoSim.active) return; clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=setTimeout(embeddedStep, embeddedAutoSim.stepMs); }
+function embeddedStep(){
+  if(!embeddedAutoSim.active) return;
+  const mid=embeddedParseMid(); const ex=embeddedParseExcel();
+  if(!mid || !ex){ embeddedStatus('Нет данных'); return embeddedSchedule(); }
+  const key=mid.join('|'); if(embeddedAutoSim.lastMidKey && embeddedAutoSim.lastMidKey!==key){ embeddedStatus('Mid changed'); }
+  embeddedAutoSim.lastMidKey=key;
+  const midMinIdx = mid[0] <= mid[1] ? 0:1; const midMin = mid[midMinIdx];
+  const exMinIdx = ex[0] <= ex[1] ? 0:1; const exMin = ex[exMinIdx];
+  const diffPct = Math.abs(exMin - midMin)/midMin*100;
+  if(diffPct <= embeddedAutoSim.tolerancePct){
+    embeddedStatus('Aligned');
+    return embeddedSchedule();
+  }
+  embeddedFlash(exMinIdx);
+  embeddedStatus(`Aligning ${diffPct.toFixed(2)}% S${exMinIdx+1}`);
+  embeddedSchedule();
+}
+function embeddedToggleAuto(){
+  embeddedAutoSim.active=!embeddedAutoSim.active;
+  const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.toggle('on', embeddedAutoSim.active);
+  const row=document.getElementById('embeddedExcelAutoRow'); if(row) row.style.display=embeddedAutoSim.active? '' : 'none';
+  embeddedStatus(embeddedAutoSim.active? `Start (tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%)` : 'Stopped');
+  if(embeddedAutoSim.active){ embeddedStep(); } else { clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=null; }
+}
+document.addEventListener('click', e=>{ if(e.target && e.target.id==='embeddedAutoBtn'){ embeddedToggleAuto(); }});
+window.__embeddedAutoSim = embeddedAutoSim;
+
+// Live tolerance update
+try {
+  const ipc = (window.require? window.require('electron').ipcRenderer: (window.ipcRenderer||null));
+  if(ipc){
+    ipc.on('auto-tolerance-updated', (_e,v)=>{
+      if(typeof v==='number' && !isNaN(v)){
+        embeddedAutoSim.tolerancePct = v;
+        try { console.log('[autoSim][embedded] tolerance updated ->', v); } catch(_){ }
+        if(embeddedAutoSim.active){ embeddedStatus(`Tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%`); }
+      }
+    });
+  }
+} catch(_){ }

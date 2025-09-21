@@ -1,2 +1,10 @@
 /* Extracted placeholder (was inline: "contrast removed"). */
 /* Add any panel-specific contrast overrides here if needed. */
+/* Auto simulation shared styles */
+.autoBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 8px; font-size:11px; margin-left:6px; cursor:pointer; border-radius:5px; }
+.autoBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
+.excelAutoCell { background:#1a2230; font-size:11px; }
+.autoIndicators { display:flex; align-items:center; gap:10px; justify-content:center; }
+.autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.35; transition:opacity .25s, background .25s; }
+.autoDot.active { opacity:1; background:var(--accent); box-shadow:0 0 6px var(--accent-glow),0 0 12px rgba(58,169,255,.4); }
+.autoStatus { font-size:11px; color:var(--muted); letter-spacing:.5px; min-width:150px; text-align:left; white-space:nowrap; }

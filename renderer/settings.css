@@ -18,9 +18,11 @@ html, body {
 .panel {
 	position: relative;
 	z-index: 2;
-	width: 460px;
+	width: 520px;
 	max-width: calc(100% - 40px);
-	margin: 60px auto;
+	/* Fixed max height so window stops growing; center offset adjusts if taller */
+	max-height: 640px;
+	margin: 40px auto;
 	background: linear-gradient(160deg,#1d2736,#121922 70%);
 	border: 1px solid #2d3947;
 	border-radius: 18px;
@@ -34,7 +36,26 @@ html, body {
 h1 { margin:0; font-size:17px; font-weight:600; letter-spacing:.5px; }
 .x { background:#202b3a; border:1px solid #324150; color:#e4e7ef; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
 .x:hover { background:#2b394c; }
-.content { padding:4px 20px 4px; display:flex; flex-direction:column; gap:16px; }
+.content { 
+	padding:4px 20px 4px; 
+	display:flex; 
+	flex-direction:column; 
+	gap:16px; 
+	overflow-y:auto; 
+	/* Reserve space so footer stays visible */
+	scrollbar-gutter: stable;
+}
+/* Make header + footer fixed inside flex layout while content scrolls */
+.panel { overflow:hidden; }
+.head { flex: 0 0 auto; }
+.content { flex: 1 1 auto; }
+.foot { flex: 0 0 auto; border-top:1px solid #2c3649; }
+
+/* Custom scrollbar (WebKit / Blink) */
+.content::-webkit-scrollbar { width:10px; }
+.content::-webkit-scrollbar-track { background: #121922; border-radius:8px; }
+.content::-webkit-scrollbar-thumb { background:#2e3b4b; border-radius:8px; border:2px solid #121922; }
+.content::-webkit-scrollbar-thumb:hover { background:#3a4a5d; }
 .row { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:500; }
 .row input[type=range] { width:100%; }
 #cVal { font-size:11px; opacity:.65; margin-left:6px; }

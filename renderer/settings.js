@@ -32,6 +32,22 @@ const anim = {
 	color2: document.getElementById('anim-color2')
 };
 
+// Auto odds tolerance (percent difference threshold)
+const autoTolInput = document.getElementById('auto-tolerance');
+let autoTolerancePct = 0.15; // default
+function clampTol(v){ return Math.max(0.01, Math.min(5, v)); }
+if(autoTolInput){
+	autoTolInput.addEventListener('input', ()=>{
+		const raw = parseFloat(autoTolInput.value);
+		if(!isNaN(raw)) autoTolerancePct = clampTol(raw);
+	});
+	autoTolInput.addEventListener('change', ()=>{
+		const raw = parseFloat(autoTolInput.value);
+		if(!isNaN(raw)) autoTolerancePct = clampTol(raw);
+		autoTolInput.value = autoTolerancePct.toFixed(2);
+	});
+}
+
 function queueStatsConfigSend(){
 	if(!currentStatsConfig) return;
 	// Merge animation inputs before send
@@ -92,6 +108,8 @@ document.getElementById('save').onclick = ()=>{
 	ipcRenderer.send('gs-heatbar-save', currentHeatBar);
 	updateStatsConfigFromInputs(false);
 	queueStatsConfigSend();
+	// Persist auto tolerance
+	try { ipcRenderer.send('auto-tolerance-set', { tolerancePct: autoTolerancePct }); } catch(_){ }
 	ipcRenderer.send('close-settings');
 };
 document.getElementById('close').onclick = ()=> ipcRenderer.send('close-settings');
@@ -118,4 +136,9 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	if(anim.color2) anim.color2.value = currentStatsConfig.animationSecondaryColor;
 	emitHeatBar();
 	updateStatsConfigFromInputs(true); // push current values on open
+	// Request stored auto tolerance after initial settings applied
+	try { ipcRenderer.invoke('auto-tolerance-get').then(v=>{
+		if(typeof v === 'number' && !isNaN(v)) autoTolerancePct = clampTol(v);
+		if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2);
+	}).catch(()=>{ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2); }); } catch(_){ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2); }
 });

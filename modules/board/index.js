@@ -69,6 +69,14 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
     mainWindow.addBrowserView(dockView);
     try { dockView.webContents.loadFile(path.join(__dirname,'..','..','renderer','board.html')); } catch(e){}
     dockView.webContents.on('did-finish-load', ()=> replayOdds());
+    // Lightweight one-time diagnostic: log current 'closed' listener count on mainWindow (helps detect leak regressions)
+    try {
+      if(!createDockView.__diagLogged){
+        createDockView.__diagLogged = true;
+        const cnt = (typeof mainWindow.listenerCount === 'function') ? mainWindow.listenerCount('closed') : 'n/a';
+        console.log('[board][diag] mainWindow closed listeners after createDockView =', cnt);
+      }
+    } catch(_){ }
   }
   function destroyDockView(){ if(!dockView) return; try { mainWindow.removeBrowserView(dockView); } catch(_){} try { dockView.webContents.destroy(); } catch(_){} dockView=null; }
   function hideDockView(){ if(!dockView) return; hideView(dockView); }
@@ -113,9 +121,16 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   function enterDocked(){
     // If window mode active, close separate window first.
     if(win){ try { win.close(); } catch(_){} }
-    // Reuse existing dockView if present; otherwise create once.
+    // Reuse existing dockView if present; otherwise create once. (Avoid destroying/creating repeatedly to prevent internal 'closed' listener accumulation on mainWindow.)
     if(!dockView) createDockView(); else ensureDockViewAttached();
     state.mode='docked'; persist(); broadcast(); setImmediate(applyDockLayout);
+    try {
+      if(!enterDocked.__diagLogged){
+        enterDocked.__diagLogged = true;
+        const cnt = (typeof mainWindow.listenerCount === 'function') ? mainWindow.listenerCount('closed') : 'n/a';
+        console.log('[board][diag] mainWindow closed listeners after enterDocked =', cnt);
+      }
+    } catch(_){ }
   }
   function enterHidden(){
     // Do NOT destroy dockView to avoid repeated addBrowserView (leads to internal 'closed' listener accumulation).
@@ -124,7 +139,22 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
     state.mode='hidden'; persist(); broadcast();
     if(layoutManager && layoutManager.setDockOffsets) layoutManager.setDockOffsets(null);
   }
-  function enterWindow(){ destroyDockView(); createWindow(); state.mode='window'; persist(); broadcast(); if(layoutManager && layoutManager.setDockOffsets) layoutManager.setDockOffsets(null); }
+  function enterWindow(){
+    // Instead of destroying the dock BrowserView (which triggers removeBrowserView -> future re-add creates new internal 'closed' listener on mainWindow), just hide it.
+    hideDockView();
+    createWindow();
+    state.mode='window';
+    persist();
+    broadcast();
+    if(layoutManager && layoutManager.setDockOffsets) layoutManager.setDockOffsets(null);
+    try {
+      if(!enterWindow.__diagLogged){
+        enterWindow.__diagLogged = true;
+        const cnt = (typeof mainWindow.listenerCount === 'function') ? mainWindow.listenerCount('closed') : 'n/a';
+        console.log('[board][diag] mainWindow closed listeners after enterWindow =', cnt);
+      }
+    } catch(_){ }
+  }
 
   function toggle(){
     if(state.mode==='hidden') enterDocked();
