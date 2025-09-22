@@ -16,24 +16,34 @@
 }
 
 /* ================= Base Layout ================= */
+html, body { height:100%; }
 body {
   margin: 0;
-  font: 14px var(--font-sans);
+  font: 13px var(--font-sans);
   background: linear-gradient(135deg, #0b0e15, #141b29);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  display:flex;
+  flex-direction:column;
+  min-height:100%;
 }
+
+#tableContainer { flex:1; min-height:0; overflow:auto; scrollbar-width:thin; }
+#tableContainer::-webkit-scrollbar { width:8px; }
+#tableContainer::-webkit-scrollbar-track { background:#10151f; }
+#tableContainer::-webkit-scrollbar-thumb { background:#243142; border-radius:4px; }
 
 /* Header */
 #header {
   display: flex;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 6px 10px;
   background: linear-gradient(90deg, #1b2434, #141b29);
   align-items: center;
   border-bottom: 1px solid #1f2a3c;
-  box-shadow: 0 2px 6px rgba(0,0,0,.55);
-  font-size: 14px;
+  box-shadow: 0 2px 5px rgba(0,0,0,.5);
+  font-size: 13px;
+  flex:0 0 auto;
 }
 
 /* Buttons & Select */
@@ -64,8 +74,8 @@ select {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0 4px;
-  font-size: 13px;
-  padding: 6px 10px;
+  font-size: 12px;
+  padding: 4px 8px 10px;
   table-layout: fixed;
 }
 
@@ -117,12 +127,12 @@ select {
 
 /* Table header cells */
 #table thead th {
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: .8px;
+  letter-spacing: .7px;
   font-weight: 600;
   color: var(--muted);
-  padding: 4px 8px;
+  padding: 3px 6px;
   text-align: center;
 }
 
@@ -134,7 +144,7 @@ select {
   border: 1px solid #222c3a;
   border-left: none;
   border-right: none;
-  padding: 8px 10px;
+  padding: 6px 8px;
   text-align: center;
   position: relative;
 }

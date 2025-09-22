@@ -249,6 +249,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
   if(hb) views.panel.webContents.send('gs-heatbar-apply', hb);
         // Inject lightweight console tap to pipe logs through stats-debug channel
         try { views.panel.webContents.executeJavaScript(`(function(){ if(window.__logTapInstalled) return; window.__logTapInstalled=true; const origLog=console.log, origErr=console.error, origWarn=console.warn; function wrap(kind, fn){ return function(){ try { const args=[...arguments].map(a=> typeof a==='object'? JSON.stringify(a): String(a)); require('electron').ipcRenderer.send('stats-debug',{ tap:kind, msg: args.join(' ')}); } catch(_){ } try { return fn.apply(this, arguments); } catch(_2){ } }; } console.log=wrap('log',origLog); console.warn=wrap('warn',origWarn); console.error=wrap('err',origErr); console.log('[logTap] installed'); })();`).catch(()=>{}); } catch(_){ }
+        // Forward embedded autoSim logs (panel variant) to main terminal
+        try { views.panel.webContents.executeJavaScript(`(function(){ if(window.__autoSimFwdInstalled) return; window.__autoSimFwdInstalled=true; const { ipcRenderer }=require('electron'); const lv=['log','warn','error']; const orig={}; function match(args){ try { return /\\[autoSim\\]\\[embedded\\]/.test(args.map(a=>''+a).join(' ')); } catch(_){ return false; } } lv.forEach(k=>{ orig[k]=console[k].bind(console); console[k]=function(){ try{ orig[k].apply(console, arguments);}catch(_){ } try{ if(match(Array.from(arguments))){ ipcRenderer.send('renderer-log-forward',{ level:k, args:Array.from(arguments).map(v=> typeof v==='string'? v: (v&&v.message)||String(v))}); } }catch(_2){} }; }); console.log('[autoSimFwd][embedded][panel] installed'); })();`).catch(()=>{}); } catch(_){ }
         // Sentinel diagnostics
         try { views.panel.webContents.executeJavaScript(`setTimeout(()=>{ try { const rows=document.querySelectorAll('#lt-body tr').length; console.log('[panel-sentinel] rowsAfterInit', rows); } catch(e){} }, 400);`).catch(()=>{}); } catch(_){ }
       } catch(_){ }
@@ -378,6 +380,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
           const hb = store.get('gsHeatBar');
           embeddedViews.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar: hb, statsConfig });
           if(hb) embeddedViews.panel.webContents.send('gs-heatbar-apply', hb);
+          try { embeddedViews.panel.webContents.executeJavaScript(`(function(){ if(window.__autoSimFwdInstalled) return; window.__autoSimFwdInstalled=true; const { ipcRenderer }=require('electron'); const lv=['log','warn','error']; const orig={}; function match(a){ try { return /\\[autoSim\\]\\[embedded\\]/.test(a.map(x=>''+x).join(' ')); } catch(_){ return false; } } lv.forEach(k=>{ orig[k]=console[k].bind(console); console[k]=function(){ try{ orig[k].apply(console, arguments);}catch(_){ } try{ if(match(Array.from(arguments))){ ipcRenderer.send('renderer-log-forward',{ level:k, args:Array.from(arguments).map(v=> typeof v==='string'? v: (v&&v.message)||String(v))}); } }catch(_2){} }; }); console.log('[autoSimFwd][embedded][embedMode] installed'); })();`).catch(()=>{}); } catch(_){ }
         } catch(_){ }
       });
       resolveAndLoad(embeddedViews.A, urls.A); resolveAndLoad(embeddedViews.B, urls.B);
@@ -450,6 +453,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
         const hb = store.get('gsHeatBar');
         windowViews.panel.webContents.send('stats-init', { urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar: hb, statsConfig });
         if(hb) windowViews.panel.webContents.send('gs-heatbar-apply', hb);
+        try { windowViews.panel.webContents.executeJavaScript(`(function(){ if(window.__autoSimFwdInstalled) return; window.__autoSimFwdInstalled=true; const { ipcRenderer }=require('electron'); const lv=['log','warn','error']; const orig={}; function match(a){ try { return /\\[autoSim\\]\\[embedded\\]/.test(a.map(x=>''+x).join(' ')); } catch(_){ return false; } } lv.forEach(k=>{ orig[k]=console[k].bind(console); console[k]=function(){ try{ orig[k].apply(console, arguments);}catch(_){ } try{ if(match(Array.from(arguments))){ ipcRenderer.send('renderer-log-forward',{ level:k, args:Array.from(arguments).map(v=> typeof v==='string'? v: (v&&v.message)||String(v))}); } }catch(_2){} }; }); console.log('[autoSimFwd][embedded][windowMode] installed'); })();`).catch(()=>{}); } catch(_){ }
       } catch(_){ }
     });
     resolveAndLoad(windowViews.A, urls.A); resolveAndLoad(windowViews.B, urls.B);

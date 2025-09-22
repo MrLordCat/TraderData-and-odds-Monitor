@@ -12,10 +12,39 @@ try {
 const path = require('path');
 const Store = require('electron-store');
 const store = new Store({ name: 'prefs' });
+const fs = require('fs');
 // Centralized shared constants (direct import to avoid circular barrel dependency)
 const constants = require('./modules/utils/constants');
 // Local constants (some consumed by modularized managers)
 const SNAP = constants.SNAP_DISTANCE; // snap threshold for drag/resize logic (needed by brokerManager ctx)
+
+// Reapply stored map & team names after broker navigation (multi-delay strategy as documented in project instructions)
+function scheduleMapReapply(view){
+  try {
+    if(!view || view.isDestroyed()) return;
+    const lastMap = store.get('lastMap');
+    const teamNames = store.get('lolTeamNames');
+    if(typeof lastMap === 'undefined' && !teamNames) return;
+  const delays = [400, 1400, 3000, 5000]; // added 5000ms for slower brokers (e.g. dataservices) to catch late listeners
+    delays.forEach(d=> setTimeout(()=>{
+      try {
+        if(view.isDestroyed()) return;
+        if(typeof lastMap !== 'undefined'){ view.webContents.send('set-map', lastMap); }
+        if(teamNames){ view.webContents.send('set-team-names', teamNames); }
+      } catch(_){ }
+    }, d));
+  } catch(_){ }
+}
+
+// Prepare dynamic SendInput helper script (F23/F24) for global key injection (AHK hook)
+let __sendInputScriptPath;
+try {
+  __sendInputScriptPath = path.join(__dirname,'sendKeyInject.ps1');
+  if(!fs.existsSync(__sendInputScriptPath)){
+    const psBody = `param([int]$vk)\nAdd-Type -TypeDefinition @\"\nusing System;\nusing System.Runtime.InteropServices;\npublic static class KBSend {\n [DllImport(\"user32.dll\")] static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);\n const uint KEYEVENTF_KEYUP = 0x0002;\n public static void Tap(byte vk){\n  keybd_event(vk,0,0,UIntPtr.Zero);\n  keybd_event(vk,0,KEYEVENTF_KEYUP,UIntPtr.Zero);\n }\n}\n\"@ -ErrorAction SilentlyContinue\n[KBSend]::Tap([byte]$vk)\n`;
+    try { fs.writeFileSync(__sendInputScriptPath, psBody); } catch(e){ console.warn('[auto-press][init] write sendKeyInject.ps1 fail', e.message); }
+  }
+} catch(e){ console.warn('[auto-press][init] sendInput script prep failed', e.message); }
 
 // Global safety nets for unexpected errors (prevent silent crashes)
 try {
@@ -34,19 +63,7 @@ function broadcastPlaceholderOdds(id){
     try { if(statsManager && statsManager.views && statsManager.views.panel){ statsManager.views.panel.webContents.send('odds-update', payload); } } catch(_){ }
   } catch(err){ try { console.warn('broadcastPlaceholderOdds failed', err); } catch(_){} }
 }
-
-// Deferred map reapply scheduling (called by brokerManager on navigation events)
-// Ensures that if user had a map selected previously, it is re-sent after a short delay
-function scheduleMapReapply(view){
-  try {
-    const lastMap = store.get('lastMap');
-    if(typeof lastMap === 'undefined') return;
-    // send twice with delays to survive transitional DOM states / SPA route swaps
-    [400, 1400].forEach(delay=>{
-      setTimeout(()=>{ try { if(view && view.webContents && !view.webContents.isDestroyed()) view.webContents.send('set-map', lastMap); } catch(_){} }, delay);
-    });
-  } catch(e){ /* swallow */ }
-}
+// (Removed stray early key injection block from previous patch attempt)
 
 // Ensure single instance (prevents profile/partition LOCK conflicts)
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -412,6 +429,96 @@ function toggleStatsEmbedded(){
 app.whenReady().then(()=>{
   bootstrap();
   initDevCssWatcher({ app, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, baseDir: __dirname });
+  // Expose manual auto-press IPC for external automation or future menus
+  try {
+    const { ipcMain } = require('electron');
+    if(!app.__autoPressHandlerRegistered){
+      app.__autoPressHandlerRegistered=true;
+      ipcMain.handle('send-auto-press', (_e, payload)=>{
+        let side = 0; // default
+        let vk = null; // explicit virtual key if provided (0x86 F23 / 0x87 F24)
+        let keyLabel = null;
+        let direction = null;
+        let diffPct = null;
+        let noConfirm = false; // if true, skip auto F22 scheduling (renderer will trigger confirm itself)
+        // Backward compat: numeric or undefined -> treat as side index like before (0->F23,1->F24)
+        if(typeof payload === 'number'){
+          side = (payload===1?1:0);
+        } else if(payload && typeof payload === 'object'){
+          if(typeof payload.side === 'number') side = (payload.side===1?1:0);
+          if(typeof payload.key === 'string') keyLabel = payload.key.toUpperCase();
+          if(typeof payload.direction === 'string') direction = payload.direction;
+          if(typeof payload.diffPct === 'number') diffPct = payload.diffPct;
+          if(payload.noConfirm===true) noConfirm = true;
+        }
+        // Mapping rules override default if keyLabel present
+        // F22 -> 0x85, F23 -> 0x86, F24 -> 0x87
+        if(keyLabel === 'F22') vk = 0x85;
+        else if(keyLabel === 'F23') vk = 0x86;
+        else if(keyLabel === 'F24') vk = 0x87;
+        // Only apply legacy side fallback when NO explicit keyLabel provided (avoid misinterpreting unknown keys like F22)
+        if(vk==null && !keyLabel){
+          vk = side===1 ? 0x87 : 0x86; keyLabel = side===1? 'F24':'F23';
+        }
+        if(keyLabel === 'F22'){ try { console.log('[auto-press][ipc] confirm request F22'); } catch(_){ } }
+        const ts = Date.now();
+        try { console.log('[auto-press][ipc] request', { side, key:keyLabel, vk: '0x'+vk.toString(16), direction, diffPct, ts }); } catch(_){ }
+        try {
+          if(boardManager && boardManager.getWebContents){
+            const bwc = boardManager.getWebContents();
+            if(bwc && !bwc.isDestroyed()) bwc.send('auto-press', { side, key:keyLabel, direction });
+          }
+        } catch(err){ try { console.warn('[auto-press][ipc] board send fail', err); } catch(_){ } }
+        let sent=false;
+        // Only SendInput via helper script using F22/F23/F24 virtual keys (0x85/0x86/0x87) so AHK v2 can hook them.
+        try {
+          const { exec } = require('child_process');
+            const injVk = vk; // already resolved mapping
+            if(typeof __sendInputScriptPath !== 'undefined' && __sendInputScriptPath && injVk!=null){
+              const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${__sendInputScriptPath}" ${injVk}`;
+              exec(cmd, (err)=>{
+                const dbg = { side, key:keyLabel, direction, diffPct, tsStart: ts, injVk, cmd, ok: !err, err: err? err.message: null, tsDone: Date.now() };
+                try { fs.writeFileSync(path.join(__dirname,'auto_press_debug.json'), JSON.stringify(dbg)); } catch(_){ }
+                if(err){ try { console.warn('[auto-press][ipc][si] FAIL', err.message); } catch(_){ } }
+                else { try { console.log('[auto-press][ipc][si] SENT', keyLabel, 'injVk', injVk); } catch(_){ } }
+              });
+              sent=true;
+              // AUTO CONFIRM: if this was a directional key (F23/F24) schedule F22 after 100ms
+              if(!noConfirm && (keyLabel==='F23' || keyLabel==='F24')){
+                const confirmDelayMs = 100;
+                const confirmVk = 0x85; // F22
+                setTimeout(()=>{
+                  try {
+                    const confirmCmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${__sendInputScriptPath}" ${confirmVk}`;
+                    exec(confirmCmd, (cerr)=>{
+                      const cdbg = { kind:'confirm', parentKey:keyLabel, confirmKey:'F22', confirmVk, confirmCmd, ok: !cerr, err: cerr? cerr.message: null, tsParent: ts, tsDone: Date.now() };
+                      try { fs.writeFileSync(path.join(__dirname,'auto_press_confirm_debug.json'), JSON.stringify(cdbg)); } catch(_){ }
+                      if(cerr){ try { console.warn('[auto-press][ipc][confirm] FAIL', cerr.message); } catch(_){ } }
+                      else { try { console.log('[auto-press][ipc][confirm] SENT F22 after', confirmDelayMs,'ms'); } catch(_){ } }
+                    });
+                  } catch(e2){ try { console.warn('[auto-press][ipc][confirm] schedule error', e2.message); } catch(_){ } }
+                }, confirmDelayMs);
+              }
+            }
+        } catch(e){ try { console.warn('[auto-press][ipc][si] unavailable', e.message); } catch(_){ } }
+        if(!sent){
+          try { fs.writeFileSync(path.join(__dirname,'auto_press_signal.json'), JSON.stringify({ side, key:keyLabel, direction, ts })); } catch(_){ }
+        }
+        return true;
+      });
+      // Additional passive logging channels from renderer
+      ipcMain.on('auto-mode-changed', (_e, payload)=>{ try { console.log('[autoSim][mode]', payload); } catch(_){ } });
+      ipcMain.on('auto-fire-attempt', (_e, payload)=>{ try { console.log('[autoSim][fireAttempt]', payload); } catch(_){ } });
+      // Forwarded renderer console lines (selective)
+      ipcMain.on('renderer-log-forward', (_e, payload)=>{
+        try {
+          if(!payload || !payload.level) return;
+          const line = '[renderer][fwd]['+payload.level+'] '+ (payload.args? payload.args.join(' '):'');
+          console[payload.level] ? console[payload.level](line) : console.log(line);
+        } catch(err){ try { console.warn('[renderer-log-forward] fail', err.message); } catch(_){} }
+      });
+    }
+  } catch(e){ console.warn('[ipc][send-auto-press] register failed', e); }
   // Register global shortcut for opening Stats Log window
   try {
     if(globalShortcut.isRegistered('Control+Alt+L')) globalShortcut.unregister('Control+Alt+L');
@@ -442,7 +549,17 @@ app.on('browser-window-created', (_e, win)=>{
           toggleStatsEmbedded();
           return;
         }
-        // F12 -> open devtools (active broker if possible else main window)
+        // Ctrl+F12 -> open Board (odds) BrowserView DevTools
+        if(input.key==='F12' && input.control){
+          try {
+            if(boardManager && boardManager.getWebContents){
+              const bwc = boardManager.getWebContents();
+              if(bwc) bwc.openDevTools({ mode:'detach' });
+            }
+          } catch(e){ console.warn('[hotkey][Ctrl+F12][board] failed', e); }
+          return;
+        }
+        // F12 (no Ctrl) -> open devtools (active broker if possible else main window)
         if(input.key==='F12'){
           try {
             // Prefer first in activeBrokerIds order; fallback to any view; then main window.
@@ -455,10 +572,57 @@ app.on('browser-window-created', (_e, win)=>{
           } catch(e){ console.warn('[hotkey][F12] failed', e); }
           return;
         }
+        // Alt+C -> disable all auto modes (board + embedded stats)
+        if(input.alt && (input.key==='C' || input.key==='c')){
+          try {
+            // Broadcast to board window if open
+            if(boardWindow && !boardWindow.isDestroyed()) boardWindow.webContents.send('auto-disable-all');
+            // Broadcast to main window embedded stats panel & stats window BrowserViews
+            try { mainWindow && mainWindow.webContents.send('auto-disable-all'); } catch(_){ }
+            try {
+              if(statsManager && statsManager.views){
+                const vs = statsManager.views;
+                ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-disable-all'); } catch(_){ } } });
+              }
+            } catch(_){ }
+            console.log('[hotkey][Alt+C] broadcast auto-disable-all');
+          } catch(e){ console.warn('[hotkey][Alt+C] failed', e); }
+          return;
+        }
         // Ctrl+Alt+L opens (or focuses) the Stats Log window (fallback if global shortcut unavailable)
         if((input.control || input.meta) && input.alt && (input.key==='L' || input.key==='l')){
           try { openStatsLogWindow(); } catch(e){ console.warn('[shortcut][stats-log][fallback] open failed', e); }
           return;
+        }
+        // Manual auto odds press mapping remains for brackets BUT internal automation now emits only F23/F24.
+        if(input.key==='[' || input.key===']'){
+          try {
+            const side = input.key===']' ? 1 : 0;
+            if(boardManager && boardManager.getWebContents){
+              const bwc = boardManager.getWebContents();
+              if(bwc && !bwc.isDestroyed()) bwc.send('auto-press', { side });
+            }
+            const ts = Date.now();
+            try { console.log('[auto-press][hotkey] attempt side', side, 'key', input.key, 'ts', ts); } catch(_){ }
+            let sent=false;
+            // Send only F23/F24 (do not resend bracket)
+            try {
+              const { exec } = require('child_process');
+              const injVk = side===1 ? 0x87 : 0x86;
+              if(typeof __sendInputScriptPath !== 'undefined' && __sendInputScriptPath){
+                const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File \"${__sendInputScriptPath}\" ${injVk}`;
+                exec(cmd, (err)=>{
+                  if(err){ try { console.warn('[auto-press][hotkey][si] FAIL', err.message); } catch(_){ } }
+                  else { try { console.log('[auto-press][hotkey][si] SENT injVk', injVk); } catch(_){ } }
+                });
+                sent=true;
+              }
+            } catch(e){ try { console.warn('[auto-press][hotkey][si] unavailable', e.message); } catch(_){ } }
+            if(!sent){
+              try { fs.writeFileSync(path.join(__dirname,'auto_press_signal.json'), JSON.stringify({ side, ts })); } catch(_){ }
+            }
+          } catch(e){ console.warn('[hotkey][auto-press] send failed', e); }
+          return; // prevent fallthrough
         }
       }
     });

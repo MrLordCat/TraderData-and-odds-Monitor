@@ -21,6 +21,7 @@
     </label>
     <label class="lastLabel" title="Use match market for final map brokers (bet365)"><input type="checkbox" id="isLastChk" /> Last</label>
   </div>
+  <div id="tableContainer">
   <table id="table">
     <thead>
       <tr>
@@ -32,7 +33,7 @@
     <tbody id="rows"></tbody>
     <tfoot>
       <tr id="midRow"><th>Mid</th><td colspan="2">-</td></tr>
-      <tr id="excelRow"><th>Excel <button id="autoBtn" class="autoBtn" title="Toggle auto alignment of smallest odds">Auto</button></th><td colspan="2">-</td></tr>
+  <tr id="excelRow"><th>Excel <button id="autoBtn" class="autoBtn" title="Toggle auto alignment of smallest odds">Auto</button><button id="autoResumeBtn" class="autoSubBtn" title="Auto-resume after suspend (on/off)">R</button></th><td colspan="2">-</td></tr>
       <tr id="excelAutoRow" style="display:none"><th></th><td colspan="2" class="excelAutoCell"><div class="autoIndicators">
         <span class="autoDot side1" title="Adjusting side 1"></span>
         <span class="autoDot side2" title="Adjusting side 2"></span>
@@ -41,6 +42,7 @@
       <tr id="arbRow"><th>Arb</th><td colspan="2">-</td></tr>
     </tfoot>
   </table>
+  </div>
   <script src="devcss-reload.js"></script>
   <script src="board.js"></script>
 </body>

@@ -1,4 +1,19 @@
 // Embedded odds board + section reorder extracted
+// Polyfill: stats panel BrowserView does NOT use the main preload (no window.desktopAPI)
+// so we expose a minimal bridge to keep existing code paths working.
+try {
+  if(!window.desktopAPI){
+    const { ipcRenderer } = require('electron');
+    if(ipcRenderer){
+      window.desktopAPI = {
+        invoke: (...args)=>{ try { return ipcRenderer.invoke(...args); } catch(e){ console.error('[embeddedOdds][polyfill][invokeErr]', e); throw e; } },
+        send: (...args)=>{ try { return ipcRenderer.send(...args); } catch(e){ console.error('[embeddedOdds][polyfill][sendErr]', e); } },
+        autoSendPress: (side)=>{ try { ipcRenderer.invoke('send-auto-press', side); } catch(e){ console.error('[embeddedOdds][polyfill][autoSendPressErr]', e); } }
+      };
+      try { console.log('[embeddedOdds][polyfill] desktopAPI shim installed'); } catch(_){ }
+    }
+  }
+} catch(_){ }
 let currentMap = undefined; // shared map number propagated from main / board
 function updateEmbeddedMapTag(){
   try {
@@ -152,7 +167,33 @@ function handleEmbeddedOdds(p){ try {
   if((currentMap===undefined || currentMap===null) && (p.map!==undefined && p.map!==null)){
     currentMap = p.map; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue();
   }
-  embeddedOddsData[p.broker]=p; renderEmbeddedOdds(); } catch(_){ } }
+  embeddedOddsData[p.broker]=p; renderEmbeddedOdds();
+  // Auto disable/resume on dataservices suspension honoring autoResume flag
+  try {
+    if(p.broker==='dataservices'){
+      if(p.frozen && window.__embeddedAutoSim && window.__embeddedAutoSim.active){
+        window.__embeddedAutoSim.active=false; clearTimeout(window.__embeddedAutoSim.timer); window.__embeddedAutoSim.timer=null;
+        const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.remove('on');
+        embeddedAutoSim.lastDisableReason='excel-suspended';
+        embeddedStatus('Auto OFF (excel suspended)');
+        try { console.log('[autoSim][embedded][autoDisable] excel suspended -> auto OFF (intent', embeddedAutoSim.userWanted? 'kept':'cleared', ') resumeAllowed', embeddedAutoSim.autoResume); } catch(_){ }
+        try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active:false, reason:'excel-suspended' }); } } catch(_){ }
+      } else if(!p.frozen && window.__embeddedAutoSim && !window.__embeddedAutoSim.active && embeddedAutoSim.userWanted && embeddedAutoSim.lastDisableReason==='excel-suspended'){
+        if(embeddedAutoSim.autoResume){
+          window.__embeddedAutoSim.active=true; embeddedAutoSim.lastDisableReason='excel-resumed';
+          const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.add('on');
+          embeddedStatus(`Resume (tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%)`);
+          try { console.log('[autoSim][embedded][autoResume] excel resumed -> auto ON (autoResume=true)'); } catch(_){ }
+          try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active:true, reason:'excel-resumed', tolerance: embeddedAutoSim.tolerancePct }); } } catch(_){ }
+          embeddedStep();
+        } else {
+          try { console.log('[autoSim][embedded][resume-blocked] excel resumed but autoResume=false'); } catch(_){ }
+          embeddedStatus('Resume blocked (R off)');
+        }
+      }
+    }
+  } catch(_){ }
+} catch(_){ } }
 function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSection'); if(!root) return; // collapse handled globally
   try { if(window.desktopAPI && window.desktopAPI.onOdds){ window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update via desktopAPI', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } else { ipcRendererEmbedded.on('odds-update', (_e,p)=>{ try { console.debug('[embeddedOdds] odds-update via ipcRenderer', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.onTeamNames){ window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } else { ipcRendererEmbedded.on('lol-team-names-update', ()=> renderEmbeddedOdds()); } } catch(_){ }
@@ -205,12 +246,19 @@ updateEmbeddedMapTag();
 window.addEventListener('DOMContentLoaded', ()=>{ try { syncEmbeddedMapSelect(); updateEmbeddedMapTag(); forceMapSelectValue(); } catch(_){ } });
 
 // ================= Embedded Auto alignment helper (simulate only, no virtual odds) =================
-const embeddedAutoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null };
-// Load stored tolerance (shared with board)
+const embeddedAutoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null, fireCooldownMs:900, lastFireTs:0, lastFireSide:null, lastFireKey:null, adaptive:true, waitingForExcel:false, waitToken:0, excelSnapshotKey:null, maxAdaptiveWaitMs:1600, userWanted:false, lastDisableReason:null, autoResume:true };
+try { const ar = localStorage.getItem('embeddedAutoResumeEnabled'); if(ar==='0') embeddedAutoSim.autoResume=false; } catch(_){ }
+try { const uw = localStorage.getItem('embeddedAutoUserWanted'); if(uw==='1'){ embeddedAutoSim.userWanted=true; } } catch(_){ }
+try { console.log('[autoSim][embedded][startup] stats_embedded.js loaded'); } catch(_){ }
+// Lightweight heartbeat to verify forwarding if main board view hidden
+try { if(!window.__embeddedAutoHb){ window.__embeddedAutoHb=true; let ticks=0; const loop=()=>{ if(embeddedAutoSim.active) return; try { console.log('[autoSim][embedded][hb]', ++ticks); } catch(_){ } if(ticks<5) setTimeout(loop, 5000); }; setTimeout(loop, 4000);} } catch(_){ }
+// Load stored tolerance + interval + adaptive (shared with board)
 try {
   const ipc = (window.require? window.require('electron').ipcRenderer: (window.ipcRenderer||null));
   if(ipc && ipc.invoke){
     ipc.invoke('auto-tolerance-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) embeddedAutoSim.tolerancePct = v; try { console.log('[autoSim][embedded] tolerance loaded', embeddedAutoSim.tolerancePct); } catch(_){ } }).catch(()=>{});
+    ipc.invoke('auto-interval-get').then(v=>{ if(typeof v==='number' && !isNaN(v)){ embeddedAutoSim.stepMs=v; try { console.log('[autoSim][embedded] interval loaded', v); } catch(_){ } } }).catch(()=>{});
+    ipc.invoke('auto-adaptive-get').then(v=>{ if(typeof v==='boolean'){ embeddedAutoSim.adaptive=v; try { console.log('[autoSim][embedded] adaptive loaded', v); } catch(_){ } } }).catch(()=>{});
   }
 } catch(_){ }
 function embeddedParsePair(cellId){
@@ -222,33 +270,117 @@ function embeddedParseExcel(){ return embeddedParsePair('embeddedExcelCell'); }
 function embeddedSetExcel(){ /* placeholder for future real integration; not used in simulation */ }
 function embeddedStatus(msg){ const el=document.getElementById('embeddedAutoStatus'); if(el) el.textContent=msg||''; }
 function embeddedFlash(idx){ const dot=document.querySelector('#embeddedExcelAutoIndicatorsRow .autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), embeddedAutoSim.stepMs-80); } }
-function embeddedSchedule(){ if(!embeddedAutoSim.active) return; clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=setTimeout(embeddedStep, embeddedAutoSim.stepMs); }
+function embeddedSchedule(delay){ if(!embeddedAutoSim.active) return; clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=setTimeout(embeddedStep, typeof delay==='number'? delay: embeddedAutoSim.stepMs); }
 function embeddedStep(){
   if(!embeddedAutoSim.active) return;
   const mid=embeddedParseMid(); const ex=embeddedParseExcel();
   if(!mid || !ex){ embeddedStatus('Нет данных'); return embeddedSchedule(); }
   const key=mid.join('|'); if(embeddedAutoSim.lastMidKey && embeddedAutoSim.lastMidKey!==key){ embeddedStatus('Mid changed'); }
   embeddedAutoSim.lastMidKey=key;
-  const midMinIdx = mid[0] <= mid[1] ? 0:1; const midMin = mid[midMinIdx];
-  const exMinIdx = ex[0] <= ex[1] ? 0:1; const exMin = ex[exMinIdx];
-  const diffPct = Math.abs(exMin - midMin)/midMin*100;
+  // Min-only alignment: choose side whose MID component is minimal and align only it
+  const sideToAdjust = (mid[0] <= mid[1]) ? 0 : 1;
+  const diffPct = Math.abs(ex[sideToAdjust] - mid[sideToAdjust]) / mid[sideToAdjust] * 100;
   if(diffPct <= embeddedAutoSim.tolerancePct){
-    embeddedStatus('Aligned');
+    embeddedStatus('Aligned (min side)');
+    try { console.log('[autoSim][embedded][step][min-only] aligned side', sideToAdjust, 'diff', diffPct.toFixed(3)); } catch(_){ }
     return embeddedSchedule();
   }
-  embeddedFlash(exMinIdx);
-  embeddedStatus(`Aligning ${diffPct.toFixed(2)}% S${exMinIdx+1}`);
-  embeddedSchedule();
+  const needRaise = ex[sideToAdjust] < mid[sideToAdjust];
+  let keyLabel;
+  if(sideToAdjust===0){ keyLabel = needRaise ? 'F24' : 'F23'; } else { keyLabel = needRaise ? 'F23' : 'F24'; }
+  const direction = needRaise ? 'raise' : 'lower';
+  embeddedFlash(sideToAdjust);
+  embeddedStatus(`Align ${direction} S${sideToAdjust+1} ${diffPct.toFixed(2)}% (min)`);
+  try { console.log('[autoSim][embedded][step][min-only] fireCandidate side', sideToAdjust, direction, 'diff%', diffPct.toFixed(3), 'key', keyLabel); } catch(_){ }
+  // Burst logic (embedded): compute pulses from diffPct
+  let pulses=1; if(diffPct>=15) pulses=4; else if(diffPct>=7) pulses=3; else if(diffPct>=5) pulses=2;
+  try { console.log('[autoSim][embedded][burst] diff', diffPct.toFixed(3), 'pulses', pulses); } catch(_){ }
+  try {
+    const now = Date.now();
+    if(now - embeddedAutoSim.lastFireTs < embeddedAutoSim.fireCooldownMs && embeddedAutoSim.lastFireSide===sideToAdjust && embeddedAutoSim.lastFireKey===keyLabel){
+      return embeddedSchedule();
+    }
+    embeddedAutoSim.lastFireTs = now; embeddedAutoSim.lastFireSide=sideToAdjust; embeddedAutoSim.lastFireKey=keyLabel;
+    const invokeDirectional = (i)=>{
+      let pathUsed='none', invoked=false, invokeErr=null;
+      try {
+        if(window.desktopAPI && typeof window.desktopAPI.invoke==='function'){
+          pathUsed='invoke'; window.desktopAPI.invoke('send-auto-press', { side: sideToAdjust, key: keyLabel, direction, diffPct, noConfirm:true }); invoked=true;
+        } else if(window.desktopAPI && window.desktopAPI.autoSendPress){
+          pathUsed='autoSendPress'; window.desktopAPI.autoSendPress({ side: sideToAdjust, key: keyLabel, direction, diffPct, noConfirm:true }); invoked=true;
+        } else {
+          const { ipcRenderer } = require('electron'); if(ipcRenderer && ipcRenderer.invoke){ pathUsed='ipcDirect'; ipcRenderer.invoke('send-auto-press', { side: sideToAdjust, key: keyLabel, direction, diffPct, noConfirm:true }); invoked=true; }
+        }
+      } catch(err){ invokeErr=err; }
+      try { console.log('[autoSim][embedded][burst] directional', i+1,'/',pulses,keyLabel,'invoked',invoked,'path',pathUsed, invokeErr? (''+invokeErr):''); } catch(_){ }
+    };
+    for(let i=0;i<pulses;i++){
+      const delay = i===0? 0 : 55*i;
+      setTimeout(()=>invokeDirectional(i), delay);
+    }
+    const confirmDelay = 55*(pulses-1)+100;
+    setTimeout(()=>{
+      try {
+        if(window.desktopAPI && typeof window.desktopAPI.invoke==='function'){
+          window.desktopAPI.invoke('send-auto-press', { side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true });
+        } else if(window.desktopAPI && window.desktopAPI.autoSendPress){
+          window.desktopAPI.autoSendPress({ side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true });
+        } else {
+          const { ipcRenderer } = require('electron'); const ip=ipcRenderer; if(ip && ip.invoke){ ip.invoke('send-auto-press', { side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true }); }
+        }
+        try { console.log('[autoSim][embedded][burst] confirm F22 after', confirmDelay,'ms'); } catch(_){ }
+      } catch(_){ }
+    }, confirmDelay);
+  } catch(_){ }
+  if(embeddedAutoSim.adaptive){
+    embeddedAutoSim.waitingForExcel=true; embeddedAutoSim.excelSnapshotKey = (ex[0]+'|'+ex[1]);
+    const myToken=++embeddedAutoSim.waitToken; const startTs=Date.now();
+    const check=()=>{
+      if(!embeddedAutoSim.active || !embeddedAutoSim.waitingForExcel || myToken!==embeddedAutoSim.waitToken) return;
+      const cur=embeddedParseExcel();
+      if(cur){
+        const kk=cur[0]+'|'+cur[1];
+        if(kk!==embeddedAutoSim.excelSnapshotKey){
+          embeddedAutoSim.waitingForExcel=false;
+            try { console.log('[autoSim][embedded][adaptive][resume] excelChanged', kk); } catch(_){ }
+          return embeddedSchedule(50);
+        }
+      }
+      if(Date.now()-startTs >= embeddedAutoSim.maxAdaptiveWaitMs){
+        embeddedAutoSim.waitingForExcel=false;
+        try { console.log('[autoSim][embedded][adaptive][timeout] resume'); } catch(_){ }
+        return embeddedSchedule();
+      }
+      setTimeout(check, 120);
+    };
+    setTimeout(check, 150);
+  } else {
+    embeddedSchedule();
+  }
 }
 function embeddedToggleAuto(){
-  embeddedAutoSim.active=!embeddedAutoSim.active;
+  const newState = !embeddedAutoSim.active;
+  embeddedAutoSim.active=newState;
   const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.toggle('on', embeddedAutoSim.active);
   const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow'); if(indRow) indRow.style.display=embeddedAutoSim.active? '' : 'none';
   const stRow=document.getElementById('embeddedExcelAutoStatusRow'); if(stRow) stRow.style.display=embeddedAutoSim.active? '' : 'none';
   embeddedStatus(embeddedAutoSim.active? `Start (tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%)` : 'Stopped');
+  try { console.log('[autoSim][embedded][toggle]', embeddedAutoSim.active? 'ON':'OFF', 'tol', embeddedAutoSim.tolerancePct); } catch(_){ }
+  try { if(embeddedAutoSim.active){ embeddedAutoSim.userWanted=true; embeddedAutoSim.lastDisableReason=null; localStorage.setItem('embeddedAutoUserWanted','1'); } else { embeddedAutoSim.userWanted=false; embeddedAutoSim.lastDisableReason='manual'; localStorage.setItem('embeddedAutoUserWanted','0'); } } catch(_){ }
+  // Forward to main (board forwarding filter in preload only catches [autoSim], so tags preserved)
+  try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active: embeddedAutoSim.active, tolerance: embeddedAutoSim.tolerancePct }); } } catch(_){ }
   if(embeddedAutoSim.active){ embeddedStep(); } else { clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=null; }
 }
 document.addEventListener('click', e=>{ if(e.target && e.target.id==='embeddedAutoBtn'){ embeddedToggleAuto(); }});
+// Auto-resume (R) button toggle
+document.addEventListener('click', e=>{ if(e.target && e.target.id==='embeddedAutoResumeBtn'){ try {
+  embeddedAutoSim.autoResume = !embeddedAutoSim.autoResume;
+  try { localStorage.setItem('embeddedAutoResumeEnabled', embeddedAutoSim.autoResume? '1':'0'); } catch(_){ }
+  e.target.classList.toggle('on', embeddedAutoSim.autoResume);
+  try { console.log('[autoSim][embedded][autoResumeFlag]', embeddedAutoSim.autoResume? 'ON':'OFF'); } catch(_){ }
+} catch(_){ } }});
+// Initialize resume button visual state after DOM ready
+window.addEventListener('DOMContentLoaded', ()=>{ try { const rbtn=document.getElementById('embeddedAutoResumeBtn'); if(rbtn) rbtn.classList.toggle('on', embeddedAutoSim.autoResume); } catch(_){ } });
 window.__embeddedAutoSim = embeddedAutoSim;
 
 // Live tolerance update
@@ -261,6 +393,27 @@ try {
         try { console.log('[autoSim][embedded] tolerance updated ->', v); } catch(_){ }
         if(embeddedAutoSim.active){ embeddedStatus(`Tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%`); }
       }
+    });
+    ipc.on('auto-interval-updated', (_e,v)=>{ if(typeof v==='number' && !isNaN(v)){ embeddedAutoSim.stepMs=v; try { console.log('[autoSim][embedded] interval updated ->', v); } catch(_){ } } });
+    ipc.on('auto-adaptive-updated', (_e,v)=>{ if(typeof v==='boolean'){ embeddedAutoSim.adaptive=v; try { console.log('[autoSim][embedded] adaptive updated ->', v); } catch(_){ } } });
+  }
+} catch(_){ }
+
+// Global disable hotkey signal listener
+try {
+  const { ipcRenderer } = require('electron');
+  if(ipcRenderer){
+    ipcRenderer.on('auto-disable-all', ()=>{
+      try {
+        if(embeddedAutoSim.active){
+          embeddedAutoSim.active=false; clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=null;
+          const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.remove('on');
+          embeddedStatus('Auto OFF (Alt+C)');
+          embeddedAutoSim.userWanted=false; embeddedAutoSim.lastDisableReason='manual-global';
+          try { localStorage.setItem('embeddedAutoUserWanted','0'); } catch(_){ }
+          try { console.log('[autoSim][embedded][autoDisable] Alt+C global -> OFF (intent cleared)'); } catch(_){ }
+        }
+      } catch(_){ }
     });
   }
 } catch(_){ }

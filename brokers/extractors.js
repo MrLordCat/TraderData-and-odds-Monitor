@@ -17,8 +17,8 @@ function getBrokerId(host){
 function deepQuery(selector, root=document){
   const res=[];
   function walk(r){
-    try { r.querySelectorAll(selector).forEach(e=>res.push(e)); } catch(_){}
-    try { r.querySelectorAll('*').forEach(n=>{ if(n.shadowRoot) walk(n.shadowRoot); }); } catch(_){}
+    try { r.querySelectorAll(selector).forEach(e=>res.push(e)); } catch(_){ }
+    try { r.querySelectorAll('*').forEach(n=>{ if(n.shadowRoot) walk(n.shadowRoot); }); } catch(_){ }
   }
   walk(root);
   return res;
@@ -26,68 +26,55 @@ function deepQuery(selector, root=document){
 
 // ---- Individual site extractors (all return {odds:[..], frozen:boolean}) ----
 function extractRivalry(mapNum=0){
-  // Completely class-agnostic Rivalry extractor.
-  // Relies ONLY on:
-  //   - wrapper: [data-editor-id="tableMarketWrapper"]
-  //   - outcome plates: [data-editor-id="tableOutcomePlate"]
-  //   - header text content (normalized): "Winner" or "First map - winner" etc.
-  // Semantics:
-  //   mapNum=0 -> match winner (exact header 'Winner')
-  //   mapNum>=1 -> strict "{Ordinal} map - winner" (ordinal English words)
+  // Classless variant (uses only data-editor-id wrappers + text heuristics)
   try {
-  const debug = !!window.__RIVALRY_DEBUG;
+    const debug = !!window.__RIVALRY_DEBUG;
     const wrappers = deepQuery('[data-editor-id="tableMarketWrapper"]');
     if(!wrappers.length) return { odds:['-','-'], frozen:false };
     const ORD=['First','Second','Third','Fourth','Fifth'];
     const norm = (s)=> (s||'').replace(/\s+/g,' ').trim().toLowerCase();
     let target=null;
     if(mapNum===0){
-      // Prefer explicit header elements first (legacy extension logic)
+      // Match overall "Winner" (exact line containing only winner)
       for(const w of wrappers){
-        const header = w.querySelector('div.bt323, div.bt341');
-        if(header && /^winner$/i.test(header.textContent.trim())){ target=w; break; }
-      }
-      // Fallback to broad text scan
-      if(!target){
-        for(const w of wrappers){
-          let headerCandidates=[];
-          const firstLine = (w.textContent||'').split('\n').map(l=>norm(l)).find(l=>l.length>0) || '';
-          if(firstLine) headerCandidates.push(firstLine);
-          headerCandidates.push(...Array.from(w.children).slice(0,3).map(c=>norm(c.textContent||'')));
-          if(headerCandidates.some(t=>/^winner$/.test(t))){ target=w; break; }
+        const raw=(w.textContent||'');
+        if(/\bwinner\b/i.test(raw)){
+          // Find first non-empty line
+          const firstLine = raw.split('\n').map(l=>norm(l)).find(l=>l.length);
+          if(firstLine==='winner'){ target=w; break; }
         }
       }
     } else {
-      const idx=mapNum-1; if(idx<0||idx>=ORD.length) return { odds:['-','-'], frozen:false };
-      const pattern = new RegExp('^'+ORD[idx].toLowerCase().replace(/([.*+?^${}()|\[\]\\])/g,'\\$1')+'\\s+map'); // loosen to match 'First map' header variants
-      // Try header-based first
-      for(const w of wrappers){
-        const header = w.querySelector('div.bt323, div.bt341');
-        if(header && pattern.test(norm(header.textContent||''))){ target=w; break; }
+      const idx = mapNum-1; if(idx<0||idx>=ORD.length) return { odds:['-','-'], frozen:false };
+      const ordWord = ORD[idx].toLowerCase();
+      const num = idx+1;
+      const mapPhraseRe = new RegExp('^('+
+        ordWord.replace(/([.*+?^${}()|\[\]\\])/g,'\\$1')+'\\s+map|map\\s+'+num+'(?:st|nd|rd|th)?'+')');
+      const badRe = /both\s+teams|first\s+(?:blood|tower|dragon)|to\s+slay|handicap|total|baron|dragon/i;
+      function looksWinner(line){
+        if(!line) return false;
+        const n=norm(line);
+        if(!/winner/.test(n)) return false;
+        if(badRe.test(n)) return false;
+        if(!mapPhraseRe.test(n)) return false;
+        // must contain winner token after phrase
+        return /winner/.test(n);
       }
-      // Fallback broad scan
-      if(!target){
-        outer: for(const w of wrappers){
-          const lines = (w.textContent||'').split('\n').map(l=>norm(l)).filter(l=>l.length);
-          for(const line of lines){ if(pattern.test(line)){ target=w; break outer; } }
-          if(!target){
-            const childTexts = Array.from(w.children).slice(0,5).map(c=>norm(c.textContent||''));
-            if(childTexts.some(t=>pattern.test(t))){ target=w; break; }
-          }
-        }
+      outer: for(const w of wrappers){
+        const lines=(w.textContent||'').split('\n').map(l=>l.trim()).filter(l=>l.length).slice(0,12);
+        for(const line of lines){ if(looksWinner(line)){ target=w; break outer; } }
       }
     }
     if(!target) return { odds:['-','-'], frozen:false };
     const plates = Array.from(target.querySelectorAll('[data-editor-id="tableOutcomePlate"]')).slice(0,2);
     if(plates.length<2) return { odds:['-','-'], frozen:false };
     const extractPrice=(plate)=>{
-      // Price usually last <span>; safeguard: choose span whose text is numeric-like.
       const spans=[...plate.querySelectorAll('span')];
       const numeric = spans.map(s=>s.textContent.trim()).filter(t=>/^\d+(?:[.,]\d+)?$/.test(t));
       const raw = numeric[numeric.length-1] || (spans.length? spans[spans.length-1].textContent.trim(): '-');
       return raw.replace(',','.');
     };
-  const odds = plates.map(extractPrice);
+    const odds = plates.map(extractPrice);
     // Enhanced suspension detection:
     // A plate is ACTIVE if:
     //  - Has a numeric odds value AND
@@ -332,10 +319,21 @@ function extractDataServices(mapNum=0){
       if(/^[-–]$/.test(t)) return '-';
       return t;
     });
-    // Frozen detection: absence of Trading flag in class list
-    const cls = target.className || '';
-    const frozen = !/flags-MarketTradingStatus-Trading/.test(cls) || /flags-UserSuspensionStatus-Suspended|Suspended/i.test(cls);
-    return { odds: odds.length===2?odds:['-','-'], frozen };
+    // Frozen detection (GLOBAL across all markets): if ANY market on page appears suspended (not just closed), we mark current odds as frozen.
+    // Rationale: need to reflect DS suspension even if it occurs in a different map market.
+    // Only consider truly suspended markets, not just closed ones.
+    let globalSuspended=false;
+    try {
+      for(const m of markets){
+        const c = m.className || '';
+        // Check specifically for suspended status (both MarketTradingStatus-Suspended AND UserSuspensionStatus-Suspended)
+        if(/flags-MarketTradingStatus-Suspended/.test(c) && /flags-UserSuspensionStatus-Suspended/.test(c)) { 
+          globalSuspended=true; 
+          break; 
+        }
+      }
+    } catch(_){ }
+    return { odds: odds.length===2?odds:['-','-'], frozen: globalSuspended };
   } catch(_){ return { odds:['-','-'], frozen:false }; }
 
   function getMarketName(m){

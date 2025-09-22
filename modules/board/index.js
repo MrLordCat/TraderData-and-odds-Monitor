@@ -25,7 +25,7 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   let state = {
     mode: store.get('boardMode') || 'docked',
     side: store.get('boardSide') || 'right',
-    width: store.get('boardWidth') || 380
+  width: store.get('boardWidth') || 320
   };
   const MIN_W = 240; const MAX_W = 800;
   let dockView = null; // BrowserView when docked

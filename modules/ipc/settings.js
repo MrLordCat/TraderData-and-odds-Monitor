@@ -45,6 +45,55 @@ function initSettingsIpc(ctx){
       }
     } catch(_){ }
   });
+
+  // === Auto interval (ms) ===
+  function clampInterval(v){ return Math.max(120, Math.min(10000, Math.floor(v))); }
+  ipcMain.handle('auto-interval-get', ()=>{
+    try {
+      const v = store.get('autoIntervalMs');
+      if(typeof v==='number' && !isNaN(v)) return clampInterval(v);
+    } catch(_){ }
+    return 500; // default
+  });
+  ipcMain.on('auto-interval-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.intervalMs==='number'? clampInterval(payload.intervalMs): null;
+      if(v){
+        store.set('autoIntervalMs', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-interval-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-interval-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
+
+  // === Auto adaptive mode (bool) ===
+  ipcMain.handle('auto-adaptive-get', ()=>{
+    try {
+      const v = store.get('autoAdaptiveEnabled');
+      if(typeof v==='boolean') return v;
+    } catch(_){ }
+    return true; // default enabled
+  });
+  ipcMain.on('auto-adaptive-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.enabled==='boolean'? payload.enabled: null;
+      if(v!==null){
+        store.set('autoAdaptiveEnabled', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-adaptive-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-adaptive-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
 }
 
 module.exports = { initSettingsIpc };

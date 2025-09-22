@@ -47,8 +47,11 @@ ipcRenderer.on('collect-now', ()=> safe(()=> safeSend('bv-odds-update', getCurre
 // Map change listener
 ipcRenderer.on('set-map', (_e, mapVal)=>{
   const n=parseInt(mapVal,10); desiredMap=Number.isNaN(n)?1:n;
+  try { if(BROKER_ID==='dataservices') console.log('[map][recv] set-map ->', desiredMap); } catch(_){ }
   triggerMapChange(HOST, desiredMap);
   [600,1500,3000].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap)), d));
+  // Extra late assertion specifically for dataservices (occasionally loads/reacts slowly)
+  if(BROKER_ID==='dataservices') [4200,6000].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap)), d));
 });
 ipcRenderer.on('set-is-last', (_e, flag)=>{
   try { isLast = !!flag; } catch(_){ }
@@ -85,6 +88,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 // Light ping so main can replay last map/placeholder odds promptly
 window.addEventListener('DOMContentLoaded', ()=>{ try { ipcRenderer.send('bv-odds-update', { broker:'_ping' }); } catch(_){} });
+
+// Dataservices specific: actively pull last map & enforce if initial broadcast missed
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(BROKER_ID!=='dataservices') return;
+  try {
+    // Ask main for last map via a synthetic request path: send a one-off eval back through mainWindow by piggy-backing odds ping cycle.
+    // Simpler: just emit a lightweight marker; main already replays, but we also schedule self-retries reading injected global if provided later.
+    const attemptApply=(delay)=> setTimeout(()=>{
+      try {
+        // We cannot invoke ipcRenderer.invoke here (contextIsolation true) unless exposed; reuse ping to encourage resend.
+        ipcRenderer.send('bv-odds-update', { broker:'_ping_ds' });
+        // If we already received desiredMap via earlier set-map, reassert once.
+        triggerMapChange(HOST, desiredMap);
+        try { console.log('[map][ds][fallback] reassert at', delay,'ms map=', desiredMap); } catch(_){ }
+      } catch(_){ }
+    }, delay);
+    [800, 2000, 4000, 7000].forEach(attemptApply);
+  } catch(_){ }
+});
 
 // (Removed legacy BrowserView drag bar injection)
 
