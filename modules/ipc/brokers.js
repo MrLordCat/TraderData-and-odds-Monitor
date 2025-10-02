@@ -62,7 +62,35 @@ function initBrokerIpc(ctx){
 
   ipcMain.on('refresh-broker', (e, id) => { views[id]?.webContents.reloadIgnoringCache(); });
   ipcMain.on('refresh-all', () => { Object.values(views).forEach(v => { try { v.webContents.reloadIgnoringCache(); } catch(_){ } }); });
-  ipcMain.on('close-broker', (e,id)=> brokerManager.closeBroker(id));
+  ipcMain.on('close-broker', (e,id)=> {
+    try {
+      if(!id) return;
+      brokerManager.closeBroker(id);
+      // Purge cached latest odds so replay won't resurrect removed broker
+      try { if(latestOddsRef && latestOddsRef.value) delete latestOddsRef.value[id]; } catch(_){}
+      // Build fresh active list (exclude slot-* views)
+      const ids = Object.keys(views).filter(k=> !k.startsWith('slot-'));
+      // Notify main window (some renderers may listen for brokers-sync to rebuild rows)
+      try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('brokers-sync', { ids }); } catch(_){ }
+      // Also proactively notify every slot-* view so its inline picker (if open) can refresh availability
+      try {
+        Object.entries(views).forEach(([vid,v])=>{
+          if(vid.startsWith('slot-') && v && v.webContents && !v.webContents.isDestroyed()){
+            v.webContents.send('brokers-sync', { ids });
+          }
+        });
+      } catch(_){ }
+      // Notify board window / docked view via boardManager replay (will emit brokers-sync + remaining odds)
+      try { const bm = boardManagerRef && boardManagerRef.value; if(bm && bm.replayOdds) bm.replayOdds(); } catch(_){ }
+      // Emit placeholder removal marker so any listeners (board aggregation, stats panel) can drop it immediately
+      const removalPayload = { broker: id, odds:['-','-'], removed:true };
+      try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', removalPayload); } catch(_){ }
+      const boardWindow = (typeof boardWindowRef!=='undefined' && boardWindowRef && boardWindowRef.value); 
+      try { if(boardWindow && !boardWindow.isDestroyed()) boardWindow.webContents.send('odds-update', removalPayload); } catch(_){ }
+      try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('odds-update', removalPayload); } catch(_){ }
+      try { console.log('[broker][close] cleaned', id); } catch(_){ }
+    } catch(err){ try { console.warn('close-broker handling failed', err.message); } catch(_){ } }
+  });
   // Deprecated popup path: ignore slot-request-add (inline picker handles UI)
   ipcMain.on('slot-request-add', ()=> { /* intentionally no-op */ });
   ipcMain.on('request-add-broker-data', (e, { slotIndex, includeActive }) => {

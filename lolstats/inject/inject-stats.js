@@ -12,7 +12,8 @@
   const RX_DRAGON     = /slaydragon/i;
   const RX_DRAKE      = /slay\w*drake/i;
   const RX_ATAKHAN    = /slaythornboundatakhan/i; // Atakhan objective
-  const RX_GAME_WIN_BLOCK = /won/i; // we'll detect sequence TeamName -> won -> Game N
+  // Strict single-line winner detection: "<Team Name> won Game <N>"
+  const RX_GAME_WIN_SINGLE = /^\s*(.*?)\s+won\s+Game\s+(\d+)\s*$/i;
   // Multi-kill timing thresholds
   const MULTI_INTER_GAP = 10_000; // ms between kills for double/triple/quadra
   const MULTI_PENTA_GAP = 30_000; // ms allowed between 4th and 5th
@@ -26,8 +27,7 @@
   // Debounce publish to avoid sequential flood during backlog replay
   let __publishTimer = null; const PUBLISH_DEBOUNCE_MS = 120;
   function schedulePublish(){ if(__publishTimer) return; __publishTimer = setTimeout(()=>{ __publishTimer=null; try { publish(); } catch(_){ } }, PUBLISH_DEBOUNCE_MS); }
-  // Winner detection helper: remember last standalone team name line
-  let lastTeamLineCandidate = null; // { teamName, ts }
+  // Note: multi-line/block-based winner inference removed to prevent false positives.
 
   const gameStats = {};
   let currentGame = null;
@@ -182,34 +182,24 @@
   if (!currentGame) return;
     const stats = gameStats[currentGame];
 
-    // Winner pattern can arrive as three separate lines: "Team X" / "won" / "Game N"
-    // State machine: capture a team name line, then if a subsequent line is exactly 'won' (or contains just won), set winner.
+    // Winner detection: strict single-line only to avoid mid-game false positives
     if (!stats.winner) {
       const teamNames = [team1Name, team2Name].filter(Boolean);
-      const lowerHead = head.toLowerCase();
-      const lowerText = (text||'').toLowerCase();
-      const isPureTeamLine = teamNames.includes(head) && head.split(/\s+/).length >= 1 && head.length > 0;
       // Direct single-line pattern: "<Team Name> won Game <N>"
-      const mSingleLine = /^(.*)\s+won\s+Game\s+(\d+)/i.exec(head);
-      if (mSingleLine && !stats.winner) {
+      const mSingleLine = RX_GAME_WIN_SINGLE.exec(head);
+      if (mSingleLine) {
         const candTeam = mSingleLine[1].trim();
+        const gNum = String(mSingleLine[2]);
         if (teamNames.includes(candTeam)) {
-          stats.winner = candTeam;
-          stats.winAt = ts;
+          // Assign winner to the exact game mentioned in the log, not to currentGame
+          const target = gameStats[gNum] || (gameStats[gNum] = makeStats());
+          if (!target.winner) {
+            target.winner = candTeam;
+            target.winAt = ts;
+            try { target.winnerSource = 'live-log-single-line'; } catch(_){ }
+            try { console.log('[lol][winner][inject]', candTeam, 'won Game', gNum, 'at', ts); } catch(_){ }
+          }
         }
-      }
-      if (isPureTeamLine) {
-        lastTeamLineCandidate = { teamName: head, ts };
-      } else if (lastTeamLineCandidate && (/^won$/i.test(head) || /^won$/i.test(text) || /\bwon\b/.test(lowerHead))) {
-        stats.winner = lastTeamLineCandidate.teamName;
-        stats.winAt = ts;
-        lastTeamLineCandidate = null;
-      } else if (teamNames.includes(head) && /\bwon\b/i.test(lowerText)) {
-        stats.winner = head;
-        stats.winAt = ts;
-        lastTeamLineCandidate = null;
-      } else if (lastTeamLineCandidate && (ts - lastTeamLineCandidate.ts) > 300000) { // 5 min safety timeout
-        lastTeamLineCandidate = null;
       }
     }
 

@@ -48,6 +48,45 @@ if(autoTolInput){
 	});
 }
 
+// Burst levels (3 tiers configurable)
+const burstInputs = {
+	th1: document.getElementById('burst1-th'), pulses1: document.getElementById('burst1-pulses'),
+	th2: document.getElementById('burst2-th'), pulses2: document.getElementById('burst2-pulses'),
+	th3: document.getElementById('burst3-th'), pulses3: document.getElementById('burst3-pulses'),
+};
+let burstLevels = [ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ];
+function sanitizeBurst(list){
+	try {
+		if(!Array.isArray(list)) list = burstLevels;
+		const cleaned = list.map(l=>({ thresholdPct: Math.max(0.01, Math.min(100, Number(l.thresholdPct)||0)), pulses: Math.max(1, Math.min(10, Math.round(Number(l.pulses)||0))) }))
+			.filter(l=> l.thresholdPct>0 && l.pulses>=1)
+			.sort((a,b)=> b.thresholdPct - a.thresholdPct)
+			.slice(0,3);
+		return cleaned.length? cleaned : [ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ];
+	} catch(_){ return [ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ]; }
+}
+function applyBurstInputsFromModel(){
+	burstLevels = sanitizeBurst(burstLevels);
+	for(let i=0;i<3;i++){
+		const l = burstLevels[i];
+		const thEl = burstInputs['th'+(i+1)];
+		const puEl = burstInputs['pulses'+(i+1)];
+		if(thEl) thEl.value = l? l.thresholdPct : '';
+		if(puEl) puEl.value = l? l.pulses : '';
+	}
+}
+function readBurstInputs(){
+	const tmp=[];
+	for(let i=1;i<=3;i++){
+		const th = parseFloat(burstInputs['th'+i]?.value);
+		const pu = parseInt(burstInputs['pulses'+i]?.value,10);
+		if(!isNaN(th) && !isNaN(pu)) tmp.push({ thresholdPct: th, pulses: pu });
+	}
+	if(tmp.length) burstLevels = tmp;
+	burstLevels = sanitizeBurst(burstLevels);
+}
+Object.values(burstInputs).forEach(el=>{ if(el){ el.addEventListener('change', ()=>{ readBurstInputs(); applyBurstInputsFromModel(); }); }});
+
 function queueStatsConfigSend(){
 	if(!currentStatsConfig) return;
 	// Merge animation inputs before send
@@ -110,6 +149,8 @@ document.getElementById('save').onclick = ()=>{
 	queueStatsConfigSend();
 	// Persist auto tolerance
 	try { ipcRenderer.send('auto-tolerance-set', { tolerancePct: autoTolerancePct }); } catch(_){ }
+	// Persist burst levels
+	try { readBurstInputs(); ipcRenderer.send('auto-burst-levels-set', { levels: burstLevels }); } catch(_){ }
 	ipcRenderer.send('close-settings');
 };
 document.getElementById('close').onclick = ()=> ipcRenderer.send('close-settings');
@@ -136,9 +177,10 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	if(anim.color2) anim.color2.value = currentStatsConfig.animationSecondaryColor;
 	emitHeatBar();
 	updateStatsConfigFromInputs(true); // push current values on open
-	// Request stored auto tolerance after initial settings applied
+	// Request stored auto tolerance & burst levels after initial settings applied
 	try { ipcRenderer.invoke('auto-tolerance-get').then(v=>{
 		if(typeof v === 'number' && !isNaN(v)) autoTolerancePct = clampTol(v);
 		if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2);
 	}).catch(()=>{ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2); }); } catch(_){ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2); }
+	try { ipcRenderer.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)) { burstLevels = v; } applyBurstInputsFromModel(); }).catch(()=> applyBurstInputsFromModel()); } catch(_){ applyBurstInputsFromModel(); }
 });

@@ -22,8 +22,8 @@ function computeDerived(){
   if(!midRow || !arbRow) return;
   const midCell=midRow.children[1];
   const arbCell=arbRow.children[1];
-  // Exclude dataservices from aggregated mid/arb calculations per requirement
-  const active = Object.values(boardData).filter(r=> r.broker!=='dataservices' && !r.frozen && r.odds.every(o=>!isNaN(parseFloat(o))));
+  // Exclude excel (and legacy dataservices) from aggregated mid/arb calculations
+  const active = Object.values(boardData).filter(r=> r.broker!=='excel' && r.broker!=='dataservices' && !r.frozen && r.odds.every(o=>!isNaN(parseFloat(o))));
   if (!active.length){ midCell.textContent='-'; arbCell.textContent='-'; return; }
   const s1=active.map(r=>parseFloat(r.odds[0]));
   const s2=active.map(r=>parseFloat(r.odds[1]));
@@ -44,9 +44,9 @@ function renderBoard(){
   const tb = document.getElementById('rows');
   if(!tb) return;
   const excelRow = document.getElementById('excelRow');
-  const excelRecord = boardData['dataservices'];
+  const excelRecord = boardData['excel'] || boardData['dataservices']; // fall back to legacy key just in case
   // Filter out dataservices from main list
-  const vals=Object.values(boardData).filter(r=>r.broker!=='dataservices').sort((a,b)=> a.broker.localeCompare(b.broker));
+  const vals=Object.values(boardData).filter(r=>r.broker!=='excel' && r.broker!=='dataservices').sort((a,b)=> a.broker.localeCompare(b.broker));
   // Best values consider only non-frozen brokers
   const liveVals = vals.filter(r=>!r.frozen);
   const parsed1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
@@ -83,7 +83,7 @@ if(window.desktopAPI){
     renderBoard(); 
   // Auto disable / resume for suspension (dataservices freeze) with autoResume flag
     try {
-      if(p.broker==='dataservices'){
+  if(p.broker==='excel' || p.broker==='dataservices'){
         if(p.frozen && window.__autoSim && window.__autoSim.active){
           window.__autoSim.active=false; clearTimeout(window.__autoSim.timer); window.__autoSim.timer=null;
           const btn=document.getElementById('autoBtn'); if(btn) btn.classList.remove('on');
@@ -258,7 +258,7 @@ try {
     setTimeout(hb, 3000);
   }
 } catch(_){ }
-const autoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null, fireCooldownMs:900, lastFireTs:0, lastFireSide:null, lastFireKey:null, adaptive:true, waitingForExcel:false, waitToken:0, excelSnapshotKey:null, maxAdaptiveWaitMs:1600, userWanted:false, lastDisableReason:null, autoResume:true };
+const autoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null, fireCooldownMs:900, lastFireTs:0, lastFireSide:null, lastFireKey:null, adaptive:true, waitingForExcel:false, waitToken:0, excelSnapshotKey:null, maxAdaptiveWaitMs:1600, userWanted:false, lastDisableReason:null, autoResume:true, burstLevels:[ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ] };
 try { const ar = localStorage.getItem('autoResumeEnabled'); if(ar==='0') autoSim.autoResume=false; } catch(_){ }
 try { const uw = localStorage.getItem('autoUserWanted'); if(uw==='1'){ autoSim.userWanted=true; } } catch(_){ }
 // Load stored tolerance + interval + adaptive mode
@@ -268,6 +268,7 @@ try {
       if(typeof v==='number' && !isNaN(v)) autoSim.tolerancePct = v;
       try { console.log('[autoSim][board] tolerance loaded', autoSim.tolerancePct); } catch(_){ }
     }).catch(()=>{});
+    window.desktopAPI.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)) { autoSim.burstLevels = v; try { console.log('[autoSim][board] burst levels loaded', v); } catch(_){ } } }).catch(()=>{});
     window.desktopAPI.invoke('auto-interval-get').then(v=>{ if(typeof v==='number' && !isNaN(v)){ autoSim.stepMs=v; try { console.log('[autoSim][board] interval loaded', v); } catch(_){ } } }).catch(()=>{});
     window.desktopAPI.invoke('auto-adaptive-get').then(v=>{ if(typeof v==='boolean'){ autoSim.adaptive=v; try { console.log('[autoSim][board] adaptive loaded', v); } catch(_){ } } }).catch(()=>{});
   } else if(window.ipcRenderer){
@@ -318,11 +319,14 @@ function autoStep(){
   try {
     if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-fire-attempt', { side: sideToAdjust, diffPct, direction, key: keyLabel }); }
   } catch(_){ }
-  // Burst logic: number of directional pulses before single confirm (F22)
-  // thresholds: >=15% -> 4, >=7% -> 3, >=5% -> 2, else 1
+  // Burst logic via configurable levels broadcast from settings (descending threshold order)
   let pulses = 1;
-  if(diffPct >= 15) pulses = 4; else if(diffPct >= 7) pulses = 3; else if(diffPct >= 5) pulses = 2;
-  try { console.log('[autoSim][burst] diff', diffPct.toFixed(3), 'pulses', pulses); } catch(_){ }
+  try {
+    if(Array.isArray(autoSim.burstLevels)){
+      for(const lvl of autoSim.burstLevels){ if(diffPct >= lvl.thresholdPct){ pulses = lvl.pulses; break; } }
+    }
+  } catch(_){ }
+  try { console.log('[autoSim][burst] diff', diffPct.toFixed(3), 'pulses', pulses, '[levels]', autoSim.burstLevels); } catch(_){ }
   // Cooldown gating applies to the start of a burst
   try {
     const now = Date.now();
@@ -420,6 +424,14 @@ document.addEventListener('click', e=>{
 window.addEventListener('DOMContentLoaded', ()=>{ try { const b=document.getElementById('autoResumeBtn'); if(b) b.classList.toggle('on', autoSim.autoResume); } catch(_){ } });
 window.__autoSim = autoSim;
 
+// Hotkey broadcast: toggle auto (from main Numpad5)
+try {
+  const { ipcRenderer } = window.require? window.require('electron'): {};
+  if(ipcRenderer){
+    ipcRenderer.on('auto-toggle-all', ()=>{ try { toggleAuto(); } catch(_){ } });
+  }
+} catch(_){ }
+
 // Live update tolerance when settings saved
 try {
   const subscribe = ()=>{
@@ -455,6 +467,14 @@ try {
     } catch(_){ }
   };
   subscribe();
+  // Burst levels live update
+  try {
+    const { ipcRenderer } = require ? require('electron') : {};
+    if(ipcRenderer && !window.__autoBurstLevelsSubscribed){
+      window.__autoBurstLevelsSubscribed = true;
+      ipcRenderer.on('auto-burst-levels-updated', (_e, levels)=>{ if(Array.isArray(levels)){ autoSim.burstLevels = levels; try { console.log('[autoSim][board] burst levels updated', levels); } catch(_){ } } });
+    }
+  } catch(_){ }
 } catch(_){ }
 
 // Listen for global auto disable broadcast

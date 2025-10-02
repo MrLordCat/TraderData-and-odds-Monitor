@@ -10,4 +10,9 @@ contextBridge.exposeInMainWorld('AddBrokerAPI', {
     });
   },
   selectBroker: (id, slotIndex) => ipcRenderer.send('add-broker-selected', { id, slotIndex })
+  ,onSync: (cb) => {
+    const handler = (_e, payload)=>{ try { cb(payload && payload.ids ? payload.ids : []); } catch(_){} };
+    ipcRenderer.on('brokers-sync', handler);
+    return () => ipcRenderer.removeListener('brokers-sync', handler);
+  }
 });

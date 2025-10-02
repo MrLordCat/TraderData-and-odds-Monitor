@@ -58,6 +58,15 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   h = h+1;
   if(state.side==='left') dockView.setBounds({ x: bounds.x, y, width: w, height: h });
   else dockView.setBounds({ x: bounds.x + bounds.width - w, y, width: w, height: h });
+        // Ensure z-order (board should stay above brokers but below overlays added later).
+        try {
+          const all = mainWindow.getBrowserViews();
+          if(all[all.length-1] !== dockView){
+            // Re-append to top without destroying contents (cheap reorder)
+            mainWindow.removeBrowserView(dockView);
+            mainWindow.addBrowserView(dockView);
+          }
+        } catch(_){ }
       } catch(e){}
     }
   }
@@ -104,6 +113,8 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
       const targetWc = (state.mode==='window' && win && !win.isDestroyed()) ? win.webContents : (dockView? dockView.webContents: null);
       if(!targetWc) return;
       const ids = activeBrokerIdsRef.value.slice();
+      // Ensure virtual excel broker included for replay
+      if(!ids.includes('excel')) ids.push('excel');
       targetWc.send('brokers-sync', { ids });
       ids.forEach(id=>{
         const p = latestOddsRef.value[id];
@@ -123,7 +134,11 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
     if(win){ try { win.close(); } catch(_){} }
     // Reuse existing dockView if present; otherwise create once. (Avoid destroying/creating repeatedly to prevent internal 'closed' listener accumulation on mainWindow.)
     if(!dockView) createDockView(); else ensureDockViewAttached();
-    state.mode='docked'; persist(); broadcast(); setImmediate(applyDockLayout);
+    state.mode='docked'; persist(); broadcast();
+    // Initial layout sometimes runs before renderer has reported real stage bounds.
+    // Apply immediately, then schedule a few retries to self-correct once stage bounds + layout preset land.
+    setImmediate(applyDockLayout);
+    [90, 280, 650].forEach(ms=> setTimeout(()=>{ try { applyDockLayout(); } catch(_){ } }, ms));
     try {
       if(!enterDocked.__diagLogged){
         enterDocked.__diagLogged = true;

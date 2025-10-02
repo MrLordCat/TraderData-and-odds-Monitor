@@ -18,8 +18,14 @@
 				<h2 class="sectionTitle">Auto Odds</h2>
 				<div class="grid formGrid">
 					<label for="auto-tolerance">Tolerance (%)</label><input id="auto-tolerance" type="number" min="0.01" max="5" step="0.01" />
+					<label>Burst L1 threshold (%)</label><input id="burst1-th" type="number" min="0.01" max="100" step="0.01" />
+					<label>Burst L1 pulses</label><input id="burst1-pulses" type="number" min="1" max="10" step="1" />
+					<label>Burst L2 threshold (%)</label><input id="burst2-th" type="number" min="0.01" max="100" step="0.01" />
+					<label>Burst L2 pulses</label><input id="burst2-pulses" type="number" min="1" max="10" step="1" />
+					<label>Burst L3 threshold (%)</label><input id="burst3-th" type="number" min="0.01" max="100" step="0.01" />
+					<label>Burst L3 pulses</label><input id="burst3-pulses" type="number" min="1" max="10" step="1" />
 				</div>
-				<div class="hint">Percentage threshold at which auto-alignment considers the sides balanced. Default is 0.15.</div>
+				<div class="hint">Tolerance: diff% below this considered aligned. Burst levels: when diff% ≥ threshold -> use pulses before confirm (F22). First matching level used. Defaults: 15%->4, 7%->3, 5%->2.</div>
 			</section>
 			<hr class="sepLine" />
 			<!-- Game Stats Theme section removed (LoL table theme controls deprecated) -->

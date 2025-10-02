@@ -35,13 +35,24 @@ function extractRivalry(mapNum=0){
     const norm = (s)=> (s||'').replace(/\s+/g,' ').trim().toLowerCase();
     let target=null;
     if(mapNum===0){
-      // Match overall "Winner" (exact line containing only winner)
+      // Match overall market. Rivalry sometimes labels it just "Winner"; map markets include a preceding map ordinal.
       for(const w of wrappers){
-        const raw=(w.textContent||'');
-        if(/\bwinner\b/i.test(raw)){
-          // Find first non-empty line
-          const firstLine = raw.split('\n').map(l=>norm(l)).find(l=>l.length);
-          if(firstLine==='winner'){ target=w; break; }
+        try {
+          // Collect first few non-empty lines of this wrapper
+          const lines=(w.textContent||'').split('\n').map(l=>norm(l)).filter(l=>l.length).slice(0,6);
+          if(!lines.length) continue;
+          const header = lines[0];
+          if(/winner/.test(header) && !/map\s*\d/.test(header)) { target = w; break; }
+          // Fallback: header may be a single 'winner' but team names appear earlier due to DOM reorder.
+          if(!target && lines.some(l=>l==='winner')){ target=w; break; }
+        } catch(_){ }
+      }
+      // Last resort: pick first wrapper having exactly two outcome plates and a plain 'Winner' token
+      if(!target){
+        for(const w of wrappers){
+          const hasWinner=/\bWinner\b/i.test(w.textContent||'');
+          const plates=[...w.querySelectorAll('[data-editor-id="tableOutcomePlate"]')].slice(0,3);
+          if(hasWinner && plates.length>=2 && !/Map\s*\d/i.test(w.textContent||'')){ target=w; break; }
         }
       }
     } else {
@@ -160,8 +171,20 @@ function extractThunder(mapNum=1){
 function extractBetboom(mapNum=1){
   // NOTE: Russian words ("Карта", "Исход", "Исход матча", "П") intentionally retained.
   // They match the bookmaker's live DOM and must NOT be translated.
-  const num=parseInt(mapNum,10)||1; const sections=[...document.querySelectorAll('section')]; const mapRe=new RegExp(`Карта\\s*${num}`,'i');
-  let target=sections.find(s=>/Исход/i.test(s.textContent)&& mapRe.test(s.textContent)); if(!target) target=sections.find(s=>/Исход\\s+матча/i.test(s.textContent)); if(!target) return {odds:['-','-'],frozen:false};
+  const sections=[...document.querySelectorAll('section')];
+  let target=null;
+  if(mapNum<=0){
+    // Explicit match-level (do NOT coerce to map1)
+    target=sections.find(s=>/Исход\s+матча/i.test(s.textContent));
+  } else {
+    const num=parseInt(mapNum,10)||1; const mapRe=new RegExp(`Карта\\s*${num}`,'i');
+    target=sections.find(s=>/Исход/i.test(s.textContent) && mapRe.test(s.textContent));
+    if(!target){
+      // Fallback to match-level if specific map collapsed or missing
+      target=sections.find(s=>/Исход\s+матча/i.test(s.textContent));
+    }
+  }
+  if(!target) return {odds:['-','-'],frozen:false};
   const buttons=[...target.querySelectorAll('button')].filter(btn=>/^П\d+$/.test(btn.querySelector('div:first-child')?.textContent.trim())).slice(0,2);
   const odds=buttons.map(btn=>{ if(btn.disabled|| btn.querySelector('use[xlink\\:href="#lock-outline"]')) return '-'; const val=btn.querySelector('div:nth-child(2)'); return val? val.textContent.trim().replace(',','.'):'-'; });
   return {odds:odds.length===2?odds:['-','-'],frozen:false};
@@ -259,9 +282,17 @@ function extractBet365(mapNum=0){
         const o = p.querySelector('.srb-ParticipantStackedBorderless_Odds, .sip-MergedHandicapParticipant_Odds, .gl-Participant_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds');
         return o? o.textContent.trim(): '-';
       });
-      const frozen = parts.slice(0,2).some(p=>{
+      const disabledFrozen = parts.slice(0,2).some(p=>{
         const o = p.querySelector('.srb-ParticipantStackedBorderless_Odds, .sip-MergedHandicapParticipant_Odds, .gl-Participant_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds');
         if(!o) return false; const cs = getComputedStyle(o); return cs.pointerEvents==='none' || parseFloat(cs.opacity||'1')<1; });
+      let groupSuspended=false; let partSusp=false;
+      try {
+        const topRow = target.querySelector('.sip-MarketGroupButton_TopRowContainer');
+        if(topRow && /suspended/i.test(topRow.className)) groupSuspended=true;
+        if(target.querySelector('.sip-MarketGroupButton_SuspendedText')) groupSuspended=true;
+      } catch(_){ }
+      try { partSusp = parts.slice(0,2).some(p=> /gl-Participant_Suspended/.test(p.className||'')); } catch(_){ }
+      const frozen = groupSuspended || partSusp || disabledFrozen;
       return { odds: odds.length===2?odds:['-','-'], frozen };
     } else {
       // Match level market: previously "Match Lines"; need to capture To Win variant where odds appear in centered stacked rows
@@ -282,8 +313,29 @@ function extractBet365(mapNum=0){
         const gp = Array.from(target.querySelectorAll('.gl-Participant')).filter(n=> n.querySelector('.gl-Participant_Odds'));
         if(gp.length>=2) parts = gp.slice(0,2);
       }
+      if(parts.length<2){
+        // NEW FALLBACK (2025-09): Column header layout (three adjacent gl-Market columns: blank label + team1 + team2)
+        try {
+          const cols = Array.from(target.querySelectorAll('.gl-MarketGroupContainer > .gl-Market.gl-Market_General-columnheader'));
+          if(cols.length>=3){
+            const teamCols = cols.slice(-2);
+            const oddsSpans = teamCols.map(c=> c.querySelector('.srb-ParticipantCenteredStackedMarketRow_Odds'));
+            if(oddsSpans.every(Boolean)){
+              parts = oddsSpans; // treat odds spans as parts for uniform mapping below
+            }
+          }
+        } catch(_){ }
+      }
       const odds = parts.slice(0,2).map(p=> p.querySelector('.sip-MergedHandicapParticipant_Odds, .srb-ParticipantStackedBorderless_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds, .gl-Participant_Odds')?.textContent.trim() || '-');
-      const frozen = parts.slice(0,2).some(p=>{ const o=p.querySelector('.sip-MergedHandicapParticipant_Odds, .srb-ParticipantStackedBorderless_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds, .gl-Participant_Odds'); if(!o) return false; const cs=getComputedStyle(o); return cs.pointerEvents==='none'|| parseFloat(cs.opacity||'1')<1; });
+      const disabledFrozen = parts.slice(0,2).some(p=>{ const o=p.querySelector('.sip-MergedHandicapParticipant_Odds, .srb-ParticipantStackedBorderless_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds, .gl-Participant_Odds'); if(!o) return false; const cs=getComputedStyle(o); return cs.pointerEvents==='none'|| parseFloat(cs.opacity||'1')<1; });
+      let groupSuspended=false; let partSusp=false;
+      try {
+        const topRow = target.querySelector('.sip-MarketGroupButton_TopRowContainer');
+        if(topRow && /suspended/i.test(topRow.className)) groupSuspended=true;
+        if(target.querySelector('.sip-MarketGroupButton_SuspendedText')) groupSuspended=true;
+      } catch(_){ }
+      try { partSusp = parts.slice(0,2).some(p=> /gl-Participant_Suspended/.test(p.className||'')); } catch(_){ }
+      const frozen = groupSuspended || partSusp || disabledFrozen;
       return { odds: odds.length===2?odds:['-','-'], frozen };
     }
   } catch(_){ return { odds:['-','-'], frozen:false }; }

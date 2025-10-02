@@ -13,19 +13,64 @@ if(!ipcRenderer){
 let activityModule = (window.__activityModule)||null; if(!activityModule){ try { activityModule = require('./stats_activity'); } catch(_){ } }
 function send(ch,p){ ipcRenderer.send(ch,p); }
 
+// --- Capture Data prototype button wiring (Slot B scoreboard snapshot) ---
+window.addEventListener('DOMContentLoaded', ()=>{
+  try {
+    const btn = document.getElementById('captureSlotBBtn');
+    if(btn && !btn.__bound){
+      btn.__bound=true;
+      btn.addEventListener('click', ()=>{
+        try {
+          btn.disabled=true; btn.textContent='Capturing…';
+          send('stats-capture-slot', { slot:'B', roi:null });
+        } catch(_){ btn.disabled=false; btn.textContent='Capture Data'; }
+      });
+    }
+    ipcRenderer.on('stats-capture-result', (_e, payload)=>{
+      try {
+        if(!payload || payload.slot!=='B') return;
+        const btn = document.getElementById('captureSlotBBtn');
+        if(btn){ btn.disabled=false; btn.textContent='Capture Data'; }
+        const r = payload.result || {};
+        if(r.ok){
+          console.log('[capture][slotB] ok clip=', r.clip, 'size=', r.width+'x'+r.height);
+          if(r.ocr){
+            console.log('[capture][slotB][ocr]', r.ocr);
+            try {
+              const ls=document.getElementById('lolStatus');
+              if(r.ocr.ok && r.ocr.kills){
+                const l=r.ocr.kills.left.value, rv=r.ocr.kills.right.value;
+                ls.textContent='OCR Kills: '+(l!=null?l:'?')+' - '+(rv!=null?rv:'?');
+              } else if(r.ocr.error){ ls.textContent='OCR fail: '+r.ocr.error; }
+            } catch(_){ }
+          }
+          // For quick visual debug: open in a tiny popup window (data URL) – optional enable
+          try {
+            const dbgWin = window.open('', '_blank', 'width='+(r.width+20)+',height='+(r.height+40));
+            if(dbgWin && r.pngBase64){ dbgWin.document.write('<title>SlotB Capture</title><img style="image-rendering:pixelated;max-width:100%;" src="data:image/png;base64,'+r.pngBase64+'" />'); }
+          } catch(_){ }
+        } else {
+          console.warn('[capture][slotB] fail', r.error);
+          try { window.desktopAPI && window.desktopAPI.notify && window.desktopAPI.notify('Capture failed: '+r.error); } catch(_){ }
+        }
+      } catch(err){ console.warn('[capture][slotB] handler error', err); }
+    });
+  } catch(_){ }
+});
+
 // (Theme logic moved to stats_theme.js)
 
 // ================= Runtime State =================
 let metricVisibility = {}; // runtime copy controlling row visibility
-const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan'];
+const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'];
 const COUNT_METRICS = ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
 let prevMatchUrls = { A: null, B: null };
 let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
 const customTeamNames = { 1:null, 2:null }; // custom display names (live)
-let metricsOrder = ['netWorth','atakhan','firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta'];
+let metricsOrder = ['netWorth','atakhan','firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta','winner'];
 let metricsOrderMutable = [...metricsOrder];
-const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', netWorth:'Net Worth', quadra:'Quadra', penta:'Penta', atakhan:'Atakhan' };
+const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', netWorth:'Net Worth', quadra:'Quadra', penta:'Penta', atakhan:'Atakhan', winner:'Winner' };
 let lastOrderSig = null;
 let __prevValues = {}; // cell previous values
 let lastGameRendered = null;
@@ -76,6 +121,8 @@ function manualSnapshotCurrent(){
   const gs = JSON.parse(JSON.stringify(base));
   const t1=[]; const t2=[];
   (gs.dragonOrderSequence||[]).forEach((team,i)=>{ const n=i+1; if(team===clone.team1Name) t1.push(n); else if(team===clone.team2Name) t2.push(n); });
+  // Ensure dragonOrders bucket exists (live-derived snapshots may lack it)
+  gs.dragonOrders = gs.dragonOrders || {};
   gs.dragonOrders[clone.team1Name]=t1; gs.dragonOrders[clone.team2Name]=t2;
   return { team1Name: clone.team1Name, team2Name: clone.team2Name, gameStats:{ [currentGame||'1']: gs } };
 }
@@ -83,7 +130,7 @@ function manualSnapshotCurrent(){
 function renderManual(){ renderLol(manualSnapshotCurrent(), true); renderMap(); applyWinLose(); }
 
 function renameTeam(idx){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const v = prompt('Team name', cur)||cur; if(v===cur) return; renameTeamInternal(idx,v); }
-function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const old=cur; if(idx===1) manualData.team1Name=v; else manualData.team2Name=v; Object.values(manualData.gameStats).forEach(gs=>{ ['killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonTimes','netWorth'].forEach(f=>{ const bucket=gs[f]; if(!bucket) return; if(bucket[old]!=null){ bucket[v]=bucket[old]; delete bucket[old]; } }); if(gs.firstKill===old) gs.firstKill=v; ['race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','atakhan','quadra','penta'].forEach(b=>{ if(gs[b]===old) gs[b]=v; }); }); renderManual(); }
+function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const old=cur; if(idx===1) manualData.team1Name=v; else manualData.team2Name=v; Object.values(manualData.gameStats).forEach(gs=>{ ['killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonTimes','netWorth'].forEach(f=>{ const bucket=gs[f]; if(!bucket) return; if(bucket[old]!=null){ bucket[v]=bucket[old]; delete bucket[old]; } }); if(gs.firstKill===old) gs.firstKill=v; ['race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','atakhan','quadra','penta','winner'].forEach(b=>{ if(gs[b]===old) gs[b]=v; }); }); renderManual(); }
 // Unified header double‑click logic (manual inline edit vs live prompt override)
 function handleTeamHeaderDblClick(idx){
   try {
@@ -203,6 +250,8 @@ function applyVisibility(){
     const row = document.querySelector(`tr[data-metric="${id}"]`);
     if(!row) return; total++; const off = (metricVisibility[id] === false); if(off) hidden++; row.style.display = off?'none':'';
   });
+  // Ensure any newly introduced metrics default to visible (e.g., 'winner')
+  metricsOrder.forEach(id=>{ if(!(id in metricVisibility)) metricVisibility[id] = true; });
   if(total && hidden === total){
   // all hidden — restore defaults
     metricsOrder.forEach(id=> metricVisibility[id]=true);
@@ -220,7 +269,7 @@ function ensureRows(){
   metricsOrderMutable.forEach(id=>{
     const tr=document.createElement('tr');
     tr.dataset.metric=id;
-    if(BINARY_METRICS.includes(id) || ['dragonOrders','netWorth','quadra','penta','atakhan'].includes(id)) tr.dataset.type='binary';
+  if(BINARY_METRICS.includes(id) || ['dragonOrders','netWorth','quadra','penta','atakhan','winner'].includes(id)) tr.dataset.type='binary';
     else if(COUNT_METRICS.includes(id) || ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].includes(id)) tr.dataset.type='count';
     tr.draggable=true;
     // IMPORTANT: no escaped quotes here – previous refactor inserted backslashes so query selectors failed
@@ -334,11 +383,19 @@ ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevM
 function ensureOption(select, value){ if(![...select.options].some(o=>o.value===value)){ const opt=document.createElement('option'); opt.value=value; opt.textContent=value.replace(/^https?:\/\/(www\.)?/,'').slice(0,40); select.appendChild(opt); } }
 
 // ================= Init From Main (stats-init) =================
-ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; document.getElementById('lolManualMode').checked = !!cfg.lolManualMode; metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const known = new Set(metricsOrder); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ metricsOrder = filtered.slice(); metricsOrderMutable = filtered.slice(); } } buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); } } catch(e) {} });
+ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; document.getElementById('lolManualMode').checked = !!cfg.lolManualMode; metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } } buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); } } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
 
 function applyWinLose(){
   try {
+    // Reset header classes
+    try {
+      const th1 = document.getElementById('lt-team1');
+      const th2 = document.getElementById('lt-team2');
+      if(th1) th1.classList.remove('wl-win','wl-lose');
+      if(th2) th2.classList.remove('wl-win','wl-lose');
+    } catch(_){ }
+    let win1 = 0, win2 = 0;
     metricsOrder.forEach(id=>{
       const row = document.querySelector(`tr[data-metric="${id}"]`);
       if(!row) return;
@@ -364,10 +421,26 @@ function applyWinLose(){
       }
       if(window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get().winLoseEnabled===false){ return; }
       if(n1===0 && n2===0) return; // nothing to highlight
-      if(n1>n2){ c1.classList.add('wl-win'); if(n2>0) c2.classList.add('wl-lose'); row.dataset.win='1'; }
-      else if(n2>n1){ c2.classList.add('wl-win'); if(n1>0) c1.classList.add('wl-lose'); row.dataset.win='2'; }
+      if(n1>n2){ c1.classList.add('wl-win'); if(n2>0) c2.classList.add('wl-lose'); row.dataset.win='1'; win1++; }
+      else if(n2>n1){ c2.classList.add('wl-win'); if(n1>0) c1.classList.add('wl-lose'); row.dataset.win='2'; win2++; }
       else { row.dataset.win='tie'; }
     });
+    // Apply header highlight ONLY if an explicit Winner row has ✓; otherwise, don't mark header at all.
+    if(!(window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get().winLoseEnabled===false)){
+      try {
+        const th1 = document.getElementById('lt-team1');
+        const th2 = document.getElementById('lt-team2');
+        const w1 = document.getElementById('winner-t1');
+        const w2 = document.getElementById('winner-t2');
+        const hasWinner = !!(w1 && w2 && ((w1.textContent||'').trim()==='✓' || (w2.textContent||'').trim()==='✓'));
+        if(th1 && th2 && hasWinner){
+          const t1won = (w1.textContent||'').trim()==='✓';
+          const t2won = (w2.textContent||'').trim()==='✓';
+          if(t1won){ th1.classList.add('wl-win'); th2.classList.add('wl-lose'); }
+          else if(t2won){ th2.classList.add('wl-win'); th1.classList.add('wl-lose'); }
+        }
+      } catch(_){ }
+    }
   } catch(_){ }
 }
 // (Heat bar listener lives in stats_theme.js)
@@ -471,6 +544,32 @@ function initDragAndDrop(){ const body=document.getElementById('lt-body'); if(!b
   ensureRows(); if(document.getElementById('lolManualMode').checked) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
 function getAfterRow(body,y){ const rows=[...body.querySelectorAll('tr:not(.dragging)')]; return rows.find(r=> y <= r.getBoundingClientRect().top + r.getBoundingClientRect().height/2); }
 let addBtn; let gameSelect; let headerH1;
+// Compute a simple winner for a given game's stats snapshot, mirroring applyWinLose comparisons
+function computeGameWinnerSimple(snapshot, team1Name, team2Name){
+  if(!snapshot) return null;
+  let score1=0, score2=0;
+  function cmpBinary(field){ const v=snapshot[field]; if(!v) return; if(v===team1Name) score1++; else if(v===team2Name) score2++; }
+  function cmpCount(field){ const b=snapshot[field]||{}; const v1=b[team1Name]||0; const v2=b[team2Name]||0; if(v1>v2) score1++; else if(v2>v1) score2++; }
+  // Binary metrics
+  ['firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20','quadra','penta','atakhan'].forEach(cmpBinary);
+  // Counts
+  ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].forEach(cmpCount);
+  // Dragon orders / times
+  try {
+    let o1=[], o2=[];
+    if(snapshot.dragonOrders){ o1 = snapshot.dragonOrders[team1Name]||[]; o2 = snapshot.dragonOrders[team2Name]||[]; }
+    else if(snapshot.dragonTimes){
+      const parseTs=(raw)=>{ if(raw==null) return Infinity; if(typeof raw==='number'&&!isNaN(raw)) return raw>36000?Math.floor(raw/1000):raw; if(typeof raw==='string'){ const v=raw.trim(); if(/^\d+$/.test(v)) return Number(v); if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(v)){ const parts=v.split(':').map(n=>Number(n)||0); if(parts.length===2){ const [m,s]=parts; return m*60+s; } if(parts.length===3){ const [h,m,s]=parts; return h*3600+m*60+s; } } } return Infinity; };
+      const arr=[]; (snapshot.dragonTimes[team1Name]||[]).forEach(ts=> arr.push({ team: team1Name, ts: parseTs(ts) })); (snapshot.dragonTimes[team2Name]||[]).forEach(ts=> arr.push({ team: team2Name, ts: parseTs(ts) }));
+      arr.sort((a,b)=> a.ts-b.ts); let idx=1; const map={}; arr.forEach(e=>{ if(!isFinite(e.ts)) return; (map[e.team]=map[e.team]||[]).push(idx++); }); o1 = map[team1Name]||[]; o2 = map[team2Name]||[];
+    }
+    if(o1.length>o2.length) score1++; else if(o2.length>o1.length) score2++;
+  } catch(_){ }
+  // Net worth
+  try { const nw=snapshot.netWorth||{}; const n1 = Number(nw[team1Name]||0); const n2 = Number(nw[team2Name]||0); if(n1>n2) score1++; else if(n2>n1) score2++; } catch(_){ }
+  if(score1===0 && score2===0) return null; // insufficient data
+  if(score1>score2) return 1; if(score2>score1) return 2; return 'tie';
+}
 function updateGameSelect(){
   if(!gameSelect) return;
   const manualOn=document.getElementById('lolManualMode').checked;
@@ -478,15 +577,35 @@ function updateGameSelect(){
   const placeholder=document.createElement('option');
   placeholder.value=''; placeholder.disabled=true; placeholder.textContent='Game -';
   let any=false;
+  // Helper: detect if a snapshot has any meaningful signals beyond empty defaults
+  function hasAnySignal(snapshot, team1Name, team2Name){
+    try {
+      if(!snapshot || typeof snapshot!== 'object') return false;
+      // Any binary set
+      const binaries=['firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20','quadra','penta','atakhan'];
+      if(binaries.some(k=> snapshot[k]===team1Name || snapshot[k]===team2Name)) return true;
+      // Any counts > 0
+      const counts=['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
+      for(const k of counts){ const b=snapshot[k]||{}; if((b[team1Name]||0)>0 || (b[team2Name]||0)>0) return true; }
+      // Dragon orders / times
+      try {
+        if(snapshot.dragonOrders){ const o1=snapshot.dragonOrders[team1Name]||[]; const o2=snapshot.dragonOrders[team2Name]||[]; if((o1.length||0)>0 || (o2.length||0)>0) return true; }
+        if(snapshot.dragonTimes){ const t1=snapshot.dragonTimes[team1Name]||[]; const t2=snapshot.dragonTimes[team2Name]||[]; if((t1.length||0)>0 || (t2.length||0)>0) return true; }
+      } catch(_){ }
+      // Net worth present and non-zero
+      try { const nw=snapshot.netWorth||{}; const n1=Number(nw[team1Name]||0); const n2=Number(nw[team2Name]||0); if(n1!==0 || n2!==0) return true; } catch(_){ }
+    } catch(_){ }
+    return false;
+  }
   if(manualOn){
     const games=Object.keys(manualData.gameStats||{}).filter(k=>/^[0-9]+$/.test(k)).map(Number).sort((a,b)=>a-b);
-    games.forEach(g=>{ const o=document.createElement('option'); o.value=String(g); o.textContent='Game '+g; if(String(g)===String(currentGame||'1')) o.selected=true; gameSelect.appendChild(o); any=true; });
+    games.forEach(g=>{ const o=document.createElement('option'); o.value=String(g); const label='Game '+g; o.textContent=label; if(String(g)===String(currentGame||'1')) o.selected=true; gameSelect.appendChild(o); any=true; });
     if(addBtn){ addBtn.setAttribute('aria-disabled','false'); addBtn.disabled=false; }
   } else if(liveDataset){
     const games=Object.keys(liveDataset.gameStats||{}).map(Number).sort((a,b)=>a-b);
     if(games.length){
       if(typeof currentLiveGame!=='number' || !games.includes(currentLiveGame)) currentLiveGame = games[games.length-1];
-      games.forEach(g=>{ const o=document.createElement('option'); o.value=String(g); o.textContent='Game '+g; if(g===currentLiveGame) o.selected=true; gameSelect.appendChild(o); any=true; });
+  games.forEach(g=>{ const o=document.createElement('option'); o.value=String(g); const label='Game '+g; o.textContent=label; if(g===currentLiveGame) o.selected=true; gameSelect.appendChild(o); any=true; });
     }
     if(addBtn){ addBtn.setAttribute('aria-disabled','true'); addBtn.disabled=true; }
   }
@@ -535,13 +654,15 @@ function renderLol(payload, manual=false){
     setCount('towerCount');
     setCount('inhibitorCount');
     setCount('baronCount');
-    setCount('dragonCount');
+  setCount('dragonCount');
+  // Winner (live only). Manual mode can also toggle if user wants.
+  if(s.winner){ setBinary('winner', filledBinary); }
     // Dragon orders
     (function(){ function parseTs(raw){ if(raw==null) return Infinity; if(typeof raw==='number' && !isNaN(raw)) return raw; if(typeof raw==='string'){ const val=raw.trim(); if(/^\d+$/.test(val)){ const num=Number(val); if(num>3600*10) return Math.floor(num/1000); return num; } if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(val)){ const parts=val.split(':').map(n=>Number(n)||0); if(parts.length===2){ const [m,s]=parts; return m*60+s; } if(parts.length===3){ const [h,m,s]=parts; return h*3600+m*60+s; } } } return Infinity; } let orders1=[], orders2=[]; if(s.dragonOrders){ orders1 = s.dragonOrders[dispTeam1]||[]; orders2 = s.dragonOrders[dispTeam2]||[]; } else if(s.dragonTimes){ const arr=[]; (s.dragonTimes[team1Name]||[]).forEach(ts=> arr.push({ team: team1Name, ts: parseTs(ts) })); (s.dragonTimes[team2Name]||[]).forEach(ts=> arr.push({ team: team2Name, ts: parseTs(ts) })); arr.sort((a,b)=> a.ts-b.ts); let idx=1; const map={}; arr.forEach(e=>{ if(!isFinite(e.ts)) return; (map[e.team]=map[e.team]||[]).push(idx++); }); orders1 = map[dispTeam1]||[]; orders2 = map[dispTeam2]||[]; } setText('dragonOrders','t1', orders1.join(' ')); setText('dragonOrders','t2', orders2.join(' ')); })();
     // Net worth
   const nw = s.netWorth || {}; const hasNw1 = Object.prototype.hasOwnProperty.call(nw, t1Key); const hasNw2 = Object.prototype.hasOwnProperty.call(nw, t2Key); const nw1 = hasNw1 ? nw[t1Key] : ''; const nw2 = hasNw2 ? nw[t2Key] : ''; setText('netWorth','t1', nw1); setText('netWorth','t2', nw2);
     if(s.quadra) setBinary('quadra', filledBinary); if(s.penta) setBinary('penta', filledBinary); if(s.atakhan) setBinary('atakhan', filledBinary);
-  ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan'].forEach(m=>{ if(!filledBinary.has(m)){ setText(m,'t1','✗'); setText(m,'t2','✗'); } });
+  ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'].forEach(m=>{ if(!filledBinary.has(m)){ setText(m,'t1','✗'); setText(m,'t2','✗'); } });
     const statusEl=document.getElementById('lolStatus'); if(statusEl) statusEl.textContent = `Games: ${games.join(', ')}`;
     // After all cell values are updated compute win/lose highlighting
     applyWinLose();

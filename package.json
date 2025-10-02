@@ -52,7 +52,8 @@
   },
   "dependencies": {
     "electron-store": "^8.1.0",
-    "onnxruntime-web": "^1.20.0"
+    "onnxruntime-web": "^1.20.0",
+    "tesseract.js": "^5.0.4"
   },
   "devDependencies": {
     "electron": "^38.0.0",

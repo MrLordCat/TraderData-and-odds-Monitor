@@ -398,6 +398,13 @@ small {
 #lolTable th, #lolTable td { padding:4px 6px; border:1px solid #283240; }
 #lolTable thead th { background:#15202b; font-weight:600; text-align:left; }
 /* Minimal placeholder widths (will be replaced in new design) */
+
+/* Win/Lose highlight (restored) */
+#lolTable td.wl-win { color: var(--good); font-weight: 600; text-shadow: 0 0 6px rgba(52,255,141,.12); }
+#lolTable td.wl-lose { color: #8b95a6; opacity: .9; }
+/* Header team name highlight */
+#lolTable th.wl-win .teamNameWrap { color: var(--good); text-shadow: 0 0 8px rgba(52,255,141,.18); }
+#lolTable th.wl-lose .teamNameWrap { color: #9aa7bd; opacity: .95; }
 #lolTable th:nth-child(1), #lolTable td:nth-child(1){ width:40%; }
 #lolTable th:nth-child(2), #lolTable td:nth-child(2){ width:30%; }
 #lolTable th:nth-child(3), #lolTable td:nth-child(3){ width:30%; }

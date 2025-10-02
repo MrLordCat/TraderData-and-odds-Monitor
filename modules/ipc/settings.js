@@ -46,6 +46,54 @@ function initSettingsIpc(ctx){
     } catch(_){ }
   });
 
+  // === Auto burst levels (array of 3 { thresholdPct, pulses }) ===
+  // Store key: 'autoBurstLevels'. Semantics: sorted descending by thresholdPct. First match (diffPct >= thresholdPct) wins. Default fallback -> pulses=1.
+  function sanitizeBurstLevels(levels){
+    try {
+      if(!Array.isArray(levels)) return null;
+      const cleaned = levels.map(l=>({
+        thresholdPct: Math.max(0.01, Math.min(100, Number(l.thresholdPct)||0)),
+        pulses: Math.max(1, Math.min(10, Math.round(Number(l.pulses)||0)))
+      })).filter(l=> l.thresholdPct>0 && l.pulses>=1);
+      if(cleaned.length===0) return null;
+      // Sort descending by threshold
+      cleaned.sort((a,b)=> b.thresholdPct - a.thresholdPct);
+      // Deduplicate identical thresholds (keep first/higher pulses order)
+      const uniq=[]; const seen=new Set();
+      for(const l of cleaned){ if(!seen.has(l.thresholdPct)){ uniq.push(l); seen.add(l.thresholdPct); } }
+      return uniq.slice(0,3); // cap to 3 (UI uses 3)
+    } catch(_){ return null; }
+  }
+  function defaultBurstLevels(){ return [
+    { thresholdPct:15, pulses:4 },
+    { thresholdPct:7, pulses:3 },
+    { thresholdPct:5, pulses:2 }
+  ]; }
+  ipcMain.handle('auto-burst-levels-get', ()=>{
+    try {
+      const v = store.get('autoBurstLevels');
+      const s = sanitizeBurstLevels(v);
+      return s && s.length? s : defaultBurstLevels();
+    } catch(_){ return defaultBurstLevels(); }
+  });
+  ipcMain.on('auto-burst-levels-set', (_e, payload)=>{
+    try {
+      const levels = payload && payload.levels;
+      const s = sanitizeBurstLevels(levels);
+      if(s){
+        store.set('autoBurstLevels', s);
+        // Broadcast update
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-burst-levels-updated', s); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-burst-levels-updated', s); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
+
   // === Auto interval (ms) ===
   function clampInterval(v){ return Math.max(120, Math.min(10000, Math.floor(v))); }
   ipcMain.handle('auto-interval-get', ()=>{

@@ -24,13 +24,27 @@ function scheduleMapReapply(view){
     if(!view || view.isDestroyed()) return;
     const lastMap = store.get('lastMap');
     const teamNames = store.get('lolTeamNames');
-    if(typeof lastMap === 'undefined' && !teamNames) return;
-  const delays = [400, 1400, 3000, 5000]; // added 5000ms for slower brokers (e.g. dataservices) to catch late listeners
+    // Determine broker id to pick a sane default when lastMap is undefined
+    let brokerId = null;
+    try {
+      const url = (view.webContents && view.webContents.getURL && view.webContents.getURL()) || '';
+      // crude hostname match; ok for our set of brokers
+      if(/dataservices|ds\.|data-services/i.test(url)) brokerId = 'dataservices';
+    } catch(_){ }
+    const defaultMap = (brokerId === 'dataservices') ? 0 : 1;
+    const mapToApply = (typeof lastMap !== 'undefined') ? lastMap : defaultMap;
+    const isLastFlag = !!store.get('isLast');
+    const delays = [400, 1400, 3000, 5000]; // added 5000ms for slower brokers (e.g. dataservices) to catch late listeners
     delays.forEach(d=> setTimeout(()=>{
       try {
         if(view.isDestroyed()) return;
-        if(typeof lastMap !== 'undefined'){ view.webContents.send('set-map', lastMap); }
-        if(teamNames){ view.webContents.send('set-team-names', teamNames); }
+        // Always assert a map (use default when no persisted lastMap yet)
+        view.webContents.send('set-map', mapToApply);
+        if(teamNames) view.webContents.send('set-team-names', teamNames);
+        // Re-apply isLast bet365 semantic flag as well
+        view.webContents.send('set-is-last', isLastFlag);
+        // Nudge an immediate collection shortly after applying controls
+        setTimeout(()=>{ try { if(!view.isDestroyed()) view.webContents.send('collect-now'); } catch(_){ } }, 250);
       } catch(_){ }
     }, d));
   } catch(_){ }
@@ -220,6 +234,8 @@ const { initStatsIpc } = require('./modules/ipc/stats');
 const { initUpscalerIpc } = require('./modules/ipc/upscaler');
 const { initTeamNamesIpc } = require('./modules/ipc/teamNames');
 const { initAutoRefreshIpc } = require('./modules/ipc/autoRefresh');
+// External Excel odds JSON watcher (pseudo broker 'excel')
+const { createExcelWatcher } = require('./modules/excelWatcher');
 const lolTeamNamesRef = { value: lolTeamNames };
 const autoRefreshEnabledRef = { value: autoRefreshEnabled };
 function createMainWindow() {
@@ -362,8 +378,32 @@ function bootstrap() {
   });
   boardManager.init();
   boardManagerRef.value = boardManager;
+  // Initialize excel watcher after board manager so early odds push displays
+  try {
+    if(!global.__excelWatcher){
+      const forward = (p)=>{
+        // Forward to docked/window board
+        try { if(boardManager && boardManager.sendOdds) boardManager.sendOdds(p); } catch(_){ }
+        // Also forward directly into stats panel (embedded/window) so Excel odds appear there (was missing before)
+        try {
+          if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
+            statsManager.views.panel.webContents.send('odds-update', p);
+          }
+        } catch(_){ }
+        // Persist into latestOddsRef cache so future replays (board detach/load) include Excel without re-selecting map
+        try { if(latestOddsRef && latestOddsRef.value) latestOddsRef.value[p.broker] = p; } catch(_){ }
+        // Keep a global last Excel odds snapshot for stats panel late load replay
+        try { global.__lastExcelOdds = p; } catch(_){ }
+      };
+      global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward });
+    }
+  } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
   // Initialize map selection IPC (needs boardManager, statsManager, mainWindow references)
   initMapIpc({ ipcMain, store, views, mainWindow, boardWindowRef:{ value: boardWindow }, boardManager, statsManager });
+  // Lightweight IPC to fetch last excel odds (used by stats panel / board after load to avoid needing map reselect)
+  try {
+    ipcMain.handle('excel-last-odds', ()=>{ return global.__lastExcelOdds || null; });
+  } catch(_){ }
   // Board IPC wiring now modular
   const { initBoardIpc } = require('./modules/ipc/board');
   initBoardIpc({ ipcMain, boardManager });
@@ -371,7 +411,7 @@ function bootstrap() {
   try { initUpscalerIpc({ ipcMain, upscalerManager, statsManager }); } catch(e){ console.warn('initUpscalerIpc failed', e); }
   try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
   try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: boardWindow }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
-  try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs } }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
+  try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs }, store }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
   // Expose mutable refs for diagnostic / future module hot-swap
   try { Object.defineProperty(global, '__oddsMoniSync', { value:{ autoRefreshEnabledRef, lolTeamNamesRef }, enumerable:false }); } catch(_){}
   staleMonitor = createStaleMonitor({ intervalMs: HEALTH_CHECK_INTERVAL, staleMs: STALE_MS, brokerHealth, views, enabledRef:{ value:autoRefreshEnabled }, onReload:(id)=>{ try { views[id].webContents.reloadIgnoringCache(); } catch(e){} } });
@@ -527,6 +567,39 @@ app.whenReady().then(()=>{
     });
     if(!ok) console.warn('[shortcut][stats-log] registration returned false');
     else console.log('[shortcut][stats-log] registered Ctrl+Alt+L');
+    // Global Numpad5 toggle for auto modes (board + embedded stats) even when app not focused
+    try {
+      // Try several accelerator variants to improve cross-OS/keyboard reliability
+      const candidates = ['Num5','Numpad5','num5'];
+      const handler = () => {
+        try {
+          const broadcastAutoToggleAll = ()=>{
+            try {
+              const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
+              if(bwc && !bwc.isDestroyed()) bwc.send('auto-toggle-all');
+            } catch(_){ }
+            try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-toggle-all'); } catch(_){ }
+            try {
+              if(statsManager && statsManager.views){
+                const vs = statsManager.views;
+                ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-toggle-all'); } catch(_){ } } });
+              }
+            } catch(_){ }
+          };
+          broadcastAutoToggleAll();
+          try { console.log('[hotkey][global][Num5] broadcast auto-toggle-all'); } catch(_){ }
+        } catch(err){ console.warn('[hotkey][global][Num5] failed', err); }
+      };
+      let registeredWith = null;
+      for(const key of candidates){
+        try { if(globalShortcut.isRegistered(key)) globalShortcut.unregister(key); } catch(_){}
+        try {
+          if(globalShortcut.register(key, handler)){ registeredWith = key; break; }
+        } catch(_){ /* try next */ }
+      }
+      if(!registeredWith) console.warn('[shortcut][Num5] registration returned false (tried: '+candidates.join(', ')+')');
+      else console.log('[shortcut][Num5] registered global as', registeredWith);
+    } catch(e){ console.warn('[shortcut][Num5] registration error', e); }
   } catch(e){ console.warn('[shortcut][stats-log] registration error', e); }
 });
 // Hotkey strategy:

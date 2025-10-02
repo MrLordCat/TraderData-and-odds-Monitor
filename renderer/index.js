@@ -133,11 +133,7 @@ async function populateAddBrokerSelect(force=false){
     sel.innerHTML=''; sel.appendChild(placeholder);
     const { brokers=[], active=[] } = await window.desktopAPI.getBrokersForPicker();
     const activeSet = new Set(active);
-    const dsOpt=document.createElement('option');
-    dsOpt.value='dataservices';
-    dsOpt.textContent = activeSet.has('dataservices') ? 'Excel (added)' : 'Excel';
-    if(activeSet.has('dataservices')) dsOpt.disabled = true;
-    sel.appendChild(dsOpt);
+  // Excel feed now internal; no special dataservices pseudo-broker option.
     for(const b of brokers){
       // Skip pseudo-broker duplication just in case
       if(b.id === 'dataservices') continue;
@@ -154,17 +150,12 @@ if(addSelect){
   addSelect.addEventListener('focus', ()=> populateAddBrokerSelect());
   addSelect.addEventListener('change', async ()=>{
     const v=addSelect.value; if(!v) return;
-    if(v==='dataservices'){
-      // Use dedicated BrowserView overlay prompt (main process) instead of in-DOM modal
-      window.desktopAPI.openDataservicesPrompt();
-      addSelect.value='';
-      setTimeout(()=> populateAddBrokerSelect(true), 150);
-      return;
-    }
     window.desktopAPI.addBroker(v);
     setTimeout(()=> populateAddBrokerSelect(true), 150);
     addSelect.value='';
   });
+  // Refresh the dropdown whenever active broker list changes (e.g., after closing one)
+  try { window.desktopAPI.onBrokersSync?.(()=> populateAddBrokerSelect(true)); } catch(_){ }
 }
 document.getElementById('layoutPreset').onchange = (e) => { if(e.target.value) window.desktopAPI.applyLayoutPreset(e.target.value); };
 const autoReloadCb = document.getElementById('autoReloadToggle');

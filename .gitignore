@@ -6,7 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 package-lock.json
-
+ublock/
 # Build outputs
 dist/
 release/

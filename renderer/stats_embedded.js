@@ -102,10 +102,18 @@ function bindEmbeddedMapSelect(){
 }
 const { ipcRenderer: ipcRendererEmbedded } = require('electron');
 const embeddedOddsData = {}; let embeddedBest1=NaN, embeddedBest2=NaN;
+// Per-broker side swap (exclude excel). Persist in localStorage under embeddedSwappedBrokers
+try {
+  if(!window.__embeddedSwapped){
+    const set = new Set();
+    try { (JSON.parse(localStorage.getItem('embeddedSwappedBrokers')||'[]')||[]).forEach(b=> set.add(b)); } catch(_){ }
+    window.__embeddedSwapped = set;
+  }
+} catch(_){ }
 function renderEmbeddedOdds(){
   const rowsEl=document.getElementById('embeddedOddsRows'); if(!rowsEl) return;
-  const excelRec = embeddedOddsData['dataservices'];
-  const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='dataservices');
+  const excelRec = embeddedOddsData['excel'] || embeddedOddsData['dataservices'];
+  const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel' && r.broker!=='dataservices');
   const liveVals = vals.filter(r=>!r.frozen);
   const p1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
   const p2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
@@ -116,8 +124,10 @@ function renderEmbeddedOdds(){
     const suspTag = r.frozen ? ' eo-broker-label' : ' eo-broker-label';
     const bestCls1 = (!r.frozen && o1===embeddedBest1)?'best':'';
     const bestCls2 = (!r.frozen && o2===embeddedBest2)?'best':'';
+    const isSwapped = window.__embeddedSwapped && window.__embeddedSwapped.has(r.broker);
+    const swapBtn = `<button class="eo-swapBtn ${isSwapped?'on':''}" data-broker="${r.broker}" title="Swap sides">⇄</button>`;
     return `<tr class="${frozenCls}">`+
-      `<td class="eo-broker"><span class="${suspTag}" title="${r.frozen?'Suspended / stale':''}">${r.broker}</span></td>`+
+      `<td class="eo-broker"><span class="${suspTag}" title="${r.frozen?'Suspended / stale':''}">${r.broker}</span>${swapBtn}</td>`+
       `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
       `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td>`+
       `</tr>`;
@@ -163,6 +173,8 @@ function renderEmbeddedOdds(){
 }
 function handleEmbeddedOdds(p){ try {
   if(!p||!p.broker) return;
+  // Apply swap if flagged (only for non-excel brokers)
+  try { if(p.broker!=='excel' && window.__embeddedSwapped && window.__embeddedSwapped.has(p.broker) && Array.isArray(p.odds) && p.odds.length===2){ p={ ...p, odds:[p.odds[1], p.odds[0]] }; } } catch(_){ }
   // If map not initialized yet and payload carries map, adopt it
   if((currentMap===undefined || currentMap===null) && (p.map!==undefined && p.map!==null)){
     currentMap = p.map; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue();
@@ -170,7 +182,7 @@ function handleEmbeddedOdds(p){ try {
   embeddedOddsData[p.broker]=p; renderEmbeddedOdds();
   // Auto disable/resume on dataservices suspension honoring autoResume flag
   try {
-    if(p.broker==='dataservices'){
+  if(p.broker==='excel' || p.broker==='dataservices'){
       if(p.frozen && window.__embeddedAutoSim && window.__embeddedAutoSim.active){
         window.__embeddedAutoSim.active=false; clearTimeout(window.__embeddedAutoSim.timer); window.__embeddedAutoSim.timer=null;
         const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.remove('on');
@@ -198,6 +210,11 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   try { if(window.desktopAPI && window.desktopAPI.onOdds){ window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update via desktopAPI', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } else { ipcRendererEmbedded.on('odds-update', (_e,p)=>{ try { console.debug('[embeddedOdds] odds-update via ipcRenderer', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.onTeamNames){ window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } else { ipcRendererEmbedded.on('lol-team-names-update', ()=> renderEmbeddedOdds()); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.getTeamNames){ window.desktopAPI.getTeamNames().then(()=>renderEmbeddedOdds()).catch(()=>{}); } } catch(_){ }
+  // One-time attempt to fetch last Excel odds (if loaded after they were emitted) so user doesn't need to re-select map
+  try {
+    const ipc = (window.require? window.require('electron').ipcRenderer: null);
+    if(ipc && ipc.invoke){ ipc.invoke('excel-last-odds').then(p=>{ if(p && p.broker==='excel'){ handleEmbeddedOdds(p); } }).catch(()=>{}); }
+  } catch(_){ }
 }
 function initSectionReorder(){
   const ORDER_KEY='statsPanelSectionOrder';
@@ -244,9 +261,25 @@ initEmbeddedMapSync();
 updateEmbeddedMapTag();
 // Fallback: after full DOM ready, re-sync in case elements mounted after initial code ran
 window.addEventListener('DOMContentLoaded', ()=>{ try { syncEmbeddedMapSelect(); updateEmbeddedMapTag(); forceMapSelectValue(); } catch(_){ } });
+// Delegate click for swap buttons
+document.addEventListener('click', e=>{
+  const btn = e.target.closest && e.target.closest('.eo-swapBtn');
+  if(!btn) return;
+  const broker = btn.getAttribute('data-broker');
+  if(!broker || broker==='excel') return;
+  try {
+    const set = window.__embeddedSwapped;
+    if(set.has(broker)) set.delete(broker); else set.add(broker);
+    localStorage.setItem('embeddedSwappedBrokers', JSON.stringify(Array.from(set)));
+    // If we already have odds for this broker – swap in-place and re-render
+    const rec = embeddedOddsData[broker];
+    if(rec && Array.isArray(rec.odds) && rec.odds.length===2){ rec.odds = [rec.odds[1], rec.odds[0]]; }
+    renderEmbeddedOdds();
+  } catch(_){ }
+});
 
 // ================= Embedded Auto alignment helper (simulate only, no virtual odds) =================
-const embeddedAutoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null, fireCooldownMs:900, lastFireTs:0, lastFireSide:null, lastFireKey:null, adaptive:true, waitingForExcel:false, waitToken:0, excelSnapshotKey:null, maxAdaptiveWaitMs:1600, userWanted:false, lastDisableReason:null, autoResume:true };
+const embeddedAutoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null, fireCooldownMs:900, lastFireTs:0, lastFireSide:null, lastFireKey:null, adaptive:true, waitingForExcel:false, waitToken:0, excelSnapshotKey:null, maxAdaptiveWaitMs:1600, userWanted:false, lastDisableReason:null, autoResume:true, burstLevels:[ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ] };
 try { const ar = localStorage.getItem('embeddedAutoResumeEnabled'); if(ar==='0') embeddedAutoSim.autoResume=false; } catch(_){ }
 try { const uw = localStorage.getItem('embeddedAutoUserWanted'); if(uw==='1'){ embeddedAutoSim.userWanted=true; } } catch(_){ }
 try { console.log('[autoSim][embedded][startup] stats_embedded.js loaded'); } catch(_){ }
@@ -256,9 +289,10 @@ try { if(!window.__embeddedAutoHb){ window.__embeddedAutoHb=true; let ticks=0; c
 try {
   const ipc = (window.require? window.require('electron').ipcRenderer: (window.ipcRenderer||null));
   if(ipc && ipc.invoke){
-    ipc.invoke('auto-tolerance-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) embeddedAutoSim.tolerancePct = v; try { console.log('[autoSim][embedded] tolerance loaded', embeddedAutoSim.tolerancePct); } catch(_){ } }).catch(()=>{});
+  ipc.invoke('auto-tolerance-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) embeddedAutoSim.tolerancePct = v; try { console.log('[autoSim][embedded] tolerance loaded', embeddedAutoSim.tolerancePct); } catch(_){ } }).catch(()=>{});
     ipc.invoke('auto-interval-get').then(v=>{ if(typeof v==='number' && !isNaN(v)){ embeddedAutoSim.stepMs=v; try { console.log('[autoSim][embedded] interval loaded', v); } catch(_){ } } }).catch(()=>{});
     ipc.invoke('auto-adaptive-get').then(v=>{ if(typeof v==='boolean'){ embeddedAutoSim.adaptive=v; try { console.log('[autoSim][embedded] adaptive loaded', v); } catch(_){ } } }).catch(()=>{});
+  ipc.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)){ embeddedAutoSim.burstLevels=v; try { console.log('[autoSim][embedded] burst levels loaded', v); } catch(_){ } } }).catch(()=>{});
   }
 } catch(_){ }
 function embeddedParsePair(cellId){
@@ -292,9 +326,9 @@ function embeddedStep(){
   embeddedFlash(sideToAdjust);
   embeddedStatus(`Align ${direction} S${sideToAdjust+1} ${diffPct.toFixed(2)}% (min)`);
   try { console.log('[autoSim][embedded][step][min-only] fireCandidate side', sideToAdjust, direction, 'diff%', diffPct.toFixed(3), 'key', keyLabel); } catch(_){ }
-  // Burst logic (embedded): compute pulses from diffPct
-  let pulses=1; if(diffPct>=15) pulses=4; else if(diffPct>=7) pulses=3; else if(diffPct>=5) pulses=2;
-  try { console.log('[autoSim][embedded][burst] diff', diffPct.toFixed(3), 'pulses', pulses); } catch(_){ }
+  // Burst logic (embedded): configurable levels
+  let pulses=1; try { if(Array.isArray(embeddedAutoSim.burstLevels)){ for(const lvl of embeddedAutoSim.burstLevels){ if(diffPct >= lvl.thresholdPct){ pulses=lvl.pulses; break; } } } } catch(_){ }
+  try { console.log('[autoSim][embedded][burst] diff', diffPct.toFixed(3), 'pulses', pulses, '[levels]', embeddedAutoSim.burstLevels); } catch(_){ }
   try {
     const now = Date.now();
     if(now - embeddedAutoSim.lastFireTs < embeddedAutoSim.fireCooldownMs && embeddedAutoSim.lastFireSide===sideToAdjust && embeddedAutoSim.lastFireKey===keyLabel){
@@ -383,6 +417,14 @@ document.addEventListener('click', e=>{ if(e.target && e.target.id==='embeddedAu
 window.addEventListener('DOMContentLoaded', ()=>{ try { const rbtn=document.getElementById('embeddedAutoResumeBtn'); if(rbtn) rbtn.classList.toggle('on', embeddedAutoSim.autoResume); } catch(_){ } });
 window.__embeddedAutoSim = embeddedAutoSim;
 
+// Hotkey broadcast: toggle embedded auto (from main Numpad5)
+try {
+  const { ipcRenderer } = window.require? window.require('electron'): {};
+  if(ipcRenderer){
+    ipcRenderer.on('auto-toggle-all', ()=>{ try { embeddedToggleAuto(); } catch(_){ } });
+  }
+} catch(_){ }
+
 // Live tolerance update
 try {
   const ipc = (window.require? window.require('electron').ipcRenderer: (window.ipcRenderer||null));
@@ -395,7 +437,8 @@ try {
       }
     });
     ipc.on('auto-interval-updated', (_e,v)=>{ if(typeof v==='number' && !isNaN(v)){ embeddedAutoSim.stepMs=v; try { console.log('[autoSim][embedded] interval updated ->', v); } catch(_){ } } });
-    ipc.on('auto-adaptive-updated', (_e,v)=>{ if(typeof v==='boolean'){ embeddedAutoSim.adaptive=v; try { console.log('[autoSim][embedded] adaptive updated ->', v); } catch(_){ } } });
+  ipc.on('auto-adaptive-updated', (_e,v)=>{ if(typeof v==='boolean'){ embeddedAutoSim.adaptive=v; try { console.log('[autoSim][embedded] adaptive updated ->', v); } catch(_){ } } });
+  ipc.on('auto-burst-levels-updated', (_e,levels)=>{ if(Array.isArray(levels)){ embeddedAutoSim.burstLevels=levels; try { console.log('[autoSim][embedded] burst levels updated', levels); } catch(_){ } } });
   }
 } catch(_){ }
 

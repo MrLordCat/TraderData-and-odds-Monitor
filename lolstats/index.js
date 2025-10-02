@@ -86,6 +86,7 @@ function createLolStatsModule(persist={}){
     try {
       Object.entries(aggregate.gameStats).forEach(([g, gs])=>{
         if(gs && gs.winner && !recordedGames.has(g)){
+          try { console.log('[lol][winner][aggregate] Game', g, 'winner=', gs.winner, 'source=', gs.winnerSource||'unknown'); } catch(_){ }
           history.push({ game: g, finishedAt: Date.now(), team1: aggregate.team1Name, team2: aggregate.team2Name, stats: JSON.parse(JSON.stringify(gs)) });
           recordedGames.add(g);
           // Trim history (optional max 200 games)
