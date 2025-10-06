@@ -5,7 +5,7 @@ const { BrowserWindow, BrowserView } = require('electron');
 const { ensureSingleClosedListener, hideView } = require('../utils/views');
 const path = require('path');
 
-function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, upscalerManager }) {
+function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef }) {
   // (ensureSingleClosedListener now imported from utils/views.js)
   function canonicalHost(h){
     try {
@@ -218,8 +218,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
       try {
         const cur = view.webContents.getURL();
         update(cur);
-    // Upscaler injection after initial load (only slot A)
-    try { if(upscalerManager) upscalerManager.maybeInject(view, slot); } catch(_){ }
         const credsAll = store.get('siteCredentials') || {};
         const host = new URL(cur).hostname;
         const ch = canonicalHost(host);
@@ -263,8 +261,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, up
     view.webContents.on('did-navigate', (_, u)=>{ maybeAutoReset(slot, u); });
     view.webContents.on('did-navigate-in-page', (_, u)=>{ maybeAutoReset(slot, u); });
     // Additional hook: slight delay inject in case of dynamic video elements
-    view.webContents.on('did-navigate', ()=>{ setTimeout(()=>{ try { if(upscalerManager) upscalerManager.maybeInject(view, slot); } catch(_){ } }, 800); });
-    view.webContents.on('did-navigate-in-page', ()=>{ setTimeout(()=>{ try { if(upscalerManager) upscalerManager.maybeInject(view, slot); } catch(_){ } }, 800); });
   }
 
   // --- Context menu support (right-click) ONLY for stats views ------------------------------

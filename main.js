@@ -180,7 +180,6 @@ try {
     if(storedNames.team2) lolTeamNames.team2 = String(storedNames.team2);
   }
 } catch(_){}
-// (stats/upscaler IPC wiring deferred to bootstrap to avoid stale statsManager reference)
 // --- Broker health tracking (stale odds auto-refresh) ---
 const brokerHealth = {}; // id -> { lastChange, lastOdds, lastRefresh }
 const STALE_MS = constants.STALE_MS; // centralized (5 minutes)
@@ -201,14 +200,11 @@ let lastStatsToggleTs = 0; // throttle for space hotkey
 let statsLogWindow = null;
 // Dev helper moved to dev/devCssWatcher.js
 const { initDevCssWatcher } = require('./modules/dev/devCssWatcher');
-// Optional video upscaler for stats slot A
-const { createUpscalerManager } = require('./modules/upscaler');
-const upscalerManager = createUpscalerManager({ store });
 // Early refs required by statsManager; define before first createStatsManager call
 let stageBounds = { x: 0, y: 300, width: 1600, height: 600 }; // initial placeholder; updated later
 const stageBoundsRef = { value: stageBounds };
 const quittingRef = { value:false };
-statsManager = createStatsManager({ store, mainWindow: null, stageBoundsRef, quittingRef, upscalerManager });
+statsManager = createStatsManager({ store, mainWindow: null, stageBoundsRef, quittingRef });
 
 // (Removed) forwardGsTheme – theme customization for stats table deprecated
 
@@ -231,7 +227,6 @@ initEarlyIpc({ ipcMain, store, boardManagerRef: earlyBoardRef });
 const { ensureVisibleBounds } = require('./modules/utils/display');
 // Deferred IPC module requires (kept top-level so bundle analyzers see them)
 const { initStatsIpc } = require('./modules/ipc/stats');
-const { initUpscalerIpc } = require('./modules/ipc/upscaler');
 const { initTeamNamesIpc } = require('./modules/ipc/teamNames');
 const { initAutoRefreshIpc } = require('./modules/ipc/autoRefresh');
 // External Excel odds JSON watcher (pseudo broker 'excel')
@@ -277,7 +272,7 @@ function createMainWindow() {
   // Recreate stats manager now that mainWindow exists (enables embedded stats creation)
   try {
     const prevMode = statsState.mode;
-  statsManager = createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef, upscalerManager });
+  statsManager = createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef });
     // Keep previous mode only if window mode requested; embedded cannot be auto-restored yet
     statsState.mode = (prevMode === 'window') ? 'window' : 'hidden';
   } catch(e){ console.warn('Failed to re-init statsManager with mainWindow', e); }
@@ -408,7 +403,6 @@ function bootstrap() {
   const { initBoardIpc } = require('./modules/ipc/board');
   initBoardIpc({ ipcMain, boardManager });
   // Now that boardManager & statsManager are finalized, initialize IPC modules that depend on them
-  try { initUpscalerIpc({ ipcMain, upscalerManager, statsManager }); } catch(e){ console.warn('initUpscalerIpc failed', e); }
   try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
   try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: boardWindow }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
   try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs }, store }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }

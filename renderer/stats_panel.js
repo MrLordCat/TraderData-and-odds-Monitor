@@ -460,30 +460,6 @@ function bindBasic(){
   safe('toggleSide', el=> el.onclick = ()=>{ send('stats-toggle-side'); const d=byId('dbgSide'); if(d) d.textContent = d.textContent==='left'?'right':'left'; });
 }
 
-// ============== FrameGen Controls (slot A) ==============
-async function initUpscalerControls(){
-  const frameGenEl = document.getElementById('frameGenA');
-  const statusEl = document.getElementById('upscalerStatus');
-  const targetFpsEl = document.getElementById('upscalerTargetFpsA');
-  if(!frameGenEl) return;
-  function updateStatus(st){
-    if(!statusEl) return;
-    statusEl.textContent = 'FrameGen: ' + (st.frameGen ? 'on' : 'off') + ' ('+(st.targetFps||60)+'fps)';
-  }
-  try {
-    const st = await ipcRenderer.invoke('video-upscaler-state');
-    if(st){
-      frameGenEl.checked = !!st.frameGen;
-      if(targetFpsEl){ targetFpsEl.value = String(st.targetFps||60); }
-      updateStatus(st);
-    }
-  } catch(_){ }
-  frameGenEl.addEventListener('change', ()=>{ ipcRenderer.send('video-upscaler-config', { frameGen: frameGenEl.checked }); });
-  if(targetFpsEl){
-    targetFpsEl.addEventListener('change', ()=>{ const v=parseInt(targetFpsEl.value,10); if(!isNaN(v)) ipcRenderer.send('video-upscaler-config', { targetFps: v }); });
-  }
-  ipcRenderer.on('video-upscaler-updated', (_e, st)=> updateStatus(st));
-}
 
 function bindReset(){
   const btn = document.getElementById('lolReset');
@@ -674,7 +650,6 @@ function renderLol(payload, manual=false){
 (function init(){
   try { console.log('[stats_panel] init()'); } catch(_){}
   bindBasic();
-  initUpscalerControls();
   bindReset();
   bindSettings();
   buildMetricToggles();
