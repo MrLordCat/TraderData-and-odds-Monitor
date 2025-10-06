@@ -140,10 +140,11 @@ function renderEmbeddedOdds(){
     const bestCls1 = (!r.frozen && o1===embeddedBest1)?'best':'';
     const bestCls2 = (!r.frozen && o2===embeddedBest2)?'best':'';
     const isSwapped = window.__embeddedSwapped && window.__embeddedSwapped.has(r.broker);
-    const swapBtn = `<button class="eo-swapBtn ${isSwapped?'on':''}" data-broker="${r.broker}" title="Swap sides">⇄</button>`;
+    const swapBtn = `<button class=\"eo-swapBtn ${isSwapped?'on':''}\" data-broker=\"${r.broker}\" title=\"Swap sides\">⇄</button>`;
     return `<tr class="${frozenCls}">`+
-      `<td class="eo-broker"><span class="${suspTag}" title="${r.frozen?'Suspended / stale':''}">${r.broker}</span>${swapBtn}</td>`+
+      `<td class="eo-broker"><span class="${suspTag}" title="${r.frozen?'Suspended / stale':''}">${r.broker}</span></td>`+
       `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
+      `<td class="eo-swap-cell">${swapBtn}</td>`+
       `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td>`+
       `</tr>`;
   }).join('');
