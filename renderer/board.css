@@ -221,7 +221,7 @@ tfoot tr#midRow th { background: #1d2330; }
   cursor: pointer;
 }
 .autoBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
-.excelAutoCell { background:#1a2230; font-size:11px; }
+.excelAutoCell { background:transparent; font-size:11px; }
 .autoIndicators { display:flex; align-items:center; gap:10px; justify-content:center; }
 .autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.35; transition:opacity .25s, background .25s; }
 .autoDot.active { opacity:1; background:var(--accent); box-shadow:0 0 6px var(--accent-glow), 0 0 12px rgba(58,169,255,.4); }

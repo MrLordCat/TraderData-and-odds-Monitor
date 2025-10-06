@@ -185,13 +185,11 @@ function renderEmbeddedOdds(){
     if(eo1) eo1.textContent=h1; if(eo2) eo2.textContent=h2;
   } catch(_){ }
 
-  // Embedded auto rows (indicators + status) visibility update
+  // Embedded auto rows (only indicators now) visibility update
   try {
     const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow');
-    const stRow=document.getElementById('embeddedExcelAutoStatusRow');
     const vis = embeddedAutoSim.active ? '' : 'none';
     if(indRow) indRow.style.display = vis;
-    if(stRow) stRow.style.display = vis;
   } catch(_){ }
 }
 function handleEmbeddedOdds(p){ try {
@@ -325,7 +323,7 @@ function embeddedParsePair(cellId){
 function embeddedParseMid(){ return embeddedParsePair('embeddedMidCell'); }
 function embeddedParseExcel(){ return embeddedParsePair('embeddedExcelCell'); }
 function embeddedSetExcel(){ /* placeholder for future real integration; not used in simulation */ }
-function embeddedStatus(msg){ const el=document.getElementById('embeddedAutoStatus'); if(el) el.textContent=msg||''; }
+function embeddedStatus(_msg){ /* status text removed (only dots retained) */ }
 function embeddedFlash(idx){ const dot=document.querySelector('#embeddedExcelAutoIndicatorsRow .autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), embeddedAutoSim.stepMs-80); } }
 function embeddedSchedule(delay){ if(!embeddedAutoSim.active) return; clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=setTimeout(embeddedStep, typeof delay==='number'? delay: embeddedAutoSim.stepMs); }
 function embeddedStep(){
@@ -420,7 +418,7 @@ function embeddedToggleAuto(){
   embeddedAutoSim.active=newState;
   const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.toggle('on', embeddedAutoSim.active);
   const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow'); if(indRow) indRow.style.display=embeddedAutoSim.active? '' : 'none';
-  const stRow=document.getElementById('embeddedExcelAutoStatusRow'); if(stRow) stRow.style.display=embeddedAutoSim.active? '' : 'none';
+  // status row removed
   embeddedStatus(embeddedAutoSim.active? `Start (tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%)` : 'Stopped');
   try { console.log('[autoSim][embedded][toggle]', embeddedAutoSim.active? 'ON':'OFF', 'tol', embeddedAutoSim.tolerancePct); } catch(_){ }
   try { if(embeddedAutoSim.active){ embeddedAutoSim.userWanted=true; embeddedAutoSim.lastDisableReason=null; localStorage.setItem('embeddedAutoUserWanted','1'); } else { embeddedAutoSim.userWanted=false; embeddedAutoSim.lastDisableReason='manual'; localStorage.setItem('embeddedAutoUserWanted','0'); } } catch(_){ }

@@ -3,7 +3,7 @@
 /* Auto simulation shared styles */
 .autoBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 8px; font-size:11px; margin-left:6px; cursor:pointer; border-radius:5px; }
 .autoBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
-.excelAutoCell { background:#1a2230; font-size:11px; }
+.excelAutoCell { background:transparent; font-size:11px; }
 .autoIndicators { display:flex; align-items:center; gap:12px; justify-content:center; width:100%; }
 /* Keep dots tight but allow status to truly center */
 .autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.38; transition:opacity .25s, background .25s; flex:0 0 auto; }

@@ -298,7 +298,7 @@ function parseMid(){ return parsePairRow('midRow'); }
 function parseExcel(){ return parsePairRow('excelRow'); }
 // setExcelOdds previously mutated the visible Excel odds during simulation; removed from auto flow.
 function setExcelOdds(n1,n2){ /* retained for future real integration but unused by auto simulation */ }
-function autoStatus(msg){ const el=document.getElementById('autoStatus'); if(el) el.textContent=msg||''; }
+function autoStatus(_msg){ /* status text removed (only indicator dots shown) */ }
 function flashDot(idx){ const dot=document.querySelector('.autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), autoSim.stepMs-80); } }
 function scheduleAuto(delay){ if(!autoSim.active) return; clearTimeout(autoSim.timer); autoSim.timer=setTimeout(autoStep, typeof delay==='number'? delay: autoSim.stepMs); }
 function autoStep(){
