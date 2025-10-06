@@ -98,6 +98,21 @@ function bindEmbeddedMapSelect(){
         currentMap = v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag();
       } catch(_){ }
     });
+    // Refresh button handler (rebroadcast current map without changing selection)
+    try {
+      const btn=document.getElementById('embeddedMapRefreshBtn');
+      if(btn && !btn.dataset.bound){
+        btn.dataset.bound='1';
+        btn.addEventListener('click', ()=>{
+          try {
+            const v = sel.value;
+            if(window.desktopAPI && window.desktopAPI.setMap){ window.desktopAPI.setMap('*', v); }
+            else { try { const { ipcRenderer } = require('electron'); ipcRenderer.send('set-map', { id:'*', map:v }); } catch(_){ } }
+            try { console.debug('[embeddedOdds] manual map refresh ->', v); } catch(_){ }
+          } catch(_){ }
+        });
+      }
+    } catch(_){ }
   } catch(_){ }
 }
 const { ipcRenderer: ipcRendererEmbedded } = require('electron');
@@ -152,7 +167,7 @@ function renderEmbeddedOdds(){
     else {
       const mid1=(Math.min(...p1)+Math.max(...p1))/2; const mid2=(Math.min(...p2)+Math.max(...p2))/2;
       midCell.textContent=`${mid1.toFixed(2)} / ${mid2.toFixed(2)}`;
-      try { const meta=document.getElementById('embeddedOddsMeta'); if(meta) meta.textContent='Mid: '+mid1.toFixed(2)+' / '+mid2.toFixed(2); } catch(_){ }
+  // Removed header Mid meta display (previously updated #embeddedOddsMeta)
     }
   }
   try {

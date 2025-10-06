@@ -195,6 +195,18 @@ document.getElementById('mapSelect')?.addEventListener('change', e=>{
   window.desktopAPI.setMap('*', map);
 });
 
+// Map refresh button: re-broadcast current selection (forces odds collectors to re-run with the same map)
+document.getElementById('mapRefreshBtn')?.addEventListener('click', ()=>{
+  try {
+    if(!window.desktopAPI) return;
+    const sel=document.getElementById('mapSelect'); if(!sel) return;
+    const val=sel.value;
+    // Emit again; main process will persist and broadcast identically
+    window.desktopAPI.setMap('*', val);
+    try { console.debug('[board] manual map refresh ->', val); } catch(_){ }
+  } catch(_){ }
+});
+
 // Keep mapSelect updated if board opens after another source changed the map
 if(window.desktopAPI && window.desktopAPI.onMap){
   window.desktopAPI.onMap(mapVal=>{
