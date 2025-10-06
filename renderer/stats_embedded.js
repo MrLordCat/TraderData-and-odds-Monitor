@@ -8,10 +8,23 @@ try {
       window.desktopAPI = {
         invoke: (...args)=>{ try { return ipcRenderer.invoke(...args); } catch(e){ console.error('[embeddedOdds][polyfill][invokeErr]', e); throw e; } },
         send: (...args)=>{ try { return ipcRenderer.send(...args); } catch(e){ console.error('[embeddedOdds][polyfill][sendErr]', e); } },
-        autoSendPress: (side)=>{ try { ipcRenderer.invoke('send-auto-press', side); } catch(e){ console.error('[embeddedOdds][polyfill][autoSendPressErr]', e); } }
+        autoSendPress: (side)=>{ try { ipcRenderer.invoke('send-auto-press', side); } catch(e){ console.error('[embeddedOdds][polyfill][autoSendPressErr]', e); } },
+        // Added Last map helpers to mirror main preload API
+        getIsLast: ()=>{ try { return ipcRenderer.invoke('get-is-last'); } catch(e){ console.error('[embeddedOdds][polyfill][getIsLastErr]', e); return Promise.resolve(false); } },
+        setIsLast: (v)=>{ try { ipcRenderer.send('set-is-last', !!v); } catch(e){ console.error('[embeddedOdds][polyfill][setIsLastErr]', e); } },
+        onIsLast: (cb)=>{ try { const h=(_e,val)=>{ try { cb(val); } catch(_){ } }; ipcRenderer.on('set-is-last', h); return ()=> ipcRenderer.removeListener('set-is-last', h); } catch(e){ console.error('[embeddedOdds][polyfill][onIsLastErr]', e); return ()=>{}; } }
       };
       try { console.log('[embeddedOdds][polyfill] desktopAPI shim installed'); } catch(_){ }
     }
+  }
+} catch(_){ }
+// If preload desktopAPI already existed (unlikely here) but lacked Last helpers, patch them in.
+try {
+  const { ipcRenderer } = require('electron');
+  if(window.desktopAPI && ipcRenderer){
+    if(!window.desktopAPI.getIsLast) window.desktopAPI.getIsLast = ()=> ipcRenderer.invoke('get-is-last').catch(()=>false);
+    if(!window.desktopAPI.setIsLast) window.desktopAPI.setIsLast = (v)=>{ try { ipcRenderer.send('set-is-last', !!v); } catch(_){ } };
+    if(!window.desktopAPI.onIsLast) window.desktopAPI.onIsLast = (cb)=>{ const h=(_e,val)=>{ try { cb(val);}catch(_){ } }; ipcRenderer.on('set-is-last', h); return ()=> ipcRenderer.removeListener('set-is-last', h); };
   }
 } catch(_){ }
 let currentMap = undefined; // shared map number propagated from main / board
