@@ -107,8 +107,12 @@
       <div class="sectionHeader" style="margin-bottom:6px;">
         <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
   <span class="accent">Odds Board</span>
-        <span id="embeddedMapTag" class="statusSmall" style="margin-left:8px;">Map -</span>
-        <label class="mapLabel" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;">
+        <span id="embeddedMapTag" class="statusSmall" style="margin-left:8px;display:none;">Map -</span>
+        <label id="embeddedIsLastWrap" class="mapLabel" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;" title="Use match market for final map brokers (bet365)">
+          <input type="checkbox" id="embeddedIsLast" style="margin:0 4px 0 0;vertical-align:middle;" />
+          <span class="font-11 muted" style="opacity:.7;">Last</span>
+        </label>
+        <label class="mapLabel" style="margin-left:4px;display:inline-flex;align-items:center;gap:4px;">
           <span class="font-11 muted" style="opacity:.7;">Set</span>
           <select id="embeddedMapSelect" class="font-11" style="padding:2px 4px;">
             <option value="0">Match</option>

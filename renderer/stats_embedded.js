@@ -36,23 +36,17 @@ function initEmbeddedMapSync(){
   window.desktopAPI.getLastMap().then(v=>{ if(typeof v!=='undefined'){ currentMap=v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } }).catch(()=>{});
     }
     bindEmbeddedMapSelect();
-    // Inject isLast checkbox if not present
+    // Bind existing 'Last' checkbox placed in Odds Board header
     try {
-      if(!document.getElementById('embeddedIsLast')){
-        const mapSection = document.getElementById('mapSection') || document.body;
-        const lbl = document.createElement('label');
-        lbl.style.cssText='margin-left:8px;font:12px system-ui;cursor:pointer;';
-        lbl.title='Use match market for final map brokers (bet365)';
-        lbl.innerHTML = '<input type="checkbox" id="embeddedIsLast" style="vertical-align:middle;margin-right:4px;"/> Last';
-        mapSection.appendChild(lbl);
-        const chk = lbl.querySelector('input');
+      const chk = document.getElementById('embeddedIsLast');
+      if(chk && !chk.dataset.bound){
+        chk.dataset.bound='1';
         chk.addEventListener('change', e=>{
           try {
             const v=!!e.target.checked;
             if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(v); }
           } catch(_){ }
         });
-        // Initial fetch of isLast
         if(window.desktopAPI && window.desktopAPI.getIsLast){
           window.desktopAPI.getIsLast().then(v=>{ try { chk.checked=!!v; } catch(_){ } }).catch(()=>{});
         }
