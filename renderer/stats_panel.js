@@ -13,50 +13,7 @@ if(!ipcRenderer){
 let activityModule = (window.__activityModule)||null; if(!activityModule){ try { activityModule = require('./stats_activity'); } catch(_){ } }
 function send(ch,p){ ipcRenderer.send(ch,p); }
 
-// --- Capture Data prototype button wiring (Slot B scoreboard snapshot) ---
-window.addEventListener('DOMContentLoaded', ()=>{
-  try {
-    const btn = document.getElementById('captureSlotBBtn');
-    if(btn && !btn.__bound){
-      btn.__bound=true;
-      btn.addEventListener('click', ()=>{
-        try {
-          btn.disabled=true; btn.textContent='Capturing…';
-          send('stats-capture-slot', { slot:'B', roi:null });
-        } catch(_){ btn.disabled=false; btn.textContent='Capture Data'; }
-      });
-    }
-    ipcRenderer.on('stats-capture-result', (_e, payload)=>{
-      try {
-        if(!payload || payload.slot!=='B') return;
-        const btn = document.getElementById('captureSlotBBtn');
-        if(btn){ btn.disabled=false; btn.textContent='Capture Data'; }
-        const r = payload.result || {};
-        if(r.ok){
-          console.log('[capture][slotB] ok clip=', r.clip, 'size=', r.width+'x'+r.height);
-          if(r.ocr){
-            console.log('[capture][slotB][ocr]', r.ocr);
-            try {
-              const ls=document.getElementById('lolStatus');
-              if(r.ocr.ok && r.ocr.kills){
-                const l=r.ocr.kills.left.value, rv=r.ocr.kills.right.value;
-                ls.textContent='OCR Kills: '+(l!=null?l:'?')+' - '+(rv!=null?rv:'?');
-              } else if(r.ocr.error){ ls.textContent='OCR fail: '+r.ocr.error; }
-            } catch(_){ }
-          }
-          // For quick visual debug: open in a tiny popup window (data URL) – optional enable
-          try {
-            const dbgWin = window.open('', '_blank', 'width='+(r.width+20)+',height='+(r.height+40));
-            if(dbgWin && r.pngBase64){ dbgWin.document.write('<title>SlotB Capture</title><img style="image-rendering:pixelated;max-width:100%;" src="data:image/png;base64,'+r.pngBase64+'" />'); }
-          } catch(_){ }
-        } else {
-          console.warn('[capture][slotB] fail', r.error);
-          try { window.desktopAPI && window.desktopAPI.notify && window.desktopAPI.notify('Capture failed: '+r.error); } catch(_){ }
-        }
-      } catch(err){ console.warn('[capture][slotB] handler error', err); }
-    });
-  } catch(_){ }
-});
+// (Removed) Capture Data prototype wiring – feature deprecated.
 
 // (Theme logic moved to stats_theme.js)
 

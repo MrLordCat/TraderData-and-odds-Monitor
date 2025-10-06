@@ -11,6 +11,7 @@ function createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBounds
     '1x2x2': { pattern: [1,2,2] },
     '2x2': { pattern: [2,2] },
     '2x3': { pattern: [2,3] },
+  '3x3': { pattern: [3,3] },
     '2': { pattern: [2] },
     '1x1x2': { pattern: [1,1,2] },
     '2x2x2': { pattern: [2,2,2] }
