@@ -3,7 +3,7 @@
 //                 latestOddsRef, zoom, SNAP, stageBoundsRef })
 
 function initBrokerIpc(ctx){
-  const { ipcMain, store, views, brokerManager, statsManager, boardWindowRef, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef } = ctx;
+  const { ipcMain, store, views, brokerManager, statsManager, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef } = ctx;
   const latestOdds = latestOddsRef.value;
   // (Drag state removed – broker window dragging disabled)
 
@@ -25,8 +25,7 @@ function initBrokerIpc(ctx){
       }
       latestOdds[brokerId] = payload;
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', payload);
-      const boardWindow = boardWindowRef && boardWindowRef.value;
-      if (boardWindow && !boardWindow.isDestroyed()) boardWindow.webContents.send('odds-update', payload);
+  // boardWindow removed
       try { if (statsManager && statsManager.views && statsManager.views.panel) { statsManager.views.panel.webContents.send('odds-update', payload); } } catch(_){ }
   try { const bm = boardManagerRef && boardManagerRef.value; bm && bm.sendOdds && bm.sendOdds(payload); } catch(_){ }
     } catch(err) { console.error('bv-odds-update error', err); }
@@ -85,8 +84,7 @@ function initBrokerIpc(ctx){
       // Emit placeholder removal marker so any listeners (board aggregation, stats panel) can drop it immediately
       const removalPayload = { broker: id, odds:['-','-'], removed:true };
       try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', removalPayload); } catch(_){ }
-      const boardWindow = (typeof boardWindowRef!=='undefined' && boardWindowRef && boardWindowRef.value); 
-      try { if(boardWindow && !boardWindow.isDestroyed()) boardWindow.webContents.send('odds-update', removalPayload); } catch(_){ }
+  // boardWindow removed
       try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('odds-update', removalPayload); } catch(_){ }
       try { console.log('[broker][close] cleaned', id); } catch(_){ }
     } catch(err){ try { console.warn('close-broker handling failed', err.message); } catch(_){ } }

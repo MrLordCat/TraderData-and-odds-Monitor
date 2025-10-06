@@ -20,8 +20,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // openBoard removed (legacy separate window replaced by docking)
   // Stats embedding API
   statsToggle: () => ipcRenderer.send('stats-toggle'),
-  statsDetach: () => ipcRenderer.send('stats-detach'),
-  statsAttach: () => ipcRenderer.send('stats-attach'),
+  // statsDetach/statsAttach removed (no separate stats window)
   getStatsState: () => ipcRenderer.invoke('get-stats-state'),
   onStatsState: (cb) => withUnsub('stats-state-updated', cb),
   refreshAll: () => ipcRenderer.send('refresh-all'),
@@ -53,9 +52,6 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // Board docking API
   ,getBoardState: () => ipcRenderer.invoke('get-board-state')
   ,onBoardUpdated: (cb) => withUnsub('board-updated', cb)
-  ,boardToggle: () => ipcRenderer.send('board-toggle')
-  ,boardDetach: () => ipcRenderer.send('board-detach')
-  ,boardAttach: () => ipcRenderer.send('board-attach')
   ,boardSetSide: (side) => ipcRenderer.send('board-set-side', { side })
   ,boardSetWidth: (width) => ipcRenderer.send('board-set-width', { width })
   // Dev: live CSS reload subscription

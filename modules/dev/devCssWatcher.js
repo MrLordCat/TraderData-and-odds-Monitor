@@ -2,7 +2,7 @@
 // initDevCssWatcher({ app, mainWindow, boardWindowRef, statsManager, baseDir })
 
 function initDevCssWatcher(ctx){
-  const { app, mainWindow, boardWindowRef, statsManager, baseDir } = ctx;
+  const { app, mainWindow, statsManager, baseDir } = ctx;
   try {
     if(app.isPackaged) return; // production skip
     const fs = require('fs');
@@ -15,8 +15,7 @@ function initDevCssWatcher(ctx){
       const list = Array.from(pending);
       pending.clear();
       try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dev-css-changed', list); } catch(_){ }
-      const boardWindow = boardWindowRef && boardWindowRef.value;
-      try { if (boardWindow && !boardWindow.isDestroyed()) boardWindow.webContents.send('dev-css-changed', list); } catch(_){ }
+  // boardWindow removed
       try {
         if (statsManager && statsManager.views) {
           Object.values(statsManager.views).forEach(v=>{ try { v.webContents && !v.webContents.isDestroyed() && v.webContents.send('dev-css-changed', list); } catch(_){ } });

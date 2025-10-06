@@ -2,7 +2,7 @@
 // initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef, statsManager, lolTeamNamesRef })
 
 function initTeamNamesIpc(ctx){
-  const { ipcMain, store, boardManager, mainWindow, boardWindowRef, statsManager, lolTeamNamesRef } = ctx;
+  const { ipcMain, store, boardManager, mainWindow, statsManager, lolTeamNamesRef } = ctx;
   ipcMain.on('lol-team-names-set', (_e, payload)=>{
     try {
       if(!payload || typeof payload!=='object') return;
@@ -10,10 +10,7 @@ function initTeamNamesIpc(ctx){
       if(team1) lolTeamNamesRef.value.team1 = String(team1).trim() || lolTeamNamesRef.value.team1;
       if(team2) lolTeamNamesRef.value.team2 = String(team2).trim() || lolTeamNamesRef.value.team2;
       try { store.set('lolTeamNames', lolTeamNamesRef.value); } catch(_){}
-      const boardWindow = boardWindowRef && boardWindowRef.value;
-      if(boardWindow && !boardWindow.isDestroyed()){
-        try { boardWindow.webContents.send('lol-team-names-update', lolTeamNamesRef.value); } catch(_){ }
-      }
+      // boardWindow removed
       if(mainWindow && !mainWindow.isDestroyed()){
         try { mainWindow.webContents.send('lol-team-names-update', lolTeamNamesRef.value); } catch(_){ }
       }

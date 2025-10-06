@@ -2,15 +2,12 @@
 // initAutoRefreshIpc({ ipcMain, store, boardWindowRef, mainWindow, autoRefreshEnabledRef })
 
 function initAutoRefreshIpc(ctx){
-  const { ipcMain, store, boardWindowRef, mainWindow, autoRefreshEnabledRef } = ctx;
+  const { ipcMain, store, mainWindow, autoRefreshEnabledRef } = ctx;
   ipcMain.handle('get-auto-refresh-enabled', () => autoRefreshEnabledRef.value);
   ipcMain.on('set-auto-refresh-enabled', (_e, value) => {
     autoRefreshEnabledRef.value = !!value;
     try { store.set('autoRefreshEnabled', autoRefreshEnabledRef.value); } catch(_) {}
-    const boardWindow = boardWindowRef && boardWindowRef.value;
-    if (boardWindow && !boardWindow.isDestroyed()) {
-      try { boardWindow.webContents.send('auto-refresh-updated', { enabled: autoRefreshEnabledRef.value }); } catch(_) {}
-    }
+    // boardWindow removed
     if (mainWindow && !mainWindow.isDestroyed()) {
       try { mainWindow.webContents.send('auto-refresh-updated', { enabled: autoRefreshEnabledRef.value }); } catch(_) {}
     }

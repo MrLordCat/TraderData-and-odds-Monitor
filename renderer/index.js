@@ -55,65 +55,42 @@ try {
 } catch(_){ }
 
 document.getElementById('refreshAll').onclick = () => window.desktopAPI.refreshAll();
-const btnToggle=document.getElementById('boardToggle');
-const btnDetach=document.getElementById('boardDetach');
-const btnAttach=document.getElementById('boardAttach');
+// Simplified board: always docked. Support side + width adjustments only.
 const btnSide=document.getElementById('boardSide');
 const splitter=document.getElementById('boardSplitter');
-
-let boardState=null; let resizing=false; let startX=0; let startWidth=0; let startWinWidth=0;
+let boardState=null; let resizing=false; let startX=0; let startWidth=0;
 function applyBoardState(st){
-  boardState=st; if(!st){ document.body.classList.remove('board-docked-left','board-docked-right'); splitter.style.display='none'; return; }
-  document.body.classList.toggle('board-docked-left', st.mode==='docked' && st.side==='left');
-  document.body.classList.toggle('board-docked-right', st.mode==='docked' && st.side==='right');
-  btnSide.style.display = st.mode==='docked' ? 'inline-block' : 'none';
-  btnDetach.style.display = st.mode==='docked' ? 'inline-block' : 'none';
-  btnAttach.style.display = st.mode==='window' || st.mode==='hidden' ? 'inline-block' : 'none';
-  splitter.style.display = st.mode==='docked' ? 'block' : 'none';
-  btnToggle.textContent = st.mode==='hidden' ? 'Board Show' : 'Board Hide';
+  boardState=st; if(!st) return;
+  document.body.classList.toggle('board-docked-left', st.side==='left');
+  document.body.classList.toggle('board-docked-right', st.side!=='left');
+  splitter.style.display='block';
+  if(btnSide){ btnSide.style.display='inline-block'; }
   computeStage();
 }
-btnToggle.onclick=()=> window.desktopAPI.boardToggle();
-btnDetach.onclick=()=> window.desktopAPI.boardDetach();
-btnAttach.onclick=()=> window.desktopAPI.boardAttach();
-btnSide.onclick=()=>{ if(!boardState) return; const next = boardState.side==='left'?'right':'left'; window.desktopAPI.boardSetSide(next); };
-window.desktopAPI.onBoardUpdated(st=> applyBoardState(st));
+if(btnSide){ btnSide.onclick=()=>{ if(!boardState) return; const next= boardState.side==='left'?'right':'left'; window.desktopAPI.boardSetSide(next); }; }
+window.desktopAPI.onBoardUpdated(applyBoardState);
 window.desktopAPI.getBoardState().then(applyBoardState);
-
-splitter.addEventListener('mousedown', e=>{ if(!boardState || boardState.mode!=='docked') return; resizing=true; startX=e.clientX; startWidth=boardState.width; startWinWidth=window.innerWidth; splitter.classList.add('dragging'); document.body.style.userSelect='none'; });
+splitter.addEventListener('mousedown', e=>{ if(!boardState) return; resizing=true; startX=e.clientX; startWidth=boardState.width; splitter.classList.add('dragging'); document.body.style.userSelect='none'; });
 window.addEventListener('mousemove', e=>{ if(!resizing) return; const dx=e.clientX-startX; let newW=startWidth; if(boardState.side==='left'){ newW = startWidth + dx; } else { newW = startWidth - dx; } newW=Math.max(240, Math.min(800, newW)); window.desktopAPI.boardSetWidth(newW); });
 window.addEventListener('mouseup', ()=>{ if(resizing){ resizing=false; splitter.classList.remove('dragging'); document.body.style.userSelect=''; } });
 
 const statsToggleBtn = document.getElementById('statsToggle');
-const statsDetachBtn = document.getElementById('statsDetach');
-const statsAttachBtn = document.getElementById('statsAttach');
+// Stats: only embedded/hidden now.
 function applyStatsState(st){
   if(!st) return;
   const wasEmbedded = document.body.classList.contains('stats-embedded');
   if(st.mode==='hidden'){
     statsToggleBtn.textContent='Stats';
-    statsDetachBtn.style.display='none';
-    statsAttachBtn.style.display='none';
     document.body.classList.remove('stats-embedded');
   } else if(st.mode==='embedded'){
     statsToggleBtn.textContent='Back';
-  statsDetachBtn.classList.remove('hidden');
-  statsDetachBtn.style.display='inline-block';
-    statsAttachBtn.style.display='none';
     document.body.classList.add('stats-embedded');
-  } else if(st.mode==='window'){
-    statsToggleBtn.textContent='Stats';
-    statsDetachBtn.style.display='none';
-    statsAttachBtn.style.display='inline-block';
-    document.body.classList.remove('stats-embedded');
   }
   if(wasEmbedded !== document.body.classList.contains('stats-embedded')){
     setTimeout(computeStage, 0);
   }
 }
 statsToggleBtn.onclick=()=> window.desktopAPI.statsToggle();
-statsDetachBtn.onclick=()=> window.desktopAPI.statsDetach();
-statsAttachBtn.onclick=()=> window.desktopAPI.statsAttach();
 window.desktopAPI.getStatsState().then(applyStatsState);
 window.desktopAPI.onStatsState(applyStatsState);
 
