@@ -71,6 +71,9 @@ header {
 /* Goals: Every top-level block (Dev Tools, Sources, Game Stats header, Map, Odds) shares spacing, border rhythm */
 .sectionGroup { display:flex; flex-direction:column; gap:14px; }
 .sectionCard { position:relative; border:1px solid #253041; background:#182230; border-radius:10px; padding:10px 12px 12px; }
+.sectionCard + .sectionCard { margin-top:14px; }
+/* Ensure odds board has same separation above following block (its own selector isn't .sectionCard in some flows) */
+#embeddedOddsSection + .sectionCard { margin-top:14px; }
 .sectionHeader { display:flex; align-items:center; gap:10px; margin:0 0 10px; font:600 13px var(--font-sans); letter-spacing:.3px; color:#d5deea; }
 .sectionHeader .accent { color:var(--accent); }
 .sectionHeader .right { margin-left:auto; display:flex; gap:6px; align-items:center; }
