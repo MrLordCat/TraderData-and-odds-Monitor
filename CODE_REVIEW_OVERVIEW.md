@@ -75,7 +75,7 @@
 - Наблюдает за внешним JSON (псевдо-брокер `excel`), парсит коэффициенты и транслирует их в общий поток как ещё один источник.
 - Последняя пачка помещается в `global.__lastExcelOdds` и кэш `latestOddsRef`.
 
-## 9. Stale Monitor (`modules/staleMonitor.js`)
+## 9. Stale Monitor (`modules/staleMonitor.js`)![1759735344133](image/CODE_REVIEW_OVERVIEW/1759735344133.png)![1759735353178](image/CODE_REVIEW_OVERVIEW/1759735353178.png)![1759735354676](image/CODE_REVIEW_OVERVIEW/1759735354676.png)![1759735355012](image/CODE_REVIEW_OVERVIEW/1759735355012.png)![1759735355540](image/CODE_REVIEW_OVERVIEW/1759735355540.png)![1759735355980](image/CODE_REVIEW_OVERVIEW/1759735355980.png)![1759735356474](image/CODE_REVIEW_OVERVIEW/1759735356474.png)![1759735356927](image/CODE_REVIEW_OVERVIEW/1759735356927.png)![1759735357854](image/CODE_REVIEW_OVERVIEW/1759735357854.png)![1759735358060](image/CODE_REVIEW_OVERVIEW/1759735358060.png)![1759735359540](image/CODE_REVIEW_OVERVIEW/1759735359540.png)![1759735359990](image/CODE_REVIEW_OVERVIEW/1759735359990.png)![1759735381630](image/CODE_REVIEW_OVERVIEW/1759735381630.png)
 - Периодически проверяет `brokerHealth[id].lastChange` / `lastRefresh` и если `now - lastChange > STALE_MS` вызывает `reloadIgnoringCache()` (если авто-рефреш включён).
 
 ## 10. Zoom Manager (`modules/zoom/`)
