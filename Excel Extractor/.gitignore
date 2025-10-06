@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+logs/
+output/
+changes.jsonl
+current_state.json

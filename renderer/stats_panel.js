@@ -170,17 +170,61 @@ function startInlineRenameUnified(idx, manualOn){
 
 function applyRaceFromKills(gs){ const bucket = gs.killCount||{}; [ ['race5',5], ['race10',10], ['race15',15], ['race20',20] ].forEach(([key,n])=>{ if(!gs[key]){ const t1=bucket[manualData.team1Name]||0; const t2=bucket[manualData.team2Name]||0; if(t1===n || t2===n) gs[key]= t1===n? manualData.team1Name: manualData.team2Name; } }); }
 
-function handleManualClick(metric, side){ const g = manualData.gameStats[currentGame]; if(!g) return; const team = side==='t1'? manualData.team1Name: manualData.team2Name; if(BINARY_METRICS.includes(metric)){ if(!g[metric]) g[metric]=team; else if(g[metric]!==team) g[metric]=team; }
-  else if(COUNT_METRICS.includes(metric)){ const bucket=g[metric] ||= {}; bucket[team]=(bucket[team]||0)+1; if(metric==='killCount') applyRaceFromKills(g); }
-  else if(metric==='dragonCount'){ const bucket=g.dragonCount ||= {}; bucket[team]=(bucket[team]||0)+1; g.dragonOrderSequence.push(team); syncDragonCounts(g); }
-  else if(metric==='netWorth'){ const bucket=g.netWorth ||= {}; const val=prompt('Net Worth for '+team, bucket[team]||0); if(val!=null) bucket[team]=Number(val)||0; }
-  renderManual(); }
+function handleManualClick(metric, side){
+  const g = manualData.gameStats[currentGame]; if(!g) return;
+  const team = side==='t1'? manualData.team1Name: manualData.team2Name;
+  if(BINARY_METRICS.includes(metric)){
+    if(!g[metric]) g[metric]=team; else if(g[metric]!==team) g[metric]=team;
+  }
+  else if(COUNT_METRICS.includes(metric)){
+    const bucket=g[metric] ||= {};
+    bucket[team]=(bucket[team]||0)+1;
+    if(metric==='killCount') applyRaceFromKills(g);
+  }
+  else if(metric==='dragonCount'){
+    // Increment team dragon count and append to order sequence (used to derive Dragon Orders row)
+    const bucket=g.dragonCount ||= {};
+    bucket[team]=(bucket[team]||0)+1;
+    g.dragonOrderSequence.push(team);
+    syncDragonCounts(g);
+  }
+  else if(metric==='netWorth'){
+    const bucket=g.netWorth ||= {};
+    const val=prompt('Net Worth for '+team, bucket[team]||0);
+    if(val!=null) bucket[team]=Number(val)||0;
+  }
+  renderManual();
+}
 
-function handleManualRightClick(metric, side){ const g=manualData.gameStats[currentGame]; if(!g) return; const team = side==='t1'? manualData.team1Name: manualData.team2Name; if(BINARY_METRICS.includes(metric)){ if(g[metric]===team) g[metric]=null; }
-  else if(COUNT_METRICS.includes(metric)){ const bucket=g[metric]||{}; if(bucket[team]>0) bucket[team]--; }
-  else if(metric==='dragonCount'){ const bucket=g.dragonCount||{}; if(bucket[team]>0){ bucket[team]--; for(let i=g.dragonOrderSequence.length-1;i>=0;i--){ if(g.dragonOrderSequence[i]===team){ g.dragonOrderSequence.splice(i,1); break; } } syncDragonCounts(g); } }
-  else if(metric==='netWorth'){ const bucket=g.netWorth||{}; bucket[team]=0; }
-  renderManual(); }
+function handleManualRightClick(metric, side){
+  const g=manualData.gameStats[currentGame]; if(!g) return;
+  const team = side==='t1'? manualData.team1Name: manualData.team2Name;
+  if(BINARY_METRICS.includes(metric)){
+    if(g[metric]===team) g[metric]=null;
+  }
+  else if(COUNT_METRICS.includes(metric)){
+    const bucket=g[metric]||{};
+    if(bucket[team]>0) bucket[team]--;
+  }
+  else if(metric==='dragonCount'){
+    const bucket=g.dragonCount ||= {};
+    if(bucket[team]>0){
+      bucket[team]--;
+      // Remove the last occurrence of this team from order sequence (undo last dragon attribution)
+      for(let i=g.dragonOrderSequence.length-1;i>=0;i--){
+        if(g.dragonOrderSequence[i]===team){
+          g.dragonOrderSequence.splice(i,1);
+          break;
+        }
+      }
+      syncDragonCounts(g);
+    }
+  }
+  else if(metric==='netWorth'){
+    const bucket=g.netWorth||{}; bucket[team]=0;
+  }
+  renderManual();
+}
 
 function syncDragonCounts(g){ const t1=manualData.team1Name, t2=manualData.team2Name; g.dragonCount[t1]=g.dragonOrderSequence.filter(t=>t===t1).length; g.dragonCount[t2]=g.dragonOrderSequence.filter(t=>t===t2).length; }
 

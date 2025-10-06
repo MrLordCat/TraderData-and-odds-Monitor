@@ -406,6 +406,153 @@ function bootstrap() {
   try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
   try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: boardWindow }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
   try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs }, store }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
+  // -------- Excel extractor (Python) process control --------
+  // Lightweight toggle: user triggers start/stop via board "S" button.
+  // We spawn a detached python process reading the workbook and writing current_state.json.
+  // Guard against rapid respawn; maintain status broadcast to renderer.
+  const { spawn } = require('child_process');
+  let excelProc = null;
+  let excelProcStarting = false;
+  let lastExcelStartTs = 0;
+  let excelProcError = null; // last error message (non-zero exit or spawn failure)
+  let excelDepsInstalling = false;
+  
+  function resolveExcelScriptPath(){
+    // 1. Store override
+    try { const custom = store.get('excelScriptPath'); if(custom && fs.existsSync(custom)) return custom; } catch(_){ }
+    // 2. Common filenames & subfolders inside project
+    const names = ['excel_watcher.py','excel-watcher.py','excelWatcher.py'];
+    const dirs = ['', 'scripts', 'script', 'python', 'excel', 'Excel Extractor', 'extractor'];
+    const tried = [];
+    for(const d of dirs){
+      for(const n of names){
+        const p = path.join(__dirname, d, n);
+        tried.push(p);
+        try { if(fs.existsSync(p)) { return p; } } catch(_){ }
+      }
+    }
+    // 3. Shallow recursive scan (depth 2) to be more forgiving
+    try {
+      const scanDirs=[__dirname];
+      const visited=new Set();
+      while(scanDirs.length){
+        const cur=scanDirs.shift();
+        if(visited.has(cur)) continue; visited.add(cur);
+        let entries=[]; try { entries = fs.readdirSync(cur, { withFileTypes:true }); } catch(_){ continue; }
+        for(const ent of entries){
+          if(ent.isDirectory()){
+            const relDepth = cur.replace(__dirname,'').split(path.sep).filter(Boolean).length;
+            if(relDepth < 2) scanDirs.push(path.join(cur, ent.name));
+          } else if(/excel[_-]?watcher\.py$/i.test(ent.name)){
+            const full = path.join(cur, ent.name);
+            return full;
+          }
+        }
+      }
+    } catch(_){ }
+    // Log what we tried for diagnostics
+    try { console.warn('[excel-extractor] script not found, tried:', tried); } catch(_){ }
+    return null;
+  }
+  function broadcastExcelStatus(){
+    try {
+      if(mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('excel-extractor-status', {
+          running: !!excelProc,
+          starting: excelProcStarting,
+          error: excelProcError,
+          installing: excelDepsInstalling
+        });
+      }
+    } catch(_){ }
+  }
+  function startExcelExtractor(){
+    if(excelProc || excelProcStarting) return;
+    const now=Date.now(); if(now - lastExcelStartTs < 1500) { return; }
+    lastExcelStartTs = now;
+  excelProcStarting = true; excelProcError=null; broadcastExcelStatus();
+    try {
+      // Resolve script path: prefer user override from store key excelScriptPath else fallback to ./excel_watcher.py
+      let scriptPath = resolveExcelScriptPath();
+      if(!scriptPath){ console.warn('[excel-extractor] script not found'); excelProcStarting=false; broadcastExcelStatus(); return; }
+      // Pick python executable: allow store override (excelPythonPath) else rely on 'python'
+      let py = 'python';
+      try { const pyOverride = store.get('excelPythonPath'); if(pyOverride) py = pyOverride; } catch(_){ }
+      const args = [scriptPath];
+      excelProc = spawn(py, args, { cwd: path.dirname(scriptPath), stdio:['ignore','pipe','pipe'] });
+      console.log('[excel-extractor] spawned pid', excelProc.pid, 'script', scriptPath);
+      excelProc.on('spawn', ()=>{ excelProcStarting=false; broadcastExcelStatus(); });
+      let stderrBuf='';
+      excelProc.stdout.on('data', d=>{ try { const s=d.toString(); if(/ERROR|Traceback|exception/i.test(s)) console.warn('[excel-extractor][stdout]', s.trim()); else console.log('[excel-extractor][stdout]', s.trim()); } catch(_){ } });
+      excelProc.stderr.on('data', d=>{ try { const t=d.toString(); stderrBuf += t; console.warn('[excel-extractor][stderr]', t.trim()); } catch(_){ } });
+      excelProc.on('exit', (code, sig)=>{ 
+        console.log('[excel-extractor] exit', code, sig);
+        if(code && code!==0){
+          // Detect missing pywin32
+          if(/pywin32/i.test(stderrBuf)){
+            excelProcError = 'pywin32 не установлен (pip install pywin32)';
+          } else {
+            excelProcError = 'Exit code '+code;
+          }
+        } else if(sig){
+          excelProcError = null; // normal manual stop
+        }
+        excelProc=null; excelProcStarting=false; broadcastExcelStatus();
+      });
+      broadcastExcelStatus();
+    } catch(err){
+      console.warn('[excel-extractor] spawn failed', err.message);
+      excelProcError = err.message; excelProcStarting=false; excelProc=null; broadcastExcelStatus();
+    }
+  }
+  function stopExcelExtractor(){
+    if(!excelProc) return;
+    try { console.log('[excel-extractor] stopping pid', excelProc.pid); excelProc.kill(); } catch(_){ }
+  }
+  ipcMain.on('excel-extractor-toggle', ()=>{ try { if(excelProc){ stopExcelExtractor(); } else { startExcelExtractor(); } } catch(_){ } });
+  ipcMain.handle('excel-extractor-status-get', ()=> ({ running: !!excelProc, starting: excelProcStarting }));
+  ipcMain.on('excel-extractor-set-path', (_e, p)=>{
+    try {
+      if(!p || typeof p !== 'string') return;
+      const trimmed = p.trim();
+      if(fs.existsSync(trimmed)){
+        store.set('excelScriptPath', trimmed);
+        console.log('[excel-extractor] custom path set', trimmed);
+        // if process not running attempt immediate start for feedback
+        if(!excelProc) startExcelExtractor(); else broadcastExcelStatus();
+      } else {
+        console.warn('[excel-extractor] set-path file does not exist', trimmed);
+      }
+    } catch(err){ console.warn('[excel-extractor] set-path error', err.message); }
+  });
+  // Broadcast initial status (not running)
+  setTimeout(()=> broadcastExcelStatus(), 500);
+  app.on('before-quit', ()=>{ try { stopExcelExtractor(); } catch(_){ } });
+  // Dependency installer (currently only pywin32)
+  ipcMain.on('excel-extractor-install-deps', ()=>{
+    if(excelDepsInstalling) return;
+    // Determine python exe (same logic as spawn)
+    let py='python';
+    try { const pyOverride = store.get('excelPythonPath'); if(pyOverride) py=pyOverride; } catch(_){ }
+    excelDepsInstalling = true; excelProcError=null; broadcastExcelStatus();
+    try {
+      const inst = spawn(py, ['-m','pip','install','pywin32'], { stdio:['ignore','pipe','pipe'] });
+      let errBuf='';
+      inst.stdout.on('data', d=>{ try { console.log('[excel-extractor][install][stdout]', d.toString().trim()); } catch(_){ } });
+      inst.stderr.on('data', d=>{ try { const s=d.toString(); errBuf+=s; console.warn('[excel-extractor][install][stderr]', s.trim()); } catch(_){ } });
+      inst.on('exit', (code)=>{
+        excelDepsInstalling=false;
+        if(code===0){
+          excelProcError=null;
+          // Auto-start after successful install if not running
+          setTimeout(()=>{ if(!excelProc) startExcelExtractor(); }, 400);
+        } else {
+          excelProcError = 'Install failed (code '+code+')';
+        }
+        broadcastExcelStatus();
+      });
+    } catch(err){ excelDepsInstalling=false; excelProcError = 'Install spawn err: '+err.message; broadcastExcelStatus(); }
+  });
   // Expose mutable refs for diagnostic / future module hot-swap
   try { Object.defineProperty(global, '__oddsMoniSync', { value:{ autoRefreshEnabledRef, lolTeamNamesRef }, enumerable:false }); } catch(_){}
   staleMonitor = createStaleMonitor({ intervalMs: HEALTH_CHECK_INTERVAL, staleMs: STALE_MS, brokerHealth, views, enabledRef:{ value:autoRefreshEnabled }, onReload:(id)=>{ try { views[id].webContents.reloadIgnoringCache(); } catch(e){} } });

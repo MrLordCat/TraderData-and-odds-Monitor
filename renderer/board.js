@@ -432,9 +432,44 @@ document.addEventListener('click', e=>{
       autoStatus('Auto resume disabled');
     }
   }
+  if(e.target && e.target.id==='excelScriptBtn'){
+    try { if(window.desktopAPI && window.desktopAPI.excelScriptToggle){ window.desktopAPI.excelScriptToggle(); } } catch(_){ }
+  }
 });
 window.addEventListener('DOMContentLoaded', ()=>{ try { const b=document.getElementById('autoResumeBtn'); if(b) b.classList.toggle('on', autoSim.autoResume); } catch(_){ } });
 window.__autoSim = autoSim;
+
+// Excel extractor status reflection
+try {
+  function applyExcelStatus(st){
+    const btn = document.getElementById('excelScriptBtn'); if(!btn) return;
+    const { running, starting, error, installing } = st || {};
+    btn.classList.toggle('on', !!running);
+    if(installing){ btn.textContent='⧗'; btn.title='Установка зависимостей (pywin32)...'; }
+    else if(starting) { btn.textContent='…'; btn.title='Стартует...'; }
+    else { btn.textContent = 'S'; btn.title = running? 'Stop Excel extractor script' : 'Start Excel extractor script'; }
+    if(error){
+      btn.classList.add('error');
+      btn.title = (btn.title? btn.title+'\n':'') + 'Ошибка: '+error + ( /pywin32/i.test(error) ? '\n(Клик ПКМ для установки pywin32)' : '' );
+    } else btn.classList.remove('error');
+  }
+  if(window.desktopAPI && window.desktopAPI.onExcelScriptStatus){
+    window.desktopAPI.onExcelScriptStatus(st=>{ try { applyExcelStatus(st); } catch(_){ } });
+  }
+  // Query initial status after small delay
+  setTimeout(()=>{ try { if(window.desktopAPI && window.desktopAPI.excelScriptGetStatus){ window.desktopAPI.excelScriptGetStatus().then(applyExcelStatus).catch(()=>{}); } } catch(_){ } }, 400);
+} catch(_){ }
+
+// Right-click on S button to auto-install pywin32 if missing
+try {
+  document.addEventListener('contextmenu', e=>{
+    const tgt = e.target;
+    if(tgt && tgt.id==='excelScriptBtn'){
+      e.preventDefault();
+      try { if(window.desktopAPI && window.desktopAPI.excelScriptInstallDeps){ window.desktopAPI.excelScriptInstallDeps(); } } catch(_){ }
+    }
+  });
+} catch(_){ }
 
 // Hotkey broadcast: toggle auto (from main Numpad5)
 try {

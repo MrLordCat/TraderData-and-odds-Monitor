@@ -16,10 +16,7 @@ function createExcelWatcher({ win, store, sendOdds }) {
   let watcher = null;
   let activePath = null; // currently watched file
   let lastResolvedPaths = [];
-  let sanitizedPath = null; // path to generated fixed json
-  let lastRepairHash = ''; // signature of last malformed original we repaired
-  let lastSanitizedWriteTs = 0;
-  let lastData = null; // cache last successfully parsed (and normalized) data
+  let lastData = null; // cache last payload (our simplified shape)
   let lastEmittedMap = null; // last map id we emitted for
   let mapPollTimer = null; // timer id for map change polling
 
@@ -28,19 +25,18 @@ function createExcelWatcher({ win, store, sendOdds }) {
   }
 
   function candidatePaths(){
+    // Only support new extractor file current_state.json (plus optional custom override path)
     const out = [];
     try {
       const custom = store.get('excelDumpPath');
       if(custom && typeof custom === 'string') out.push(custom);
     } catch(_){ }
-    // Documents (electron) path
-    try { if(electronApp) out.push(path.join(electronApp.getPath('documents'), 'excel_dump.json')); } catch(_){ }
-    // Windows USERPROFILE/Documents fallback
+    const FILE = 'current_state.json';
+    try { if(electronApp){ const doc = electronApp.getPath('documents'); out.push(path.join(doc, FILE)); } } catch(_){ }
     const up = process.env.USERPROFILE || process.env.HOME || '';
-    if(up) out.push(path.join(up, 'Documents', 'excel_dump.json'));
-    // Working dir (in case user put file next to app)
-    out.push(path.join(process.cwd(), 'excel_dump.json'));
-    // Deduplicate
+    if(up) out.push(path.join(up, 'Documents', FILE));
+    out.push(path.join(process.cwd(), FILE));
+    out.push(path.join(process.cwd(), 'Excel Extractor', FILE));
     return [...new Set(out)];
   }
 
@@ -81,28 +77,52 @@ function createExcelWatcher({ win, store, sendOdds }) {
     return desired;
   }
 
-  function emitFromData(data){
-    if(!data || !Array.isArray(data.markets)) return;
-    lastData = data; // cache
-    const sig = data.timestamp+ ':' + data.markets.map(m=> [m.id,m.odds1,m.odds2,m.status].join('|')).join('~');
-
-    const desiredMap = pickDesiredMap();
-    const wantedId = 'map'+desiredMap;
-    let market = data.markets.find(m=> (m.id||'').toLowerCase() === wantedId);
-    if(!market) market = data.markets[0];
-    if(!market) return;
-
-    const odds = [market.odds1, market.odds2].map(v=>{ const n=parseFloat(v); return isNaN(n)? '-' : String(n); });
-    const frozen = /suspend|close/i.test(market.status||'');
-  // Emit as dedicated broker id 'excel' (dataservices legacy no longer used for this feed).
-  const payload = { broker:'excel', map:desiredMap, odds, frozen, ts:Date.now(), label: market.label || ('Map '+desiredMap+' Winner'), source:'excel' };
-    // Only skip if both signature AND map are unchanged.
+  function emitCurrent({ odds1, odds2, frozen, rawTs, mapId }){
+    const desiredMap = mapId || pickDesiredMap();
+    const odds = [odds1, odds2].map(v=> (v==null||isNaN(v))? '-' : String(v));
+    const sig = (rawTs||'')+ ':' + desiredMap + ':' + odds.join('/') + ':' + (frozen?'F':'T');
     if(sig === lastSig && desiredMap === lastEmittedMap) return;
     lastSig = sig;
     lastEmittedMap = desiredMap;
+  const payload = { broker:'excel', map:desiredMap, odds, frozen, ts:Date.now(), label:'Map '+desiredMap+' Winner', source:'excel' };
+  lastData = { odds1, odds2, frozen, rawTs, map: desiredMap };
     try { win.webContents.send('odds-update', payload); } catch(e){ log('emit failed main win', e.message); }
     try { if(typeof sendOdds === 'function') sendOdds(payload); } catch(e){ log('emit forward failed', e.message); }
     log('emit', payload);
+  }
+
+  // Parse new Excel Extractor current_state.json and emit odds
+  function parseCurrentState(raw){
+    if(!raw || typeof raw !== 'object') return false;
+    const cells = raw.cells;
+    const maps = raw.maps;
+    if(!cells || typeof cells !== 'object') return false;
+    try {
+      // Global status cell (default C6) for frozen detection
+      const statusKey = (store.get('excelCurrentStateMapping')||{}).status || 'C6';
+      const statusVal = String(cells[statusKey]||'').trim();
+      const frozen = /suspend|closed|halt|pause/i.test(statusVal||'');
+      const desiredMap = pickDesiredMap();
+      let odds1=null, odds2=null;
+      if(maps && typeof maps==='object'){
+        const entry = maps[String(desiredMap)];
+        if(entry){
+          const n1 = parseFloat(entry.side1);
+            const n2 = parseFloat(entry.side2);
+            if(!isNaN(n1)) odds1=n1; if(!isNaN(n2)) odds2=n2;
+        }
+      }
+      // Fallback to legacy single mapping if maps not present
+      if(odds1==null && odds2==null){
+        const mapping = Object.assign({ status:'C6', side1:'M336', side2:'N336' }, store.get('excelCurrentStateMapping')||{});
+        const n1 = parseFloat(cells[mapping.side1]);
+        const n2 = parseFloat(cells[mapping.side2]);
+        if(!isNaN(n1)) odds1=n1; if(!isNaN(n2)) odds2=n2;
+      }
+      if(odds1==null && odds2==null) return false;
+      emitCurrent({ odds1, odds2, frozen, rawTs: raw.ts||raw.timestamp||'', mapId: desiredMap });
+      return true;
+    } catch(err){ log('current_state parse error', err.message); return false; }
   }
 
   function readAndEmit(tag){
@@ -115,71 +135,8 @@ function createExcelWatcher({ win, store, sendOdds }) {
         return;
       }
       let data;
-      try {
-        data = JSON.parse(txt);
-      } catch(e){
-        // Malformed original. If we already have a sanitized file and original hash unchanged, reuse sanitized silently.
-        const curHash = txt.length+ ':' + txt.slice(0,120);
-        if(curHash === lastRepairHash && sanitizedPath){
-          try {
-            const sTxt = fs.readFileSync(sanitizedPath, 'utf8');
-            data = JSON.parse(sTxt);
-            // silently continue
-          } catch(_sanErr){
-            // fall through to attempt a new repair
-          }
-        }
-        if(!data){
-          // Attempt lightweight repair strategies before giving up.
-          let repaired = txt;
-          try {
-            repaired = repaired.replace(/("markets"\s*:\s*)\[\s*\[/, '$1[');
-            // If we now have ending with ]] we collapse to ] if counts indicate off-by-one.
-            const openCount = (repaired.match(/\[/g)||[]).length;
-            const closeCount = (repaired.match(/\]/g)||[]).length;
-            if(openCount + 1 === closeCount){
-              repaired = repaired.replace(/\]\s*\]\s*}$/, ']}');
-            }
-            data = JSON.parse(repaired);
-            if(curHash !== lastRepairHash){
-              log('repair applied after parse error', e.message);
-              lastRepairHash = curHash;
-            }
-            // Write / refresh sanitized file for other consumers (one per source directory)
-            try {
-              const dir = path.dirname(activePath);
-              sanitizedPath = path.join(dir, 'excel_dump.fixed.json');
-              const outTxt = JSON.stringify(data);
-              // Avoid needless writes if unchanged
-              let shouldWrite = true;
-              try {
-                const prev = fs.readFileSync(sanitizedPath, 'utf8');
-                if(prev === outTxt) shouldWrite = false;
-              } catch(_r){ }
-              if(shouldWrite){
-                fs.writeFileSync(sanitizedPath + '.part', outTxt, 'utf8');
-                try { fs.renameSync(sanitizedPath + '.part', sanitizedPath); } catch(_rn){ }
-                lastSanitizedWriteTs = Date.now();
-              }
-            } catch(_w){ }
-          } catch(e2){
-            if(curHash !== lastRepairHash){
-              log('parse fail unrepaired', e.message, 'repairErr:', e2.message);
-              lastRepairHash = curHash;
-            }
-            return; // give up; wait for next change
-          }
-        }
-      }
-
-      // Post-parse normalization: flatten nested markets arrays if shape [[...]]
-      try {
-        if(data && Array.isArray(data.markets) && data.markets.length === 1 && Array.isArray(data.markets[0])){
-          data.markets = data.markets[0];
-          log('flattened nested markets array');
-        }
-      } catch(_){ }
-      emitFromData(data);
+      try { data = JSON.parse(txt); } catch(parseErr){ return; }
+      parseCurrentState(data); // ignore if shape unsupported
     });
   }
 
@@ -205,8 +162,9 @@ function createExcelWatcher({ win, store, sendOdds }) {
     try {
       const desiredMap = pickDesiredMap();
       if(lastData && desiredMap !== lastEmittedMap){
-        // force emit using cached data (emitFromData handles signature+map logic)
-        emitFromData(lastData);
+        // Re-emit cached odds for new map selection (same odds reused)
+        // Force re-parse to pick different map's odds from stored raw file instead of reusing lastData blindly
+        readAndEmit('map-change');
       }
     } catch(_){ }
     mapPollTimer = setTimeout(mapPoll, 400); // lightweight

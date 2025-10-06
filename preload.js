@@ -72,6 +72,12 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,send: (channel, payload) => { try { ipcRenderer.send(channel, payload); } catch(_) { } }
   // Convenience wrappers for auto simulation
   ,autoSendPress: (side) => { try { return ipcRenderer.invoke('send-auto-press', side); } catch(_) { return Promise.resolve(false); } }
+  // Excel extractor process control
+  ,excelScriptToggle: () => { try { ipcRenderer.send('excel-extractor-toggle'); } catch(_){ } }
+  ,excelScriptGetStatus: () => ipcRenderer.invoke('excel-extractor-status-get')
+  ,onExcelScriptStatus: (cb) => withUnsub('excel-extractor-status', cb)
+  ,excelScriptSetPath: (p) => { try { ipcRenderer.send('excel-extractor-set-path', p); } catch(_){ } }
+  ,excelScriptInstallDeps: () => { try { ipcRenderer.send('excel-extractor-install-deps'); } catch(_){ } }
 });
 
 // ---------- Console forwarding (selective) ----------
