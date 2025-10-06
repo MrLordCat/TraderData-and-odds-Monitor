@@ -63,3 +63,5 @@ renderer/fonts/
 # Misc
 *.swp
 *.swo
+auto_press_debug.json
+auto_press_confirm_debug.json
