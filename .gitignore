@@ -66,3 +66,10 @@ renderer/fonts/
 *.swo
 auto_press_debug.json
 auto_press_confirm_debug.json
+
+# Python virtual environments (Excel Extractor)
+.venv/
+venv/
+env/
+*/__pycache__/
+__pycache__/
