@@ -94,6 +94,12 @@ statsToggleBtn.onclick=()=> window.desktopAPI.statsToggle();
 window.desktopAPI.getStatsState().then(applyStatsState);
 window.desktopAPI.onStatsState(applyStatsState);
 
+// DevTools button
+try {
+  const devBtn = document.getElementById('openDevTools');
+  if(devBtn){ devBtn.onclick = () => { try { window.desktopAPI.openDevTools(); } catch(_){} }; }
+} catch(_){ }
+
 // Add broker via select dropdown mirroring layout behavior
 let __populatingAddSelect = false;
 async function populateAddBrokerSelect(force=false){

@@ -77,6 +77,8 @@ function renderBoard(){
 }
 
 if(window.desktopAPI){
+  // Excel extractor log bridging
+  try { window.desktopAPI.onExcelLog && window.desktopAPI.onExcelLog(payload=>{ try { if(payload && payload.msg) console.log('[excel-extractor][bridge]', payload.msg); } catch(_){ } }); } catch(_){ }
   window.desktopAPI.onOdds && window.desktopAPI.onOdds(p=>{ 
     if(swapped.has(p.broker) && Array.isArray(p.odds) && p.odds.length===2){ p = { ...p, odds:[p.odds[1], p.odds[0]] }; }
     boardData[p.broker]=p; 

@@ -236,6 +236,30 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
     const ipc = (window.require? window.require('electron').ipcRenderer: null);
     if(ipc && ipc.invoke){ ipc.invoke('excel-last-odds').then(p=>{ if(p && p.broker==='excel'){ handleEmbeddedOdds(p); } }).catch(()=>{}); }
   } catch(_){ }
+  // Excel extractor toggle + status (embedded panel)
+  try {
+    const { ipcRenderer } = require('electron');
+    const btn = document.getElementById('embeddedExcelScriptBtn');
+    if(btn && !btn.dataset.bound){
+      btn.dataset.bound='1';
+      btn.addEventListener('click', ()=>{ try { ipcRenderer.send('excel-extractor-toggle'); } catch(_){ } });
+    }
+    const statusCell = document.getElementById('embeddedExcelStatusCell');
+    ipcRenderer.on('excel-extractor-status', (_e, s)=>{
+      try {
+        if(statusCell){
+          if(s.installing) statusCell.textContent='installing...';
+          else if(s.starting) statusCell.textContent='starting';
+          else if(s.running) statusCell.textContent='running';
+          else if(s.error) statusCell.textContent='error';
+          else statusCell.textContent='idle';
+        }
+        if(btn) btn.classList.toggle('on', !!s.running);
+      } catch(_){ }
+    });
+    // Initial status fetch
+    try { ipcRenderer.invoke('excel-extractor-status-get').then(s=>{ ipcRenderer.emit('excel-extractor-status', null, s); }).catch(()=>{}); } catch(_){ }
+  } catch(_){ }
 }
 function initSectionReorder(){
   const ORDER_KEY='statsPanelSectionOrder';
@@ -260,14 +284,26 @@ function initSectionReorder(){
   blocks.forEach(b=> ensureHandle(b));
   let dragging=null; let placeholder=null; let startY=0;
   function ensureHandle(block){ if(block.dataset.handleReady) return; block.dataset.handleReady='1'; let handle=block.querySelector('.dragHandleSec'); if(!handle){ handle=document.createElement('button'); handle.className='dragHandleSec'; handle.type='button'; handle.textContent='≡'; handle.title='Move section'; if(block.id==='stats'){ const hdr=block.querySelector('.sectionHeader'); if(hdr) hdr.prepend(handle); else block.prepend(handle); } else if(block.matches('fieldset')){ const lg=block.querySelector('legend'); if(lg) lg.prepend(handle); else block.prepend(handle); } else { block.prepend(handle); } }
-    handle.addEventListener('pointerdown', e=>{ e.preventDefault(); dragging=block; startY=e.clientY; block.classList.add('reorderGhost'); placeholder=document.createElement('div'); placeholder.style.height=block.getBoundingClientRect().height+'px'; placeholder.className='dropIndicator'; block.parentNode.insertBefore(placeholder, block.nextSibling); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp, { once:true }); }); }
+    handle.addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      dragging=block; startY=e.clientY;
+      // Visual styles: ghost fade + strong outline highlight
+      block.classList.add('reorderGhost','reorderDragging');
+      // Use a slim line indicator instead of full-height placeholder to avoid large blank gap
+      placeholder=document.createElement('div');
+      placeholder.className='dropLine';
+      // Place initial indicator just after the dragged block
+      block.parentNode.insertBefore(placeholder, block.nextSibling);
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp, { once:true });
+    }); }
   function collectBlocks(){
     // Dynamic order: querySelectorAll returns in DOM order, so we reflect user drag result
     const nodes = document.querySelectorAll('#sourcesSection,#devtoolsSection,#stats,#mapSection,#embeddedOddsSection');
     return Array.from(nodes);
   }
   function onMove(e){ if(!dragging || !placeholder) return; const dy=e.clientY-startY; dragging.style.transform=`translateY(${dy}px)`; const blocksNow=collectBlocks().filter(b=>b!==dragging); const mid=e.clientY; let inserted=false; for(const blk of blocksNow){ const r=blk.getBoundingClientRect(); const midLine=r.top + r.height/2; if(mid < midLine){ blk.parentNode.insertBefore(placeholder, blk); inserted=true; break; } } if(!inserted){ const last=blocksNow[blocksNow.length-1]; if(last) last.parentNode.appendChild(placeholder); } }
-  function onUp(){ if(!dragging) return; dragging.style.transform=''; dragging.classList.remove('reorderGhost'); if(placeholder){ placeholder.parentNode.insertBefore(dragging, placeholder); placeholder.remove(); placeholder=null; } saveOrder(); dragging=null; }
+  function onUp(){ if(!dragging) return; dragging.style.transform=''; dragging.classList.remove('reorderGhost','reorderDragging'); if(placeholder){ placeholder.parentNode.insertBefore(dragging, placeholder); placeholder.remove(); placeholder=null; } saveOrder(); dragging=null; }
   function saveOrder(){ const order=collectBlocks().map(b=>b.id); appliedOrder=order;
     try { if(ipc){ ipc.send('stats-section-order-set', order); } } catch(_){ }
     try { localStorage.setItem(ORDER_KEY, JSON.stringify(order)); } catch(_){ }

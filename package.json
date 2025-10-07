@@ -20,7 +20,9 @@
     "dist": "electron-builder --dir",
     "dist:dir": "electron-builder --dir",
     "dist:zip": "electron-builder --dir && powershell -NoProfile -Command Compress-Archive -Force dist/win-unpacked/* dist/OddsMoni-portable.zip",
-    "dist:portable": "electron-builder --dir && powershell -NoProfile -Command \"$name = (Get-Content package.json | ConvertFrom-Json).build.productName; $ver = (Get-Content package.json | ConvertFrom-Json).version; $arch=$env:PROCESSOR_ARCHITECTURE; Compress-Archive -Force dist/win-unpacked/* \"dist/$name-$ver-$arch-portable.zip\"\""
+    "dist:portable": "electron-builder --dir && powershell -NoProfile -Command \"$name = (Get-Content package.json | ConvertFrom-Json).build.productName; $ver = (Get-Content package.json | ConvertFrom-Json).version; $arch=$env:PROCESSOR_ARCHITECTURE; Compress-Archive -Force dist/win-unpacked/* \"dist/$name-$ver-$arch-portable.zip\"\"",
+  "pack:win": "electron-packager . OddsMoni --platform=win32 --arch=x64 --out=dist-pack --overwrite --prune=true",
+    "pack:zip": "npm run -s pack:win && powershell -NoProfile -Command \"Compress-Archive -Force dist-pack/OddsMoni-win32-x64/* dist-pack/OddsMoni-win32-x64-portable.zip\""
   },
   "build": {
     "appId": "com.oddsmoni.desktop",
@@ -43,7 +45,8 @@
       "main": "main.js"
     },
     "win": {
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "sign": false
     },
     "asar": false,
     "directories": {
@@ -56,6 +59,7 @@
   },
   "devDependencies": {
     "electron": "^38.0.0",
-    "electron-builder": "^24.6.0"
+    "electron-builder": "^24.6.0",
+    "electron-packager": "^17.1.2"
   }
 }

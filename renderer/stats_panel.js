@@ -274,7 +274,12 @@ function ensureRows(){
     else if(COUNT_METRICS.includes(id) || ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].includes(id)) tr.dataset.type='count';
     tr.draggable=true;
     // IMPORTANT: no escaped quotes here – previous refactor inserted backslashes so query selectors failed
-    tr.innerHTML=`<td class="metricLabel"><span class="dragHandle" title="Drag">≡</span><input type="checkbox" class="markMetric" data-metric="${id}" checked>${metricLabels[id]||id}</td><td id="${id}-t1" class="editable"></td><td id="${id}-t2" class="editable"></td>`;
+  // Per‑game checkbox (default unchecked). State stored in window.__LOL_CHECK_STATE[game][metric]
+  const cg = (window.__CURRENT_GAME_ID) || '1';
+  window.__LOL_CHECK_STATE = window.__LOL_CHECK_STATE || {};
+  const gameState = window.__LOL_CHECK_STATE[cg] || (window.__LOL_CHECK_STATE[cg] = {});
+  const checked = !!gameState[id];
+  tr.innerHTML=`<td class="metricLabel"><span class="dragHandle" title="Drag">≡</span><input type="checkbox" class="markMetric" data-metric="${id}" ${checked? 'checked':''}>${metricLabels[id]||id}</td><td id="${id}-t1" class="editable"></td><td id="${id}-t2" class="editable"></td>`;
     body.appendChild(tr);
   });
   lastOrderSig = sig;
@@ -384,7 +389,17 @@ ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevM
 function ensureOption(select, value){ if(![...select.options].some(o=>o.value===value)){ const opt=document.createElement('option'); opt.value=value; opt.textContent=value.replace(/^https?:\/\/(www\.)?/,'').slice(0,40); select.appendChild(opt); } }
 
 // ================= Init From Main (stats-init) =================
-ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; document.getElementById('lolManualMode').checked = !!cfg.lolManualMode; metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } } buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); } } catch(e) {} });
+ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; document.getElementById('lolManualMode').checked = !!cfg.lolManualMode; metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
+  if(cfg.lolManualData && typeof cfg.lolManualData==='object'){
+    try { manualData = JSON.parse(JSON.stringify(cfg.lolManualData)); } catch(_){ }
+  }
+  if(cfg.lolMetricMarks && typeof cfg.lolMetricMarks==='object'){
+    window.__LOL_CHECK_STATE = JSON.parse(JSON.stringify(cfg.lolMetricMarks));
+  }
+  buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); }
+  if(document.getElementById('lolManualMode').checked){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
+  try { ipcRenderer.send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE }); } catch(_){ }
+ } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
 
 function applyWinLose(){
@@ -481,6 +496,10 @@ function bindReset(){
         updateGameSelect();
         renderManual();
       }
+      // Clear checkbox marks & persist
+      window.__LOL_CHECK_STATE = {};
+      try { ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE); } catch(_){ }
+      try { ipcRenderer.send('lol-manual-data-set', manualData); } catch(_){ }
       // Reset aggregator in main (does not navigate)
       ipcRenderer.send('lol-stats-reset');
       // Request a reload of slot A ONLY (keep exact same URL; no cache-bust param added)
@@ -681,6 +700,7 @@ function renderLol(payload, manual=false){
       currentGame = next;
       updateGameSelect();
       renderManual();
+      try { ipcRenderer.send('lol-manual-data-set', manualData); } catch(_){ }
   } catch(err){ }
   };
   if(gameSelect){
@@ -739,9 +759,65 @@ function renderLol(payload, manual=false){
   // (map init lives in stats_map.js - see initLolMap)
   updateGameSelect(); if(addBtn){ addBtn.setAttribute('aria-disabled','true'); addBtn.disabled=true; }
   // Lightweight self-test sample (only if no data after short delay)
-  setTimeout(()=>{ try { if(!liveDataset){ console.log('[stats_panel] injecting mock snapshot'); const mock={ team1Name:'Alpha', team2Name:'Beta', gameStats:{ 1:{ killCount:{ Alpha:3, Beta:2 }, towerCount:{}, inhibitorCount:{}, baronCount:{}, dragonCount:{ Alpha:1 }, dragonOrders:{ Alpha:[1] }, netWorth:{ Alpha:1500, Beta:1400 }, firstKill:'Alpha' } } }; renderLol(mock); console.log('[stats_panel] rows now', document.querySelectorAll('#lt-body tr').length); } } catch(_){ } }, 1500);
+  // Removed mock Alpha/Beta injection sample.
   // Ensure headers initialized & dblclick bound immediately (before first data payload)
   try { setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false); } catch(_){ }
   // (embedded odds + reordering initialized by stats_boot.js)
 })();
 // (embedded odds board & section reordering in stats_embedded.js)
+
+// ================= Added: Per‑Game Checkbox Persistence =================
+// Checkboxes are not tied to metric visibility; they represent custom user flags per game.
+// Requirements: default unchecked, persist per game, cleared by reset.
+(function(){
+  window.__LOL_CHECK_STATE = window.__LOL_CHECK_STATE || {}; // { gameId: { metricId: true } }
+  function currentGameId(){
+    try {
+      if(document.getElementById('lolManualMode').checked){
+        return String(currentGame||'1');
+      }
+      // live mode: use lastGameRendered or detected live game
+      return String(lastGameRendered || currentLiveGame || '1');
+    } catch(_){ return '1'; }
+  }
+  window.__CURRENT_GAME_ID = currentGameId();
+  function syncFromState(){
+    const gid=currentGameId();
+    window.__CURRENT_GAME_ID = gid;
+    const st = window.__LOL_CHECK_STATE[gid] || {};
+    document.querySelectorAll('input.markMetric').forEach(cb=>{
+      const m = cb.getAttribute('data-metric');
+      cb.checked = !!st[m];
+    });
+  }
+  function persistMetric(metric, value){
+    const gid=currentGameId();
+    const bucket = window.__LOL_CHECK_STATE[gid] || (window.__LOL_CHECK_STATE[gid]={});
+    if(value) bucket[metric]=true; else delete bucket[metric];
+  }
+  document.addEventListener('change', e=>{
+    const cb = e.target.closest && e.target.closest('input.markMetric');
+    if(!cb) return;
+    const metric = cb.getAttribute('data-metric');
+    persistMetric(metric, cb.checked);
+    try { ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE); } catch(_){ }
+  });
+  // Hook into game select changes & manual/live toggle to refresh checkbox states
+  const obs = new MutationObserver(()=> syncFromState());
+  const body = document.getElementById('lt-body'); if(body) obs.observe(body, { childList:true, subtree:true });
+  // Refresh when game changes (override existing handler by wrapping)
+  const origUpdateGameSelect = updateGameSelect;
+  updateGameSelect = function(){ origUpdateGameSelect.apply(this, arguments); setTimeout(syncFromState, 0); };
+  // Integrate with reset button: clear all states when reset fires
+  const resetBtn = document.getElementById('lolReset');
+  if(resetBtn){
+    const prev = resetBtn.onclick;
+    resetBtn.onclick = function(ev){
+      if(prev) prev.call(this, ev);
+      window.__LOL_CHECK_STATE = {}; // clear all
+      setTimeout(syncFromState, 0);
+    };
+  }
+  // Initial sync (after initial rows)
+  setTimeout(syncFromState, 0);
+})();

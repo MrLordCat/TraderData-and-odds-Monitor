@@ -10,6 +10,7 @@ package-lock.json
 ublock/
 # Build outputs
 dist/
+dist-pack/
 release/
 *.asar
 *.asar.unpacked/

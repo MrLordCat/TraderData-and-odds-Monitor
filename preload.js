@@ -78,6 +78,8 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,onExcelScriptStatus: (cb) => withUnsub('excel-extractor-status', cb)
   ,excelScriptSetPath: (p) => { try { ipcRenderer.send('excel-extractor-set-path', p); } catch(_){ } }
   ,excelScriptInstallDeps: () => { try { ipcRenderer.send('excel-extractor-install-deps'); } catch(_){ } }
+  ,openDevTools: () => { try { ipcRenderer.send('open-devtools'); } catch(_){ } }
+  ,onExcelLog: (cb) => withUnsub('excel-extractor-log', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

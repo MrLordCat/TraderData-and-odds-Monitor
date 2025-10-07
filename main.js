@@ -17,6 +17,21 @@ const fs = require('fs');
 const constants = require('./modules/utils/constants');
 // Local constants (some consumed by modularized managers)
 const SNAP = constants.SNAP_DISTANCE; // snap threshold for drag/resize logic (needed by brokerManager ctx)
+2
+// Allow renderer toolbar 'Dev' button to open main window DevTools
+ipcMain.on('open-devtools', () => {
+  try {
+    // Prefer board dock view (чтобы видеть логи odds / excel watcher и т.п.)
+    let opened = false;
+    try {
+      if(typeof boardManager?.getWebContents === 'function'){
+        const bwc = boardManager.getWebContents();
+        if(bwc && !bwc.isDestroyed()) { bwc.openDevTools({ mode:'detach' }); opened = true; }
+      }
+    } catch(_){ }
+    if(!opened && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.openDevTools({ mode: 'detach' });
+  } catch(e){ console.warn('openDevTools failed', e); }
+});
 
 // Reapply stored map & team names after broker navigation (multi-delay strategy as documented in project instructions)
 function scheduleMapReapply(view){
@@ -373,6 +388,21 @@ function bootstrap() {
   });
   boardManager.init();
   boardManagerRef.value = boardManager;
+  // Cleanup stray bilibili/generic views (removed from supported sources). Closes any broker ids containing 'bilibili'.
+  try {
+    const stray = activeBrokerIdsRef.value.filter(id=> /bilibili/i.test(id));
+    if(stray.length){
+      console.warn('[startup][cleanup] closing stray bilibili views', stray);
+      stray.forEach(id=>{ try { brokerManager.closeBroker(id); } catch(_){ } });
+    }
+    ipcMain.on('cleanup-foreign-views', ()=>{
+      try {
+        const toClose = activeBrokerIdsRef.value.filter(id=> /bilibili/i.test(id));
+        toClose.forEach(id=>{ try { brokerManager.closeBroker(id); } catch(_){ } });
+        console.log('[cleanup-foreign-views] closed', toClose);
+      } catch(err){ console.warn('[cleanup-foreign-views] error', err.message); }
+    });
+  } catch(_){ }
   // Initialize excel watcher after board manager so early odds push displays
   try {
     if(!global.__excelWatcher){
@@ -416,19 +446,54 @@ function bootstrap() {
   let lastExcelStartTs = 0;
   let excelProcError = null; // last error message (non-zero exit or spawn failure)
   let excelDepsInstalling = false;
+    function excelLog(){
+      const msg = Array.from(arguments).map(a=>{
+        if(a instanceof Error) return a.stack||a.message;
+        if(typeof a==='object'){ try { return JSON.stringify(a); } catch(_){ return String(a); } }
+        return String(a);
+      }).join(' ');
+      try { console.log('[excel-extractor][log]', msg); } catch(_){ }
+      try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('excel-extractor-log', { ts:Date.now(), msg }); } catch(_){ }
+      try {
+        if(typeof boardManager?.getWebContents==='function'){
+          const bwc = boardManager.getWebContents();
+          if(bwc && !bwc.isDestroyed()) bwc.send('excel-extractor-log', { ts:Date.now(), msg });
+        }
+      } catch(_){ }
+    }
   
   function resolveExcelScriptPath(){
     // 1. Store override
-    try { const custom = store.get('excelScriptPath'); if(custom && fs.existsSync(custom)) return custom; } catch(_){ }
+    try { const custom = store.get('excelScriptPath'); if(custom && fs.existsSync(custom)) return custom; } catch(_){}
     // 2. Common filenames & subfolders inside project
     const names = ['excel_watcher.py','excel-watcher.py','excelWatcher.py'];
     const dirs = ['', 'scripts', 'script', 'python', 'excel', 'Excel Extractor', 'extractor'];
-    const tried = [];
+    const isDev = !app.isPackaged;
+    if(isDev){
+      // In dev часто нужно добавить корень проекта и cwd варианты
+      try {
+        const cwd = process.cwd();
+        dirs.push(cwd);
+        dirs.push(path.join(cwd, 'Excel Extractor'));
+      } catch(_){ }
+    }
+    // When packaged, __dirname points at resources/app; also attempt explicit resources/app and resources/app/Excel Extractor
+    try {
+      if(process.resourcesPath){
+        const base = path.join(process.resourcesPath, 'app');
+        dirs.push(base);
+        dirs.push(path.join(base, 'Excel Extractor'));
+      }
+    } catch(_){}
+  const tried = [];
     for(const d of dirs){
       for(const n of names){
         const p = path.join(__dirname, d, n);
         tried.push(p);
-        try { if(fs.existsSync(p)) { return p; } } catch(_){ }
+        try { if(fs.existsSync(p)) { 
+          console.warn('[excel-extractor] resolveExcelScriptPath: found', p);
+          return p; 
+        }} catch(_){}
       }
     }
     // 3. Shallow recursive scan (depth 2) to be more forgiving
@@ -445,13 +510,17 @@ function bootstrap() {
             if(relDepth < 2) scanDirs.push(path.join(cur, ent.name));
           } else if(/excel[_-]?watcher\.py$/i.test(ent.name)){
             const full = path.join(cur, ent.name);
+            console.warn('[excel-extractor] resolveExcelScriptPath: found (scan)', full);
             return full;
           }
         }
       }
-    } catch(_){ }
+    } catch(_){}
     // Log what we tried for diagnostics
-    try { console.warn('[excel-extractor] script not found, tried:', tried); } catch(_){ }
+    try { console.warn('[excel-extractor] script not found, tried:', tried); } catch(_){}
+    if(isDev){
+      console.warn('[excel-extractor] DEV HINT: размести excel_watcher.py в корень или папку "Excel Extractor" либо укажи путь через IPC excel-extractor-set-path');
+    }
     return null;
   }
   function broadcastExcelStatus(){
@@ -470,23 +539,55 @@ function bootstrap() {
     if(excelProc || excelProcStarting) return;
     const now=Date.now(); if(now - lastExcelStartTs < 1500) { return; }
     lastExcelStartTs = now;
-  excelProcStarting = true; excelProcError=null; broadcastExcelStatus();
+    excelProcStarting = true; excelProcError=null; broadcastExcelStatus();
     try {
       // Resolve script path: prefer user override from store key excelScriptPath else fallback to ./excel_watcher.py
       let scriptPath = resolveExcelScriptPath();
-      if(!scriptPath){ console.warn('[excel-extractor] script not found'); excelProcStarting=false; broadcastExcelStatus(); return; }
+      if(!scriptPath){ excelLog('script not found (resolveExcelScriptPath returned null)'); excelProcStarting=false; broadcastExcelStatus(); return; }
       // Pick python executable: allow store override (excelPythonPath) else rely on 'python'
       let py = 'python';
-      try { const pyOverride = store.get('excelPythonPath'); if(pyOverride) py = pyOverride; } catch(_){ }
-      const args = [scriptPath];
-      excelProc = spawn(py, args, { cwd: path.dirname(scriptPath), stdio:['ignore','pipe','pipe'] });
-      console.log('[excel-extractor] spawned pid', excelProc.pid, 'script', scriptPath);
+      try { const pyOverride = store.get('excelPythonPath'); if(pyOverride) py = pyOverride; } catch(_){}
+      // Use unbuffered mode (-u) to force immediate flush of stdout/stderr (so logs visible in board DevTools)
+      const args = ['-u', scriptPath];
+      const cwd = path.dirname(scriptPath);
+      // Log all details before spawn
+      excelLog('spawn attempt', JSON.stringify({ python:py, args, cwd, scriptPath }));
+      // Quick absolute path existence check if user provided full path
+      if(/[\\/]/.test(py)){
+        try { if(!fs.existsSync(py)) excelLog('warning: python path does not exist:', py); } catch(_){ }
+      }
+      const spawnEnv = Object.assign({}, process.env, {
+        PYTHONUNBUFFERED: '1',
+        PYTHONIOENCODING: 'utf-8'
+      });
+      excelProc = spawn(py, args, { cwd, stdio:['ignore','pipe','pipe'], env: spawnEnv });
+      excelLog('spawned pid', excelProc.pid, 'script', scriptPath);
       excelProc.on('spawn', ()=>{ excelProcStarting=false; broadcastExcelStatus(); });
+      // If user hasn't overridden excelDumpPath, set it to current script directory/current_state.json for watcher alignment
+      try {
+        const existingDump = store.get('excelDumpPath');
+        const dumpCandidate = path.join(cwd, 'current_state.json');
+        const needReset = !existingDump || path.dirname(existingDump) !== cwd || !fs.existsSync(existingDump);
+        if(needReset){
+          store.set('excelDumpPath', dumpCandidate);
+          excelLog('excelDumpPath synced to', dumpCandidate, '(needReset=', needReset, ')');
+        } else {
+          excelLog('excelDumpPath ok', existingDump);
+        }
+      } catch(_){ }
       let stderrBuf='';
-      excelProc.stdout.on('data', d=>{ try { const s=d.toString(); if(/ERROR|Traceback|exception/i.test(s)) console.warn('[excel-extractor][stdout]', s.trim()); else console.log('[excel-extractor][stdout]', s.trim()); } catch(_){ } });
-      excelProc.stderr.on('data', d=>{ try { const t=d.toString(); stderrBuf += t; console.warn('[excel-extractor][stderr]', t.trim()); } catch(_){ } });
+      let gotAnyOutput = false;
+      let firstOutputTimer = setTimeout(()=>{
+        if(!gotAnyOutput && excelProc){
+          excelLog('no-output-first-4s: возможно скрипт ждёт Excel или не установлен pywin32. Убедитесь что: Excel открыт с нужной книгой и выполнен pip install pywin32');
+        }
+      }, 4000);
+      function markOutput(){ if(!gotAnyOutput){ gotAnyOutput=true; try { clearTimeout(firstOutputTimer); } catch(_){ } } }
+      excelProc.stdout.on('data', d=>{ try { markOutput(); const s=d.toString(); excelLog('[stdout]', s.trim()); if(/ERROR|Traceback|exception/i.test(s)) console.warn('[excel-extractor][stdout]', s.trim()); } catch(_){ } });
+      excelProc.stderr.on('data', d=>{ try { markOutput(); const t=d.toString(); stderrBuf += t; excelLog('[stderr]', t.trim()); } catch(_){ } });
       excelProc.on('exit', (code, sig)=>{ 
-        console.log('[excel-extractor] exit', code, sig);
+        excelLog('exit code', code, 'sig', sig||'');
+        try { clearTimeout(firstOutputTimer); } catch(_){ }
         if(code && code!==0){
           // Detect missing pywin32
           if(/pywin32/i.test(stderrBuf)){
@@ -501,7 +602,7 @@ function bootstrap() {
       });
       broadcastExcelStatus();
     } catch(err){
-      console.warn('[excel-extractor] spawn failed', err.message);
+      excelLog('spawn failed', err.message);
       excelProcError = err.message; excelProcStarting=false; excelProc=null; broadcastExcelStatus();
     }
   }

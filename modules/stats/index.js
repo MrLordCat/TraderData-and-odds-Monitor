@@ -16,7 +16,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   let embedOffsetY = 0;                                           // toolbar offset
 
   // LoL stats related
-  let lolManualMode = false; // session only
+  let lolManualMode = store.get('lolManualMode', false); // persisted
+  let lolManualData = store.get('lolManualData', null); // { team1Name, team2Name, gameStats }
+  let lolMetricMarks = store.get('lolMetricMarks', {}); // { gameId: { metric:true } }
   let lolMetricVisibility = store.get('lolMetricVisibility', {});
   let lolMetricOrder = store.get('lolMetricOrder', null);
   const DEFAULT_STATS_CONFIG = { animationsEnabled:true, animationDurationMs:450, animationScale:1, animationPrimaryColor:'#3b82f6', animationSecondaryColor:'#f59e0b', heatBarOpacity:0.55, winLoseEnabled:true };
@@ -34,6 +36,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     store.set('lolMetricVisibility', lolMetricVisibility);
     if(lolMetricOrder) store.set('lolMetricOrder', lolMetricOrder);
     store.set('statsConfig', statsConfig);
+    store.set('lolManualMode', lolManualMode);
+    if(lolManualData) store.set('lolManualData', lolManualData);
+    store.set('lolMetricMarks', lolMetricMarks);
   }
 
   // --- Helpers ---------------------------------------------------------------------------
@@ -182,7 +187,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
 
 
   // --- Embedded lifecycle ----------------------------------------------------------------
-  function createEmbedded(offsetY){ if(embeddedActive) return; if(!mainWindow||mainWindow.isDestroyed()) return; const fresh = !(views.panel && views.A && views.B); if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel'); try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ } views.panel.webContents.on('did-finish-load',()=>{ try { const hb=store.get('gsHeatBar'); views.panel.webContents.send('stats-init',{ urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar:hb, statsConfig }); if(hb) views.panel.webContents.send('gs-heatbar-apply', hb); } catch(_){ } }); resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B); attachNavTracking('A', views.A); attachNavTracking('B', views.B); }
+  function createEmbedded(offsetY){ if(embeddedActive) return; if(!mainWindow||mainWindow.isDestroyed()) return; const fresh = !(views.panel && views.A && views.B); if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel'); try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ } views.panel.webContents.on('did-finish-load',()=>{ try { const hb=store.get('gsHeatBar'); views.panel.webContents.send('stats-init',{ urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar:hb, statsConfig, lolManualData, lolMetricMarks }); if(hb) views.panel.webContents.send('gs-heatbar-apply', hb); } catch(_){ } }); resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B); attachNavTracking('A', views.A); attachNavTracking('B', views.B); }
     embeddedActive=true; embedOffsetY = typeof offsetY==='number'? offsetY: embedOffsetY; layout(); setTimeout(layout,60); }
   function destroyEmbedded(force){ if(!embeddedActive && !force) return; if(embeddedActive){ ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v) try { v.setBounds({ x:0,y:0,width:10,height:10 }); } catch(_){ } }); } if(force){ ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v) try { v.webContents.destroy(); } catch(_){ } }); } embeddedActive=false; }
   function detachToWindow(){ /* noop (removed) */ }
@@ -208,7 +213,20 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
         try { const { slot, username, password } = payload||{}; if(slot && username){ const v=views[slot]; if(v){ const host=new URL(v.webContents.getURL()).hostname; const all=store.get('siteCredentials')||{}; all[host]={ username,password }; store.set('siteCredentials',all); v.webContents.send('apply-credentials',{ hostname:host, username, password }); if(views.panel) views.panel.webContents.send('stats-credentials-status',{ slot, hostname:host, has:true, username }); } } } catch(_){}
         break;
       case 'lol-stats-settings':
-        if(payload){ if(typeof payload.manualMode==='boolean') lolManualMode=payload.manualMode; if(payload.metricVisibility) lolMetricVisibility={ ...lolMetricVisibility, ...payload.metricVisibility }; if(Array.isArray(payload.metricOrder)) lolMetricOrder=payload.metricOrder.slice(); persist(); }
+        if(payload){
+          if(typeof payload.manualMode==='boolean') lolManualMode=payload.manualMode;
+            if(payload.metricVisibility) lolMetricVisibility={ ...lolMetricVisibility, ...payload.metricVisibility };
+            if(Array.isArray(payload.metricOrder)) lolMetricOrder=payload.metricOrder.slice();
+            if(payload.manualData) lolManualData = payload.manualData;
+            if(payload.metricMarks) lolMetricMarks = payload.metricMarks;
+            persist();
+        }
+        break;
+      case 'lol-manual-data-set':
+        try { if(payload && typeof payload==='object'){ lolManualData = payload; persist(); } } catch(_){ }
+        break;
+      case 'lol-metric-marks-set':
+        try { if(payload && typeof payload==='object'){ lolMetricMarks = payload; persist(); } } catch(_){ }
         break;
       case 'stats-config-set':
         try { if(payload && typeof payload==='object'){ Object.keys(payload).forEach(k=>{ if(k in statsConfig) statsConfig[k]=payload[k]; }); persist(); if(views.panel) views.panel.webContents.send('stats-config-applied', statsConfig); } } catch(_){}
