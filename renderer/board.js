@@ -63,15 +63,18 @@ function renderBoard(){
   }).join('');
   // Update Excel row
   if(excelRow){
+    const valSpan = document.getElementById('excelOddsVal');
+    const statusSpan = document.getElementById('excelStatusCell');
     if(excelRecord && Array.isArray(excelRecord.odds)){
       const o1=excelRecord.odds[0];
       const o2=excelRecord.odds[1];
-      excelRow.children[1].textContent = `${o1} / ${o2}`;
+      if(valSpan) valSpan.textContent = `${o1} / ${o2}`; else excelRow.children[1].textContent = `${o1} / ${o2}`;
       excelRow.classList.toggle('frozen', !!excelRecord.frozen);
     } else {
-      excelRow.children[1].textContent='-';
+      if(valSpan) valSpan.textContent='-'; else excelRow.children[1].textContent='-';
       excelRow.classList.remove('frozen');
     }
+    if(statusSpan && statusSpan.dataset.last==='idle'){ statusSpan.style.display='none'; }
   }
   computeDerived();
 }
@@ -116,6 +119,33 @@ if(window.desktopAPI){
     ids.forEach(id=>{ if(!boardData[id]) boardData[id]={ broker:id, odds:['-','-'], frozen:true, ts:Date.now() }; });
     renderBoard();
   });
+  // Excel extractor status updates (mirror embedded panel UI)
+  try {
+    if(window.desktopAPI.onExcelExtractorStatus){
+      window.desktopAPI.onExcelExtractorStatus(s=>{
+        try {
+          const statusEl=document.getElementById('excelStatusCell');
+          const btn=document.getElementById('excelScriptBtn');
+          if(btn) btn.classList.toggle('on', !!s.running);
+          if(statusEl){
+            let text='';
+            if(s.installing) text='installing...';
+            else if(s.starting) text='starting';
+            else if(s.running) text='running';
+            else if(s.error) text='error';
+            else text='idle';
+            statusEl.dataset.last=text;
+            if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; statusEl.title='Excel extractor idle'; }
+            else { statusEl.style.display='inline'; statusEl.textContent=text; statusEl.title='Excel extractor: '+text; }
+          }
+        } catch(_){ }
+      });
+      // Initial fetch if API supports
+      if(window.desktopAPI.getExcelExtractorStatus){
+        window.desktopAPI.getExcelExtractorStatus().then(s=>{ if(s) window.desktopAPI.onExcelExtractorStatus._last && window.desktopAPI.onExcelExtractorStatus._last(s); }).catch(()=>{});
+      }
+    }
+  } catch(_){ }
 }
 
 document.addEventListener('click', e=>{
@@ -208,6 +238,36 @@ document.getElementById('mapRefreshBtn')?.addEventListener('click', ()=>{
     try { console.debug('[board] manual map refresh ->', val); } catch(_){ }
   } catch(_){ }
 });
+// Right click toggles 30s auto-rebroadcast mode (shared between board & embedded stats)
+document.getElementById('mapRefreshBtn')?.addEventListener('contextmenu', (e)=>{
+  try { e.preventDefault(); if(window.desktopAPI && window.desktopAPI.toggleMapAutoRefresh){ window.desktopAPI.toggleMapAutoRefresh(); } else { const { ipcRenderer } = require('electron'); ipcRenderer.send('toggle-map-auto-refresh'); } } catch(_){ }
+});
+
+// Status listener to style button when auto enabled
+function bindMapAutoRefreshStatus(){
+  try {
+    const btn=document.getElementById('mapRefreshBtn'); if(!btn) return;
+    if(window.desktopAPI && window.desktopAPI.getMapAutoRefreshStatus){
+      window.desktopAPI.getMapAutoRefreshStatus().then(p=>applyMapAutoRefreshVisual(p)).catch(()=>{});
+    }
+  } catch(_){ }
+}
+function applyMapAutoRefreshVisual(p){
+  try {
+    const btn=document.getElementById('mapRefreshBtn'); if(!btn) return;
+    const enabled = !!(p && p.enabled);
+    btn.style.opacity = enabled ? '1' : '';
+    btn.style.background = enabled ? '#2f4b6a' : '';
+    btn.style.border = enabled ? '1px solid #3f6c90' : '';
+    btn.title = enabled ? 'Auto odds refresh: ON (right-click to disable)' : 'Re-broadcast current map (refresh odds) (right-click to enable auto)';
+  } catch(_){ }
+}
+try {
+  if(window.desktopAPI && window.desktopAPI.onMapAutoRefreshStatus){ window.desktopAPI.onMapAutoRefreshStatus(applyMapAutoRefreshVisual); }
+  // fallback raw ipc
+  else { const { ipcRenderer } = require('electron'); ipcRenderer.on('map-auto-refresh-status', (_e,p)=> applyMapAutoRefreshVisual(p)); }
+} catch(_){ }
+bindMapAutoRefreshStatus();
 
 // Keep mapSelect updated if board opens after another source changed the map
 if(window.desktopAPI && window.desktopAPI.onMap){

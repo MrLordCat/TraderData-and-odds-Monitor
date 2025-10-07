@@ -80,6 +80,10 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,excelScriptInstallDeps: () => { try { ipcRenderer.send('excel-extractor-install-deps'); } catch(_){ } }
   ,openDevTools: () => { try { ipcRenderer.send('open-devtools'); } catch(_){ } }
   ,onExcelLog: (cb) => withUnsub('excel-extractor-log', cb)
+  // Map auto refresh (odds rebroadcast) controls
+  ,toggleMapAutoRefresh: () => { try { ipcRenderer.send('toggle-map-auto-refresh'); } catch(_){ } }
+  ,getMapAutoRefreshStatus: () => ipcRenderer.invoke('get-map-auto-refresh-status')
+  ,onMapAutoRefreshStatus: (cb) => withUnsub('map-auto-refresh-status', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

@@ -7,7 +7,7 @@ const path = require('path');
 let electronApp = null;
 try { ({ app: electronApp } = require('electron')); } catch(_){ }
 
-function createExcelWatcher({ win, store, sendOdds }) {
+function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
   if(!win || win.isDestroyed()) return { dispose(){} };
 
   let lastSig = '';
@@ -21,6 +21,7 @@ function createExcelWatcher({ win, store, sendOdds }) {
   let mapPollTimer = null; // timer id for map change polling
 
   function log(){
+    if(!verbose) return;
     try { console.log('[excel][watcher]', ...arguments); } catch(_){ }
   }
 
@@ -28,7 +29,7 @@ function createExcelWatcher({ win, store, sendOdds }) {
     // Only support new extractor file current_state.json (plus optional custom override path)
     const out = [];
     try {
-      const custom = store.get('excelDumpPath'); if(custom && typeof custom === 'string'){ out.push(custom); log('stored excelDumpPath', custom); }
+  const custom = store.get('excelDumpPath'); if(custom && typeof custom === 'string'){ out.push(custom); if(verbose) log('stored excelDumpPath', custom); }
     } catch(_){ }
     const FILE = 'current_state.json';
     // Packaged app note: __dirname here is <appRoot>/modules. The Python script cwd is <appRoot>/Excel Extractor.
@@ -45,7 +46,7 @@ function createExcelWatcher({ win, store, sendOdds }) {
     out.push(path.join(process.cwd(), FILE));
     out.push(path.join(process.cwd(), 'Excel Extractor', FILE));
     const uniq = [...new Set(out)];
-    log('candidatePaths', uniq);
+    if(verbose) log('candidatePaths', uniq);
     return uniq;
   }
 
@@ -67,8 +68,8 @@ function createExcelWatcher({ win, store, sendOdds }) {
     activePath = target;
     if(!activePath) return;
     try {
-      watcher = fs.watch(activePath, { persistent: true }, ()=> readAndEmit('fs-watch'));
-      log('watching', activePath);
+  watcher = fs.watch(activePath, { persistent: true }, ()=> readAndEmit('fs-watch'));
+  if(verbose) log('watching', activePath);
     } catch(e){ log('fs.watch failed (will rely on polling)', e.message); }
   }
 
@@ -139,14 +140,14 @@ function createExcelWatcher({ win, store, sendOdds }) {
                 mapping.side1 = mKeys[0];
                 mapping.side2 = nKeys[0];
                 try { store.set('excelCurrentStateMapping', { status:mapping.status, side1:mapping.side1, side2:mapping.side2 }); } catch(_){ }
-                log('auto-detected mapping', mapping);
+                if(verbose) log('auto-detected mapping', mapping);
                 n1 = parseFloat(cells[mapping.side1]);
                 n2 = parseFloat(cells[mapping.side2]);
               } else {
-                log('auto-detect failed: no numeric M#/N# pairs found');
+                if(verbose) log('auto-detect failed: no numeric M#/N# pairs found');
               }
           } else {
-            log('using stored/default mapping', mapping);
+            if(verbose) log('using stored/default mapping', mapping);
           }
           if(!isNaN(n1)) odds1=n1; if(!isNaN(n2)) odds2=n2;
       }
@@ -169,7 +170,7 @@ function createExcelWatcher({ win, store, sendOdds }) {
       let data;
       try { data = JSON.parse(txt); } catch(parseErr){ log('JSON parse error', parseErr.message); return; }
       const ok = parseCurrentState(data);
-      if(!ok) log('parseCurrentState returned false (shape mismatch?)');
+  if(!ok && verbose) log('parseCurrentState returned false (shape mismatch?)');
     });
   }
 
@@ -177,7 +178,7 @@ function createExcelWatcher({ win, store, sendOdds }) {
     if(disposed) return;
     const resolved = resolvePath();
     if(resolved !== activePath){
-      log('path change', activePath, '->', resolved);
+      if(verbose) log('path change', activePath, '->', resolved);
       ensureWatcher(resolved);
     }
     readAndEmit('poll');
@@ -204,7 +205,7 @@ function createExcelWatcher({ win, store, sendOdds }) {
   }
   mapPoll();
 
-  log('candidates', lastResolvedPaths);
+  if(verbose) log('candidates', lastResolvedPaths);
 
   return {
     dispose(){

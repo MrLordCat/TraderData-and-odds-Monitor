@@ -221,6 +221,11 @@ tfoot tr#midRow th { background: #1d2330; }
   cursor: pointer;
 }
 .autoBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
+.excelControls { display:inline-flex; align-items:center; gap:6px; flex-wrap:nowrap; }
+.excelControls button { margin-left:0; }
+.excelControls .autoBtn { margin-left:8px; }
+.autoSubBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 6px; font-size:11px; line-height:1; cursor:pointer; border-radius:6px; }
+.autoSubBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
 .excelAutoCell { background:transparent; font-size:11px; }
 .autoIndicators { display:flex; align-items:center; gap:10px; justify-content:center; }
 .autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.35; transition:opacity .25s, background .25s; }

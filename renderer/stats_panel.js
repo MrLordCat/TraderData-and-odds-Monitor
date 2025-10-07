@@ -173,20 +173,20 @@ function applyRaceFromKills(gs){ const bucket = gs.killCount||{}; [ ['race5',5],
 function handleManualClick(metric, side){
   const g = manualData.gameStats[currentGame]; if(!g) return;
   const team = side==='t1'? manualData.team1Name: manualData.team2Name;
+  // Order matters: dragonCount must be handled BEFORE generic COUNT_METRICS branch
   if(BINARY_METRICS.includes(metric)){
     if(!g[metric]) g[metric]=team; else if(g[metric]!==team) g[metric]=team;
+  }
+  else if(metric==='dragonCount'){
+    const bucket=g.dragonCount ||= {};
+    bucket[team]=(bucket[team]||0)+1;
+    (g.dragonOrderSequence ||= []).push(team);
+    syncDragonCounts(g);
   }
   else if(COUNT_METRICS.includes(metric)){
     const bucket=g[metric] ||= {};
     bucket[team]=(bucket[team]||0)+1;
     if(metric==='killCount') applyRaceFromKills(g);
-  }
-  else if(metric==='dragonCount'){
-    // Increment team dragon count and append to order sequence (used to derive Dragon Orders row)
-    const bucket=g.dragonCount ||= {};
-    bucket[team]=(bucket[team]||0)+1;
-    g.dragonOrderSequence.push(team);
-    syncDragonCounts(g);
   }
   else if(metric==='netWorth'){
     const bucket=g.netWorth ||= {};
@@ -202,23 +202,18 @@ function handleManualRightClick(metric, side){
   if(BINARY_METRICS.includes(metric)){
     if(g[metric]===team) g[metric]=null;
   }
-  else if(COUNT_METRICS.includes(metric)){
-    const bucket=g[metric]||{};
-    if(bucket[team]>0) bucket[team]--;
-  }
   else if(metric==='dragonCount'){
     const bucket=g.dragonCount ||= {};
     if(bucket[team]>0){
       bucket[team]--;
-      // Remove the last occurrence of this team from order sequence (undo last dragon attribution)
-      for(let i=g.dragonOrderSequence.length-1;i>=0;i--){
-        if(g.dragonOrderSequence[i]===team){
-          g.dragonOrderSequence.splice(i,1);
-          break;
-        }
-      }
+      const seq = (g.dragonOrderSequence ||= []);
+      for(let i=seq.length-1;i>=0;i--){ if(seq[i]===team){ seq.splice(i,1); break; } }
       syncDragonCounts(g);
     }
+  }
+  else if(COUNT_METRICS.includes(metric)){
+    const bucket=g[metric]||{};
+    if(bucket[team]>0) bucket[team]--;
   }
   else if(metric==='netWorth'){
     const bucket=g.netWorth||{}; bucket[team]=0;

@@ -118,12 +118,32 @@ function bindEmbeddedMapSelect(){
             try { console.debug('[embeddedOdds] manual map refresh ->', v); } catch(_){ }
           } catch(_){ }
         });
+        // Right-click toggles shared auto mode
+        btn.addEventListener('contextmenu', (e)=>{
+          try { e.preventDefault(); if(window.desktopAPI && window.desktopAPI.toggleMapAutoRefresh){ window.desktopAPI.toggleMapAutoRefresh(); } else { const { ipcRenderer } = require('electron'); ipcRenderer.send('toggle-map-auto-refresh'); } } catch(_){ }
+        });
       }
     } catch(_){ }
   } catch(_){ }
 }
 const { ipcRenderer: ipcRendererEmbedded } = require('electron');
 const embeddedOddsData = {}; let embeddedBest1=NaN, embeddedBest2=NaN;
+// Auto map rebroadcast status visual sync
+try {
+  function applyEmbeddedMapAutoRefreshVisual(p){
+    try {
+      const btn=document.getElementById('embeddedMapRefreshBtn'); if(!btn) return;
+      const enabled = !!(p && p.enabled);
+      btn.style.opacity = enabled ? '1' : '';
+      btn.style.background = enabled ? '#2f4b6a' : '';
+      btn.style.border = enabled ? '1px solid #3f6c90' : '';
+      btn.title = enabled ? 'Auto odds refresh: ON (right-click to disable)' : 'Re-broadcast current map (refresh odds) (right-click to enable auto)';
+    } catch(_){ }
+  }
+  if(window.desktopAPI && window.desktopAPI.onMapAutoRefreshStatus){ window.desktopAPI.onMapAutoRefreshStatus(applyEmbeddedMapAutoRefreshVisual); }
+  else { ipcRendererEmbedded.on('map-auto-refresh-status', (_e,p)=> applyEmbeddedMapAutoRefreshVisual(p)); }
+  if(window.desktopAPI && window.desktopAPI.getMapAutoRefreshStatus){ window.desktopAPI.getMapAutoRefreshStatus().then(p=>applyEmbeddedMapAutoRefreshVisual(p)).catch(()=>{}); }
+} catch(_){ }
 // Per-broker side swap (exclude excel). Persist in localStorage under embeddedSwappedBrokers
 try {
   if(!window.__embeddedSwapped){

@@ -425,6 +425,11 @@ function bootstrap() {
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
   // Initialize map selection IPC (needs boardManager, statsManager, mainWindow references)
   initMapIpc({ ipcMain, store, views, mainWindow, boardWindowRef:{ value: boardWindow }, boardManager, statsManager });
+  // Initialize periodic map re-broadcast (odds refresh auto loop)
+  try {
+    const { initMapAutoRefreshIpc } = require('./modules/ipc/mapAutoRefresh');
+    initMapAutoRefreshIpc({ ipcMain, store, mainWindow, boardManager, statsManager });
+  } catch(e){ console.warn('initMapAutoRefreshIpc failed', e.message); }
   // Lightweight IPC to fetch last excel odds (used by stats panel / board after load to avoid needing map reselect)
   try {
     ipcMain.handle('excel-last-odds', ()=>{ return global.__lastExcelOdds || null; });
