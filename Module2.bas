@@ -1,194 +1,197 @@
+Attribute VB_Name = "Module2"
 Option Explicit
 
 ' =============== EVENT-DRIVEN DUMPER (on any change) ===============
-' –ü—Ä–∏ –ª—é–±–æ–º –∏–∑–º–µ–Ω–µ–Ω–∏–∏ –≤ –ª—é–±–æ–π –≤–∫–ª–∞–¥–∫–µ –∫–Ω–∏–≥–∏ (Workbook_SheetChange)
-' –≤—ã–∑—ã–≤–∞–µ–º TryImmediateJsonDump -> (throttle) -> DumpOnce.
-' –ë–æ–ª—å—à–µ –ù–ï–¢ –ø–µ—Ä–∏–æ–¥–∏—á–µ—Å–∫–æ–≥–æ —Ç–∞–π–º–µ—Ä–∞.
+' œË Î˛·ÓÏ ËÁÏÂÌÂÌËË ‚ Î˛·ÓÈ ‚ÍÎ‡‰ÍÂ ÍÌË„Ë (Workbook_SheetChange)
+' ‚˚Á˚‚‡ÂÏ TryImmediateJsonDump -> (throttle) -> DumpOnce.
+' ¡ÓÎ¸¯Â Õ≈“ ÔÂËÓ‰Ë˜ÂÒÍÓ„Ó Ú‡ÈÏÂ‡.
 ' ================================================================
 
 Private Const OUT_FILENAME As String = "excel_dump.json"
 Private Const SHEET_NAME As String = "InPlay FRONT"
 Private Const DEBUG_LOG As Boolean = True
-Private Const MIN_EVENT_INTERVAL_MS As Long = 120 ' –∑–∞—â–∏—Ç–∞ –æ—Ç –ª–∞–≤–∏–Ω—ã –ø—Ä–∏ –º–∞—Å—Å–æ–≤–æ–π –≤—Å—Ç–∞–≤–∫–µ
+Private Const MIN_EVENT_INTERVAL_MS As Long = 120 ' Á‡˘ËÚ‡ ÓÚ Î‡‚ËÌ˚ ÔË Ï‡ÒÒÓ‚ÓÈ ‚ÒÚ‡‚ÍÂ
 
-Private mLastEventDumpAt As Double ' Excel serial –≤—Ä–µ–º–µ–Ω–∏ –ø–æ—Å–ª–µ–¥–Ω–µ–≥–æ –¥–∞–º–ø–∞
+Private mLastEventDumpAt As Double ' Excel serial ‚ÂÏÂÌË ÔÓÒÎÂ‰ÌÂ„Ó ‰‡ÏÔ‡
 Private mWriteCount As Long
-Private mPending As Boolean           ' –µ—Å—Ç—å –ª–∏ –æ—Ç–ª–æ–∂–µ–Ω–Ω—ã–π –¥–∞–º–ø (—Ö–≤–æ—Å—Ç–æ–≤–∞—è —á–∞—Å—Ç—å debounce)
-Private mPendingScheduledAt As Double ' –∫–æ–≥–¥–∞ –∑–∞–ø–ª–∞–Ω–∏—Ä–æ–≤–∞–Ω FlushPendingDump (serial)
+Private mPending As Boolean           ' ÂÒÚ¸ ÎË ÓÚÎÓÊÂÌÌ˚È ‰‡ÏÔ (ı‚ÓÒÚÓ‚‡ˇ ˜‡ÒÚ¸ debounce)
+Private mPendingScheduledAt As Double ' ÍÓ„‰‡ Á‡ÔÎ‡ÌËÓ‚‡Ì FlushPendingDump (serial)
 
-' --- –ü—É–±–ª–∏—á–Ω—ã–µ –≤—ã–∑–æ–≤—ã ---
+' --- œÛ·ÎË˜Ì˚Â ‚˚ÁÓ‚˚ ---
 Public Sub ForceExcelDump(): DumpOnce: End Sub
 Public Sub DumpOddsNow(): DumpOnce: End Sub
 Public Sub ForceJsonDump(): DumpOnce: End Sub
-Public Sub TryImmediateJsonDump(): TryImmediateDump: End Sub ' –∞–ª–∏–∞—Å
+Public Sub TryImmediateJsonDump(): TryImmediateDump: End Sub ' ‡ÎË‡Ò
 
 Public Sub TryImmediateDump()
-	On Error Resume Next
-	Dim elapsedMs As Double
-	If mLastEventDumpAt > 0 Then
-		elapsedMs = (Now - mLastEventDumpAt) * 86400000#
-		If elapsedMs < MIN_EVENT_INTERVAL_MS Then
-			' –í –æ–∫–Ω–æ —Ç—Ä–æ—Ç—Ç–ª–∏–Ω–≥–∞ ‚Äì –∑–∞–ø–ª–∞–Ω–∏—Ä—É–µ–º ¬´—Ö–≤–æ—Å—Ç–æ–≤–æ–π¬ª –¥–∞–º–ø –Ω–∞ –∫–æ–Ω–µ—Ü –∏–Ω—Ç–µ—Ä–≤–∞–ª–∞
-			SchedulePendingDump (MIN_EVENT_INTERVAL_MS - elapsedMs)
-			Exit Sub
-		End If
-	End If
-	DumpOnce
-	' –£—Å–ø–µ—à–Ω—ã–π –Ω–µ–º–µ–¥–ª–µ–Ω–Ω—ã–π –¥–∞–º–ø –æ—Ç–º–µ–Ω—è–µ—Ç –æ—Ç–ª–æ–∂–µ–Ω–Ω—ã–π
-	CancelPendingDump
+    On Error Resume Next
+    Dim elapsedMs As Double
+    If mLastEventDumpAt > 0 Then
+        elapsedMs = (Now - mLastEventDumpAt) * 86400000#
+        If elapsedMs < MIN_EVENT_INTERVAL_MS Then
+            ' ¬ ÓÍÌÓ ÚÓÚÚÎËÌ„‡ ñ Á‡ÔÎ‡ÌËÛÂÏ ´ı‚ÓÒÚÓ‚ÓÈª ‰‡ÏÔ Ì‡ ÍÓÌÂˆ ËÌÚÂ‚‡Î‡
+            SchedulePendingDump (MIN_EVENT_INTERVAL_MS - elapsedMs)
+            Exit Sub
+        End If
+    End If
+    DumpOnce
+    ' ”ÒÔÂ¯Ì˚È ÌÂÏÂ‰ÎÂÌÌ˚È ‰‡ÏÔ ÓÚÏÂÌˇÂÚ ÓÚÎÓÊÂÌÌ˚È
+    CancelPendingDump
 End Sub
 
 Private Sub DumpOnce()
-	On Error GoTo fail
-	Dim ws As Worksheet
-	Set ws = ThisWorkbook.Worksheets(SHEET_NAME)
-	If ws Is Nothing Then GoTo fail
+    On Error GoTo fail
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets(SHEET_NAME)
+    If ws Is Nothing Then GoTo fail
 
-	Dim tsSec As Long: tsSec = DateDiff("s", #1/1/1970#, Now)
+    Dim tsSec As Long: tsSec = DateDiff("s", #1/1/1970#, Now)
 
-	' –†–Ø–î–´ (–æ—Å–Ω–æ–≤–Ω—ã–µ 5 –∫–∞—Ä—Ç)
-	Dim rows(): rows = Array(44, 190, 336, 482, 628)
-	' –°—Ç–æ–ª–±—Ü—ã: B - label, C - status, M/N - odds1/odds2
-	Dim i&, r&
-	Dim sb As String
-	sb = "{""timestamp"":" & tsSec & ",""source"":""excel"",""markets"":[]"
-	sb = Left$(sb, Len(sb) - 1) & "[" ' –∑–∞–º–µ–Ω–∏—Ç—å ] –Ω–∞ [
-	For i = 0 To UBound(rows)
-		r = rows(i)
-		Dim lbl$, statusRaw$, statusNorm$, o1$, o2$, id$
-		lbl = SafeCell(ws, "B" & r)
-		statusRaw = UCase$(SafeCell(ws, "C" & r))
-		o1 = SafeCell(ws, "M" & r)
-		o2 = SafeCell(ws, "N" & r)
-		If lbl = "" Then lbl = "Map " & (i + 1) & " Winner"
-		id = "map" & CStr(i + 1)
-		If InStr(statusRaw, "SUSP") > 0 Then
-			statusNorm = "suspended"
-		ElseIf InStr(statusRaw, "CLOSE") > 0 Then
-			statusNorm = "closed"
-		Else
-			statusNorm = "trading"
-		End If
-		If i > 0 Then sb = sb & ","
-		sb = sb & "{""id"":""" & JEsc(id) & """,""label"":""" & JEsc(lbl) & """,""status"":""" & JEsc(statusNorm) & _
-				 """,""odds1"":""" & JEsc(o1) & """,""odds2"":""" & JEsc(o2) & """}"
-	Next
-	sb = sb & "]}"
+    ' –ﬂƒ€ (ÓÒÌÓ‚Ì˚Â 5 Í‡Ú)
+    Dim rows(): rows = Array(44, 190, 336, 482, 628)
+    ' —ÚÓÎ·ˆ˚: B - label, C - status, M/N - odds1/odds2
+    Dim i&, r&
+    Dim sb As String
+    sb = "{""timestamp"":" & tsSec & ",""source"":""excel"",""markets"":[]"
+    sb = Left$(sb, Len(sb) - 1) & "[" ' Á‡ÏÂÌËÚ¸ ] Ì‡ [
+    For i = 0 To UBound(rows)
+        r = rows(i)
+        Dim lbl$, statusRaw$, statusNorm$, o1$, o2$, ID$
+        lbl = SafeCell(ws, "B" & r)
+        statusRaw = UCase$(SafeCell(ws, "C" & r))
+        o1 = SafeCell(ws, "M" & r)
+        o2 = SafeCell(ws, "N" & r)
+        If lbl = "" Then lbl = "Map " & (i + 1) & " Winner"
+        ID = "map" & CStr(i + 1)
+        If InStr(statusRaw, "SUSP") > 0 Then
+            statusNorm = "suspended"
+        ElseIf InStr(statusRaw, "CLOSE") > 0 Then
+            statusNorm = "closed"
+        Else
+            statusNorm = "trading"
+        End If
+        If i > 0 Then sb = sb & ","
+        sb = sb & "{""id"":""" & JEsc(ID) & """,""label"":""" & JEsc(lbl) & """,""status"":""" & JEsc(statusNorm) & _
+                 """,""odds1"":""" & JEsc(o1) & """,""odds2"":""" & JEsc(o2) & """}"
+    Next
+    sb = sb & "]}"
 
-	Dim outPath$
-	If Len(ThisWorkbook.Path) > 0 Then
-		outPath = ThisWorkbook.Path & Application.PathSeparator & OUT_FILENAME
-	Else
-		outPath = Environ$("USERPROFILE") & "\Documents\" & OUT_FILENAME
-	End If
+    Dim outPath$
+    If Len(ThisWorkbook.path) > 0 Then
+        outPath = ThisWorkbook.path & Application.PathSeparator & OUT_FILENAME
+    Else
+        outPath = Environ$("USERPROFILE") & "\Documents\" & OUT_FILENAME
+    End If
 
-	WriteAtomic outPath, sb
-	mWriteCount = mWriteCount + 1
-	mLastEventDumpAt = Now
-	' –ï—Å–ª–∏ –ø–æ–∫–∞ –ø–∏—Å–∞–ª–∏ —Ñ–∞–π–ª ‚Äì –º–æ–≥–ª–∏ –ø—Ä–∏–π—Ç–∏ –µ—â—ë –∏–∑–º–µ–Ω–µ–Ω–∏—è –∏ –≤—ã—Å—Ç–∞–≤–∏—Ç—å mPending.
-	' –°—Ä–∞–∑—É –ù–ï —Å–±—Ä–∞—Å—ã–≤–∞–µ–º mPending –∑–¥–µ—Å—å: –µ—Å–ª–∏ –ø–æ–ª—å–∑–æ–≤–∞—Ç–µ–ª—å —É—Å–ø–µ–ª —Å–¥–µ–ª–∞—Ç—å –µ—â—ë –æ–¥–Ω–æ –∏–∑–º–µ–Ω–µ–Ω–∏–µ
-	' –≤ –ø–æ—Å–ª–µ–¥–Ω–∏–µ –º–∏–ª–ª–∏—Å–µ–∫—É–Ω–¥—ã –∑–∞–ø–∏—Å–∏, —Ö–≤–æ—Å—Ç–æ–≤–æ–π –≤—ã–∑–æ–≤ –≤—Å—ë —Ä–∞–≤–Ω–æ –ø–µ—Ä–µ–∑–∞–ø–∏—à–µ—Ç —Ñ–∞–π–ª –±–æ–ª–µ–µ —Å–≤–µ–∂–∏–º–∏ –¥–∞–Ω–Ω—ã–º–∏.
-	If (mWriteCount Mod 20) = 0 Then LogMsg "[Dump] writes=" & mWriteCount & " -> " & outPath
-	Exit Sub
+    WriteAtomic outPath, sb
+    mWriteCount = mWriteCount + 1
+    mLastEventDumpAt = Now
+    ' ≈ÒÎË ÔÓÍ‡ ÔËÒ‡ÎË Ù‡ÈÎ ñ ÏÓ„ÎË ÔËÈÚË Â˘∏ ËÁÏÂÌÂÌËˇ Ë ‚˚ÒÚ‡‚ËÚ¸ mPending.
+    ' —‡ÁÛ Õ≈ Ò·‡Ò˚‚‡ÂÏ mPending Á‰ÂÒ¸: ÂÒÎË ÔÓÎ¸ÁÓ‚‡ÚÂÎ¸ ÛÒÔÂÎ Ò‰ÂÎ‡Ú¸ Â˘∏ Ó‰ÌÓ ËÁÏÂÌÂÌËÂ
+    ' ‚ ÔÓÒÎÂ‰ÌËÂ ÏËÎÎËÒÂÍÛÌ‰˚ Á‡ÔËÒË, ı‚ÓÒÚÓ‚ÓÈ ‚˚ÁÓ‚ ‚Ò∏ ‡‚ÌÓ ÔÂÂÁ‡ÔË¯ÂÚ Ù‡ÈÎ ·ÓÎÂÂ Ò‚ÂÊËÏË ‰‡ÌÌ˚ÏË.
+    If (mWriteCount Mod 20) = 0 Then LogMsg "[Dump] writes=" & mWriteCount & " -> " & outPath
+    Exit Sub
 fail:
-	LogMsg "[Dump ERROR] " & Err.Number & " " & Err.Description
+    LogMsg "[Dump ERROR] " & Err.Number & " " & Err.Description
 End Sub
 
 ' ------- HELPERS -------
 Private Function SafeCell(ws As Worksheet, addr$) As String
-	On Error GoTo done
-	Dim v: v = ws.Range(addr).Value
-	If IsError(v) Or IsEmpty(v) Then Exit Function
-	SafeCell = Trim$(CStr(v))
+    On Error GoTo done
+    Dim v: v = ws.Range(addr).value
+    If IsError(v) Or IsEmpty(v) Then Exit Function
+    SafeCell = Trim$(CStr(v))
 done:
 End Function
 
 Private Function JEsc(ByVal s$) As String
-	Dim t$: t = s
-	t = Replace(t, "\\", "\\\\")
-	t = Replace(t, """", "\\""")
-	t = Replace(t, vbCrLf, "\n")
-	t = Replace(t, vbCr, "\n")
-	t = Replace(t, vbLf, "\n")
-	JEsc = t
+    Dim t$: t = s
+    t = Replace(t, "\\", "\\\\")
+    t = Replace(t, """", "\\""")
+    t = Replace(t, vbCrLf, "\n")
+    t = Replace(t, vbCr, "\n")
+    t = Replace(t, vbLf, "\n")
+    JEsc = t
 End Function
 
 Private Sub WriteAtomic(fullPath$, content$)
-	On Error GoTo fail
-	Dim fso As Object, tmp$, ts
-	Set fso = CreateObject("Scripting.FileSystemObject")
-	tmp = fullPath & ".part"
-	Set ts = fso.CreateTextFile(tmp, True, False)
-	ts.Write content: ts.Close
-	If fso.FileExists(fullPath) Then fso.DeleteFile fullPath, True
-	fso.MoveFile tmp, fullPath
-	Exit Sub
+    On Error GoTo fail
+    Dim fso As Object, tmp$, ts
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    tmp = fullPath & ".part"
+    Set ts = fso.CreateTextFile(tmp, True, False)
+    ts.Write content: ts.Close
+    If fso.FileExists(fullPath) Then fso.DeleteFile fullPath, True
+    fso.MoveFile tmp, fullPath
+    Exit Sub
 fail:
-	LogMsg "[Write FAIL] " & Err.Number & " " & Err.Description & " path=" & fullPath
+    LogMsg "[Write FAIL] " & Err.Number & " " & Err.Description & " path=" & fullPath
 End Sub
 
 Private Sub LogMsg(msg$)
-	If Not DEBUG_LOG Then Exit Sub
-	On Error Resume Next
-	Debug.Print Format$(Now, "hh:nn:ss"), msg
+    If Not DEBUG_LOG Then Exit Sub
+    On Error Resume Next
+    Debug.Print Format$(Now, "hh:nn:ss"), msg
 End Sub
 
-' ------- Legacy stub (–Ω–µ–∫–æ—Ç–æ—Ä—ã–π –∫–æ–¥ –º–æ–∂–µ—Ç –∑–≤–∞—Ç—å ExcelBuildSig) -------
+' ------- Legacy stub (ÌÂÍÓÚÓ˚È ÍÓ‰ ÏÓÊÂÚ Á‚‡Ú¸ ExcelBuildSig) -------
 Public Function ExcelBuildSig() As String
-	ExcelBuildSig = CStr(Timer) ' stub (legacy safety)
+    ExcelBuildSig = CStr(Timer) ' stub (legacy safety)
 End Function
 
 ' ================= Trailing Debounce Helpers =================
-' –ó–∞–¥–∞—á–∞: –µ—Å–ª–∏ –Ω–µ—Å–∫–æ–ª—å–∫–æ –∏–∑–º–µ–Ω–µ–Ω–∏–π –ø—Ä–∏—Ö–æ–¥—è—Ç –±—ã—Å—Ç—Ä–µ–µ MIN_EVENT_INTERVAL_MS, —Ö–æ—Ç–∏–º –≤—Å—ë —Ä–∞–≤–Ω–æ
-' –ø–æ–ª—É—á–∏—Ç—å —Ñ–∏–Ω–∞–ª—å–Ω–æ–µ —Å–æ—Å—Ç–æ—è–Ω–∏–µ (–¥–∞–∂–µ –µ—Å–ª–∏ –ø–æ–ª—å–∑–æ–≤–∞—Ç–µ–ª—å –ø–µ—Ä–µ—Å—Ç–∞–ª –º–µ–Ω—è—Ç—å —è—á–µ–π–∫–∏).
-' –†–µ–∞–ª–∏–∑–∞—Ü–∏—è: –ø—Ä–∏ –ø–æ–ø–∞–¥–∞–Ω–∏–∏ –≤ —Ç—Ä–æ—Ç—Ç–ª–∏–Ω–≥ —Å—Ç–∞–≤–∏–º/–ø–µ—Ä–µ–Ω–∞–∑–Ω–∞—á–∞–µ–º Application.OnTime –Ω–∞ –∫–æ–Ω–µ—Ü –æ–∫–Ω–∞.
-' –ü—Ä–∏ –Ω–æ–≤–æ–º —Å–æ–±—ã—Ç–∏–∏ –≤–Ω—É—Ç—Ä–∏ –æ–∫–Ω–∞ ‚Äì –ø–µ—Ä–µ–Ω–æ—Å–∏–º —Ä–∞—Å–ø–∏—Å–∞–Ω–∏–µ.
-' NB: Application.OnTime —Ç–æ—á–Ω–æ—Å—Ç—å ~1 —Å–µ–∫. –í –±–æ–ª—å—à–∏–Ω—Å—Ç–≤–µ Excel –æ–Ω–∞ –ø—Ä–∏–Ω–∏–º–∞–µ—Ç –¥—Ä–æ–±–Ω—ã–µ –¥–∞—Ç—ã,
-' –Ω–æ –º–æ–∂–µ—Ç –æ–∫—Ä—É–≥–ª—è—Ç—å. –ï—Å–ª–∏ –≤–¥—Ä—É–≥ –∑–∞–¥–µ—Ä–∂–∫–∞ –æ–∫–∞–∂–µ—Ç—Å—è –¥–ª–∏–Ω–Ω–µ–µ –æ–∂–∏–¥–∞–µ–º–æ–≥–æ (>=1s), –º–æ–∂–Ω–æ —É–º–µ–Ω—å—à–∏—Ç—å
-' MIN_EVENT_INTERVAL_MS –∏–ª–∏ –∑–∞–º–µ–Ω–∏—Ç—å —Å—Ç—Ä–∞—Ç–µ–≥–∏—é. –î–ª—è –Ω–∞—à–∏—Ö 120‚Äì300–º—Å —ç—Ç–æ –ª–∏–±–æ –º–≥–Ω–æ–≤–µ–Ω–Ω–æ (–µ—Å–ª–∏
-' –æ–∫—Ä—É–≥–ª–∏—Ç—Å—è –¥–æ –±–ª–∏–∂–∞–π—à–µ–π —Å–µ–∫—É–Ω–¥—ã –≤ –ø—Ä–æ—à–ª–æ–º) –ª–∏–±–æ –¥–æ 1 —Å–µ–∫. –î–æ–ø—É—Å–∫–∞–µ–º.
+' «‡‰‡˜‡: ÂÒÎË ÌÂÒÍÓÎ¸ÍÓ ËÁÏÂÌÂÌËÈ ÔËıÓ‰ˇÚ ·˚ÒÚÂÂ MIN_EVENT_INTERVAL_MS, ıÓÚËÏ ‚Ò∏ ‡‚ÌÓ
+' ÔÓÎÛ˜ËÚ¸ ÙËÌ‡Î¸ÌÓÂ ÒÓÒÚÓˇÌËÂ (‰‡ÊÂ ÂÒÎË ÔÓÎ¸ÁÓ‚‡ÚÂÎ¸ ÔÂÂÒÚ‡Î ÏÂÌˇÚ¸ ˇ˜ÂÈÍË).
+' –Â‡ÎËÁ‡ˆËˇ: ÔË ÔÓÔ‡‰‡ÌËË ‚ ÚÓÚÚÎËÌ„ ÒÚ‡‚ËÏ/ÔÂÂÌ‡ÁÌ‡˜‡ÂÏ Application.OnTime Ì‡ ÍÓÌÂˆ ÓÍÌ‡.
+' œË ÌÓ‚ÓÏ ÒÓ·˚ÚËË ‚ÌÛÚË ÓÍÌ‡ ñ ÔÂÂÌÓÒËÏ ‡ÒÔËÒ‡ÌËÂ.
+' NB: Application.OnTime ÚÓ˜ÌÓÒÚ¸ ~1 ÒÂÍ. ¬ ·ÓÎ¸¯ËÌÒÚ‚Â Excel ÓÌ‡ ÔËÌËÏ‡ÂÚ ‰Ó·Ì˚Â ‰‡Ú˚,
+' ÌÓ ÏÓÊÂÚ ÓÍÛ„ÎˇÚ¸. ≈ÒÎË ‚‰Û„ Á‡‰ÂÊÍ‡ ÓÍ‡ÊÂÚÒˇ ‰ÎËÌÌÂÂ ÓÊË‰‡ÂÏÓ„Ó (>=1s), ÏÓÊÌÓ ÛÏÂÌ¸¯ËÚ¸
+' MIN_EVENT_INTERVAL_MS ËÎË Á‡ÏÂÌËÚ¸ ÒÚ‡ÚÂ„Ë˛. ƒÎˇ Ì‡¯Ëı 120ñ300ÏÒ ˝ÚÓ ÎË·Ó Ï„ÌÓ‚ÂÌÌÓ (ÂÒÎË
+' ÓÍÛ„ÎËÚÒˇ ‰Ó ·ÎËÊ‡È¯ÂÈ ÒÂÍÛÌ‰˚ ‚ ÔÓ¯ÎÓÏ) ÎË·Ó ‰Ó 1 ÒÂÍ. ƒÓÔÛÒÍ‡ÂÏ.
 '
 Private Sub SchedulePendingDump(remainingMs As Double)
-	On Error Resume Next
-	Dim totalMs As Double
-	totalMs = IIf(remainingMs > 0, remainingMs, MIN_EVENT_INTERVAL_MS)
-	' –ï—Å–ª–∏ —É–∂–µ –∑–∞–ø–ª–∞–Ω–∏—Ä–æ–≤–∞–Ω–æ ‚Äì –æ—Ç–º–µ–Ω–∏–º –∏ –ø–µ—Ä–µ–Ω–∞–∑–Ω–∞—á–∏–º (–æ–±–Ω–æ–≤–ª—è–µ–º ¬´—Ö–≤–æ—Å—Ç¬ª)
-	If mPendingScheduledAt > 0 Then
-		Application.OnTime EarliestTime:=mPendingScheduledAt, Procedure:="FlushPendingDump", Schedule:=False
-	End If
-	Dim delayDays As Double
-	delayDays = (totalMs / 86400000#)
-	mPendingScheduledAt = Now + delayDays
-	mPending = True
-	Application.OnTime EarliestTime:=mPendingScheduledAt, Procedure:="FlushPendingDump", Schedule:=True
-	' –î–∏–∞–≥–Ω–æ—Å—Ç–∏–∫–∞ (–≤ Immediate –æ–∫–Ω–æ)
-	If DEBUG_LOG Then Debug.Print Format$(Now, "hh:nn:ss"), "[Debounce] scheduled trailing dump in", CLng(totalMs), "ms"
+    On Error Resume Next
+    Dim totalMs As Double
+    totalMs = IIf(remainingMs > 0, remainingMs, MIN_EVENT_INTERVAL_MS)
+    ' ≈ÒÎË ÛÊÂ Á‡ÔÎ‡ÌËÓ‚‡ÌÓ ñ ÓÚÏÂÌËÏ Ë ÔÂÂÌ‡ÁÌ‡˜ËÏ (Ó·ÌÓ‚ÎˇÂÏ ´ı‚ÓÒÚª)
+    If mPendingScheduledAt > 0 Then
+        Application.OnTime EarliestTime:=mPendingScheduledAt, Procedure:="FlushPendingDump", Schedule:=False
+    End If
+    Dim delayDays As Double
+    delayDays = (totalMs / 86400000#)
+    mPendingScheduledAt = Now + delayDays
+    mPending = True
+    Application.OnTime EarliestTime:=mPendingScheduledAt, Procedure:="FlushPendingDump", Schedule:=True
+    ' ƒË‡„ÌÓÒÚËÍ‡ (‚ Immediate ÓÍÌÓ)
+    If DEBUG_LOG Then Debug.Print Format$(Now, "hh:nn:ss"), "[Debounce] scheduled trailing dump in", CLng(totalMs), "ms"
 End Sub
 
 Private Sub CancelPendingDump()
-	On Error Resume Next
-	If mPendingScheduledAt > 0 Then
-		Application.OnTime EarliestTime:=mPendingScheduledAt, Procedure:="FlushPendingDump", Schedule:=False
-	End If
-	mPendingScheduledAt = 0
-	mPending = False
+    On Error Resume Next
+    If mPendingScheduledAt > 0 Then
+        Application.OnTime EarliestTime:=mPendingScheduledAt, Procedure:="FlushPendingDump", Schedule:=False
+    End If
+    mPendingScheduledAt = 0
+    mPending = False
 End Sub
 
 Public Sub FlushPendingDump()
-	On Error GoTo done
-	Dim nowTs As Double: nowTs = Now
-	mPendingScheduledAt = 0
-	If Not mPending Then GoTo done
-	mPending = False
-	' –ï—Å–ª–∏ –≤—Å—ë –µ—â—ë –Ω–∞—Ö–æ–¥–∏–º—Å—è –≤–Ω—É—Ç—Ä–∏ –æ–∫–Ω–∞ —Ç—Ä–æ—Ç—Ç–ª–∏–Ω–≥–∞ –æ—Ç–Ω–æ—Å–∏—Ç–µ–ª—å–Ω–æ –ø–æ—Å–ª–µ–¥–Ω–µ–≥–æ —Ä–µ–∞–ª—å–Ω–æ–≥–æ –¥–∞–º–ø–∞ ‚Äì
-	' —Å–º–µ—Å—Ç–∏–º –µ—â—ë —Ä–∞–∑ (—Ä–µ–¥–∫–∏–π —Å–ª—É—á–∞–π, –µ—Å–ª–∏ —Ç–∞–π–º–µ—Ä —Å—Ä–∞–±–æ—Ç–∞–ª —Ä–∞–Ω—å—à–µ –∏–∑-–∑–∞ –æ–∫—Ä—É–≥–ª–µ–Ω–∏—è)
-	Dim elapsedMs As Double
-	elapsedMs = (nowTs - mLastEventDumpAt) * 86400000#
-	If elapsedMs < MIN_EVENT_INTERVAL_MS Then
-		SchedulePendingDump (MIN_EVENT_INTERVAL_MS - elapsedMs)
-	Else
-		DumpOnce
-	End If
+    On Error GoTo done
+    Dim nowTs As Double: nowTs = Now
+    mPendingScheduledAt = 0
+    If Not mPending Then GoTo done
+    mPending = False
+    ' ≈ÒÎË ‚Ò∏ Â˘∏ Ì‡ıÓ‰ËÏÒˇ ‚ÌÛÚË ÓÍÌ‡ ÚÓÚÚÎËÌ„‡ ÓÚÌÓÒËÚÂÎ¸ÌÓ ÔÓÒÎÂ‰ÌÂ„Ó Â‡Î¸ÌÓ„Ó ‰‡ÏÔ‡ ñ
+    ' ÒÏÂÒÚËÏ Â˘∏ ‡Á (Â‰ÍËÈ ÒÎÛ˜‡È, ÂÒÎË Ú‡ÈÏÂ Ò‡·ÓÚ‡Î ‡Ì¸¯Â ËÁ-Á‡ ÓÍÛ„ÎÂÌËˇ)
+    Dim elapsedMs As Double
+    elapsedMs = (nowTs - mLastEventDumpAt) * 86400000#
+    If elapsedMs < MIN_EVENT_INTERVAL_MS Then
+        SchedulePendingDump (MIN_EVENT_INTERVAL_MS - elapsedMs)
+    Else
+        DumpOnce
+    End If
 done:
 End Sub
+
+
 
