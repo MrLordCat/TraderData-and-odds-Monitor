@@ -266,6 +266,12 @@ function createBrokerManager(ctx){
       }
     }
     if(layoutManager.getCurrentPresetId()) layoutManager.applyLayoutPreset(layoutManager.getCurrentPresetId()); else layoutManager.relayoutAll();
+    // After layout reflow new slot-* views may have been added on top; reassert stats z-order
+    try {
+      if(ctx.statsManager && typeof ctx.statsManager.ensureTopmost==='function'){
+        [0,80,200].forEach(d=> setTimeout(()=>{ try { ctx.statsManager.ensureTopmost(); } catch(_){ } }, d));
+      }
+    } catch(_){ }
     syncBoard();
   }
 
@@ -280,6 +286,12 @@ function createBrokerManager(ctx){
     const dis = store.get('disabledBrokers', []);
     if(!dis.includes(id)){ dis.push(id); store.set('disabledBrokers', dis); }
     if(layoutManager.getCurrentPresetId()) layoutManager.applyLayoutPreset(layoutManager.getCurrentPresetId()); else layoutManager.relayoutAll();
+    // Re-assert stats panel z-order after removal triggers preset reflow
+    try {
+      if(ctx.statsManager && typeof ctx.statsManager.ensureTopmost==='function'){
+        [0,80,200].forEach(d=> setTimeout(()=>{ try { ctx.statsManager.ensureTopmost(); } catch(_){ } }, d));
+      }
+    } catch(_){ }
     syncBoard();
   }
 

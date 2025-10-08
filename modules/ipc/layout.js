@@ -10,7 +10,15 @@ function initLayoutIpc(ctx){
     }
     return layout;
   });
-  ipcMain.on('apply-layout-preset', (e, presetId)=>{ layoutManager.applyLayoutPreset(presetId); });
+  ipcMain.on('apply-layout-preset', (e, presetId)=>{ 
+    layoutManager.applyLayoutPreset(presetId);
+    // Reassert stats panel topmost order (prevent brokers covering panel after preset change)
+    try {
+      if(statsManager && typeof statsManager.ensureTopmost==='function'){
+        [0,60,180].forEach(d=> setTimeout(()=>{ try { statsManager.ensureTopmost(); } catch(_){ } }, d));
+      }
+    } catch(_){ }
+  });
   // Handle may already be registered early in main (early safe handler) -> swallow duplicate attempts
   try {
     ipcMain.handle('get-layout-preset', () => { try { return store.get('layoutPreset'); } catch(e){ return null; } });
@@ -28,6 +36,12 @@ function initLayoutIpc(ctx){
     } else {
       Object.keys(views).forEach(id => layoutManager.clampViewToStage(id));
     }
+    // After stage resize the broker views might overlap; raise stats again if active
+    try {
+      if(statsManager && typeof statsManager.ensureTopmost==='function'){
+        [0,80].forEach(d=> setTimeout(()=>{ try { statsManager.ensureTopmost(); } catch(_){ } }, d));
+      }
+    } catch(_){ }
   });
 }
 
