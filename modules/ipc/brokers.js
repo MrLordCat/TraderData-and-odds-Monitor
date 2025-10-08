@@ -71,11 +71,14 @@ function initBrokerIpc(ctx){
       const ids = Object.keys(views).filter(k=> !k.startsWith('slot-'));
       // Notify main window (some renderers may listen for brokers-sync to rebuild rows)
       try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('brokers-sync', { ids }); } catch(_){ }
+      // Explicit broker-closed event (some listeners rely on it for immediate row removal)
+      try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('broker-closed', { id }); } catch(_){ }
       // Also proactively notify every slot-* view so its inline picker (if open) can refresh availability
       try {
         Object.entries(views).forEach(([vid,v])=>{
           if(vid.startsWith('slot-') && v && v.webContents && !v.webContents.isDestroyed()){
             v.webContents.send('brokers-sync', { ids });
+            try { v.webContents.send('broker-closed', { id }); } catch(_){ }
           }
         });
       } catch(_){ }
@@ -86,6 +89,8 @@ function initBrokerIpc(ctx){
       try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', removalPayload); } catch(_){ }
   // boardWindow removed
       try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('odds-update', removalPayload); } catch(_){ }
+      // Direct broker-closed for stats panel (in case odds removal races with initial render)
+      try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('broker-closed', { id }); } catch(_){ }
       try { console.log('[broker][close] cleaned', id); } catch(_){ }
     } catch(err){ try { console.warn('close-broker handling failed', err.message); } catch(_){ } }
   });

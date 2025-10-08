@@ -214,6 +214,7 @@ function renderEmbeddedOdds(){
 }
 function handleEmbeddedOdds(p){ try {
   if(!p||!p.broker) return;
+  if(p.removed){ if(embeddedOddsData[p.broker]){ delete embeddedOddsData[p.broker]; renderEmbeddedOdds(); } return; }
   // Apply swap if flagged (only for non-excel brokers)
   try { if(p.broker!=='excel' && window.__embeddedSwapped && window.__embeddedSwapped.has(p.broker) && Array.isArray(p.odds) && p.odds.length===2){ p={ ...p, odds:[p.odds[1], p.odds[0]] }; } } catch(_){ }
   // If map not initialized yet and payload carries map, adopt it
@@ -251,6 +252,22 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   try { if(window.desktopAPI && window.desktopAPI.onOdds){ window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update via desktopAPI', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } else { ipcRendererEmbedded.on('odds-update', (_e,p)=>{ try { console.debug('[embeddedOdds] odds-update via ipcRenderer', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.onTeamNames){ window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } else { ipcRendererEmbedded.on('lol-team-names-update', ()=> renderEmbeddedOdds()); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.getTeamNames){ window.desktopAPI.getTeamNames().then(()=>renderEmbeddedOdds()).catch(()=>{}); } } catch(_){ }
+  // Remove broker rows when a broker is closed (mirror board behavior)
+  try {
+    if(window.desktopAPI && window.desktopAPI.onBrokerClosed){
+      window.desktopAPI.onBrokerClosed(id=>{ try { if(id && embeddedOddsData[id]){ delete embeddedOddsData[id]; renderEmbeddedOdds(); } } catch(_){ } });
+    } else if(ipcRendererEmbedded){
+      ipcRendererEmbedded.on('broker-closed', (_e,p)=>{ try { const id=p&&p.id; if(id && embeddedOddsData[id]){ delete embeddedOddsData[id]; renderEmbeddedOdds(); } } catch(_){ } });
+    }
+  } catch(_){ }
+  // Sync with full active brokers list (drop any stale entries not present anymore)
+  try {
+    if(window.desktopAPI && window.desktopAPI.onBrokersSync){
+      window.desktopAPI.onBrokersSync(ids=>{ try { const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel'||k==='dataservices') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
+    } else if(ipcRendererEmbedded){
+      ipcRendererEmbedded.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel'||k==='dataservices') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
+    }
+  } catch(_){ }
   // One-time attempt to fetch last Excel odds (if loaded after they were emitted) so user doesn't need to re-select map
   try {
     const ipc = (window.require? window.require('electron').ipcRenderer: null);
