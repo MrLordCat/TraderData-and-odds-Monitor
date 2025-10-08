@@ -428,7 +428,7 @@ function bootstrap() {
   // Initialize periodic map re-broadcast (odds refresh auto loop)
   try {
     const { initMapAutoRefreshIpc } = require('./modules/ipc/mapAutoRefresh');
-    initMapAutoRefreshIpc({ ipcMain, store, mainWindow, boardManager, statsManager });
+  initMapAutoRefreshIpc({ ipcMain, store, mainWindow, boardManager, statsManager, views });
   } catch(e){ console.warn('initMapAutoRefreshIpc failed', e.message); }
   // Lightweight IPC to fetch last excel odds (used by stats panel / board after load to avoid needing map reselect)
   try {
