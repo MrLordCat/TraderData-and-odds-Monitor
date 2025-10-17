@@ -492,6 +492,12 @@ function bindBasic(){
   safe('modeA', el=> el.onclick = ()=>{ send('stats-layout',{mode:'focusA'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='focusA'; });
   safe('modeB', el=> el.onclick = ()=>{ send('stats-layout',{mode:'focusB'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='focusB'; });
   safe('toggleSide', el=> el.onclick = ()=>{ send('stats-toggle-side'); const d=byId('dbgSide'); if(d) d.textContent = d.textContent==='left'?'right':'left'; });
+
+  // Observe global game changes (placeholder: console + optional badge later)
+  try {
+    ipcRenderer.invoke('game-get').then(g=>{ try { console.log('[stats_panel] game initial', g); } catch(_){ } }).catch(()=>{});
+    ipcRenderer.on('game-changed', (_e, g)=>{ try { console.log('[stats_panel] game changed ->', g); } catch(_){ } });
+  } catch(_){ }
 }
 
 

@@ -183,4 +183,29 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2);
 	}).catch(()=>{ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2); }); } catch(_){ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2); }
 	try { ipcRenderer.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)) { burstLevels = v; } applyBurstInputsFromModel(); }).catch(()=> applyBurstInputsFromModel()); } catch(_){ applyBurstInputsFromModel(); }
+	// Pre-apply game selector from payload if present
+	try {
+		const sel = document.getElementById('game-select');
+		if(sel && cfg && cfg.selectedGame){ sel.value = cfg.selectedGame; }
+	} catch(_){ }
 });
+
+// ===== Game selector (global) =====
+(function(){
+	const sel = document.getElementById('game-select');
+	if(!sel) return;
+	const VALID = new Set(['lol','cs2','dota2']);
+	function applyInitial(v){
+		const game = VALID.has(v) ? v : 'lol';
+		sel.value = game;
+	}
+	try {
+		ipcRenderer.invoke('game-get').then(v=> applyInitial(v)).catch(()=> applyInitial('lol'));
+	} catch(_){ applyInitial('lol'); }
+	sel.addEventListener('change', ()=>{
+		const game = sel.value;
+		if(!VALID.has(game)) return;
+		// Persist and broadcast globally
+		try { ipcRenderer.send('game-set', { game }); } catch(_){ }
+	});
+})();

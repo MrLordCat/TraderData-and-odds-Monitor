@@ -15,6 +15,25 @@ function initSettingsIpc(ctx){
   ipcMain.on('settings-contrast-preview', ()=>{});
   ipcMain.on('settings-contrast-save', ()=>{});
 
+  // ===== Global Game selection (affects extractors & UI consumers) =====
+  const VALID_GAMES = new Set(['lol','cs2','dota2']);
+  function sanitizeGame(v){ return VALID_GAMES.has(v)? v: 'lol'; }
+  ipcMain.handle('game-get', ()=>{
+    try { return sanitizeGame(store.get('selectedGame') || 'lol'); } catch(_){ return 'lol'; }
+  });
+  ipcMain.on('game-set', (_e, payload)=>{
+    try {
+      const game = sanitizeGame(payload && payload.game);
+      store.set('selectedGame', game);
+      // Broadcast to all BrowserWindows and their BrowserViews
+      const { BrowserWindow } = require('electron');
+      BrowserWindow.getAllWindows().forEach(w=>{
+        try { w.webContents.send('game-changed', game); } catch(_){ }
+        try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('game-changed', game); } catch(_){ } }); } } catch(_){ }
+      });
+    } catch(_){ }
+  });
+
   // Auto odds tolerance (percent). Persist under key 'autoTolerancePct'.
   function clampTol(v){ return Math.max(0.01, Math.min(5, v)); }
   ipcMain.handle('auto-tolerance-get', ()=>{

@@ -1,5 +1,7 @@
 // Broker extractors & odds collection
-// Provides: getBrokerId(host), collectOdds(host, desiredMap), and deepQuery (internal export for advanced extractors)
+// Provides: getBrokerId(host), collectOdds(host, desiredMap, game), and deepQuery (internal export for advanced extractors)
+// NOTE: game-aware prep — All extractors accept (mapNum, game) but many ignore `game` for now.
+// This scaffolding allows switching selectors/phrases per game later without touching call sites again.
 
 function getBrokerId(host){
   try { host = (host||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'').replace(/^www\./,''); } catch(_){}
@@ -24,8 +26,23 @@ function deepQuery(selector, root=document){
   return res;
 }
 
+// ===== Game normalization and tokens (prep for future game-specific selectors) =====
+function normalizeGame(v){
+  try { const s=String(v||'lol').toLowerCase(); if(['lol','cs','cs2','dota','dota2'].includes(s)) return (s==='cs'? 'cs2': s==='dota'? 'dota2': s); } catch(_){ }
+  return 'lol';
+}
+function gameTokens(game){
+  const g = normalizeGame(game);
+  // Common tokens per game; can be expanded per broker later
+  const base = { mapWordEN: 'Map', matchWinnerEN: 'Match Winner' };
+  if(g==='lol') return base;
+  if(g==='cs2') return base; // CS2 generally uses Map terminology for map winner
+  if(g==='dota2') return base; // Dota 2 too
+  return base;
+}
+
 // ---- Individual site extractors (all return {odds:[..], frozen:boolean}) ----
-function extractRivalry(mapNum=0){
+function extractRivalry(mapNum=0, game='lol'){
   // Classless variant (uses only data-editor-id wrappers + text heuristics)
   try {
     const debug = !!window.__RIVALRY_DEBUG;
@@ -34,7 +51,7 @@ function extractRivalry(mapNum=0){
     const ORD=['First','Second','Third','Fourth','Fifth'];
     const norm = (s)=> (s||'').replace(/\s+/g,' ').trim().toLowerCase();
     let target=null;
-    if(mapNum===0){
+  if(mapNum===0){
       // Match overall market. Rivalry sometimes labels it just "Winner"; map markets include a preceding map ordinal.
       for(const w of wrappers){
         try {
@@ -55,7 +72,7 @@ function extractRivalry(mapNum=0){
           if(hasWinner && plates.length>=2 && !/Map\s*\d/i.test(w.textContent||'')){ target=w; break; }
         }
       }
-    } else {
+  } else {
       const idx = mapNum-1; if(idx<0||idx>=ORD.length) return { odds:['-','-'], frozen:false };
       const ordWord = ORD[idx].toLowerCase();
       const num = idx+1;
@@ -85,7 +102,7 @@ function extractRivalry(mapNum=0){
       const raw = numeric[numeric.length-1] || (spans.length? spans[spans.length-1].textContent.trim(): '-');
       return raw.replace(',','.');
     };
-    const odds = plates.map(extractPrice);
+  const odds = plates.map(extractPrice);
     // Enhanced suspension detection:
     // A plate is ACTIVE if:
     //  - Has a numeric odds value AND
@@ -144,7 +161,7 @@ function extractRivalry(mapNum=0){
   } catch(_){ return { odds:['-','-'], frozen:false }; }
 }
 
-function extractGg(mapNum=1){
+function extractGg(mapNum=1, game='lol'){
   // STRICT policy for map markets (>=1): if specific "Map N - Winner" is missing, DO NOT fallback to other markets.
   // GG UI uses [data-test="market-name"] with values like "Map 3 - Winner (incl. overtime)".
   let blocks=[...document.querySelectorAll('div.bg-surface-middle.mb-2')];
@@ -175,13 +192,13 @@ function extractGg(mapNum=1){
   return {odds:odds.length===2?odds:['-','-'],frozen};
 }
 
-function extractThunder(mapNum=1){
+function extractThunder(mapNum=1, game='lol'){
   const mapRe=new RegExp(`Map\\s*${mapNum}\\s+Winner`,'i'); const matchRe=/Match\\s+Winner/i; const markets=[...document.querySelectorAll("div[data-testid^='market-']")];
   let t=markets.find(m=>mapRe.test(m.textContent)); if(!t) t=markets.find(m=>matchRe.test(m.textContent)); if(!t) return {odds:['-','-'],frozen:false};
   const odds=[...t.querySelectorAll('span.odds-button__odds')].map(e=>e.textContent.trim()).slice(0,2); return {odds:odds.length===2?odds:['-','-'],frozen:false};
 }
 
-function extractBetboom(mapNum=1){
+function extractBetboom(mapNum=1, game='lol'){
   // NOTE: Russian words ("Карта", "Исход", "Исход матча", "П") intentionally retained.
   // They match the bookmaker's live DOM and must NOT be translated.
   const sections=[...document.querySelectorAll('section')];
@@ -203,7 +220,7 @@ function extractBetboom(mapNum=1){
   return {odds:odds.length===2?odds:['-','-'],frozen:false};
 }
 
-function extractPari(mapNum=0){
+function extractPari(mapNum=0, game='lol'){
   // NOTE: Russian literals ("-я карта", "Исход") intentionally retained for DOM matching.
   try {
     const wrapper=document.querySelector('.keyboard-navigator--Zb6nL');
@@ -224,7 +241,7 @@ function extractPari(mapNum=0){
   return {odds:odds.length===2?odds:['-','-'],frozen};
 }
 
-function extractMarathon(mapNum=1){
+function extractMarathon(mapNum=1, game='lol'){
   try {
     const blocks = Array.from(document.querySelectorAll('div.market-inline-block-table-wrapper'));
     if(!blocks.length) return { odds:['-','-'], frozen:false };
@@ -258,7 +275,7 @@ function extractMarathon(mapNum=1){
   } catch(_) { return { odds:['-','-'], frozen:false }; }
 }
 
-function extractBet365(mapNum=0){
+function extractBet365(mapNum=0, game='lol'){
   // bet365 structure policy (adjusted):
   //  mapNum === 0      => Match Lines (overall match winner)
   //  mapNum >= 1 (1,2,3...) => "Map {n} - Winner" (STRICT). Если конкретный Map рынок отсутствует -> возвращаем ['-','-'] (не подставляем матчевые).
@@ -359,7 +376,7 @@ function extractBet365(mapNum=0){
 //  Match Up Winner  (mapNum=0)
 //  Map N Winner     (mapNum>=1)
 // Strict: if a specific map market absent -> ['-','-']
-function extractDataServices(mapNum=0){
+function extractDataServices(mapNum=0, game='lol'){
   try {
     const markets = Array.from(document.querySelectorAll('div.market'));
     if(!markets.length) return { odds:['-','-'], frozen:false };
@@ -369,7 +386,8 @@ function extractDataServices(mapNum=0){
       target = markets.find(m=> re.test(getMarketName(m)) );
       if(!target) return { odds:['-','-'], frozen:false };
     } else {
-      target = markets.find(m=> /Match\s*Up\s*Winner/i.test(getMarketName(m)) );
+  // For most games DS uses "Match Up Winner"; allow broader pattern if adjusted later per game
+  target = markets.find(m=> /Match\s*Up\s*Winner/i.test(getMarketName(m)) );
       if(!target) return { odds:['-','-'], frozen:false };
     }
     const items = Array.from(target.querySelectorAll('ul.selections-container li.selection-item')).slice(0,2);
@@ -420,9 +438,10 @@ const EXTRACTOR_TABLE = [
   ,{ test: /betgenius\.com$/i, fn: extractDataServices }
 ];
 
-function collectOdds(host, desiredMap){
+function collectOdds(host, desiredMap, game){
+  const g = normalizeGame(game);
   let meta={odds:['-','-'],frozen:false};
-  for(const row of EXTRACTOR_TABLE){ if(row.test.test(host)){ meta=row.fn(desiredMap)||meta; break; } }
+  for(const row of EXTRACTOR_TABLE){ if(row.test.test(host)){ meta=row.fn(desiredMap, g)||meta; break; } }
   return { broker:getBrokerId(host), odds:meta.odds, frozen:meta.frozen, ts:Date.now(), map:desiredMap };
 }
 

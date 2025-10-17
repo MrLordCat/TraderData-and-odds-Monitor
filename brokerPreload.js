@@ -35,12 +35,19 @@ ipcRenderer.on('zoom-indicator', (_evt, factor)=>{
 
 // Odds collection wrapper
 function effectiveMap(){
-  // For brokers that represent final map as match market (currently only bet365) -> if isLast enabled and desiredMap>0 use 0
-  if(isLast && BROKER_ID==='bet365' && desiredMap>0) return 0;
+  // For brokers that represent final map as match market -> if isLast enabled and desiredMap>0 use 0
+  // Currently: bet365, rivalry
+  if(isLast && desiredMap>0){
+    if(BROKER_ID==='bet365' || BROKER_ID==='rivalry') return 0;
+  }
   return desiredMap;
 }
+// Current selected game (global). Default 'lol'.
+let __selectedGame = 'lol';
+try { ipcRenderer.invoke('game-get').then(v=>{ if(v) __selectedGame=v; }).catch(()=>{}); } catch(_){ }
+ipcRenderer.on('game-changed', (_e, game)=>{ try { if(typeof game==='string') __selectedGame=game; } catch(_){ } });
 function getCurrentOdds(){
-  const data = collectOddsExt(HOST, effectiveMap());
+  const data = collectOddsExt(HOST, effectiveMap(), __selectedGame);
   try { if(BROKER_ID && data && typeof data==='object') data.broker = BROKER_ID; } catch(_){ }
   return data;
 }

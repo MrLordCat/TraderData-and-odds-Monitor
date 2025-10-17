@@ -15,6 +15,19 @@
 		</div>
 		<div class="content">
 			<section>
+				<h2 class="sectionTitle">Game</h2>
+				<div class="grid formGrid">
+					<label for="game-select">Select game</label>
+					<select id="game-select">
+						<option value="lol">League of Legends</option>
+						<option value="cs2">CS2</option>
+						<option value="dota2">Dota 2</option>
+					</select>
+				</div>
+				<div class="hint">Эта настройка применяется глобально. Слушатели получают событие и могут менять парсеры и отображение.</div>
+			</section>
+			<hr class="sepLine" />
+			<section>
 				<h2 class="sectionTitle">Auto Odds</h2>
 				<div class="grid formGrid">
 					<label for="auto-tolerance">Tolerance (%)</label><input id="auto-tolerance" type="number" min="0.01" max="5" step="0.01" />

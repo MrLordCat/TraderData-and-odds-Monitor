@@ -23,7 +23,7 @@ function computeDerived(){
   const midCell=midRow.children[1];
   const arbCell=arbRow.children[1];
   // Exclude excel (and legacy dataservices) from aggregated mid/arb calculations
-  const active = Object.values(boardData).filter(r=> r.broker!=='excel' && r.broker!=='dataservices' && !r.frozen && r.odds.every(o=>!isNaN(parseFloat(o))));
+  const active = Object.values(boardData).filter(r=> r.broker!=='excel' && r.broker!=='dataservices' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
   if (!active.length){ midCell.textContent='-'; arbCell.textContent='-'; return; }
   const s1=active.map(r=>parseFloat(r.odds[0]));
   const s2=active.map(r=>parseFloat(r.odds[1]));
@@ -56,8 +56,8 @@ function renderBoard(){
   const best1=parsed1.length?Math.max(...parsed1):NaN;
   const best2=parsed2.length?Math.max(...parsed2):NaN;
   tb.innerHTML = vals.map(r=>{
-    const o1=parseFloat(r.odds[0]);
-    const o2=parseFloat(r.odds[1]);
+    const o1=parseFloat(r.odds?.[0]);
+    const o2=parseFloat(r.odds?.[1]);
     const isSwapped = swapped.has(r.broker);
     const bestCls1 = (!r.frozen && o1===best1)?'best':'';
     const bestCls2 = (!r.frozen && o2===best2)?'best':'';
@@ -85,21 +85,24 @@ if(window.desktopAPI){
   // Excel extractor log bridging
   try { window.desktopAPI.onExcelLog && window.desktopAPI.onExcelLog(payload=>{ try { if(payload && payload.msg) console.log('[excel-extractor][bridge]', payload.msg); } catch(_){ } }); } catch(_){ }
   window.desktopAPI.onOdds && window.desktopAPI.onOdds(p=>{ 
+    if(!p || !p.broker){ return; }
     if(p && p.removed){ if(boardData[p.broker]){ delete boardData[p.broker]; renderBoard(); } return; }
-    if(swapped.has(p.broker) && Array.isArray(p.odds) && p.odds.length===2){ p = { ...p, odds:[p.odds[1], p.odds[0]] }; }
-    boardData[p.broker]=p; 
+    let rec = p;
+    if(!Array.isArray(rec.odds) || rec.odds.length<2){ rec = { ...rec, odds:['-','-'], frozen: !!rec.frozen }; }
+    if(swapped.has(rec.broker) && Array.isArray(rec.odds) && rec.odds.length===2){ rec = { ...rec, odds:[rec.odds[1], rec.odds[0]] }; }
+    boardData[rec.broker]=rec; 
     renderBoard(); 
   // Auto disable / resume for suspension (dataservices freeze) with autoResume flag
     try {
-  if(p.broker==='excel' || p.broker==='dataservices'){
-        if(p.frozen && window.__autoSim && window.__autoSim.active){
+  if(rec.broker==='excel' || rec.broker==='dataservices'){
+        if(rec.frozen && window.__autoSim && window.__autoSim.active){
           window.__autoSim.active=false; clearTimeout(window.__autoSim.timer); window.__autoSim.timer=null;
           const btn=document.getElementById('autoBtn'); if(btn) btn.classList.remove('on');
           autoSim.lastDisableReason='excel-suspended';
           autoStatus('Auto OFF (excel suspended)');
           try { console.log('[autoSim][board][autoDisable] excel suspended -> auto OFF (intent', autoSim.userWanted? 'kept':'cleared', ') resumeAllowed', autoSim.autoResume); } catch(_){ }
           try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { active:false, reason:'excel-suspended' }); } } catch(_){ }
-        } else if(!p.frozen && window.__autoSim && !window.__autoSim.active && autoSim.userWanted && autoSim.lastDisableReason==='excel-suspended'){
+        } else if(!rec.frozen && window.__autoSim && !window.__autoSim.active && autoSim.userWanted && autoSim.lastDisableReason==='excel-suspended'){
           if(autoSim.autoResume){
             window.__autoSim.active=true; autoSim.lastDisableReason='excel-resumed';
             const btn=document.getElementById('autoBtn'); if(btn) btn.classList.add('on');
@@ -304,6 +307,12 @@ window.addEventListener('DOMContentLoaded', ()=>{
   restoreMapAndBroadcast();
   // If external map arrived before DOM ready, enforce it now
   try { if(currentMapBoard!=null){ forceBoardMapSelect(currentMapBoard); } } catch(_){ }
+  // Observe global game changes (prep)
+  try {
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.invoke('game-get').then(g=>{ try { console.log('[board] game initial', g); } catch(_){ } }).catch(()=>{});
+    ipcRenderer.on('game-changed', (_e,g)=>{ try { console.log('[board] game changed ->', g); } catch(_){ } });
+  } catch(_){ }
 });
 
 // Remove manual editable headers; rely on synced names from stats panel.

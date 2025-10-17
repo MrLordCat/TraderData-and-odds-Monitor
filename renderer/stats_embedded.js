@@ -213,6 +213,12 @@ function renderEmbeddedOdds(){
     if(indRow) indRow.style.display = vis;
   } catch(_){ }
 }
+// Prepare for game-specific tweaks (just log for now)
+try {
+  const { ipcRenderer } = require('electron');
+  ipcRenderer.invoke('game-get').then(g=>{ try { console.log('[embeddedOdds] game initial', g); } catch(_){ } }).catch(()=>{});
+  ipcRenderer.on('game-changed', (_e,g)=>{ try { console.log('[embeddedOdds] game changed ->', g); } catch(_){ } });
+} catch(_){ }
 function handleEmbeddedOdds(p){ try {
   if(!p||!p.broker) return;
   if(p.removed){ if(embeddedOddsData[p.broker]){ delete embeddedOddsData[p.broker]; renderEmbeddedOdds(); } return; }
