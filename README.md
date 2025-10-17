@@ -98,6 +98,13 @@ Confirm (F22) fires ~60–120ms after final directional pulse. AHK maps F22 to t
 
 Automation disables when the Excel/dataservices feed stops changing (freeze timeout). A localStorage intent flag ensures only automatically suspended sessions auto-resume on feed change; manual disables stay off until re-enabled.
 
+### New: Auto suspend by market state (R-mode)
+- When Auto is ON and Resume (R) is enabled, the app now automatically suspends Auto in two cases:
+	- All books are suspended so Mid cannot be computed (no live odds) — Auto OFF (reason: `no-mid`).
+	- A large cross-book arbitrage appears (>= 5%) — Auto OFF (reason: `arb-spike`).
+- It automatically resumes Auto once Mid is available again and there is no arbitrage (arb < 5%), but only if the last disable was automatic (one of the two reasons above) and the user previously enabled Auto.
+- The same behavior applies to the embedded stats panel.
+
 ## Map Auto-Restore & Dataservices Fallback
 
 Map selection (`lastMap`) & team names persist. After any navigation the main process replays `set-map` at 400/1400/3000/5000ms. Each preload re-applies the map (plus SPA mutation observer). Sometimes dataservices misses all early broadcasts, so extra safeguards were added:

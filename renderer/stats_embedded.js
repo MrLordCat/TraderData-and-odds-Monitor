@@ -212,6 +212,8 @@ function renderEmbeddedOdds(){
     const vis = embeddedAutoSim.active ? '' : 'none';
     if(indRow) indRow.style.display = vis;
   } catch(_){ }
+  // After rendering, evaluate embedded auto guard
+  try { embeddedAutoGuardByMarket(); } catch(_){ }
 }
 // Prepare for game-specific tweaks (just log for now)
 try {
@@ -255,6 +257,87 @@ function handleEmbeddedOdds(p){ try {
     }
   } catch(_){ }
 } catch(_){ } }
+
+// ======= Embedded derived + auto guard =======
+function computeEmbeddedDerived(){
+  // Compute hasMid/arb similar to board: exclude excel/dataservices and frozen
+  const vals=Object.values(embeddedOddsData).filter(r=>r && r.broker!=='excel' && r.broker!=='dataservices' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
+  if(!vals.length){ window.__embeddedDerived={ hasMid:false, arbProfitPct:null }; return; }
+  const s1=vals.map(r=>parseFloat(r.odds[0]));
+  const s2=vals.map(r=>parseFloat(r.odds[1]));
+  const over=1/Math.max(...s1)+1/Math.max(...s2);
+  const hasArb = over < 1;
+  const profitPct = hasArb ? (1-over)*100 : 0;
+  window.__embeddedDerived={ hasMid:true, arbProfitPct: profitPct };
+}
+
+const EMB_ARB_SUSPEND_PCT = 5.0;
+function embeddedAutoGuardByMarket(){
+  try {
+    computeEmbeddedDerived();
+    const d = window.__embeddedDerived; if(!d) return;
+    const sim = window.__embeddedAutoSim; if(!sim) return;
+    if(!sim.autoResume) return; // R-mode must be on for auto changes
+    const btn=document.getElementById('embeddedAutoBtn');
+    const shouldSuspend = (!d.hasMid) || (typeof d.arbProfitPct==='number' && d.arbProfitPct >= EMB_ARB_SUSPEND_PCT);
+    if(shouldSuspend){
+      if(sim.active){
+        sim.active=false; clearTimeout(sim.timer); sim.timer=null;
+        sim.lastDisableReason = (!d.hasMid) ? 'no-mid' : 'arb-spike';
+        if(btn) btn.classList.remove('on');
+        try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active:false, reason: sim.lastDisableReason }); } } catch(_){ }
+          // Fire global suspend (F21) so AHK performs Suspend+Update
+          try {
+            if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true }); }
+            else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true }); } }
+          } catch(_){ }
+          // Retry once after 500ms if Excel still shows trading (not frozen)
+          try {
+            setTimeout(()=>{
+              try {
+                if(window.__embeddedAutoSim && window.__embeddedAutoSim.active) return;
+                const lastReason = window.__embeddedAutoSim && window.__embeddedAutoSim.lastDisableReason;
+                if(!(lastReason==='no-mid' || lastReason==='arb-spike')) return;
+                const ex = embeddedOddsData['excel'] || embeddedOddsData['dataservices'];
+                const stillTrading = !ex || !ex.frozen;
+                if(stillTrading){
+                  try {
+                    if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, retry:true }); }
+                    else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, retry:true }); } }
+                  } catch(_){ }
+                }
+              } catch(_){ }
+            }, 500);
+          } catch(_){ }
+      }
+      return;
+    }
+    const canResume = (d.hasMid && (!d.arbProfitPct || d.arbProfitPct < EMB_ARB_SUSPEND_PCT));
+    if(canResume && !sim.active && sim.userWanted && (sim.lastDisableReason==='no-mid' || sim.lastDisableReason==='arb-spike')){
+      sim.active=true; sim.lastDisableReason='market-resumed';
+      if(btn) btn.classList.add('on');
+      try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active:true, reason:'market-resumed', tolerance: sim.tolerancePct }); } } catch(_){ }
+        // On resume, send Unsuspend (F21) immediately and retry once after 500ms if conditions still good
+        try {
+          if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true }); }
+          else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true }); } }
+        } catch(_){ }
+        try {
+          setTimeout(()=>{
+            try {
+              const d2 = window.__embeddedDerived || window.__boardDerived; // fallback if shared
+              const stillCanResume = d2 && d2.hasMid && (!d2.arbProfitPct || d2.arbProfitPct < 5.0);
+              if(!stillCanResume) return;
+              if(!(window.__embeddedAutoSim && window.__embeddedAutoSim.active)) return;
+              if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true, retry:true }); }
+              else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true, retry:true }); } }
+            } catch(_){ }
+          }, 500);
+        } catch(_){ }
+        try { embeddedStep(); } catch(_){ }
+    }
+  } catch(_){ }
+}
 function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSection'); if(!root) return; // collapse handled globally
   try { if(window.desktopAPI && window.desktopAPI.onOdds){ window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update via desktopAPI', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } else { ipcRendererEmbedded.on('odds-update', (_e,p)=>{ try { console.debug('[embeddedOdds] odds-update via ipcRenderer', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.onTeamNames){ window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } else { ipcRendererEmbedded.on('lol-team-names-update', ()=> renderEmbeddedOdds()); } } catch(_){ }
@@ -523,6 +606,20 @@ try {
   const { ipcRenderer } = window.require? window.require('electron'): {};
   if(ipcRenderer){
     ipcRenderer.on('auto-toggle-all', ()=>{ try { embeddedToggleAuto(); } catch(_){ } });
+    // Mirror auto ON/OFF broadcast from main/board
+    ipcRenderer.on('auto-set-all', (_e, p)=>{
+      try {
+        const wantOn = !!(p && p.on);
+        if(wantOn !== embeddedAutoSim.active){
+          embeddedAutoSim.active = wantOn;
+          if(wantOn){ embeddedAutoSim.userWanted=true; embeddedAutoSim.lastDisableReason=null; embeddedStep(); }
+          else { clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=null; }
+          try { localStorage.setItem('embeddedAutoUserWanted', wantOn? '1':'0'); } catch(_){ }
+          const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.toggle('on', wantOn);
+          const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow'); if(indRow) indRow.style.display=wantOn? '' : 'none';
+        }
+      } catch(_){ }
+    });
   }
 } catch(_){ }
 

@@ -221,6 +221,7 @@ tfoot tr#midRow th { background: #1d2330; }
   cursor: pointer;
 }
 .autoBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
+.autoBtn.paused { background:#6b5a2a; color:#fff; border-color:#8a7336; }
 .excelControls { display:inline-flex; align-items:center; gap:6px; flex-wrap:nowrap; }
 .excelControls button { margin-left:0; }
 .excelControls .autoBtn { margin-left:8px; }

@@ -24,7 +24,11 @@ function computeDerived(){
   const arbCell=arbRow.children[1];
   // Exclude excel (and legacy dataservices) from aggregated mid/arb calculations
   const active = Object.values(boardData).filter(r=> r.broker!=='excel' && r.broker!=='dataservices' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
-  if (!active.length){ midCell.textContent='-'; arbCell.textContent='-'; return; }
+  if (!active.length){
+    midCell.textContent='-'; arbCell.textContent='-';
+    try { window.__boardDerived = { hasMid:false, arbProfitPct:null }; } catch(_){ }
+    return;
+  }
   const s1=active.map(r=>parseFloat(r.odds[0]));
   const s2=active.map(r=>parseFloat(r.odds[1]));
   // IMPORTANT: Mid is defined as the midpoint between the lowest and highest odds only
@@ -37,9 +41,85 @@ function computeDerived(){
     const profitPct = (1 - over) * 100;
     arbCell.textContent = profitPct.toFixed(2) + '%';
     arbCell.classList.add('arb-positive');
+    try { window.__boardDerived = { hasMid:true, arbProfitPct: profitPct }; } catch(_){ }
   } else {
     arbCell.textContent = '—';
+    try { window.__boardDerived = { hasMid:true, arbProfitPct: 0 }; } catch(_){ }
   }
+}
+
+// Auto guard: suspend/resume based on market state (no Mid or large ARB)
+const ARB_SUSPEND_PCT = 5.0; // suspend if arbitrage >= 5%
+function autoGuardByMarket(){
+  try {
+    const d = window.__boardDerived;
+    if(!d) return;
+    const sim = window.__autoSim; if(!sim) return;
+    // Only operate when resume allowed (R-mode) is ON
+    if(!sim.autoResume) return;
+    const btn=document.getElementById('autoBtn');
+    // Suspend conditions: no Mid OR large arbitrage
+    const shouldSuspend = (!d.hasMid) || (typeof d.arbProfitPct==='number' && d.arbProfitPct >= ARB_SUSPEND_PCT);
+    if(shouldSuspend){
+      if(sim.active){
+        sim.active=false; clearTimeout(sim.timer); sim.timer=null;
+        sim.lastDisableReason = (!d.hasMid) ? 'no-mid' : 'arb-spike';
+  if(btn) btn.classList.remove('on');
+        try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { active:false, reason: sim.lastDisableReason }); } } catch(_){ }
+  try { refreshAutoButtonsVisual(); } catch(_){ }
+        // Fire global suspend (F21) so AHK performs Suspend+Update
+        try {
+          if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true }); }
+          else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true }); } }
+        } catch(_){ }
+        // Retry once after 500ms if Excel still shows trading (not frozen)
+        try {
+          setTimeout(()=>{
+            try {
+              // Skip if auto already resumed or reason changed
+              if(window.__autoSim && window.__autoSim.active) return;
+              if(!(window.__autoSim && (window.__autoSim.lastDisableReason==='no-mid' || window.__autoSim.lastDisableReason==='arb-spike'))) return;
+              const exRec = boardData['excel'] || boardData['dataservices'];
+              const stillTrading = !exRec || !exRec.frozen; // if unknown, be conservative and retry
+              if(stillTrading){
+                try {
+                  if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, retry:true }); }
+                  else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, retry:true }); } }
+                } catch(_){ }
+              }
+            } catch(_){ }
+          }, 500);
+        } catch(_){ }
+      }
+      return; // stay suspended
+    }
+    // Resume conditions: Mid present AND no arbitrage, last disable was our reason, and user intended auto previously
+    const canResume = (d.hasMid && (!d.arbProfitPct || d.arbProfitPct < ARB_SUSPEND_PCT));
+    if(canResume && !sim.active && sim.userWanted && (sim.lastDisableReason==='no-mid' || sim.lastDisableReason==='arb-spike')){
+      sim.active=true; sim.lastDisableReason='market-resumed';
+  if(btn) btn.classList.add('on');
+      try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { active:true, reason:'market-resumed', tolerance: sim.tolerancePct }); } } catch(_){ }
+  try { refreshAutoButtonsVisual(); } catch(_){ }
+      // On resume, issue Unsuspend (F21) and retry once after 500ms if still resumable
+      try {
+        if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true }); }
+        else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true }); } }
+      } catch(_){ }
+      try {
+        setTimeout(()=>{
+          try {
+            const d2 = window.__boardDerived;
+            const stillCanResume = d2 && d2.hasMid && (!d2.arbProfitPct || d2.arbProfitPct < ARB_SUSPEND_PCT);
+            if(!stillCanResume) return;
+            if(!(window.__autoSim && window.__autoSim.active)) return;
+            if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true, retry:true }); }
+            else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true, retry:true }); } }
+          } catch(_){ }
+        }, 500);
+      } catch(_){ }
+      try { autoStep(); } catch(_){ }
+    }
+  } catch(_){ }
 }
 
 function renderBoard(){
@@ -79,6 +159,8 @@ function renderBoard(){
     if(statusSpan && statusSpan.dataset.last==='idle'){ statusSpan.style.display='none'; }
   }
   computeDerived();
+  // Evaluate auto guard after rendering derived values
+  autoGuardByMarket();
 }
 
 if(window.desktopAPI){
@@ -102,6 +184,7 @@ if(window.desktopAPI){
           autoStatus('Auto OFF (excel suspended)');
           try { console.log('[autoSim][board][autoDisable] excel suspended -> auto OFF (intent', autoSim.userWanted? 'kept':'cleared', ') resumeAllowed', autoSim.autoResume); } catch(_){ }
           try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { active:false, reason:'excel-suspended' }); } } catch(_){ }
+          try { refreshAutoButtonsVisual(); } catch(_){ }
         } else if(!rec.frozen && window.__autoSim && !window.__autoSim.active && autoSim.userWanted && autoSim.lastDisableReason==='excel-suspended'){
           if(autoSim.autoResume){
             window.__autoSim.active=true; autoSim.lastDisableReason='excel-resumed';
@@ -109,10 +192,12 @@ if(window.desktopAPI){
             autoStatus(`Resume (tol ${autoSim.tolerancePct.toFixed(2)}%)`);
             try { console.log('[autoSim][board][autoResume] excel resumed -> auto ON (autoResume=true)'); } catch(_){ }
             try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { active:true, reason:'excel-resumed', tolerance:autoSim.tolerancePct }); } } catch(_){ }
+            try { refreshAutoButtonsVisual(); } catch(_){ }
             autoStep();
           } else {
             try { console.log('[autoSim][board][resume-blocked] excel resumed but autoResume=false'); } catch(_){ }
             autoStatus('Resume blocked (R off)');
+            try { refreshAutoButtonsVisual(); } catch(_){ }
           }
         }
       }
@@ -373,6 +458,21 @@ function parseExcel(){ return parsePairRow('excelRow'); }
 // setExcelOdds previously mutated the visible Excel odds during simulation; removed from auto flow.
 function setExcelOdds(n1,n2){ /* retained for future real integration but unused by auto simulation */ }
 function autoStatus(_msg){ /* status text removed (only indicator dots shown) */ }
+// Visual state helpers for Auto/R buttons
+function refreshAutoButtonsVisual(){
+  try {
+    const autoBtn = document.getElementById('autoBtn');
+    const rBtn = document.getElementById('autoResumeBtn');
+    const sim = window.__autoSim;
+    if(autoBtn && sim){
+      autoBtn.classList.toggle('on', !!sim.active);
+      const paused = !sim.active && !!sim.userWanted && (sim.lastDisableReason && !/^manual/.test(sim.lastDisableReason));
+      autoBtn.classList.toggle('paused', paused);
+      autoBtn.title = paused ? `Auto paused (${sim.lastDisableReason||''})` : (sim.active? 'Auto: ON' : 'Auto: OFF');
+    }
+    if(rBtn && sim){ rBtn.classList.toggle('on', !!sim.autoResume); }
+  } catch(_){ }
+}
 function flashDot(idx){ const dot=document.querySelector('.autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), autoSim.stepMs-80); } }
 function scheduleAuto(delay){ if(!autoSim.active) return; clearTimeout(autoSim.timer); autoSim.timer=setTimeout(autoStep, typeof delay==='number'? delay: autoSim.stepMs); }
 function autoStep(){
@@ -489,6 +589,7 @@ function toggleAuto(){
     if(autoSim.active){ autoSim.userWanted=true; autoSim.lastDisableReason=null; localStorage.setItem('autoUserWanted','1'); }
     else { autoSim.userWanted=false; autoSim.lastDisableReason='manual'; localStorage.setItem('autoUserWanted','0'); }
   } catch(_){ }
+  refreshAutoButtonsVisual();
   // Notify main for centralized logging
   try {
     if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { active: autoSim.active, tolerance: autoSim.tolerancePct }); }
@@ -505,12 +606,14 @@ document.addEventListener('click', e=>{
     if(!autoSim.autoResume && autoSim.lastDisableReason==='excel-suspended'){
       autoStatus('Auto resume disabled');
     }
+    refreshAutoButtonsVisual();
   }
   if(e.target && e.target.id==='excelScriptBtn'){
     try { if(window.desktopAPI && window.desktopAPI.excelScriptToggle){ window.desktopAPI.excelScriptToggle(); } } catch(_){ }
   }
 });
 window.addEventListener('DOMContentLoaded', ()=>{ try { const b=document.getElementById('autoResumeBtn'); if(b) b.classList.toggle('on', autoSim.autoResume); } catch(_){ } });
+window.addEventListener('DOMContentLoaded', ()=>{ try { refreshAutoButtonsVisual(); } catch(_){ } });
 window.__autoSim = autoSim;
 
 // Excel extractor status reflection
@@ -519,12 +622,12 @@ try {
     const btn = document.getElementById('excelScriptBtn'); if(!btn) return;
     const { running, starting, error, installing } = st || {};
     btn.classList.toggle('on', !!running);
-    if(installing){ btn.textContent='⧗'; btn.title='Установка зависимостей (pywin32)...'; }
-    else if(starting) { btn.textContent='…'; btn.title='Стартует...'; }
-    else { btn.textContent = 'S'; btn.title = running? 'Stop Excel extractor script' : 'Start Excel extractor script'; }
+    if(installing){ btn.textContent='⧗'; btn.title='Excel script: installing dependencies (pywin32)...'; }
+    else if(starting) { btn.textContent='…'; btn.title='Excel script: starting...'; }
+    else { btn.textContent = running? 'S●' : 'S○'; btn.title = running? 'Excel script: running (click to stop)' : 'Excel script: stopped (click to start)'; }
     if(error){
       btn.classList.add('error');
-      btn.title = (btn.title? btn.title+'\n':'') + 'Ошибка: '+error + ( /pywin32/i.test(error) ? '\n(Клик ПКМ для установки pywin32)' : '' );
+      btn.title = (btn.title? btn.title+'\n':'') + 'Ошибка: '+error + ( /pywin32/i.test(error) ? '\n(ПКМ: установить pywin32)' : '' );
     } else btn.classList.remove('error');
   }
   if(window.desktopAPI && window.desktopAPI.onExcelScriptStatus){
@@ -647,6 +750,21 @@ try {
         // Optional: if autoSim inactive we still show a transient status
         if(!autoSim.active){
           autoStatus('Manual '+ (side===0?'S1':'S2'));
+        }
+      } catch(_){ }
+    });
+    // Mirror auto ON/OFF from other views
+    ipcRenderer.on('auto-set-all', (_e, p)=>{
+      try {
+        const wantOn = !!(p && p.on);
+        if(wantOn !== autoSim.active){
+          autoSim.active = wantOn;
+          if(wantOn){ autoSim.userWanted=true; autoSim.lastDisableReason=null; autoStep(); }
+          else { clearTimeout(autoSim.timer); autoSim.timer=null; }
+          // update visuals and persist intent
+          try { localStorage.setItem('autoUserWanted', wantOn? '1':'0'); } catch(_){ }
+          const btn=document.getElementById('autoBtn'); if(btn) btn.classList.toggle('on', wantOn);
+          refreshAutoButtonsVisual();
         }
       } catch(_){ }
     });

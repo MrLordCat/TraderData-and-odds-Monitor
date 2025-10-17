@@ -11,6 +11,9 @@ SetMouseDelay(-1)
 
 global gIniPath := A_ScriptDir "\\config159.ini"
 global gSyncPath := A_ScriptDir "\\template_sync.json"
+; File-signal path from Electron (main.js writes here)
+global gSignalPath := A_ScriptDir "\\..\\desktop\\auto_press_signal.json"
+global gSignalLastTs := 0
 
 ; Read hotkeys from INI
 LBKey2 := IniRead(gIniPath, "Keyboard", "LBKey2", "NumpadSub")
@@ -29,13 +32,15 @@ SetTimer(WatchSync, 400)
 SetTimer(() => (WatchSync(), 0), -300)
 ; Watch INI changes to rebind hotkeys live
 SetTimer(WatchIni, 800)
+; Watch external key signal file as an additional trigger channel (covers cases where F-keys are not intercepted)
+SetTimer(CheckAutoSignal, 250)
 ; Help window hotkey (fixed): Numpad9
 Hotkey("Numpad9", ShowHelp, "On")
 ; Global actions (fixed): Numpad1 = Suspend/Unsuspend, Numpad0 = Update
 Hotkey("Numpad1", GlobalSuspend, "On")
 Hotkey("Numpad0", GlobalUpdate, "On")
 ; External triggers (fixed): F23/LB, F24/RB, F22/Update, F21/Suspend
-global gEmitGuard := false  ; prevents re-entry when we Send F-keys ourselves
+global gEmitGuardUntil := 0  ; timestamp (A_TickCount) until which inbound F-hotkeys are ignored
 Hotkey("F23", OnF23, "On")
 Hotkey("F24", OnF24, "On")
 Hotkey("F22", OnF22, "On")
@@ -109,23 +114,24 @@ ReapplyModesFromName(*) {
 
 ; ---------- Action (no-CTRL) hotkeys ----------
 LaunchLBClick(*) {
-    global gEmitGuard
     ; emit signal for external listener, but avoid triggering our own F-hotkey handler
-    gEmitGuard := true
+    GuardEmit(300)
     try Send "{F23}"
-    gEmitGuard := false
     DoClick("LB")
 }
 LaunchRBClick(*) {
-    global gEmitGuard
-    gEmitGuard := true
+    GuardEmit(300)
     try Send "{F24}"
-    gEmitGuard := false
     DoClick("RB")
 }
 
 DoClick(kind) {
     global gOverrideTpl, gOverrideMap
+    ; Ensure Excel window is active before clicking
+    if (!EnsureExcelActive()) {
+        Balloon("Excel не активен — попытка активации не удалась")
+        ; proceed anyway to avoid blocking, but likely click will miss target
+    }
     T := GetEffectiveTemplate()
     if !T {
         Balloon("Нет шаблона для клика")
@@ -459,12 +465,9 @@ ShowHelp(*) {
 
 ; ---------- Global actions ----------
 GlobalSuspend(*) {
-    global gIniPath, gEmitGuard
-    if (!gEmitGuard) {
-        gEmitGuard := true
-        try Send "{F21}"
-        gEmitGuard := false
-    }
+    global gIniPath
+    GuardEmit(300)
+    try Send "{F21}"
     sx := IniRead(gIniPath, "Joy3", "SuspendX", "")
     sy := IniRead(gIniPath, "Joy3", "SuspendY", "")
     if (sx = "" or sy = "") {
@@ -493,6 +496,9 @@ GlobalSuspend(*) {
     ; Perform two clicks with one save/restore of cursor
     MouseGetPos &ox, &oy
     try {
+        if (!EnsureExcelActive()) {
+            Balloon("Excel не активен — попытка активации не удалась")
+        }
         MouseMove sxx, syy, 0
         Click "Left"
         Sleep delayMs
@@ -512,11 +518,11 @@ GlobalSuspend(*) {
 }
 
 GlobalUpdate(*) {
-    global gIniPath, gEmitGuard
-    if (!gEmitGuard) {
-        gEmitGuard := true
-        try Send "{F22}"
-        gEmitGuard := false
+    global gIniPath
+    GuardEmit(300)
+    try Send "{F22}"
+    if (!EnsureExcelActive()) {
+        Balloon("Excel не активен — попытка активации не удалась")
     }
     x := IniRead(gIniPath, "Joy3", "UpdateX", "")
     y := IniRead(gIniPath, "Joy3", "UpdateY", "")
@@ -538,6 +544,9 @@ GlobalUpdate(*) {
 TryClickAt(x, y) {
     try {
         xx := Integer(x), yy := Integer(y)
+        if (!EnsureExcelActive()) {
+            Balloon("Excel не активен — попытка активации не удалась")
+        }
         MouseGetPos &ox, &oy
         MouseMove xx, yy, 0
         Click "Left"
@@ -548,22 +557,80 @@ TryClickAt(x, y) {
     }
 }
 
+EnsureExcelActive() {
+    ; Returns true if Excel window is active, otherwise tries to activate it (twice) and returns success
+    global gIniPath
+    title := IniRead(gIniPath, "Keyboard", "ExcelTitleContains", "")
+    cls := IniRead(gIniPath, "Keyboard", "ExcelClass", "XLMAIN")
+    exe := IniRead(gIniPath, "Keyboard", "ExcelExe", "EXCEL.EXE")
+    crit := (title != "" ? (title " ") : "") . "ahk_class " . cls . " ahk_exe " . exe
+    try {
+        if WinActive(crit)
+            return true
+        ; Two activation attempts with brief delay (user requested "две нажатия")
+        WinActivate crit
+        Sleep 60
+        WinActivate crit
+        WinWaitActive crit, , 500
+        return !!WinActive(crit)
+    } catch {
+        return false
+    }
+}
+
+CheckAutoSignal(*) {
+    try {
+        file := gSignalPath
+        if !FileExist(file)
+            return
+        content := FileRead(file, "UTF-8")
+        ; Expect JSON like { "key":"F21","side":0,"ts":123456789 }
+        local ts := 0, key := ""
+        if RegExMatch(content, '"ts"\s*:\s*(\d+)', &mTs)
+            ts := Integer(mTs[1])
+        if (ts <= gSignalLastTs)
+            return
+        gSignalLastTs := ts
+        if RegExMatch(content, '"key"\s*:\s*"(F2[1-4])"', &mKey)
+            key := mKey[1]
+        else {
+            ; Legacy: map side to F23/F24 if key missing
+            local side := -1
+            if RegExMatch(content, '"side"\s*:\s*(\d+)', &mSide) {
+                side := Integer(mSide[1])
+                key := (side=1) ? "F24" : "F23"
+            }
+        }
+        ; Dispatch without re-emitting F-keys
+        if (key = "F21")
+            OnF21()
+        else if (key = "F22")
+            OnF22()
+        else if (key = "F23")
+            OnF23()
+        else if (key = "F24")
+            OnF24()
+    } catch {
+        ; ignore parse errors
+    }
+}
+
 ; --------- Inbound external F-key handlers (no re-emission) ---------
 OnF23(*) {
-    global gEmitGuard
-    if (gEmitGuard)
+    global gEmitGuardUntil
+    if (A_TickCount < gEmitGuardUntil)
         return
     DoClick("LB")
 }
 OnF24(*) {
-    global gEmitGuard
-    if (gEmitGuard)
+    global gEmitGuardUntil
+    if (A_TickCount < gEmitGuardUntil)
         return
     DoClick("RB")
 }
 OnF22(*) {
-    global gIniPath, gEmitGuard
-    if (gEmitGuard)
+    global gIniPath, gEmitGuardUntil
+    if (A_TickCount < gEmitGuardUntil)
         return
     x := IniRead(gIniPath, "Joy3", "UpdateX", "")
     y := IniRead(gIniPath, "Joy3", "UpdateY", "")
@@ -581,8 +648,8 @@ OnF22(*) {
         Balloon("Update: " x "," y, 0.6)
 }
 OnF21(*) {
-    global gIniPath, gEmitGuard
-    if (gEmitGuard)
+    global gIniPath, gEmitGuardUntil
+    if (A_TickCount < gEmitGuardUntil)
         return
     sx := IniRead(gIniPath, "Joy3", "SuspendX", "")
     sy := IniRead(gIniPath, "Joy3", "SuspendY", "")
@@ -624,4 +691,13 @@ OnF21(*) {
         MouseMove ox, oy, 0
     }
     Balloon("Suspend + Update", 0.6)
+}
+
+GuardEmit(ms := 250) {
+    global gEmitGuardUntil
+    try {
+        gEmitGuardUntil := A_TickCount + Integer(ms)
+    } catch {
+        gEmitGuardUntil := A_TickCount + 250
+    }
 }

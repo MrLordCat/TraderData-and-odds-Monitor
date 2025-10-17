@@ -740,9 +740,10 @@ app.whenReady().then(()=>{
           if(typeof payload.diffPct === 'number') diffPct = payload.diffPct;
           if(payload.noConfirm===true) noConfirm = true;
         }
-        // Mapping rules override default if keyLabel present
-        // F22 -> 0x85, F23 -> 0x86, F24 -> 0x87
-        if(keyLabel === 'F22') vk = 0x85;
+  // Mapping rules override default if keyLabel present
+  // F21 -> 0x84, F22 -> 0x85, F23 -> 0x86, F24 -> 0x87
+  if(keyLabel === 'F21') vk = 0x84;
+  else if(keyLabel === 'F22') vk = 0x85;
         else if(keyLabel === 'F23') vk = 0x86;
         else if(keyLabel === 'F24') vk = 0x87;
         // Only apply legacy side fallback when NO explicit keyLabel provided (avoid misinterpreting unknown keys like F22)
@@ -759,6 +760,8 @@ app.whenReady().then(()=>{
           }
         } catch(err){ try { console.warn('[auto-press][ipc] board send fail', err); } catch(_){ } }
         let sent=false;
+  // Always write a file signal so AHK can react even if virtual key injection is blocked
+  try { fs.writeFileSync(path.join(__dirname,'auto_press_signal.json'), JSON.stringify({ side, key:keyLabel, direction, ts })); } catch(_){ }
         // Only SendInput via helper script using F22/F23/F24 virtual keys (0x85/0x86/0x87) so AHK v2 can hook them.
         try {
           const { exec } = require('child_process');
@@ -797,6 +800,25 @@ app.whenReady().then(()=>{
       });
       // Additional passive logging channels from renderer
       ipcMain.on('auto-mode-changed', (_e, payload)=>{ try { console.log('[autoSim][mode]', payload); } catch(_){ } });
+      // Relay auto mode ON/OFF across views so board and embedded stay in sync
+      ipcMain.on('auto-mode-changed', (_e, payload)=>{
+        try {
+          const on = !!(payload && payload.active);
+          // send to board
+          try {
+            const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
+            if(bwc && !bwc.isDestroyed()) bwc.send('auto-set-all', { on });
+          } catch(_){ }
+          // send to main window (embedded) + stats views
+          try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-set-all', { on }); } catch(_){ }
+          try {
+            if(statsManager && statsManager.views){
+              const vs = statsManager.views;
+              ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-set-all', { on }); } catch(_){ } } });
+            }
+          } catch(_){ }
+        } catch(_){ }
+      });
       ipcMain.on('auto-fire-attempt', (_e, payload)=>{ try { console.log('[autoSim][fireAttempt]', payload); } catch(_){ } });
       // Forwarded renderer console lines (selective)
       ipcMain.on('renderer-log-forward', (_e, payload)=>{
@@ -871,6 +893,28 @@ app.on('browser-window-created', (_e, win)=>{
           toggleStatsEmbedded();
           return;
         }
+        // Numpad5 fallback (if global shortcut didn't register on this OS)
+        try {
+          const isNum5 = (String(input.code||'').toLowerCase()==='numpad5') || ((input.key==='5' || input.key==='Num5') && input.location===3);
+          if(isNum5){
+            const broadcast = ()=>{
+              try {
+                const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
+                if(bwc && !bwc.isDestroyed()) bwc.send('auto-toggle-all');
+              } catch(_){ }
+              try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-toggle-all'); } catch(_){ }
+              try {
+                if(statsManager && statsManager.views){
+                  const vs = statsManager.views;
+                  ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-toggle-all'); } catch(_){ } } });
+                }
+              } catch(_){ }
+            };
+            broadcast();
+            try { console.log('[hotkey][window][Num5] broadcast auto-toggle-all'); } catch(_){ }
+            return;
+          }
+        } catch(_){ }
         // Ctrl+F12 -> open Board (odds) BrowserView DevTools
         if(input.key==='F12' && input.control){
           try {
