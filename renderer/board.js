@@ -27,6 +27,8 @@ function computeDerived(){
   if (!active.length){ midCell.textContent='-'; arbCell.textContent='-'; return; }
   const s1=active.map(r=>parseFloat(r.odds[0]));
   const s2=active.map(r=>parseFloat(r.odds[1]));
+  // IMPORTANT: Mid is defined as the midpoint between the lowest and highest odds only
+  // (NOT the average of all books). This matches product requirement #1.
   const mid1=(Math.min(...s1)+Math.max(...s1))/2; const mid2=(Math.min(...s2)+Math.max(...s2))/2;
   const over=1/Math.max(...s1)+1/Math.max(...s2);
   midCell.textContent=`${mid1.toFixed(2)} / ${mid2.toFixed(2)}`;

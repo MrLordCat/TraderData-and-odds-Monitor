@@ -145,21 +145,34 @@ function extractRivalry(mapNum=0){
 }
 
 function extractGg(mapNum=1){
+  // STRICT policy for map markets (>=1): if specific "Map N - Winner" is missing, DO NOT fallback to other markets.
+  // GG UI uses [data-test="market-name"] with values like "Map 3 - Winner (incl. overtime)".
   let blocks=[...document.querySelectorAll('div.bg-surface-middle.mb-2')];
   if(!blocks.length) blocks=[...document.querySelectorAll('div.mb-2.w-full.bg-surface-middle')];
   if(!blocks.length) blocks=[...document.querySelectorAll("div[class*='bg-surface-middle']")].filter(d=>d.querySelector('[data-test="market-name"]'));
   if(!blocks.length) return {odds:['-','-'],frozen:false};
   let target=null;
   if(mapNum<=0){
-    target=blocks.find(b=>/Winner/i.test(b.querySelector('[data-test="market-name"]')?.textContent||''));
+    // Match-level winner (leave as permissive)
+    target=blocks.find(b=>/\bWinner\b/i.test(b.querySelector('[data-test="market-name"]')?.textContent||''));
   } else {
-    const re=new RegExp(`Map\\s*${mapNum}\\s*-\\s*Winner`,'i');
-    target=blocks.find(b=>re.test(b.textContent));
-    if(!target) target=blocks.find(b=>/Winner/i.test(b.querySelector('[data-test="market-name"]')?.textContent||''));
+    const nameOf = (b)=> (b.querySelector('[data-test="market-name"]')?.textContent||'').trim();
+    const reStrict = new RegExp('^' + 'Map\\s*'+mapNum+'\\s*-?\\s*Winner' + '(?:\\s*\\(incl\\\.?\\s*overtime\\))?' + '$','i');
+    target = blocks.find(b=> reStrict.test(nameOf(b)) );
+    // No fallback to generic "Winner" if strict market not present
   }
   if(!target) return {odds:['-','-'],frozen:false};
-  const odds=[...target.querySelectorAll('div[data-test="odd-button__result"]')].map(el=>el.textContent.trim()).slice(0,2);
-  return {odds:odds.length===2?odds:['-','-'],frozen:false};
+  const resultEls = Array.from(target.querySelectorAll('div[data-test="odd-button__result"]')).slice(0,2);
+  const odds = resultEls.map(el=> (el.textContent||'').trim().replace(',','.'));
+  // Basic frozen detection: if all corresponding buttons appear non-interactive (cursor-not-allowed/disabled)
+  const frozen = (resultEls.length===2) && resultEls.every(el=>{
+    const btn = el.closest('[data-test*="odd-button"]') || el.closest('div');
+    if(!btn) return false; const cls = (btn.className||'');
+    if(/cursor-not-allowed/.test(cls)) return true;
+    try { const cs = getComputedStyle(btn); if(cs.pointerEvents==='none' || parseFloat(cs.opacity||'1') < 0.5) return true; } catch(_){ }
+    return false;
+  });
+  return {odds:odds.length===2?odds:['-','-'],frozen};
 }
 
 function extractThunder(mapNum=1){

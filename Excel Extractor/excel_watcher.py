@@ -35,6 +35,8 @@ MAP_CELL_PAIRS: list[tuple[str,str]] = [
     ("M44", "N44"),   # Map 1
     ("M190", "N190"), # Map 2
     ("M336", "N336"), # Map 3
+    ("M482", "N482"), # Map 4
+    ("M628", "N628"), # Map 5
 ]
 
 # Flat list used for batch reading order
