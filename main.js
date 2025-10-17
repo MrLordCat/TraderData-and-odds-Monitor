@@ -420,6 +420,8 @@ function bootstrap() {
         // Keep a global last Excel odds snapshot for stats panel late load replay
         try { global.__lastExcelOdds = p; } catch(_){ }
       };
+      // Annotate forward with a hint for template sync side-channel
+      try { Object.defineProperty(forward, '__acceptsTemplateSync', { value: false, enumerable:false }); } catch(_){ }
       global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward });
     }
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }

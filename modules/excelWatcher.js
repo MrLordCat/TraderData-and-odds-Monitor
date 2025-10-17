@@ -19,6 +19,7 @@ function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
   let lastData = null; // cache last payload (our simplified shape)
   let lastEmittedMap = null; // last map id we emitted for
   let mapPollTimer = null; // timer id for map change polling
+  let lastTemplate = null; // last seen template string from Excel (C1)
 
   function log(){
     if(!verbose) return;
@@ -99,6 +100,8 @@ function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
     try { win.webContents.send('odds-update', payload); } catch(e){ log('emit failed main win', e.message); }
     try { if(typeof sendOdds === 'function') sendOdds(payload); } catch(e){ log('emit forward failed', e.message); }
     log('emit', payload);
+    // Also broadcast latest template+map for AHK sync consumers
+    broadcastTemplateSync();
   }
 
   // Parse new Excel Extractor current_state.json and emit odds
@@ -108,6 +111,14 @@ function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
     const maps = raw.maps;
     if(!cells || typeof cells !== 'object') return false;
     try {
+      // Pick up template if present (python exporter writes template: <string>)
+      try {
+        const tpl = typeof raw.template === 'string' ? raw.template.trim() : (typeof cells.C1 === 'string' ? cells.C1.trim() : null);
+        if(tpl != null && tpl !== lastTemplate){
+          lastTemplate = tpl;
+          broadcastTemplateSync();
+        }
+      } catch(_){ }
       // Global status cell (default C6) for frozen detection
       const statusKey = (store.get('excelCurrentStateMapping')||{}).status || 'C6';
       const statusVal = String(cells[statusKey]||'').trim();
@@ -204,6 +215,26 @@ function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
     mapPollTimer = setTimeout(mapPoll, 400); // lightweight
   }
   mapPoll();
+
+  // Broadcast template + map to consumers (renderer or AHK bridge). Also write a tiny sync file for AHK.
+  function broadcastTemplateSync(){
+    try {
+      const effectiveMap = lastEmittedMap || pickDesiredMap();
+      const template = lastTemplate || '';
+      const payload = { template, map: effectiveMap, ts: Date.now() };
+      if(win && !win.isDestroyed()){
+        try { win.webContents.send('excel-template-sync', payload); } catch(_){ }
+      }
+      // Optional: also forward via sendOdds callback path if provided and expects generic channel
+      try { if(typeof sendOdds === 'function' && sendOdds.__acceptsTemplateSync) sendOdds(payload); } catch(_){ }
+      // Write sync file next to current_state.json so external AHK can read
+      if(activePath){
+        const dir = path.dirname(activePath);
+        const out = path.join(dir, 'template_sync.json');
+        try { fs.writeFileSync(out, JSON.stringify(payload)); } catch(_){ }
+      }
+    } catch(_){ }
+  }
 
   if(verbose) log('candidates', lastResolvedPaths);
 

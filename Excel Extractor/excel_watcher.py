@@ -28,6 +28,8 @@ FILE_PATH = Path(r"C:\\Users\\kristian.vlassenko\\Documents\\Esports Excel Tradi
 SHEET_NAME = "InPlay FRONT"
 
 # Logical mapping:
+#   Template selector cell (Excel template name)
+TEMPLATE_CELL = "C1"
 #   Status cell (global trading / suspend indicator)
 STATUS_CELL = "C6"
 #   Map side pairs: (side1, side2)
@@ -39,10 +41,11 @@ MAP_CELL_PAIRS: list[tuple[str,str]] = [
     ("M628", "N628"), # Map 5
 ]
 
-# Flat list used for batch reading order
-CELLS: List[str] = [STATUS_CELL] + [c for pair in MAP_CELL_PAIRS for c in pair]
+# Flat list used for batch reading order (include template cell first so it's always present)
+CELLS: List[str] = [TEMPLATE_CELL, STATUS_CELL] + [c for pair in MAP_CELL_PAIRS for c in pair]
 INTERVAL = 0.5  # seconds
 STATE_FILE = Path("current_state.json")  # файл, который всегда содержит актуальное состояние
+CONFIG_INI = Path("config159.ini")       # AHK конфиг в той же папке, где и скрипт
 
 
 def ts():
@@ -118,17 +121,39 @@ def write_state(timestamp_str: str, full: dict, changed: dict | None, first: boo
       "changed": { ... только изменившиеся ... } (отсутствует если initial или нет изменений)
     }
     """
+    # Derive template string and whether it changed
+    try:
+        template_val = full.get(TEMPLATE_CELL)
+        template_str = str(template_val).strip() if template_val is not None else ""
+    except Exception:
+        template_str = ""
+    template_changed = False
+    try:
+        if not first and prev_full is not None:
+            template_changed = prev_full.get(TEMPLATE_CELL) != full.get(TEMPLATE_CELL)
+    except Exception:
+        template_changed = False
+
     payload = {
         "ts": timestamp_str,
         "initial": first,
         "cells": full,
         "maps": build_maps(full),
+        "template": template_str,
     }
     # Add which maps changed (if not initial)
     if not first and prev_full is not None:
         map_changed = diff_maps(prev_full, full)
         if map_changed:
             payload["mapsChanged"] = map_changed
+    if template_changed:
+        payload["templateChanged"] = True
+        # Try to sync DefaultTemplate in config159.ini so AHK picks the same template
+        try:
+            sync_default_template(template_str)
+        except Exception as _e:
+            # non-fatal
+            pass
     if changed:
         payload["changed"] = changed
     tmp = STATE_FILE.with_suffix(STATE_FILE.suffix + ".tmp")
@@ -162,6 +187,13 @@ def main():
                 now = ts()
                 print(f"{now} INIT: " + ", ".join(f"{k}={current[k]}" for k in CELLS))
                 write_state(now, current, None, first=True, prev_full=None)
+                # Initial sync of DefaultTemplate
+                try:
+                    tpl_init = str(current.get(TEMPLATE_CELL) or '').strip()
+                    if tpl_init:
+                        sync_default_template(tpl_init)
+                except Exception:
+                    pass
             else:
                 changed = {k: v for k, v in current.items() if prev.get(k) != v}
                 if changed:
@@ -176,3 +208,65 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def sync_default_template(template_name: str):
+    """Update DefaultTemplate in config159.ini [Global] section to match given template.
+    Non-destructive line-based replace: preserves comments and order.
+    """
+    if not template_name:
+        return
+    # Resolve INI path relative to STATE_FILE location
+    ini_path = CONFIG_INI
+    try:
+        # If running from another cwd, prefer script directory
+        base = Path(__file__).resolve().parent
+        cand = base / CONFIG_INI
+        if cand.exists():
+            ini_path = cand
+        else:
+            # fallback to cwd
+            ini_path = Path(CONFIG_INI)
+    except Exception:
+        ini_path = Path(CONFIG_INI)
+    try:
+        text = ini_path.read_text(encoding='utf-8')
+    except Exception:
+        return
+    lines = text.splitlines()
+    out = []
+    in_global = False
+    done = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        if stripped.startswith('[') and stripped.endswith(']'):
+            # Leaving [Global] without writing DefaultTemplate -> insert at end of section
+            if in_global and not done:
+                out.append(f"DefaultTemplate={template_name}")
+                done = True
+            in_global = (stripped.lower() == '[global]')
+            out.append(line)
+            i += 1
+            continue
+        if in_global and stripped.lower().startswith('defaulttemplate'):
+            # Replace existing
+            out.append(f"DefaultTemplate={template_name}")
+            done = True
+        else:
+            out.append(line)
+        i += 1
+    # If file had no [Global] section at all
+    if not any(l.strip().lower().startswith('[global]') for l in lines):
+        out.insert(0, '[Global]')
+        out.insert(1, f'DefaultTemplate={template_name}')
+        done = True
+    # If [Global] existed but we never wrote DefaultTemplate (empty section at EOF)
+    if in_global and not done:
+        out.append(f"DefaultTemplate={template_name}")
+        done = True
+    if done:
+        try:
+            ini_path.write_text("\n".join(out) + "\n", encoding='utf-8')
+        except Exception:
+            pass
