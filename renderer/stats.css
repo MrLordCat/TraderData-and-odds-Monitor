@@ -351,6 +351,16 @@ small {
 	flex: 1;
 }
 
+/* Visually indicate disabled state for layout buttons */
+.modeButtons button:disabled {
+	opacity: .35;
+	cursor: default;
+	filter: grayscale(.3);
+}
+.modeButtons button:disabled:hover {
+	opacity: .35;
+}
+
 .modeButtons {
 	display: flex;
 	gap: 6px;
@@ -358,6 +368,11 @@ small {
 
 .panelSideBtn {
 	width: 100%;
+}
+.panelSideBtn:disabled {
+	opacity: .35;
+	cursor: default;
+	filter: grayscale(.3);
 }
 
 /* Sources Grid */
@@ -372,6 +387,12 @@ small {
 	font-size: 11px;
 	color: var(--muted);
 	text-align: right;
+}
+
+.sourcesGrid select:disabled {
+	opacity: .45;
+	filter: grayscale(.25);
+	cursor: default;
 }
 
 .divider {

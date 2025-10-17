@@ -193,7 +193,8 @@ function renderEmbeddedOdds(){
   if(midCell){
     if(!p1.length||!p2.length){ midCell.textContent='-'; }
     else {
-      const mid1=(Math.min(...p1)+Math.max(...p1))/2; const mid2=(Math.min(...p2)+Math.max(...p2))/2;
+  // Mid is the midpoint between min and max of live books (not average of all)
+  const mid1=(Math.min(...p1)+Math.max(...p1))/2; const mid2=(Math.min(...p2)+Math.max(...p2))/2;
       midCell.textContent=`${mid1.toFixed(2)} / ${mid2.toFixed(2)}`;
   // Removed header Mid meta display (previously updated #embeddedOddsMeta)
     }

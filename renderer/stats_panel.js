@@ -384,7 +384,7 @@ ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevM
 function ensureOption(select, value){ if(![...select.options].some(o=>o.value===value)){ const opt=document.createElement('option'); opt.value=value; opt.textContent=value.replace(/^https?:\/\/(www\.)?/,'').slice(0,40); select.appendChild(opt); } }
 
 // ================= Init From Main (stats-init) =================
-ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; document.getElementById('lolManualMode').checked = !!cfg.lolManualMode; metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
+ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; document.getElementById('lolManualMode').checked = !!cfg.lolManualMode; const sw=!!cfg.singleWindow; const swEl=document.getElementById('singleWindowMode'); if(swEl){ swEl.checked=sw; if(typeof window.__applySingleWindowUi==='function') window.__applySingleWindowUi(sw); } metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
   if(cfg.lolManualData && typeof cfg.lolManualData==='object'){
     try { manualData = JSON.parse(JSON.stringify(cfg.lolManualData)); } catch(_){ }
   }
@@ -462,8 +462,31 @@ function bindBasic(){
   const safe = (id, fn)=>{ const el=byId(id); if(el) fn(el); };
   safe('srcA', el=> el.onchange = e=> send('stats-set-url',{slot:'A',url:e.target.value}));
   safe('srcB', el=> el.onchange = e=> send('stats-set-url',{slot:'B',url:e.target.value}));
-  safe('applyA', el=> el.onclick = ()=>{ const v=byId('customA').value.trim(); if(v) send('stats-set-url',{slot:'A',url:v}); });
-  safe('applyB', el=> el.onclick = ()=>{ const v=byId('customB').value.trim(); if(v) send('stats-set-url',{slot:'B',url:v}); });
+  // Single-window mode: when ON, only one slot (A or B) is active; the other is stopped in main.
+  (function(){
+    const chk = byId('singleWindowMode'); if(!chk) return;
+    const btnSplit = byId('modeSplit'); const btnVert = byId('modeVertical'); const btnA = byId('modeA'); const btnB = byId('modeB');
+    const selA = byId('srcA'); const selB = byId('srcB');
+    function applyUi(disable){
+      try {
+        if(btnSplit) btnSplit.disabled = !!disable;
+        if(btnVert) btnVert.disabled = !!disable;
+        if(btnA) btnA.disabled = !!disable;
+        if(btnB) btnB.disabled = !!disable;
+        // Optional: disable source selector of background slot in single-window, informative only
+        const layout = byId('dbgLayout')?.textContent;
+        if(selB) selB.disabled = !!disable && (layout==='focusA');
+        if(selA) selA.disabled = !!disable && (layout==='focusB');
+      } catch(_){ }
+    }
+    chk.addEventListener('change', ()=>{
+      const enabled = !!chk.checked;
+      applyUi(enabled);
+      send('stats-single-window',{ enabled });
+    });
+    // Expose for initial apply from stats-init
+    window.__applySingleWindowUi = applyUi;
+  })();
   safe('modeSplit', el=> el.onclick = ()=>{ send('stats-layout',{mode:'split'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='split'; });
   safe('modeVertical', el=> el.onclick = ()=>{ send('stats-layout',{mode:'vertical'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='vertical'; });
   safe('modeA', el=> el.onclick = ()=>{ send('stats-layout',{mode:'focusA'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='focusA'; });

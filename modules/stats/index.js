@@ -14,6 +14,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   let mode = store.get('statsLayoutMode', 'split');               // split|focusA|focusB|vertical
   let side = store.get('statsPanelSide', 'right');                // left|right
   let embedOffsetY = 0;                                           // toolbar offset
+  let singleWindow = !!store.get('statsSingleWindow', false);     // when true, only one slot is active and others are stopped
 
   // LoL stats related
   let lolManualMode = store.get('lolManualMode', false); // persisted
@@ -33,6 +34,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     store.set('statsUrls', urls);
     store.set('statsLayoutMode', mode);
     store.set('statsPanelSide', side);
+    store.set('statsSingleWindow', singleWindow);
     store.set('lolMetricVisibility', lolMetricVisibility);
     if(lolMetricOrder) store.set('lolMetricOrder', lolMetricOrder);
     store.set('statsConfig', statsConfig);
@@ -78,24 +80,64 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     const contentW = full.width - PANEL_WIDTH;
     try { views.panel.setBounds({ x:panelX, y:baseY, width:PANEL_WIDTH, height:h }); } catch(_){}
     const setSafe=(v,r)=>{ if(v) try { v.setBounds(r); } catch(_){ } };
-    if(mode==='split'){
+    const effectiveMode = singleWindow && (mode==='split' || mode==='vertical') ? (mode='focusA', persist(), 'focusA') : mode;
+    if(effectiveMode==='split'){
       const hHalf = Math.floor((h-GAP)/2);
       setSafe(views.A,{ x:contentX,y:baseY,width:contentW,height:hHalf });
       setSafe(views.B,{ x:contentX,y:baseY+hHalf+GAP,width:contentW,height:h-hHalf-GAP });
-    } else if(mode==='focusA'){
+    } else if(effectiveMode==='focusA'){
       setSafe(views.A,{ x:contentX,y:baseY,width:contentW,height:h });
       setSafe(views.B,{ x:contentX,y:baseY,width:0,height:0 });
-    } else if(mode==='focusB'){
+    } else if(effectiveMode==='focusB'){
       setSafe(views.A,{ x:contentX,y:baseY,width:0,height:0 });
       setSafe(views.B,{ x:contentX,y:baseY,width:contentW,height:h });
-    } else if(mode==='vertical'){
+    } else if(effectiveMode==='vertical'){
       const wHalf = Math.floor((contentW-GAP)/2);
       setSafe(views.A,{ x:contentX,y:baseY,width:wHalf,height:h });
       setSafe(views.B,{ x:contentX+wHalf+GAP,y:baseY,width:contentW-wHalf-GAP,height:h });
     }
   }
-  function setMode(m){ if(['split','focusA','focusB','vertical'].includes(m)){ mode=m; persist(); layout(); } }
+  function setMode(m){
+    if(!['split','focusA','focusB','vertical'].includes(m)) return;
+    // Block modes that imply two active windows when singleWindow is on
+    if(singleWindow){
+      if(m==='split' || m==='vertical'){ mode='focusA'; persist(); layout(); return; }
+      // Also block switching focus from current slot when singleWindow is enabled
+      if((mode==='focusA' && m==='focusB') || (mode==='focusB' && m==='focusA')){ layout(); return; }
+    }
+    mode=m; persist(); layout();
+  }
   function toggleSide(){ side = side==='left'?'right':'left'; persist(); layout(); }
+
+  function applySingleWindow(enabled){
+    singleWindow = !!enabled; persist();
+    try {
+      if(singleWindow){
+        // Suspend background slot by loading about:blank
+        const bg = (mode==='focusA') ? 'B' : (mode==='focusB' ? 'A' : 'B');
+        const v = views[bg]; if(v){ try { v.webContents.loadURL('about:blank'); } catch(_){ } }
+        if(mode==='split' || mode==='vertical'){ mode='focusA'; }
+      } else {
+        // Resume only the background slot to its URL; do NOT reload the currently active slot
+        // Determine active slot based on current mode (fallback to 'A')
+        const active = (mode==='focusA') ? 'A' : (mode==='focusB' ? 'B' : 'A');
+        const bg = active==='A' ? 'B' : 'A';
+        const bgView = views[bg];
+        const desiredUrl = urls[bg];
+        if(bgView && desiredUrl){
+          try {
+            const cur = bgView.webContents.getURL();
+            // If desired is embed:lolstats, current will be a file:// URL to renderer/lolstats/index.html
+            const isDesiredEmbed = typeof desiredUrl==='string' && desiredUrl.startsWith('embed:lolstats');
+            const curIsEmbedLol = typeof cur==='string' && /renderer[\\\/]lolstats[\\\/]index\.html/i.test(cur);
+            const shouldLoad = !cur || cur==='about:blank' || (isDesiredEmbed ? !curIsEmbedLol : cur !== desiredUrl);
+            if(shouldLoad){ resolveAndLoad(bgView, desiredUrl); }
+          } catch(_){ resolveAndLoad(bgView, desiredUrl); }
+        }
+      }
+    } catch(_){ }
+    layout();
+  }
 
   function resolveAndLoad(view, raw){
     if(!view) return;
@@ -135,6 +177,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     slotInit[slot] = true;
     const update = (u) => {
       try {
+        // When single-window mode is enabled, ignore about:blank navigations for the background slot
+        // to avoid clobbering the persisted URL with a placeholder.
+        if(singleWindow && u === 'about:blank') return;
         urls[slot] = u; persist();
         if(views.panel) views.panel.webContents.send('stats-url-update',{ slot, url:u });
       } catch(_){}
@@ -187,7 +232,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
 
 
   // --- Embedded lifecycle ----------------------------------------------------------------
-  function createEmbedded(offsetY){ if(embeddedActive) return; if(!mainWindow||mainWindow.isDestroyed()) return; const fresh = !(views.panel && views.A && views.B); if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel'); try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ } views.panel.webContents.on('did-finish-load',()=>{ try { const hb=store.get('gsHeatBar'); views.panel.webContents.send('stats-init',{ urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar:hb, statsConfig, lolManualData, lolMetricMarks }); if(hb) views.panel.webContents.send('gs-heatbar-apply', hb); } catch(_){ } }); resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B); attachNavTracking('A', views.A); attachNavTracking('B', views.B); }
+  function createEmbedded(offsetY){ if(embeddedActive) return; if(!mainWindow||mainWindow.isDestroyed()) return; const fresh = !(views.panel && views.A && views.B); if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel'); try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ } views.panel.webContents.on('did-finish-load',()=>{ try { const hb=store.get('gsHeatBar'); views.panel.webContents.send('stats-init',{ urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar:hb, statsConfig, lolManualData, lolMetricMarks, singleWindow }); if(hb) views.panel.webContents.send('gs-heatbar-apply', hb); } catch(_){ } }); resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B); attachNavTracking('A', views.A); attachNavTracking('B', views.B); }
     embeddedActive=true; embedOffsetY = typeof offsetY==='number'? offsetY: embedOffsetY; layout(); setTimeout(layout,60);
     // Assert topmost ordering shortly after creation (and a few retries for late views)
     try { ['panel','A','B'].forEach(k=>{ const v=views[k]; if(v) try { mainWindow.setTopBrowserView(v); } catch(_){ } }); } catch(_){ }
@@ -210,6 +255,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
         } catch(_){}
         break;
       case 'stats-toggle-side': toggleSide(); break;
+  case 'stats-single-window': applySingleWindow(payload && payload.enabled); break;
       case 'stats-reload-slot':
         try { const slot=payload && payload.slot; if(['A','B'].includes(slot)){ const v=views[slot]; if(v) try { v.webContents.reloadIgnoringCache(); } catch(_){ try { v.webContents.reload(); } catch(_2){} } } } catch(_){}
         break;

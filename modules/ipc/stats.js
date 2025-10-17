@@ -10,7 +10,7 @@ function initStatsIpc(ctx){
   ipcMain.on('stats-toggle', ()=> toggleStatsEmbedded());
   // stats-detach / stats-attach removed (window mode deleted)
   // Forward common stats panel control channels + config/persistence updates to statsManager
-  ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings','stats-config-set'].forEach(ch=>{
+  ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings','stats-config-set','stats-single-window'].forEach(ch=>{
     ipcMain.on(ch, (e,p)=>{ try { statsManager.handleIpc(ch, p); } catch(_){ } });
   });
 

@@ -39,8 +39,10 @@
             </select>
           </div>
           <div class="divider"></div>
-          <div class="row"><input class="grow" id="customA" placeholder="Custom A URL"><button id="applyA">Set A</button></div>
-          <div class="row"><input class="grow" id="customB" placeholder="Custom B URL"><button id="applyB">Set B</button></div>
+          <label class="row" style="gap:8px;align-items:center;cursor:pointer;">
+            <input type="checkbox" id="singleWindowMode" />
+            <span class="muted">Single-window mode (A or B only)</span>
+          </label>
           <div class="divider"></div>
           <div class="modeButtons"><button id="modeSplit" title="Horizontal split">Split</button><button id="modeVertical" title="Vertical split">Vert</button><button id="modeA" title="A full height">A</button><button id="modeB" title="B full height">B</button></div>
           <button id="toggleSide" class="panelSideBtn" title="Toggle panel side">Panel Side</button>
