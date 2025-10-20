@@ -754,11 +754,21 @@ app.whenReady().then(()=>{
         const ts = Date.now();
         try { console.log('[auto-press][ipc] request', { side, key:keyLabel, vk: '0x'+vk.toString(16), direction, diffPct, ts }); } catch(_){ }
         try {
+          // Board (odds) view
           if(boardManager && boardManager.getWebContents){
             const bwc = boardManager.getWebContents();
             if(bwc && !bwc.isDestroyed()) bwc.send('auto-press', { side, key:keyLabel, direction });
           }
-        } catch(err){ try { console.warn('[auto-press][ipc] board send fail', err); } catch(_){ } }
+          // Main window (embedded stats lives here)
+          if(mainWindow && !mainWindow.isDestroyed()){
+            mainWindow.webContents.send('auto-press', { side, key:keyLabel, direction });
+          }
+          // Stats panel/window + slots if present
+          if(statsManager && statsManager.views){
+            const vs = statsManager.views;
+            ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-press', { side, key:keyLabel, direction }); } catch(_){ } } });
+          }
+        } catch(err){ try { console.warn('[auto-press][ipc] send fail', err); } catch(_){ } }
         let sent=false;
   // Always write a file signal so AHK can react even if virtual key injection is blocked
   try { fs.writeFileSync(path.join(__dirname,'auto_press_signal.json'), JSON.stringify({ side, key:keyLabel, direction, ts })); } catch(_){ }
@@ -820,6 +830,31 @@ app.whenReady().then(()=>{
         } catch(_){ }
       });
       ipcMain.on('auto-fire-attempt', (_e, payload)=>{ try { console.log('[autoSim][fireAttempt]', payload); } catch(_){ } });
+      // Store last auto states to serve late-loaded windows
+      let __autoLast = { active:false, resume:true };
+      ipcMain.on('auto-active-set', (_e, p)=>{ try { __autoLast.active = !!(p&&p.on); } catch(_){ } try {
+        const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
+        if(bwc && !bwc.isDestroyed()) bwc.send('auto-active-set', p);
+        mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-active-set', p);
+        if(statsManager && statsManager.views){ const vs=statsManager.views; ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ v.webContents.send('auto-active-set', p); } }); }
+      } catch(_){ } });
+      ipcMain.on('auto-resume-set', (_e, p)=>{ try { __autoLast.resume = !!(p&&p.on); } catch(_){ } });
+  ipcMain.handle('auto-state-get', ()=> { try { console.log('[auto][state-get] return', { active: __autoLast.active, resume: __autoLast.resume }); } catch(_){ } return ({ active: __autoLast.active, resume: __autoLast.resume }); });
+      // Cross-window sync for Auto Resume (R)
+      ipcMain.on('auto-resume-set', (_e, p)=>{
+        try {
+          const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
+          if(bwc && !bwc.isDestroyed()) bwc.send('auto-resume-set', p);
+        } catch(_){ }
+        try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-resume-set', p); } catch(_){ }
+        try {
+          if(statsManager && statsManager.views){
+            const vs = statsManager.views;
+            ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-resume-set', p); } catch(_){ } } });
+          }
+        } catch(_){ }
+        try { console.log('[auto][resume-broadcast]', p); } catch(_){ }
+      });
       // Forwarded renderer console lines (selective)
       ipcMain.on('renderer-log-forward', (_e, payload)=>{
         try {

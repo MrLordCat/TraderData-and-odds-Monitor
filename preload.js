@@ -84,6 +84,10 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,toggleMapAutoRefresh: () => { try { ipcRenderer.send('toggle-map-auto-refresh'); } catch(_){ } }
   ,getMapAutoRefreshStatus: () => ipcRenderer.invoke('get-map-auto-refresh-status')
   ,onMapAutoRefreshStatus: (cb) => withUnsub('map-auto-refresh-status', cb)
+  // Auto mode broadcast subscriptions (for views without direct ipcRenderer)
+  ,onAutoToggleAll: (cb) => withUnsub('auto-toggle-all', cb)
+  ,onAutoSetAll: (cb) => withUnsub('auto-set-all', cb)
+  ,onAutoDisableAll: (cb) => withUnsub('auto-disable-all', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

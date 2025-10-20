@@ -209,11 +209,11 @@ function renderEmbeddedOdds(){
   // Embedded auto rows (only indicators now) visibility update
   try {
     const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow');
-    const vis = embeddedAutoSim.active ? '' : 'none';
+    const sim = window.__embeddedAutoSim;
+    const vis = (sim && sim.active) ? '' : 'none';
     if(indRow) indRow.style.display = vis;
   } catch(_){ }
-  // After rendering, evaluate embedded auto guard
-  try { embeddedAutoGuardByMarket(); } catch(_){ }
+  // Auto guards moved to centralized AutoHub
 }
 // Prepare for game-specific tweaks (just log for now)
 try {
@@ -231,115 +231,31 @@ function handleEmbeddedOdds(p){ try {
     currentMap = p.map; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue();
   }
   embeddedOddsData[p.broker]=p; renderEmbeddedOdds();
-  // Auto disable/resume on dataservices suspension honoring autoResume flag
-  try {
-  if(p.broker==='excel' || p.broker==='dataservices'){
-      if(p.frozen && window.__embeddedAutoSim && window.__embeddedAutoSim.active){
-        window.__embeddedAutoSim.active=false; clearTimeout(window.__embeddedAutoSim.timer); window.__embeddedAutoSim.timer=null;
-        const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.remove('on');
-        embeddedAutoSim.lastDisableReason='excel-suspended';
-        embeddedStatus('Auto OFF (excel suspended)');
-        try { console.log('[autoSim][embedded][autoDisable] excel suspended -> auto OFF (intent', embeddedAutoSim.userWanted? 'kept':'cleared', ') resumeAllowed', embeddedAutoSim.autoResume); } catch(_){ }
-        try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active:false, reason:'excel-suspended' }); } } catch(_){ }
-      } else if(!p.frozen && window.__embeddedAutoSim && !window.__embeddedAutoSim.active && embeddedAutoSim.userWanted && embeddedAutoSim.lastDisableReason==='excel-suspended'){
-        if(embeddedAutoSim.autoResume){
-          window.__embeddedAutoSim.active=true; embeddedAutoSim.lastDisableReason='excel-resumed';
-          const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.add('on');
-          embeddedStatus(`Resume (tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%)`);
-          try { console.log('[autoSim][embedded][autoResume] excel resumed -> auto ON (autoResume=true)'); } catch(_){ }
-          try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active:true, reason:'excel-resumed', tolerance: embeddedAutoSim.tolerancePct }); } } catch(_){ }
-          embeddedStep();
-        } else {
-          try { console.log('[autoSim][embedded][resume-blocked] excel resumed but autoResume=false'); } catch(_){ }
-          embeddedStatus('Resume blocked (R off)');
-        }
-      }
-    }
-  } catch(_){ }
 } catch(_){ } }
 
 // ======= Embedded derived + auto guard =======
-function computeEmbeddedDerived(){
-  // Compute hasMid/arb similar to board: exclude excel/dataservices and frozen
-  const vals=Object.values(embeddedOddsData).filter(r=>r && r.broker!=='excel' && r.broker!=='dataservices' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
-  if(!vals.length){ window.__embeddedDerived={ hasMid:false, arbProfitPct:null }; return; }
-  const s1=vals.map(r=>parseFloat(r.odds[0]));
-  const s2=vals.map(r=>parseFloat(r.odds[1]));
-  const over=1/Math.max(...s1)+1/Math.max(...s2);
-  const hasArb = over < 1;
-  const profitPct = hasArb ? (1-over)*100 : 0;
-  window.__embeddedDerived={ hasMid:true, arbProfitPct: profitPct };
-}
-
-const EMB_ARB_SUSPEND_PCT = 5.0;
-function embeddedAutoGuardByMarket(){
+// Derived + market guards handled by AutoHub now
+function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSection'); if(!root) return; // collapse handled globally
+  // Prefer shared OddsCore hub if available; fallback to direct onOdds (legacy)
   try {
-    computeEmbeddedDerived();
-    const d = window.__embeddedDerived; if(!d) return;
-    const sim = window.__embeddedAutoSim; if(!sim) return;
-    if(!sim.autoResume) return; // R-mode must be on for auto changes
-    const btn=document.getElementById('embeddedAutoBtn');
-    const shouldSuspend = (!d.hasMid) || (typeof d.arbProfitPct==='number' && d.arbProfitPct >= EMB_ARB_SUSPEND_PCT);
-    if(shouldSuspend){
-      if(sim.active){
-        sim.active=false; clearTimeout(sim.timer); sim.timer=null;
-        sim.lastDisableReason = (!d.hasMid) ? 'no-mid' : 'arb-spike';
-        if(btn) btn.classList.remove('on');
-        try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active:false, reason: sim.lastDisableReason }); } } catch(_){ }
-          // Fire global suspend (F21) so AHK performs Suspend+Update
-          try {
-            if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true }); }
-            else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true }); } }
-          } catch(_){ }
-          // Retry once after 500ms if Excel still shows trading (not frozen)
-          try {
-            setTimeout(()=>{
-              try {
-                if(window.__embeddedAutoSim && window.__embeddedAutoSim.active) return;
-                const lastReason = window.__embeddedAutoSim && window.__embeddedAutoSim.lastDisableReason;
-                if(!(lastReason==='no-mid' || lastReason==='arb-spike')) return;
-                const ex = embeddedOddsData['excel'] || embeddedOddsData['dataservices'];
-                const stillTrading = !ex || !ex.frozen;
-                if(stillTrading){
-                  try {
-                    if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, retry:true }); }
-                    else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, retry:true }); } }
-                  } catch(_){ }
-                }
-              } catch(_){ }
-            }, 500);
-          } catch(_){ }
-      }
-      return;
-    }
-    const canResume = (d.hasMid && (!d.arbProfitPct || d.arbProfitPct < EMB_ARB_SUSPEND_PCT));
-    if(canResume && !sim.active && sim.userWanted && (sim.lastDisableReason==='no-mid' || sim.lastDisableReason==='arb-spike')){
-      sim.active=true; sim.lastDisableReason='market-resumed';
-      if(btn) btn.classList.add('on');
-      try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active:true, reason:'market-resumed', tolerance: sim.tolerancePct }); } } catch(_){ }
-        // On resume, send Unsuspend (F21) immediately and retry once after 500ms if conditions still good
-        try {
-          if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true }); }
-          else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true }); } }
-        } catch(_){ }
-        try {
-          setTimeout(()=>{
-            try {
-              const d2 = window.__embeddedDerived || window.__boardDerived; // fallback if shared
-              const stillCanResume = d2 && d2.hasMid && (!d2.arbProfitPct || d2.arbProfitPct < 5.0);
-              if(!stillCanResume) return;
-              if(!(window.__embeddedAutoSim && window.__embeddedAutoSim.active)) return;
-              if(window.desktopAPI && window.desktopAPI.invoke){ window.desktopAPI.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true, retry:true }); }
-              else if(window.require){ const { ipcRenderer } = window.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', { key:'F21', noConfirm:true, resume:true, retry:true }); } }
-            } catch(_){ }
-          }, 500);
-        } catch(_){ }
-        try { embeddedStep(); } catch(_){ }
+    if(window.OddsCore && !window.__embeddedOddsHub){
+      const hub = window.OddsCore.createOddsHub(); window.__embeddedOddsHub = hub;
+      try { console.log('[embeddedOdds][init] Using shared OddsCore hub'); } catch(_){ }
+      let firstLogged=false;
+      hub.subscribe(st=>{ try {
+        if(!firstLogged){
+          firstLogged=true;
+          const cnt = Object.keys(st.records||{}).length;
+          try { console.log('[embeddedOdds][hub][first] records:', cnt, 'derived.hasMid:', !!(st && st.derived && st.derived.hasMid)); } catch(_){ }
+        }
+        Object.assign(embeddedOddsData, st.records||{}); renderEmbeddedOdds();
+      } catch(_){ } });
+      hub.start();
+    } else {
+      try { console.log('[embeddedOdds][init] Fallback odds wiring (desktopAPI/ipcRenderer)'); } catch(_){ }
+      if(window.desktopAPI && window.desktopAPI.onOdds){ window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update via desktopAPI', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } else { ipcRendererEmbedded.on('odds-update', (_e,p)=>{ try { console.debug('[embeddedOdds] odds-update via ipcRenderer', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); }
     }
   } catch(_){ }
-}
-function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSection'); if(!root) return; // collapse handled globally
-  try { if(window.desktopAPI && window.desktopAPI.onOdds){ window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update via desktopAPI', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } else { ipcRendererEmbedded.on('odds-update', (_e,p)=>{ try { console.debug('[embeddedOdds] odds-update via ipcRenderer', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.onTeamNames){ window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } else { ipcRendererEmbedded.on('lol-team-names-update', ()=> renderEmbeddedOdds()); } } catch(_){ }
   try { if(window.desktopAPI && window.desktopAPI.getTeamNames){ window.desktopAPI.getTeamNames().then(()=>renderEmbeddedOdds()).catch(()=>{}); } } catch(_){ }
   // Remove broker rows when a broker is closed (mirror board behavior)
@@ -361,7 +277,7 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   // One-time attempt to fetch last Excel odds (if loaded after they were emitted) so user doesn't need to re-select map
   try {
     const ipc = (window.require? window.require('electron').ipcRenderer: null);
-    if(ipc && ipc.invoke){ ipc.invoke('excel-last-odds').then(p=>{ if(p && p.broker==='excel'){ handleEmbeddedOdds(p); } }).catch(()=>{}); }
+    if(ipc && ipc.invoke){ ipc.invoke('excel-last-odds').then(p=>{ try { console.log('[embeddedOdds][excel-last-odds]', p? 'received':'none'); } catch(_){ } if(p && p.broker==='excel'){ handleEmbeddedOdds(p); } }).catch(()=>{}); }
   } catch(_){ }
   // Excel extractor toggle + status (embedded panel)
   try {
@@ -462,199 +378,4 @@ document.addEventListener('click', e=>{
   } catch(_){ }
 });
 
-// ================= Embedded Auto alignment helper (simulate only, no virtual odds) =================
-const embeddedAutoSim = { active:false, timer:null, stepMs:500, tolerancePct:0.15, lastMidKey:null, fireCooldownMs:900, lastFireTs:0, lastFireSide:null, lastFireKey:null, adaptive:true, waitingForExcel:false, waitToken:0, excelSnapshotKey:null, maxAdaptiveWaitMs:1600, userWanted:false, lastDisableReason:null, autoResume:true, burstLevels:[ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ] };
-try { const ar = localStorage.getItem('embeddedAutoResumeEnabled'); if(ar==='0') embeddedAutoSim.autoResume=false; } catch(_){ }
-try { const uw = localStorage.getItem('embeddedAutoUserWanted'); if(uw==='1'){ embeddedAutoSim.userWanted=true; } } catch(_){ }
-try { console.log('[autoSim][embedded][startup] stats_embedded.js loaded'); } catch(_){ }
-// Lightweight heartbeat to verify forwarding if main board view hidden
-try { if(!window.__embeddedAutoHb){ window.__embeddedAutoHb=true; let ticks=0; const loop=()=>{ if(embeddedAutoSim.active) return; try { console.log('[autoSim][embedded][hb]', ++ticks); } catch(_){ } if(ticks<5) setTimeout(loop, 5000); }; setTimeout(loop, 4000);} } catch(_){ }
-// Load stored tolerance + interval + adaptive (shared with board)
-try {
-  const ipc = (window.require? window.require('electron').ipcRenderer: (window.ipcRenderer||null));
-  if(ipc && ipc.invoke){
-  ipc.invoke('auto-tolerance-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) embeddedAutoSim.tolerancePct = v; try { console.log('[autoSim][embedded] tolerance loaded', embeddedAutoSim.tolerancePct); } catch(_){ } }).catch(()=>{});
-    ipc.invoke('auto-interval-get').then(v=>{ if(typeof v==='number' && !isNaN(v)){ embeddedAutoSim.stepMs=v; try { console.log('[autoSim][embedded] interval loaded', v); } catch(_){ } } }).catch(()=>{});
-    ipc.invoke('auto-adaptive-get').then(v=>{ if(typeof v==='boolean'){ embeddedAutoSim.adaptive=v; try { console.log('[autoSim][embedded] adaptive loaded', v); } catch(_){ } } }).catch(()=>{});
-  ipc.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)){ embeddedAutoSim.burstLevels=v; try { console.log('[autoSim][embedded] burst levels loaded', v); } catch(_){ } } }).catch(()=>{});
-  }
-} catch(_){ }
-function embeddedParsePair(cellId){
-  const el=document.getElementById(cellId); if(!el) return null; const txt=(el.textContent||'').trim(); if(!/\d/.test(txt)) return null;
-  const parts=txt.split('/').map(s=>parseFloat(s.trim())).filter(n=>!isNaN(n)); return parts.length===2?parts:null;
-}
-function embeddedParseMid(){ return embeddedParsePair('embeddedMidCell'); }
-function embeddedParseExcel(){ return embeddedParsePair('embeddedExcelCell'); }
-function embeddedSetExcel(){ /* placeholder for future real integration; not used in simulation */ }
-function embeddedStatus(_msg){ /* status text removed (only dots retained) */ }
-function embeddedFlash(idx){ const dot=document.querySelector('#embeddedExcelAutoIndicatorsRow .autoDot.'+(idx===0?'side1':'side2')); if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), embeddedAutoSim.stepMs-80); } }
-function embeddedSchedule(delay){ if(!embeddedAutoSim.active) return; clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=setTimeout(embeddedStep, typeof delay==='number'? delay: embeddedAutoSim.stepMs); }
-function embeddedStep(){
-  if(!embeddedAutoSim.active) return;
-  const mid=embeddedParseMid(); const ex=embeddedParseExcel();
-  if(!mid || !ex){ embeddedStatus('Нет данных'); return embeddedSchedule(); }
-  const key=mid.join('|'); if(embeddedAutoSim.lastMidKey && embeddedAutoSim.lastMidKey!==key){ embeddedStatus('Mid changed'); }
-  embeddedAutoSim.lastMidKey=key;
-  // Min-only alignment: choose side whose MID component is minimal and align only it
-  const sideToAdjust = (mid[0] <= mid[1]) ? 0 : 1;
-  const diffPct = Math.abs(ex[sideToAdjust] - mid[sideToAdjust]) / mid[sideToAdjust] * 100;
-  if(diffPct <= embeddedAutoSim.tolerancePct){
-    embeddedStatus('Aligned (min side)');
-    try { console.log('[autoSim][embedded][step][min-only] aligned side', sideToAdjust, 'diff', diffPct.toFixed(3)); } catch(_){ }
-    return embeddedSchedule();
-  }
-  const needRaise = ex[sideToAdjust] < mid[sideToAdjust];
-  let keyLabel;
-  if(sideToAdjust===0){ keyLabel = needRaise ? 'F24' : 'F23'; } else { keyLabel = needRaise ? 'F23' : 'F24'; }
-  const direction = needRaise ? 'raise' : 'lower';
-  embeddedFlash(sideToAdjust);
-  embeddedStatus(`Align ${direction} S${sideToAdjust+1} ${diffPct.toFixed(2)}% (min)`);
-  try { console.log('[autoSim][embedded][step][min-only] fireCandidate side', sideToAdjust, direction, 'diff%', diffPct.toFixed(3), 'key', keyLabel); } catch(_){ }
-  // Burst logic (embedded): configurable levels
-  let pulses=1; try { if(Array.isArray(embeddedAutoSim.burstLevels)){ for(const lvl of embeddedAutoSim.burstLevels){ if(diffPct >= lvl.thresholdPct){ pulses=lvl.pulses; break; } } } } catch(_){ }
-  try { console.log('[autoSim][embedded][burst] diff', diffPct.toFixed(3), 'pulses', pulses, '[levels]', embeddedAutoSim.burstLevels); } catch(_){ }
-  try {
-    const now = Date.now();
-    if(now - embeddedAutoSim.lastFireTs < embeddedAutoSim.fireCooldownMs && embeddedAutoSim.lastFireSide===sideToAdjust && embeddedAutoSim.lastFireKey===keyLabel){
-      return embeddedSchedule();
-    }
-    embeddedAutoSim.lastFireTs = now; embeddedAutoSim.lastFireSide=sideToAdjust; embeddedAutoSim.lastFireKey=keyLabel;
-    const invokeDirectional = (i)=>{
-      let pathUsed='none', invoked=false, invokeErr=null;
-      try {
-        if(window.desktopAPI && typeof window.desktopAPI.invoke==='function'){
-          pathUsed='invoke'; window.desktopAPI.invoke('send-auto-press', { side: sideToAdjust, key: keyLabel, direction, diffPct, noConfirm:true }); invoked=true;
-        } else if(window.desktopAPI && window.desktopAPI.autoSendPress){
-          pathUsed='autoSendPress'; window.desktopAPI.autoSendPress({ side: sideToAdjust, key: keyLabel, direction, diffPct, noConfirm:true }); invoked=true;
-        } else {
-          const { ipcRenderer } = require('electron'); if(ipcRenderer && ipcRenderer.invoke){ pathUsed='ipcDirect'; ipcRenderer.invoke('send-auto-press', { side: sideToAdjust, key: keyLabel, direction, diffPct, noConfirm:true }); invoked=true; }
-        }
-      } catch(err){ invokeErr=err; }
-      try { console.log('[autoSim][embedded][burst] directional', i+1,'/',pulses,keyLabel,'invoked',invoked,'path',pathUsed, invokeErr? (''+invokeErr):''); } catch(_){ }
-    };
-    for(let i=0;i<pulses;i++){
-      const delay = i===0? 0 : 55*i;
-      setTimeout(()=>invokeDirectional(i), delay);
-    }
-    const confirmDelay = 55*(pulses-1)+100;
-    setTimeout(()=>{
-      try {
-        if(window.desktopAPI && typeof window.desktopAPI.invoke==='function'){
-          window.desktopAPI.invoke('send-auto-press', { side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true });
-        } else if(window.desktopAPI && window.desktopAPI.autoSendPress){
-          window.desktopAPI.autoSendPress({ side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true });
-        } else {
-          const { ipcRenderer } = require('electron'); const ip=ipcRenderer; if(ip && ip.invoke){ ip.invoke('send-auto-press', { side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true }); }
-        }
-        try { console.log('[autoSim][embedded][burst] confirm F22 after', confirmDelay,'ms'); } catch(_){ }
-      } catch(_){ }
-    }, confirmDelay);
-  } catch(_){ }
-  if(embeddedAutoSim.adaptive){
-    embeddedAutoSim.waitingForExcel=true; embeddedAutoSim.excelSnapshotKey = (ex[0]+'|'+ex[1]);
-    const myToken=++embeddedAutoSim.waitToken; const startTs=Date.now();
-    const check=()=>{
-      if(!embeddedAutoSim.active || !embeddedAutoSim.waitingForExcel || myToken!==embeddedAutoSim.waitToken) return;
-      const cur=embeddedParseExcel();
-      if(cur){
-        const kk=cur[0]+'|'+cur[1];
-        if(kk!==embeddedAutoSim.excelSnapshotKey){
-          embeddedAutoSim.waitingForExcel=false;
-            try { console.log('[autoSim][embedded][adaptive][resume] excelChanged', kk); } catch(_){ }
-          return embeddedSchedule(50);
-        }
-      }
-      if(Date.now()-startTs >= embeddedAutoSim.maxAdaptiveWaitMs){
-        embeddedAutoSim.waitingForExcel=false;
-        try { console.log('[autoSim][embedded][adaptive][timeout] resume'); } catch(_){ }
-        return embeddedSchedule();
-      }
-      setTimeout(check, 120);
-    };
-    setTimeout(check, 150);
-  } else {
-    embeddedSchedule();
-  }
-}
-function embeddedToggleAuto(){
-  const newState = !embeddedAutoSim.active;
-  embeddedAutoSim.active=newState;
-  const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.toggle('on', embeddedAutoSim.active);
-  const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow'); if(indRow) indRow.style.display=embeddedAutoSim.active? '' : 'none';
-  // status row removed
-  embeddedStatus(embeddedAutoSim.active? `Start (tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%)` : 'Stopped');
-  try { console.log('[autoSim][embedded][toggle]', embeddedAutoSim.active? 'ON':'OFF', 'tol', embeddedAutoSim.tolerancePct); } catch(_){ }
-  try { if(embeddedAutoSim.active){ embeddedAutoSim.userWanted=true; embeddedAutoSim.lastDisableReason=null; localStorage.setItem('embeddedAutoUserWanted','1'); } else { embeddedAutoSim.userWanted=false; embeddedAutoSim.lastDisableReason='manual'; localStorage.setItem('embeddedAutoUserWanted','0'); } } catch(_){ }
-  // Forward to main (board forwarding filter in preload only catches [autoSim], so tags preserved)
-  try { if(window.desktopAPI && window.desktopAPI.send){ window.desktopAPI.send('auto-mode-changed', { embedded:true, active: embeddedAutoSim.active, tolerance: embeddedAutoSim.tolerancePct }); } } catch(_){ }
-  if(embeddedAutoSim.active){ embeddedStep(); } else { clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=null; }
-}
-document.addEventListener('click', e=>{ if(e.target && e.target.id==='embeddedAutoBtn'){ embeddedToggleAuto(); }});
-// Auto-resume (R) button toggle
-document.addEventListener('click', e=>{ if(e.target && e.target.id==='embeddedAutoResumeBtn'){ try {
-  embeddedAutoSim.autoResume = !embeddedAutoSim.autoResume;
-  try { localStorage.setItem('embeddedAutoResumeEnabled', embeddedAutoSim.autoResume? '1':'0'); } catch(_){ }
-  e.target.classList.toggle('on', embeddedAutoSim.autoResume);
-  try { console.log('[autoSim][embedded][autoResumeFlag]', embeddedAutoSim.autoResume? 'ON':'OFF'); } catch(_){ }
-} catch(_){ } }});
-// Initialize resume button visual state after DOM ready
-window.addEventListener('DOMContentLoaded', ()=>{ try { const rbtn=document.getElementById('embeddedAutoResumeBtn'); if(rbtn) rbtn.classList.toggle('on', embeddedAutoSim.autoResume); } catch(_){ } });
-window.__embeddedAutoSim = embeddedAutoSim;
-
-// Hotkey broadcast: toggle embedded auto (from main Numpad5)
-try {
-  const { ipcRenderer } = window.require? window.require('electron'): {};
-  if(ipcRenderer){
-    ipcRenderer.on('auto-toggle-all', ()=>{ try { embeddedToggleAuto(); } catch(_){ } });
-    // Mirror auto ON/OFF broadcast from main/board
-    ipcRenderer.on('auto-set-all', (_e, p)=>{
-      try {
-        const wantOn = !!(p && p.on);
-        if(wantOn !== embeddedAutoSim.active){
-          embeddedAutoSim.active = wantOn;
-          if(wantOn){ embeddedAutoSim.userWanted=true; embeddedAutoSim.lastDisableReason=null; embeddedStep(); }
-          else { clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=null; }
-          try { localStorage.setItem('embeddedAutoUserWanted', wantOn? '1':'0'); } catch(_){ }
-          const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.toggle('on', wantOn);
-          const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow'); if(indRow) indRow.style.display=wantOn? '' : 'none';
-        }
-      } catch(_){ }
-    });
-  }
-} catch(_){ }
-
-// Live tolerance update
-try {
-  const ipc = (window.require? window.require('electron').ipcRenderer: (window.ipcRenderer||null));
-  if(ipc){
-    ipc.on('auto-tolerance-updated', (_e,v)=>{
-      if(typeof v==='number' && !isNaN(v)){
-        embeddedAutoSim.tolerancePct = v;
-        try { console.log('[autoSim][embedded] tolerance updated ->', v); } catch(_){ }
-        if(embeddedAutoSim.active){ embeddedStatus(`Tol ${embeddedAutoSim.tolerancePct.toFixed(2)}%`); }
-      }
-    });
-    ipc.on('auto-interval-updated', (_e,v)=>{ if(typeof v==='number' && !isNaN(v)){ embeddedAutoSim.stepMs=v; try { console.log('[autoSim][embedded] interval updated ->', v); } catch(_){ } } });
-  ipc.on('auto-adaptive-updated', (_e,v)=>{ if(typeof v==='boolean'){ embeddedAutoSim.adaptive=v; try { console.log('[autoSim][embedded] adaptive updated ->', v); } catch(_){ } } });
-  ipc.on('auto-burst-levels-updated', (_e,levels)=>{ if(Array.isArray(levels)){ embeddedAutoSim.burstLevels=levels; try { console.log('[autoSim][embedded] burst levels updated', levels); } catch(_){ } } });
-  }
-} catch(_){ }
-
-// Global disable hotkey signal listener
-try {
-  const { ipcRenderer } = require('electron');
-  if(ipcRenderer){
-    ipcRenderer.on('auto-disable-all', ()=>{
-      try {
-        if(embeddedAutoSim.active){
-          embeddedAutoSim.active=false; clearTimeout(embeddedAutoSim.timer); embeddedAutoSim.timer=null;
-          const btn=document.getElementById('embeddedAutoBtn'); if(btn) btn.classList.remove('on');
-          embeddedStatus('Auto OFF (Alt+C)');
-          embeddedAutoSim.userWanted=false; embeddedAutoSim.lastDisableReason='manual-global';
-          try { localStorage.setItem('embeddedAutoUserWanted','0'); } catch(_){ }
-          try { console.log('[autoSim][embedded][autoDisable] Alt+C global -> OFF (intent cleared)'); } catch(_){ }
-        }
-      } catch(_){ }
-    });
-  }
-} catch(_){ }
+// (Legacy embedded auto code removed – unified Auto Core is used via auto_trader_embedded.js)

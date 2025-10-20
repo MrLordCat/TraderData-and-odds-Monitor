@@ -254,6 +254,8 @@ body { padding-right:2px; }
 .autoBtn, .autoSubBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 6px; font-size:10.5px; line-height:1; border-radius:5px; cursor:pointer; }
 .autoSubBtn { padding:2px 5px; }
 .autoBtn.on, .autoSubBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
+/* Excel-suspended marker for auto button (embedded) */
+.autoBtn.susp { background:#775c1f; color:#fff; border-color:#a9852f; box-shadow:0 0 0 1px rgba(169,133,47,.35) inset; }
 .excelControls button { flex:0 0 auto; }
 
 h1.statsHeader {

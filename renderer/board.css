@@ -222,6 +222,8 @@ tfoot tr#midRow th { background: #1d2330; }
 }
 .autoBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
 .autoBtn.paused { background:#6b5a2a; color:#fff; border-color:#8a7336; }
+/* Excel-suspended highlight */
+.autoBtn.susp { background:#775c1f; color:#fff; border-color:#a9852f; box-shadow:0 0 0 1px rgba(169,133,47,.35) inset; }
 .excelControls { display:inline-flex; align-items:center; gap:6px; flex-wrap:nowrap; }
 .excelControls button { margin-left:0; }
 .excelControls .autoBtn { margin-left:8px; }
