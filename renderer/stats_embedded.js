@@ -361,6 +361,23 @@ initEmbeddedMapSync();
 updateEmbeddedMapTag();
 // Fallback: after full DOM ready, re-sync in case elements mounted after initial code ran
 window.addEventListener('DOMContentLoaded', ()=>{ try { syncEmbeddedMapSelect(); updateEmbeddedMapTag(); forceMapSelectValue(); } catch(_){ } });
+// Centralized tolerance badge (embedded header) – prefer engine state, fallback to settings
+try {
+  const { ipcRenderer } = require('electron');
+  function getEngTol(){ try { const st = window.__embeddedAutoSim; if(st && typeof st.tolerancePct==='number' && !isNaN(st.tolerancePct)) return st.tolerancePct; } catch(_){ } return null; }
+  function setEmbTolBadge(v){
+    try {
+      const el=document.getElementById('embeddedTolBadge'); if(!el) return;
+      const eff = getEngTol(); const val = (typeof eff==='number' && !isNaN(eff)) ? eff : ((typeof v==='number' && !isNaN(v)) ? v : null);
+      el.textContent = (val!=null) ? `Tol: ${val.toFixed(2)}%` : 'Tol: —';
+    } catch(_){ }
+  }
+  if(ipcRenderer){
+    try { ipcRenderer.invoke('auto-tolerance-get').then(v=> setEmbTolBadge(v)).catch(()=> setEmbTolBadge(null)); } catch(_){ }
+    ipcRenderer.on('auto-tolerance-updated', (_e,v)=> setTimeout(()=> setEmbTolBadge(v), 0));
+    ipcRenderer.on('auto-active-set', ()=> setTimeout(()=> setEmbTolBadge(getEngTol()), 0));
+  }
+} catch(_){ }
 // Delegate click for swap buttons
 document.addEventListener('click', e=>{
   const btn = e.target.closest && e.target.closest('.eo-swapBtn');

@@ -21,6 +21,7 @@
     </label>
     <button id="mapRefreshBtn" title="Re-broadcast current map (refresh odds)" style="margin-left:6px;padding:2px 6px;font:12px system-ui;line-height:1;cursor:pointer;">⟳</button>
     <label class="lastLabel" title="Use match market for final map brokers (bet365)"><input type="checkbox" id="isLastChk" /> Last</label>
+    <span id="tolBadge" class="tag" title="Auto tolerance (from Settings)">Tol: —</span>
   </div>
   <div id="tableContainer">
   <table id="table">
@@ -38,6 +39,7 @@
       <tr id="excelAutoRow" style="display:none"><th></th><td colspan="2" class="excelAutoCell"><div class="autoIndicators">
         <span class="autoDot side1" title="Adjusting side 1"></span>
         <span class="autoDot side2" title="Adjusting side 2"></span>
+        <span id="autoStatusText" class="autoStatus"></span>
       </div></td></tr>
       <tr id="arbRow"><th>Arb</th><td colspan="2">-</td></tr>
     </tfoot>

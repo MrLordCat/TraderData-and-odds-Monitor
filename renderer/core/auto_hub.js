@@ -88,6 +88,7 @@
 
     function addBroadcastListeners(){
       try {
+        const applyConfigAll = (cfg)=>{ if(!cfg) return; views.forEach(v=>{ try { if(v.engine && v.engine.setConfig) v.engine.setConfig(cfg); } catch(_){ } }); };
         const handleToggle = ()=>{
           let after = null;
           views.forEach(v=>{ try { const eng=v.engine; if(eng){ const next = !eng.state.active; eng.setActive(next); after = next; } } catch(_){ } });
@@ -132,6 +133,11 @@
             ipcRenderer.on('auto-disable-all', handleDisable);
             ipcRenderer.on('auto-resume-set', (_e,p)=> handleResumeSet(p));
             ipcRenderer.on('auto-active-set', (_e,p)=> handleActiveSet(p));
+            // Apply settings updates to all engines centrally
+            ipcRenderer.on('auto-tolerance-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ tolerancePct:v }); });
+            ipcRenderer.on('auto-interval-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ stepMs:v }); });
+            ipcRenderer.on('auto-adaptive-updated', (_e, v)=>{ if(typeof v==='boolean') applyConfigAll({ adaptive:v }); });
+            ipcRenderer.on('auto-burst-levels-updated', (_e, levels)=>{ if(Array.isArray(levels)) applyConfigAll({ burstLevels:levels }); });
           }
         }
       } catch(_){ }
@@ -160,11 +166,22 @@
               ipcRenderer.invoke('auto-burst-levels-get').catch(()=>null),
             ]).then(([tol, interval, adaptive, levels])=>{
               const cfg = {};
-              if(typeof tol==='number' && !isNaN(tol)) cfg.tolerancePct = tol;
-              if(typeof interval==='number' && !isNaN(interval)) cfg.stepMs = interval;
-              if(typeof adaptive==='boolean') cfg.adaptive = adaptive;
-              if(Array.isArray(levels)) cfg.burstLevels = levels;
+              const missing = [];
+              if(typeof tol==='number' && !isNaN(tol)) cfg.tolerancePct = tol; else missing.push('Tolerance');
+              // Provide safe defaults for missing params so auto can run once Tolerance is set
+              cfg.stepMs = (typeof interval==='number' && !isNaN(interval)) ? interval : 500;
+              cfg.adaptive = (typeof adaptive==='boolean') ? adaptive : false;
+              cfg.burstLevels = (Array.isArray(levels) && levels.length) ? levels : [
+                { thresholdPct:15, pulses:4 },
+                { thresholdPct:7, pulses:3 },
+                { thresholdPct:5, pulses:2 }
+              ];
               try { engine.setConfig(cfg); } catch(_){ }
+              // If no tolerance configured at all, inform UI and keep auto off
+              if(missing.length){
+                try { ui && ui.status && ui.status('Set in Settings: '+missing.join(', ')); } catch(_){ }
+                try { engine.setActive(false); } catch(_){ }
+              }
             }).catch(()=>{});
           }
         }

@@ -364,3 +364,48 @@ function flashDot(idx){
   const stepMs = (window.__autoSim && window.__autoSim.stepMs) ? window.__autoSim.stepMs : 500;
   if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), stepMs-80); }
 }
+
+// Centralized tolerance badge (from core Settings)
+(function bindToleranceBadge(){
+  let lastTol = null;
+  function currentEngTol(){ try { const st = window.__autoSim; if(st && typeof st.tolerancePct==='number' && !isNaN(st.tolerancePct)) return st.tolerancePct; } catch(_){ } return null; }
+  function setBadge(v){
+    const eff = currentEngTol();
+    lastTol = (typeof eff==='number' && !isNaN(eff)) ? eff : ((typeof v==='number' && !isNaN(v)) ? v : null);
+    try {
+      const el = document.getElementById('tolBadge'); if(!el) return;
+      if(lastTol!=null) el.textContent = `Tol: ${lastTol.toFixed(2)}%`;
+      else el.textContent = 'Tol: —';
+    } catch(_){ }
+  }
+  function fetchInitial(){
+    try {
+      if(window.desktopAPI && typeof window.desktopAPI.invoke==='function'){
+        window.desktopAPI.invoke('auto-tolerance-get').then(v=> setBadge(v)).catch(()=> setBadge(null));
+        return;
+      }
+    } catch(_){ }
+    try {
+      const { ipcRenderer } = require ? require('electron') : {};
+      if(ipcRenderer){
+        ipcRenderer.invoke('auto-tolerance-get').then(v=> setBadge(v)).catch(()=> setBadge(null));
+        ipcRenderer.on('auto-tolerance-updated', (_e, v)=> setTimeout(()=> setBadge(v), 0));
+        // Also resync when auto state toggles (engine may have just attached/initialized)
+        ipcRenderer.on('auto-active-set', ()=> setTimeout(()=> setBadge(currentEngTol()), 0));
+      }
+    } catch(_){ }
+  }
+  // Subscribe to live updates (both bridges)
+  try {
+    if(window.desktopAPI && typeof window.desktopAPI.on==='function'){
+      // If a generic .on isn't available, rely on raw ipcRenderer subscription above
+    }
+  } catch(_){ }
+  // Ensure badge updates after DOM is ready too
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', ()=> setBadge(lastTol), { once:true });
+  } else {
+    setBadge(lastTol);
+  }
+  fetchInitial();
+})();

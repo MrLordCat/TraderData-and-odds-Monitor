@@ -15,7 +15,8 @@
       confirmBase: 100,
       fireCooldownMs: 900,
       maxAdaptiveWaitMs: 1600,
-      initial: { tolerancePct:0.15, stepMs:500, adaptive:true, burstLevels:[ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ] },
+      // No defaults: will be provided by settings via AutoHub
+      initial: { tolerancePct: NaN, stepMs: NaN, adaptive: null, burstLevels: [] },
     }, opts||{});
 
     const press = cfg.press || defaultPress;
@@ -29,10 +30,10 @@
     const state = {
       active:false,
       timer:null,
-      stepMs: cfg.initial.stepMs,
-      tolerancePct: cfg.initial.tolerancePct,
-      adaptive: cfg.initial.adaptive,
-      burstLevels: Array.isArray(cfg.initial.burstLevels)? cfg.initial.burstLevels.slice(): [],
+  stepMs: cfg.initial.stepMs,
+  tolerancePct: cfg.initial.tolerancePct,
+  adaptive: cfg.initial.adaptive,
+  burstLevels: Array.isArray(cfg.initial.burstLevels)? cfg.initial.burstLevels.slice(): [],
       lastMidKey:null,
       fireCooldownMs: cfg.fireCooldownMs,
       lastFireTs:0,
@@ -77,6 +78,11 @@
       if(!state.active) return;
       const mid = parseMid && parseMid();
       const ex = parseExcel && parseExcel();
+      // Require config before operating
+      if(!(typeof state.tolerancePct==='number' && !isNaN(state.tolerancePct)) || !(typeof state.stepMs==='number' && !isNaN(state.stepMs)) || typeof state.adaptive!=='boolean' || !Array.isArray(state.burstLevels) || state.burstLevels.length===0){
+        status('Set Auto config in Settings');
+        return schedule();
+      }
       if(!mid || !ex){ status('Нет данных'); return schedule(); }
       const key = mid.join('|');
       if(state.lastMidKey && state.lastMidKey!==key){ status('Mid changed'); }

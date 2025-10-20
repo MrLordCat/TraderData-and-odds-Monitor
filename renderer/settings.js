@@ -32,6 +32,12 @@ const anim = {
 	color2: document.getElementById('anim-color2')
 };
 
+// Optional future inputs for auto interval/adaptive (not present in current UI but support live apply if added)
+const autoIntervalInput = document.getElementById('auto-interval');
+const autoAdaptiveInput = document.getElementById('auto-adaptive');
+if(autoIntervalInput){ autoIntervalInput.addEventListener('change', ()=>{ const v=parseInt(autoIntervalInput.value,10); if(!isNaN(v)) try { ipcRenderer.send('auto-interval-set', { intervalMs: v }); } catch(_){ } }); }
+if(autoAdaptiveInput){ autoAdaptiveInput.addEventListener('change', ()=>{ const en=!!autoAdaptiveInput.checked; try { ipcRenderer.send('auto-adaptive-set', { enabled: en }); } catch(_){ } }); }
+
 // Auto odds tolerance (percent difference threshold)
 const autoTolInput = document.getElementById('auto-tolerance');
 let autoTolerancePct = 0.15; // default
@@ -45,6 +51,8 @@ if(autoTolInput){
 		const raw = parseFloat(autoTolInput.value);
 		if(!isNaN(raw)) autoTolerancePct = clampTol(raw);
 		autoTolInput.value = autoTolerancePct.toFixed(2);
+		// Apply immediately (live) so auto engines react without pressing Save
+		try { ipcRenderer.send('auto-tolerance-set', { tolerancePct: autoTolerancePct }); } catch(_){ }
 	});
 }
 
@@ -85,7 +93,7 @@ function readBurstInputs(){
 	if(tmp.length) burstLevels = tmp;
 	burstLevels = sanitizeBurst(burstLevels);
 }
-Object.values(burstInputs).forEach(el=>{ if(el){ el.addEventListener('change', ()=>{ readBurstInputs(); applyBurstInputsFromModel(); }); }});
+Object.values(burstInputs).forEach(el=>{ if(el){ el.addEventListener('change', ()=>{ readBurstInputs(); applyBurstInputsFromModel(); try { ipcRenderer.send('auto-burst-levels-set', { levels: burstLevels }); } catch(_){ } }); }});
 
 function queueStatsConfigSend(){
 	if(!currentStatsConfig) return;

@@ -41,7 +41,7 @@ function initSettingsIpc(ctx){
       const v = store.get('autoTolerancePct');
       if(typeof v === 'number' && !isNaN(v)) return clampTol(v);
     } catch(_){ }
-    return 0.15; // default
+    return null; // no default on first run
   });
   ipcMain.on('auto-tolerance-set', (_e, payload)=>{
     try {
@@ -83,17 +83,13 @@ function initSettingsIpc(ctx){
       return uniq.slice(0,3); // cap to 3 (UI uses 3)
     } catch(_){ return null; }
   }
-  function defaultBurstLevels(){ return [
-    { thresholdPct:15, pulses:4 },
-    { thresholdPct:7, pulses:3 },
-    { thresholdPct:5, pulses:2 }
-  ]; }
+  function defaultBurstLevels(){ return null; }
   ipcMain.handle('auto-burst-levels-get', ()=>{
     try {
       const v = store.get('autoBurstLevels');
       const s = sanitizeBurstLevels(v);
-      return s && s.length? s : defaultBurstLevels();
-    } catch(_){ return defaultBurstLevels(); }
+      return (s && s.length)? s : null;
+    } catch(_){ return null; }
   });
   ipcMain.on('auto-burst-levels-set', (_e, payload)=>{
     try {
@@ -120,7 +116,7 @@ function initSettingsIpc(ctx){
       const v = store.get('autoIntervalMs');
       if(typeof v==='number' && !isNaN(v)) return clampInterval(v);
     } catch(_){ }
-    return 500; // default
+    return null; // no default on first run
   });
   ipcMain.on('auto-interval-set', (_e, payload)=>{
     try {
@@ -144,7 +140,7 @@ function initSettingsIpc(ctx){
       const v = store.get('autoAdaptiveEnabled');
       if(typeof v==='boolean') return v;
     } catch(_){ }
-    return true; // default enabled
+    return null; // no default on first run
   });
   ipcMain.on('auto-adaptive-set', (_e, payload)=>{
     try {

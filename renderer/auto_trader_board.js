@@ -25,10 +25,12 @@ const __autoEngine = (function(){
     onActiveChanged(active, st){
       const btn=document.getElementById('autoBtn'); if(btn) btn.classList.toggle('on', !!active);
       const row=document.getElementById('excelAutoRow'); if(row) row.style.display=active? '' : 'none';
+      // Clear stale status text on toggle; next step will write fresh status
+      try { const el=document.getElementById('autoStatusText'); if(el && active){ el.textContent=''; } } catch(_){ }
       try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ }
     },
     flash(idx){ const dot=document.querySelector('.autoDot.'+(idx===0?'side1':'side2')); if(dot){ const ms = (view?.state?.stepMs)||500; dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), ms-80); } },
-    status(_msg){},
+    status(msg){ try { const el=document.getElementById('autoStatusText'); if(el){ el.textContent = msg||''; } } catch(_){ } },
     onAutoResumeChanged(on){ try { const r=document.getElementById('autoResumeBtn'); if(r) r.classList.toggle('on', !!on); } catch(_){ } },
   });
   return {
@@ -81,10 +83,10 @@ try {
       const { ipcRenderer } = require ? require('electron') : {};
       if(ipcRenderer && !subscribe.__attached){
         subscribe.__attached=true;
-        ipcRenderer.on('auto-tolerance-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)){ __autoEngine && __autoEngine.setConfig({ tolerancePct:v }); } });
-        ipcRenderer.on('auto-interval-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)){ __autoEngine && __autoEngine.setConfig({ stepMs:v }); } });
-        ipcRenderer.on('auto-adaptive-updated', (_e, v)=>{ if(typeof v==='boolean'){ __autoEngine && __autoEngine.setConfig({ adaptive:v }); } });
-        ipcRenderer.on('auto-burst-levels-updated', (_e, levels)=>{ if(Array.isArray(levels)){ __autoEngine && __autoEngine.setConfig({ burstLevels:levels }); } });
+        ipcRenderer.on('auto-tolerance-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)){ if(__autoEngine){ __autoEngine.setConfig({ tolerancePct:v }); if(__autoEngine.state.active){ __autoEngine.step(); } } } });
+        ipcRenderer.on('auto-interval-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)){ if(__autoEngine){ __autoEngine.setConfig({ stepMs:v }); if(__autoEngine.state.active){ __autoEngine.step(); } } } });
+        ipcRenderer.on('auto-adaptive-updated', (_e, v)=>{ if(typeof v==='boolean'){ if(__autoEngine){ __autoEngine.setConfig({ adaptive:v }); if(__autoEngine.state.active){ __autoEngine.step(); } } } });
+        ipcRenderer.on('auto-burst-levels-updated', (_e, levels)=>{ if(Array.isArray(levels)){ if(__autoEngine){ __autoEngine.setConfig({ burstLevels:levels }); if(__autoEngine.state.active){ __autoEngine.step(); } } } });
       }
     } catch(_){ }
   };
