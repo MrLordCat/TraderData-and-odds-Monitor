@@ -139,6 +139,16 @@ if(window.desktopAPI){
   } catch(_){ }
   // Excel extractor status updates (mirror embedded panel UI)
   try {
+    // Bind S button click to toggle the Python extractor
+    try {
+      const sBtn = document.getElementById('excelScriptBtn');
+      if(sBtn && !sBtn.dataset.bound){
+        sBtn.dataset.bound = '1';
+        sBtn.addEventListener('click', ()=>{
+          try { window.desktopAPI.excelScriptToggle && window.desktopAPI.excelScriptToggle(); } catch(_){ }
+        });
+      }
+    } catch(_){ }
     if(window.desktopAPI.onExcelExtractorStatus){
       window.desktopAPI.onExcelExtractorStatus(s=>{
         try {
@@ -160,7 +170,24 @@ if(window.desktopAPI){
       });
       // Initial fetch if API supports
       if(window.desktopAPI.getExcelExtractorStatus){
-        window.desktopAPI.getExcelExtractorStatus().then(s=>{ if(s) window.desktopAPI.onExcelExtractorStatus._last && window.desktopAPI.onExcelExtractorStatus._last(s); }).catch(()=>{});
+        window.desktopAPI.getExcelExtractorStatus().then(s=>{
+          try {
+            const statusEl=document.getElementById('excelStatusCell');
+            const btn=document.getElementById('excelScriptBtn');
+            if(btn) btn.classList.toggle('on', !!(s && s.running));
+            if(statusEl && s){
+              let text='';
+              if(s.installing) text='installing...';
+              else if(s.starting) text='starting';
+              else if(s.running) text='running';
+              else if(s.error) text='error';
+              else text='idle';
+              statusEl.dataset.last=text;
+              if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; statusEl.title='Excel extractor idle'; }
+              else { statusEl.style.display='inline'; statusEl.textContent=text; statusEl.title='Excel extractor: '+text; }
+            }
+          } catch(_){ }
+        }).catch(()=>{});
       }
     }
   } catch(_){ }

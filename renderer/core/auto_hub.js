@@ -21,12 +21,20 @@
       try {
         const elapsed = now()-lastF21At; if(elapsed < 250) return; // debounce
         lastF21At = now();
-        if(global.desktopAPI && global.desktopAPI.invoke){ global.desktopAPI.invoke('send-auto-press', Object.assign({ key:'F21', noConfirm:true }, opts||{})); }
-        else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', Object.assign({ key:'F21', noConfirm:true }, opts||{})); } }
+        const base = { key:'F21', noConfirm:true };
+        // Map reason into 'direction' to surface in main log
+        if(opts && typeof opts.reason==='string') base.direction = opts.reason;
+        else if(opts && opts.resume) base.direction = 'resume';
+        else if(opts && opts.retry) base.direction = 'retry';
+        if(opts && typeof opts.diffPct==='number' && !isNaN(opts.diffPct)) base.diffPct = Number(opts.diffPct);
+        if(global.desktopAPI && global.desktopAPI.invoke){ global.desktopAPI.invoke('send-auto-press', base); }
+        else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.invoke){ ipcRenderer.invoke('send-auto-press', base); } }
       } catch(_){ }
     }
 
-    function getExcelRecord(){ return state.records['excel'] || state.records['dataservices'] || null; }
+  function getExcelRecord(){ return state.records['excel'] || state.records['dataservices'] || null; }
+  let shockThresholdPct = null; // user-configurable
+  let lastExcelForShock = null;
     function getMid(){ const d=state.derived; return (d && d.hasMid && Array.isArray(d.mid) && d.mid.length===2)? d.mid : null; }
 
     function computeDerived(){ try { state.derived = (global.OddsCore && global.OddsCore.computeDerivedFrom) ? global.OddsCore.computeDerivedFrom(state.records) : { hasMid:false, arbProfitPct:null, mid:null }; } catch(_){ state.derived={ hasMid:false, arbProfitPct:null, mid:null }; } }
@@ -38,10 +46,10 @@
         const eng=v.engine, ui=v.ui; if(!eng||!eng.state) return;
         const st=eng.state;
         // Suspend
-        if(ex.frozen && st.active){ st.lastDisableReason='excel-suspended'; eng.setActive(false); anyDisabled=true; try { ui.onActiveChanged && ui.onActiveChanged(false, st, { excelSuspended:true }); } catch(_){ } }
+        if(ex.frozen && st.active){ st.lastDisableReason='excel-suspended'; eng.setActive(false); anyDisabled=true; try { ui.onActiveChanged && ui.onActiveChanged(false, st, { excelSuspended:true }); } catch(_){ } try { ui && ui.status && ui.status('Suspended: excel'); } catch(_){ } }
         // Resume
         else if(!ex.frozen && !st.active && st.userWanted && st.lastDisableReason==='excel-suspended'){
-          if(st.autoResume){ eng.setActive(true); anyEnabled=true; st.lastDisableReason='excel-resumed'; try { ui.onActiveChanged && ui.onActiveChanged(true, st, { excelResumed:true }); } catch(_){ } try { eng.step(); } catch(_){ } }
+          if(st.autoResume){ eng.setActive(true); anyEnabled=true; st.lastDisableReason='excel-resumed'; try { ui.onActiveChanged && ui.onActiveChanged(true, st, { excelResumed:true }); } catch(_){ } try { ui && ui.status && ui.status('Resumed: excel'); } catch(_){ } try { eng.step(); } catch(_){ } }
         }
       });
       // Broadcast state change across windows so late-loaded views sync
@@ -61,11 +69,14 @@
           const eng=v.engine, ui=v.ui; if(!eng||!eng.state) return; const st=eng.state; if(!st.autoResume) return; if(st.active){ anyDisabled=true; st.lastDisableReason = (!d.hasMid)?'no-mid':'arb-spike'; eng.setActive(false); try { ui.onActiveChanged && ui.onActiveChanged(false, st, { marketSuspended:true }); } catch(_){ } }
         });
         if(anyDisabled){
-          sendAutoPressF21({});
+          try { console.log('[autoHub][marketGuard] suspend', { noMid: !d.hasMid, arbProfitPct: d.arbProfitPct }); } catch(_){ }
+          const reason = !d.hasMid ? 'market:no-mid' : ('market:arb-'+(typeof d.arbProfitPct==='number'? Number(d.arbProfitPct).toFixed(1): 'n/a'));
+          try { views.forEach(v=>{ try { v.ui && v.ui.status && v.ui.status(!d.hasMid? 'Suspended: no mid' : ('Suspended: arb spike '+Number(d.arbProfitPct).toFixed(1)+'%')); } catch(_){ } }); } catch(_){ }
+          sendAutoPressF21({ reason });
           // Broadcast OFF so other windows reflect true state
           try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } } } catch(_){ }
           // Retry after 500ms if Excel still trading
-          setTimeout(()=>{ try { const ex=getExcelRecord(); const stillTrading = !ex || !ex.frozen; if(stillTrading){ sendAutoPressF21({ retry:true }); } } catch(_){ } }, 500);
+          setTimeout(()=>{ try { const ex=getExcelRecord(); const stillTrading = !ex || !ex.frozen; if(stillTrading){ sendAutoPressF21({ reason: reason+':retry', retry:true }); } } catch(_){ } }, 500);
         }
       } else {
         // Resume if previously disabled due to market and userWanted=true
@@ -75,18 +86,75 @@
             eng.setActive(true); st.lastDisableReason='market-resumed'; try { ui.onActiveChanged && ui.onActiveChanged(true, st, { marketResumed:true }); } catch(_){ }
             // Broadcast ON so other windows reflect true state
             try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:true }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:true }); } } } catch(_){ }
-            sendAutoPressF21({ resume:true }); setTimeout(()=>{ try { const d2=state.derived; const ok = d2 && d2.hasMid && (!d2.arbProfitPct || d2.arbProfitPct < ARB_SUSPEND_PCT); if(ok && eng.state.active){ sendAutoPressF21({ resume:true, retry:true }); } } catch(_){ } }, 500);
+            try { views.forEach(x=>{ try { x.ui && x.ui.status && x.ui.status('Resumed: market OK'); } catch(_){ } }); } catch(_){ }
+            sendAutoPressF21({ reason:'market:resume', resume:true }); setTimeout(()=>{ try { const d2=state.derived; const ok = d2 && d2.hasMid && (!d2.arbProfitPct || d2.arbProfitPct < ARB_SUSPEND_PCT); if(ok && eng.state.active){ sendAutoPressF21({ reason:'market:resume:retry', resume:true, retry:true }); } } catch(_){ } }, 500);
             try { eng.step(); } catch(_){ }
           }
         });
       }
     }
 
-    function onHubUpdate(st){ try { state.records = Object.assign({}, st.records||{}); computeDerived(); applyExcelGuard(); applyMarketGuard(); } catch(_){ } }
+    function maybeShockSuspend(){
+      try {
+        if(!(typeof shockThresholdPct==='number' && !isNaN(shockThresholdPct))) return;
+        const ex = getExcelRecord(); if(!ex || !Array.isArray(ex.odds) || ex.odds.length!==2) return;
+        const n1=parseFloat(ex.odds[0]); const n2=parseFloat(ex.odds[1]); if(isNaN(n1)||isNaN(n2)) return;
+        const cur=[n1,n2];
+        if(lastExcelForShock && Array.isArray(lastExcelForShock) && lastExcelForShock.length===2){
+          const p1 = lastExcelForShock[0]; const p2 = lastExcelForShock[1];
+          // Per-side jumps (для справки в логах)
+          const j1 = p1>0 ? Math.abs((cur[0]-p1)/p1)*100 : NaN;
+          const j2 = p2>0 ? Math.abs((cur[1]-p2)/p2)*100 : NaN;
+          // Реакция только на минимальный оддс: сравниваем jump у минимума
+          const prevMinIdx = (p1<=p2 ? 0 : 1);
+          const curMinIdx = (cur[0]<=cur[1] ? 0 : 1);
+          const prevMinVal = prevMinIdx===0 ? p1 : p2;
+          const curMinVal = curMinIdx===0 ? cur[0] : cur[1];
+          if(!(prevMinVal>0)) { lastExcelForShock = cur; return; }
+          const jumpMin = Math.abs((curMinVal - prevMinVal) / prevMinVal) * 100;
+          if(jumpMin >= shockThresholdPct){
+            // Suspend all active engines
+            let anyDisabled=false;
+            views.forEach(v=>{ try {
+              const eng=v.engine; if(!eng||!eng.state) return; const st=eng.state;
+              if(st.active){ eng.setActive(false); st.lastDisableReason='shock'; anyDisabled=true; try { v.ui.onActiveChanged && v.ui.onActiveChanged(false, st, { shock:true, jump: jumpMin }); } catch(_){ } try { v.ui && v.ui.status && v.ui.status('Suspended: shock '+jumpMin.toFixed(1)+'%'); } catch(_){ } }
+            } catch(_){ } });
+            if(anyDisabled){
+              // Detailed diagnostics с упором на минимальный оддс
+              const details = {
+                prevOdds: [Number(p1), Number(p2)],
+                curOdds: [Number(cur[0]), Number(cur[1])],
+                perSideJumpsPct: { side0: isNaN(j1)? null : Number(j1.toFixed(2)), side1: isNaN(j2)? null : Number(j2.toFixed(2)) },
+                minLine: {
+                  prev: { idx: prevMinIdx, value: Number(prevMinVal) },
+                  curr: { idx: curMinIdx, value: Number(curMinVal) },
+                  switched: prevMinIdx !== curMinIdx,
+                  jumpPct: Number(jumpMin.toFixed(2))
+                },
+                thresholdPct: Number(shockThresholdPct)
+              };
+              try {
+                console.log('[autoHub][shockGuard] suspend', details);
+                // Also forward to main so it appears in main console
+                if(global.require){
+                  const { ipcRenderer } = global.require('electron');
+                  if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('renderer-log-forward', { level:'log', args: ['[autoHub][shockGuard] details', JSON.stringify(details)] }); }
+                }
+              } catch(_){ }
+              sendAutoPressF21({ reason: 'shock:'+jumpMin.toFixed(1)+'%', diffPct: jumpMin });
+              try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } } } catch(_){ }
+            }
+          }
+        }
+        lastExcelForShock = cur;
+      } catch(_){ }
+    }
+
+    function onHubUpdate(st){ try { state.records = Object.assign({}, st.records||{}); computeDerived(); applyExcelGuard(); applyMarketGuard(); maybeShockSuspend(); } catch(_){ } }
 
     function attachOdds(){ if(!oddsHub) return; oddsHub.subscribe(onHubUpdate); oddsHub.start(); }
 
-    function addBroadcastListeners(){
+  function addBroadcastListeners(){
       try {
         const applyConfigAll = (cfg)=>{ if(!cfg) return; views.forEach(v=>{ try { if(v.engine && v.engine.setConfig) v.engine.setConfig(cfg); } catch(_){ } }); };
         const handleToggle = ()=>{
@@ -138,6 +206,10 @@
             ipcRenderer.on('auto-interval-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ stepMs:v }); });
             ipcRenderer.on('auto-adaptive-updated', (_e, v)=>{ if(typeof v==='boolean') applyConfigAll({ adaptive:v }); });
             ipcRenderer.on('auto-burst-levels-updated', (_e, levels)=>{ if(Array.isArray(levels)) applyConfigAll({ burstLevels:levels }); });
+            // Shock threshold live update
+            ipcRenderer.on('auto-shock-threshold-updated', (_e,v)=>{ if(typeof v==='number' && !isNaN(v)) shockThresholdPct=v; });
+            // Initial fetch
+            ipcRenderer.invoke('auto-shock-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) shockThresholdPct=v; }).catch(()=>{});
           }
         }
       } catch(_){ }

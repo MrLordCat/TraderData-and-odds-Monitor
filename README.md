@@ -14,6 +14,7 @@ Work in progress.
 ## Auto Press / Alignment Trigger (F23/F24 Strategy)
 
 Автоматическое выравнивание теперь НЕ жмёт больше реальные '[' и ']'. Вместо этого:
+
 - side 0 -> F23 (VK 0x86)
 - side 1 -> F24 (VK 0x87)
 
@@ -31,14 +32,14 @@ F24:: Send "]"
 
 ; (Опционально) лог в консоль
 F23:: {
-	Send "["
-	ToolTip "F23 -> ["
-	SetTimer () => ToolTip(), -800
+  Send "["
+  ToolTip "F23 -> ["
+  SetTimer () => ToolTip(), -800
 }
 F24:: {
-	Send "]"
-	ToolTip "F24 -> ]"
-	SetTimer () => ToolTip(), -800
+  Send "]"
+  ToolTip "F24 -> ]"
+  SetTimer () => ToolTip(), -800
 }
 ```
 
@@ -51,29 +52,31 @@ F24:: {
 ```
 
 AHK v2 пример опроса файла:
+
 ```ahk
 file := A_ScriptDir "\\auto_press_signal.json"
 lastTs := 0
 SetTimer(CheckAutoPress, 200)
 
 CheckAutoPress() {
-	global file, lastTs
-	if !FileExist(file)
-		return
-	content := FileRead(file, "UTF-8")
-	if RegExMatch(content, '"side":(\d+)', &mSide) && RegExMatch(content, '"ts":(\d+)', &mTs) {
-		ts := mTs[1]
-		if (ts > lastTs) {
-			lastTs := ts
-			side := mSide[1]
-			key := (side = 1) ? "]" : "["
-			Send key
-		}
-	}
+  global file, lastTs
+  if !FileExist(file)
+    return
+  content := FileRead(file, "UTF-8")
+  if RegExMatch(content, '"side":(\d+)', &mSide) && RegExMatch(content, '"ts":(\d+)', &mTs) {
+    ts := mTs[1]
+    if (ts > lastTs) {
+      lastTs := ts
+      side := mSide[1]
+      key := (side = 1) ? "]" : "["
+      Send key
+    }
+  }
 }
 ```
 
 ### Логи
+
 - `[autoSim][mode]` – смена режима авто.
 - `[autoSim][fireAttempt]` – попытка авто-триггера в рендерере.
 - `[auto-press][ipc]` – IPC запрос в main.
@@ -87,6 +90,7 @@ CheckAutoPress() {
 Alignment now stages directional pulses (F23/F24 per side & raise/lower) followed by a single confirm key (F22). Renderers send directional presses with `noConfirm=true` so main does not auto-fire confirm; after all pulses the renderer explicitly schedules F22.
 
 Pulse count scale (diff% vs target):
+
 - >=15% -> 4 pulses
 - >=7% -> 3 pulses
 - >=5% -> 2 pulses
@@ -99,18 +103,20 @@ Confirm (F22) fires ~60–120ms after final directional pulse. AHK maps F22 to t
 Automation disables when the Excel/dataservices feed stops changing (freeze timeout). A localStorage intent flag ensures only automatically suspended sessions auto-resume on feed change; manual disables stay off until re-enabled.
 
 ### New: Auto suspend by market state (R-mode)
+
 - When Auto is ON and Resume (R) is enabled, the app now automatically suspends Auto in two cases:
-	- All books are suspended so Mid cannot be computed (no live odds) — Auto OFF (reason: `no-mid`).
-	- A large cross-book arbitrage appears (>= 5%) — Auto OFF (reason: `arb-spike`).
+  - All books are suspended so Mid cannot be computed (no live odds) — Auto OFF (reason: `no-mid`).
+  - A large cross-book arbitrage appears (>= 5%) — Auto OFF (reason: `arb-spike`).
 - It automatically resumes Auto once Mid is available again and there is no arbitrage (arb < 5%), but only if the last disable was automatic (one of the two reasons above) and the user previously enabled Auto.
 - The same behavior applies to the embedded stats panel.
 
 ## Map Auto-Restore & Dataservices Fallback
 
 Map selection (`lastMap`) & team names persist. After any navigation the main process replays `set-map` at 400/1400/3000/5000ms. Each preload re-applies the map (plus SPA mutation observer). Sometimes dataservices misses all early broadcasts, so extra safeguards were added:
-* Preload logs `[map][recv] set-map -> N` on receipt.
-* Extra reasserts at 4200/6000ms inside the handler.
-* DOMContentLoaded fallback reasserts at 800/2000/4000/7000ms with `_ping_ds` to provoke a resend.
+
+- Preload logs `[map][recv] set-map -> N` on receipt.
+- Extra reasserts at 4200/6000ms inside the handler.
+- DOMContentLoaded fallback reasserts at 800/2000/4000/7000ms with `_ping_ds` to provoke a resend.
 
 If you still need to manually re-select: capture `[map]` logs; absence of any `[map][recv]` means the view attached listeners after all sends — reload to reproduce with timings.
 

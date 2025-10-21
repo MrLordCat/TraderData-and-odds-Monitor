@@ -532,14 +532,29 @@ function bootstrap() {
   }
   function broadcastExcelStatus(){
     try {
+      const payload = {
+        running: !!excelProc,
+        starting: excelProcStarting,
+        error: excelProcError,
+        installing: excelDepsInstalling
+      };
       if(mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('excel-extractor-status', {
-          running: !!excelProc,
-          starting: excelProcStarting,
-          error: excelProcError,
-          installing: excelDepsInstalling
-        });
+        mainWindow.webContents.send('excel-extractor-status', payload);
       }
+      // Also broadcast to board BrowserView if present
+      try {
+        if(typeof boardManager?.getWebContents === 'function'){
+          const bwc = boardManager.getWebContents();
+          if(bwc && !bwc.isDestroyed()) bwc.send('excel-extractor-status', payload);
+        }
+      } catch(_){ }
+      // And to stats panel / slots if present
+      try {
+        if(statsManager && statsManager.views){
+          const vs = statsManager.views;
+          ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('excel-extractor-status', payload); } catch(_){ } } });
+        }
+      } catch(_){ }
     } catch(_){ }
   }
   function startExcelExtractor(){
@@ -723,6 +738,11 @@ app.whenReady().then(()=>{
     const { ipcMain } = require('electron');
     if(!app.__autoPressHandlerRegistered){
       app.__autoPressHandlerRegistered=true;
+      // Centralized de-duplication for F21 (suspend) presses across windows
+      // Prevents double sends when both board and embedded stats AutoHubs trigger simultaneously,
+      // and also when both schedule their 500ms retry. Separate buckets for initial and retry.
+      let __lastF21SentAt = 0;
+      let __lastF21RetrySentAt = 0;
       ipcMain.handle('send-auto-press', (_e, payload)=>{
         let side = 0; // default
         let vk = null; // explicit virtual key if provided (0x86 F23 / 0x87 F24)
@@ -730,6 +750,7 @@ app.whenReady().then(()=>{
         let direction = null;
         let diffPct = null;
         let noConfirm = false; // if true, skip auto F22 scheduling (renderer will trigger confirm itself)
+        let isRetry = false; // renderer may flag retry
         // Backward compat: numeric or undefined -> treat as side index like before (0->F23,1->F24)
         if(typeof payload === 'number'){
           side = (payload===1?1:0);
@@ -739,6 +760,7 @@ app.whenReady().then(()=>{
           if(typeof payload.direction === 'string') direction = payload.direction;
           if(typeof payload.diffPct === 'number') diffPct = payload.diffPct;
           if(payload.noConfirm===true) noConfirm = true;
+          if(payload.retry===true) isRetry = true;
         }
   // Mapping rules override default if keyLabel present
   // F21 -> 0x84, F22 -> 0x85, F23 -> 0x86, F24 -> 0x87
@@ -751,6 +773,27 @@ app.whenReady().then(()=>{
           vk = side===1 ? 0x87 : 0x86; keyLabel = side===1? 'F24':'F23';
         }
         if(keyLabel === 'F22'){ try { console.log('[auto-press][ipc] confirm request F22'); } catch(_){ } }
+        // Normalize retry flag from direction suffix for older senders
+        if(!isRetry && typeof direction === 'string' && direction.indexOf(':retry') !== -1){ isRetry = true; }
+        // Global de-dup for F21 initial and retry
+        if(keyLabel === 'F21'){
+          const nowTs = Date.now();
+          const initialWindowMs = 300; // collapse near-simultaneous initial F21
+          const retryWindowMs = 400;   // collapse near-simultaneous retry F21 (~500ms schedules from multiple renderers)
+          if(isRetry){
+            if(nowTs - __lastF21RetrySentAt < retryWindowMs){
+              try { console.log('[auto-press][ipc][dedupe] suppress F21 retry', { direction, ts: nowTs }); } catch(_){ }
+              return true;
+            }
+            __lastF21RetrySentAt = nowTs;
+          } else {
+            if(nowTs - __lastF21SentAt < initialWindowMs){
+              try { console.log('[auto-press][ipc][dedupe] suppress F21 initial', { direction, ts: nowTs }); } catch(_){ }
+              return true;
+            }
+            __lastF21SentAt = nowTs;
+          }
+        }
         const ts = Date.now();
         try { console.log('[auto-press][ipc] request', { side, key:keyLabel, vk: '0x'+vk.toString(16), direction, diffPct, ts }); } catch(_){ }
         try {

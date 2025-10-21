@@ -157,6 +157,31 @@ function initSettingsIpc(ctx){
       }
     } catch(_){ }
   });
+
+  // === Auto shock suspend threshold (%) ===
+  function clampShock(v){ return Math.max(1, Math.min(100, Math.round(v*10)/10)); }
+  ipcMain.handle('auto-shock-threshold-get', ()=>{
+    try {
+      const v = store.get('autoShockThresholdPct');
+      if(typeof v==='number' && !isNaN(v)) return clampShock(v);
+    } catch(_){ }
+    return null;
+  });
+  ipcMain.on('auto-shock-threshold-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.pct==='number' ? clampShock(payload.pct) : null;
+      if(v!=null){
+        store.set('autoShockThresholdPct', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-shock-threshold-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-shock-threshold-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
 }
 
 module.exports = { initSettingsIpc };

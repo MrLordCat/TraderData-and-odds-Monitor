@@ -76,6 +76,9 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,excelScriptToggle: () => { try { ipcRenderer.send('excel-extractor-toggle'); } catch(_){ } }
   ,excelScriptGetStatus: () => ipcRenderer.invoke('excel-extractor-status-get')
   ,onExcelScriptStatus: (cb) => withUnsub('excel-extractor-status', cb)
+  // Aliases for legacy/new naming used in various renderers (board uses *Extractor* names)
+  ,getExcelExtractorStatus: () => ipcRenderer.invoke('excel-extractor-status-get')
+  ,onExcelExtractorStatus: (cb) => withUnsub('excel-extractor-status', cb)
   ,excelScriptSetPath: (p) => { try { ipcRenderer.send('excel-extractor-set-path', p); } catch(_){ } }
   ,excelScriptInstallDeps: () => { try { ipcRenderer.send('excel-extractor-install-deps'); } catch(_){ } }
   ,openDevTools: () => { try { ipcRenderer.send('open-devtools'); } catch(_){ } }

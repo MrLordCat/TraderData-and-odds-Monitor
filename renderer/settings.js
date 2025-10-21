@@ -40,8 +40,8 @@ if(autoAdaptiveInput){ autoAdaptiveInput.addEventListener('change', ()=>{ const 
 
 // Auto odds tolerance (percent difference threshold)
 const autoTolInput = document.getElementById('auto-tolerance');
-let autoTolerancePct = 0.15; // default
-function clampTol(v){ return Math.max(0.01, Math.min(5, v)); }
+let autoTolerancePct = 0.1; // default display precision: tenths
+function clampTol(v){ return Math.max(0.01, Math.min(5, Math.round(v*10)/10)); }
 if(autoTolInput){
 	autoTolInput.addEventListener('input', ()=>{
 		const raw = parseFloat(autoTolInput.value);
@@ -50,10 +50,19 @@ if(autoTolInput){
 	autoTolInput.addEventListener('change', ()=>{
 		const raw = parseFloat(autoTolInput.value);
 		if(!isNaN(raw)) autoTolerancePct = clampTol(raw);
-		autoTolInput.value = autoTolerancePct.toFixed(2);
+		autoTolInput.value = autoTolerancePct.toFixed(1);
 		// Apply immediately (live) so auto engines react without pressing Save
 		try { ipcRenderer.send('auto-tolerance-set', { tolerancePct: autoTolerancePct }); } catch(_){ }
 	});
+}
+
+// Shock suspend threshold (%) – auto suspends when Excel odds jump by >= this percent
+const shockInput = document.getElementById('auto-shock-threshold');
+let shockThresholdPct = 40.0; // default UI suggestion
+function clampShock(v){ return Math.max(1, Math.min(100, Math.round(v*10)/10)); }
+if(shockInput){
+	shockInput.addEventListener('input', ()=>{ const raw=parseFloat(shockInput.value); if(!isNaN(raw)) shockThresholdPct=clampShock(raw); });
+	shockInput.addEventListener('change', ()=>{ const raw=parseFloat(shockInput.value); if(!isNaN(raw)) shockThresholdPct=clampShock(raw); shockInput.value = shockThresholdPct.toFixed(1); try { ipcRenderer.send('auto-shock-threshold-set', { pct: shockThresholdPct }); } catch(_){ } });
 }
 
 // Burst levels (3 tiers configurable)
@@ -79,7 +88,7 @@ function applyBurstInputsFromModel(){
 		const l = burstLevels[i];
 		const thEl = burstInputs['th'+(i+1)];
 		const puEl = burstInputs['pulses'+(i+1)];
-		if(thEl) thEl.value = l? l.thresholdPct : '';
+		if(thEl) thEl.value = l? Number(l.thresholdPct).toFixed(1) : '';
 		if(puEl) puEl.value = l? l.pulses : '';
 	}
 }
@@ -157,6 +166,8 @@ document.getElementById('save').onclick = ()=>{
 	queueStatsConfigSend();
 	// Persist auto tolerance
 	try { ipcRenderer.send('auto-tolerance-set', { tolerancePct: autoTolerancePct }); } catch(_){ }
+	// Persist shock threshold
+	try { ipcRenderer.send('auto-shock-threshold-set', { pct: shockThresholdPct }); } catch(_){ }
 	// Persist burst levels
 	try { readBurstInputs(); ipcRenderer.send('auto-burst-levels-set', { levels: burstLevels }); } catch(_){ }
 	ipcRenderer.send('close-settings');
@@ -188,8 +199,10 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	// Request stored auto tolerance & burst levels after initial settings applied
 	try { ipcRenderer.invoke('auto-tolerance-get').then(v=>{
 		if(typeof v === 'number' && !isNaN(v)) autoTolerancePct = clampTol(v);
-		if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2);
-	}).catch(()=>{ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2); }); } catch(_){ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(2); }
+		if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(1);
+	}).catch(()=>{ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(1); }); } catch(_){ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(1); }
+	// Initialize shock threshold from store
+	try { ipcRenderer.invoke('auto-shock-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) shockThresholdPct=clampShock(v); if(shockInput) shockInput.value = shockThresholdPct.toFixed(1); }).catch(()=>{ if(shockInput) shockInput.value = shockThresholdPct.toFixed(1); }); } catch(_){ if(shockInput) shockInput.value = shockThresholdPct.toFixed(1); }
 	try { ipcRenderer.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)) { burstLevels = v; } applyBurstInputsFromModel(); }).catch(()=> applyBurstInputsFromModel()); } catch(_){ applyBurstInputsFromModel(); }
 	// Pre-apply game selector from payload if present
 	try {

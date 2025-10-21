@@ -1,170 +1,186 @@
-# Code Review Overview / Обзор Кода
+# Code Review Overview
 
-Этот документ консолидирует ключевые моменты архитектуры проекта, роли основных файлов и доступные глобальные (общие) константы. Цель — быстрое ориентирование при ревью и добавлении новых функций.
+This document summarizes the project architecture, responsibilities of key files, and the shared conventions. It aims to speed up onboarding and reviews.
 
-## 1. Глобальные Константы (`modules/utils/constants.js`)
-Экспортируемый объект:
-- `VIEW_GAP` (8) — горизонтальный зазор между `BrowserView` брокеров и ячейками пресета.
-- `SNAP_DISTANCE` (12) — порог пикселей для прилипания при drag/resize (используется broker/layout менеджерами).
-- `STALE_MS` (5 * 60 * 1000) — таймаут «устаревших» коэффициентов (используется staleMonitor / auto refresh).
-- `HEALTH_CHECK_INTERVAL` (60 * 1000) — период проверки свежести коэффициентов.
-- `STATS_PANEL_WIDTH` (360) — базовая ширина докуемой/встроенной stats панели.
-- `STATS_VIEW_GAP` (4) — внутренний отступ между подпредставлениями stats.
+## 1) Core constants (`modules/utils/constants.js`)
 
-Все дополнительные «магические» числа следует по возможности поднимать сюда.
+Exported values commonly used across the app:
 
-## 2. Главный Процесс (`main.js`)
-Основные зоны ответственности:
-- Инициализация приложения, одиночный инстанс, глобальные safety handlers (`unhandledRejection`, `uncaughtException`).
-- Определение списка брокеров `BROKERS` и их стартовых URL, восстановление сохранённых URL (per broker) из `electron-store`.
-- Управление окнами: главное окно (`mainWindow`), док-борда (через `boardManager`), встроенный/отдельный stats (через `statsManager`).
-- Управление `BrowserView` брокеров: реестр `views` (id -> BrowserView), список активных брокеров `activeBrokerIds` (также обёрнут в ref для межмодульного доступа).
-- Состояние коэффициентов: `latestOddsRef` (кэш последней пачки на брокера — для повторной отрисовки board/stats при реконнекте/детаче).
-- Автообновление и свежесть: `brokerHealth` + константы `STALE_MS`, `HEALTH_CHECK_INTERVAL`; создаётся `staleMonitor` с автоматическим reload зависших брокеров.
-- Перезапуск карты/команд после навигации: `scheduleMapReapply(view)` с множественными задержками (400/1400/3000/5000ms) для SPA/лентивых брокеров.
-- Prompt для DataServices URL (`dsPromptView`) с блюром всех брокерских вью при открытии и очисткой CSS при закрытии.
-- Горячие клавиши: `before-input-event` на окнах (Space для toggle stats, F12 / Ctrl+F12 DevTools, Alt+C disable auto, глобальные Control+Alt+L и Num5 через `globalShortcut`).
-- Авто-нажатие (F22/F23/F24) через PowerShell script генерацию (`sendKeyInject.ps1`) + IPC `send-auto-press` с авто-confirm (F22) логикой.
-- Создание и последовательная инициализация менеджеров: `layoutManager`, `brokerManager`, `boardManager`, `statsManager`, `upscalerManager`, `excelWatcher`.
-- Модульный IPC: `early`, `brokers`, `layout`, `settings`, `map`, `board`, `teamNames`, `autoRefresh`, `stats`, `upscaler`.
-- Встроенный vs window режим статистики: `statsState.mode` = `hidden|embedded|window`; embed НЕ удаляет брокерские views (избегается listener leak).
+- `VIEW_GAP` (8): Horizontal gap between broker BrowserViews and layout cells.
+- `SNAP_DISTANCE` (12): Drag/resize snap threshold used by broker/layout managers.
+- `STALE_MS` (5 * 60 * 1000): Odds staleness timeout (stale monitor / auto-refresh).
+- `HEALTH_CHECK_INTERVAL` (60 * 1000): Broker health polling interval.
+- `STATS_PANEL_WIDTH` (360): Base width for the docked/embedded stats panel.
+- `STATS_VIEW_GAP` (4): Inner gap between stats subviews.
 
-Главные рефы, передаваемые между менеджерами (паттерн `{ value: ... }`):
-- `stageBoundsRef` — геометрия рабочей сцены (используется layout и stats). 
-- `activeBrokerIdsRef` — актуальный список брокеров для layout/board.
-- `latestOddsRef` — кэш odds.
-- `lolTeamNamesRef` — текущие названия команд.
-- `autoRefreshEnabledRef` — флаг авто-рефреша.
-- `quittingRef` — устанавливается в `before-quit`, чтобы корректно останавливать фоновые процессы.
+Keep new "magic numbers" here when possible.
 
-Прочее:
-- `BROKER_FRAME_CSS` — единый стиль рамки для каждого брокерского `BrowserView` (вставляется на `did-finish-load`).
-- Механика сохранения/восстановления: `electron-store` ключи: `disabledBrokers`, `layout`, `layoutPreset`, `lastUrls`, `lastMap`, `lolTeamNames`, `autoRefreshEnabled`, `mainBounds`, `siteCredentials`, `lastDataservicesUrl` и т.д.
+## 2) Main process (`main.js`)
 
-## 3. Broker Manager (`modules/brokerManager/index.js`)
-Функции:
-- `createAll()` — создание всех активных брокеров (учитывает `disabledBrokers` + сохранённые bounds/URL; стартовое позиционирование перед применением layout пресета).
-- `addBroker(id, urlOverride)` — добавляет брокера, при `dataservices` выполняет мульти-инъекцию карты и имён команд (250/900/1800ms). Реюзает bounds placeholder `slot-*`, если есть.
-- `closeBroker(id)` — удаляет view, обновляет списки и запись в disabled.
-- Внутренняя `createSingleInternal` — настройка UA + CDP override (`Emulation.setUserAgentOverride`), обработчики навигации, авто-применение кредов, контекстное меню (Back/Forward/Reload/DevTools/Inspect), вставка рамки CSS, интеграция с layout/zoom/stats z-order.
-- Клавиатурные шорткаты в отдельном view: F12, F5, Ctrl+R, Space (с проверкой editable через `executeJavaScript`).
-- Placeholder odds через `broadcastPlaceholderOdds` до поступления реальных данных.
-- Политика ретраев загрузки: до 3 попыток `reloadIgnoringCache` с экспоненциальной задержкой (1.2s * попытка); затем страница ошибки `renderer/error.html`.
+Responsibilities:
 
-## 4. Layout Manager (`modules/layout/`)
-(Детали кода не открыты в этом обзоре, паттерн из инструкций):
-- Применяет пресеты вида `2x3`, `1x2x2` и т.п.
-- Создаёт `slot-*` placeholder BrowserViews в пустых клетках.
-- Управляет док-отступами (board/stats) через `setDockOffsets`.
-- Предоставляет `sanitizeInitialBounds` и `clampViewToStage` для корректного позиционирования добавляемых брокеров.
+- App bootstrap, single-instance, global safety handlers (`unhandledRejection`, `uncaughtException`).
+- Broker list `BROKERS` (id + URL) and per-broker last URLs via `electron-store`.
+- Windows/views management: main window, docked odds board (`boardManager`), embedded/window stats (`statsManager`).
+- Broker BrowserViews registry and active ids (shared via `{ value: ... }` refs).
+- Odds cache `latestOddsRef` for re-renders after reconnect/reattach.
+- Freshness & auto-reload: `brokerHealth`, `STALE_MS`, `HEALTH_CHECK_INTERVAL`; `staleMonitor` auto-reloads stuck brokers.
+- Map/team reapply after navigations: `scheduleMapReapply(view)` with multiple delays (400/1400/3000/5000ms) to survive SPA/transitions.
+- DataServices URL prompt (`dsPromptView`) with global blur/unblur.
+- Hotkeys: window-level `before-input-event` (Space toggles stats; F12/Ctrl+F12 DevTools; Alt+C disables auto). Global shortcuts: `Control+Alt+L` (stats log) and `Num5` (auto toggle) with in-window fallback.
+- Auto press injection (`send-auto-press`) using PowerShell helper (`sendKeyInject.ps1`): schedules F22 confirm for F23/F24.
+- Central de-dup for F21 (suspend) requests: main collapses near-simultaneous initial and retry F21s coming from multiple windows.
+- Managers init order: `layoutManager`, `brokerManager`, `boardManager`, `statsManager`, `upscalerManager`, `excelWatcher`.
+- Modular IPC: `early`, `brokers`, `layout`, `settings`, `map`, `board`, `teamNames`, `autoRefresh`, `stats`, `upscaler`.
+- Stats embedded vs window tracked in `statsState.mode` = `hidden|embedded|window`; embedding no longer removes broker views (prevents listener leaks).
 
-## 5. Board Manager (`modules/board/`)
-- Аггрегирует коэффициенты, вычисляет лучшую линию, mid, потенциальные арбитражи (исключая `dataservices`).
-- Может быть докован / отделён (в коде присутствуют ссылки на `boardWindowRef`, но окно может отсутствовать, предпочтение docking).
-- `sendOdds(payload)` рассылает обновления всем заинтересованным потребителям.
+Shared refs passed as `{ value: ... }`:
 
-## 6. Stats Manager (`modules/stats/`)
-- Режимы: embedded / window / hidden.
-- Поддержка слотов A/B (например, для видео/upscaler) + панель.
-- Метод `ensureTopmost()` гарантирует, что при появлении новых брокерских вью stats остаётся поверх (многоступенчатые таймауты 0/60/180/360ms).
+- `stageBoundsRef`: stage geometry (used by layout/stats)
+- `activeBrokerIdsRef`: active brokers list
+- `latestOddsRef`: last odds cache
+- `lolTeamNamesRef`: team names
+- `autoRefreshEnabledRef`: auto-refresh flag
+- `quittingRef`: set on `before-quit` to stop background processes safely
 
-## 7. (Удалено) Upscaler / FrameGen
-Ранее присутствовал модуль апскейла/FrameGen для слота A. Полностью удалён: код, IPC, UI‑контролы и инъекции.
+Persistence keys (via `electron-store`): `disabledBrokers`, `layout`, `layoutPreset`, `lastUrls`, `lastMap`, `lolTeamNames`, `autoRefreshEnabled`, `mainBounds`, `siteCredentials`, `lastDataservicesUrl`, etc.
 
-## 8. Excel Watcher (`modules/excelWatcher.js`)
-- Наблюдает за внешним JSON (псевдо-брокер `excel`), парсит коэффициенты и транслирует их в общий поток как ещё один источник.
-- Последняя пачка помещается в `global.__lastExcelOdds` и кэш `latestOddsRef`.
+## 3) Broker manager (`modules/brokerManager/`)
 
-## 9. Stale Monitor (`modules/staleMonitor.js`)![1759735344133](image/CODE_REVIEW_OVERVIEW/1759735344133.png)![1759735353178](image/CODE_REVIEW_OVERVIEW/1759735353178.png)![1759735354676](image/CODE_REVIEW_OVERVIEW/1759735354676.png)![1759735355012](image/CODE_REVIEW_OVERVIEW/1759735355012.png)![1759735355540](image/CODE_REVIEW_OVERVIEW/1759735355540.png)![1759735355980](image/CODE_REVIEW_OVERVIEW/1759735355980.png)![1759735356474](image/CODE_REVIEW_OVERVIEW/1759735356474.png)![1759735356927](image/CODE_REVIEW_OVERVIEW/1759735356927.png)![1759735357854](image/CODE_REVIEW_OVERVIEW/1759735357854.png)![1759735358060](image/CODE_REVIEW_OVERVIEW/1759735358060.png)![1759735359540](image/CODE_REVIEW_OVERVIEW/1759735359540.png)![1759735359990](image/CODE_REVIEW_OVERVIEW/1759735359990.png)![1759735381630](image/CODE_REVIEW_OVERVIEW/1759735381630.png)
-- Периодически проверяет `brokerHealth[id].lastChange` / `lastRefresh` и если `now - lastChange > STALE_MS` вызывает `reloadIgnoringCache()` (если авто-рефреш включён).
+Provides `createAll`, `addBroker`, `closeBroker`. Sets UA (CDP `Emulation.setUserAgentOverride`), navigation handlers, auto credentials, context menus (Back/Forward/Reload/DevTools/Inspect), frame CSS, z-order with layout/zoom/stats, view-level hotkeys (F12/F5/Ctrl+R/Space with editable guard). Uses 3-step reload retries and an error page fallback.
 
-## 10. Zoom Manager (`modules/zoom/`)
-- Оборачивает логику `webContents.setZoomFactor` / user prefs на per-broker основе, прикрепляется к каждому view в `brokerManager`.
+## 4) Layout manager (`modules/layout/`)
 
-## 11. Настройки / Overlay (`modules/settingsOverlay/` и IPC)
-- Рендерер `settings.html` через `settingsOverlay` как поверхностный BrowserView + блюр UI (`ui-blur-on/off`).
-- Управление темой, контрастом, layout preset, включение/выключение брокеров.
+Applies presets like `2x3` or `1x2x2`, creates `slot-*` placeholders for empty cells, manages dock offsets (board/stats) via `setDockOffsets`, and exposes helpers like `sanitizeInitialBounds` and `clampViewToStage`.
 
-## 12. IPC Модули (папка `modules/ipc/`)
-Каналы (основные):
-- `brokers` — добавление/закрытие, refresh, список активных.
-- `layout` — применение пресета, обновление bounds/stage.
-- `map` — выбор карты (`set-map`), флаги (`set-is-last`).
-- `teamNames` — синхронизация названий команд.
-- `board` — взаимодействие с док-панелью коэффициентов.
-- `autoRefresh` — включение/выключение авто перезагрузок.
-- `stats` — переключение режимов, обновления состояния.
-- `upscaler` — режимы апскейла.
-- `early` — ранние каналы до полной инициализации (например, placeholder events).
+## 5) Board manager (`modules/board/`)
 
-## 13. Extractors (`brokers/extractors.js`)
-Экспорт:
-- `getBrokerId(host)` — мапит hostname -> идентификатор брокера.
-- `collectOdds(host, desiredMap)` — подбирает нужный extractor и возвращает `{ broker, odds:[o1,o2], frozen, ts, map }`.
-- `deepQuery(selector, root)` — поиск внутри теневых DOM (используется в Rivalry extractor).
+Aggregates odds, computes best/mid/arb (excluding `dataservices`), and renders the dockable board BrowserView. Broadcasts odds updates to consumers.
 
-Особенности:
-- Каждый `extract*` максимально устойчив к DOM изменениям: fallback цепочки, проверка наличия, возврат `['-','-']` при неуспехе.
-- `frozen` вычисляется по разным критериям: pointer-events/opacity/классы suspension/lock и текстовые сигналы.
-- Строгая политика для map рынков (не подставлять match winner если конкретный map рынок отсутствует) применена к нескольким брокерам (bet365, dataservices, marathon, и т.д.).
+## 6) Stats manager (`modules/stats/`)
 
-## 14. Preloads
-Файлы (`preload.js`, `brokerPreload.js`, `slotPreload.js`, `addBrokerPreload.js`, `statsContentPreload.js`) обеспечивают мост `window.desktopAPI` и коммуникацию view <-> main через безопасный IPC. (Детали реализации см. при необходимости; стандарт: `contextIsolation: true`).
+Controls embedded/window/hidden modes, supports slots A/B plus the panel, and keeps stats on top with staggered timeouts.
 
-## 15. Рендерер (`renderer/`)
-- `index.*` — базовый контейнер для брокерских views и встроенных панелей.
-- `board.*` — UI аггрегированных коэффициентов (dock / detach).
-- `stats_*` — скрипты для активности,Collapse,Config,Theme,Map,Embedded и пр.
-- `add_broker.*` — диалог добавления брокера (использует slot placeholder). 
-- `settings.*` — overlay настроек.
-- `ds_url.*` — prompt для ввода DataServices URL.
-- Глобальные стили: `common.css`, `main.css`, `toolbar.css` и т.п.
+## 7) Upscaler / FrameGen (`modules/upscaler/`)
 
-## 16. Управление Картой и Названиями Команд
-- Сохраняется `lastMap`, `lolTeamNames`, `isLast` (флаг специфический для bet365 сценариев) в store.
-- Повторная отправка на брокеров после навигаций (несколько задержек) + немедленная отправка при добавлении `dataservices`.
+Present (not removed). Currently injects only into slot A, guarded by `maybeInject(view, 'A')`.
 
-## 17. Безопасность / Устойчивость
-- Всюду try/catch для защиты от неожиданных ошибок и снижению риска краша процесса.
-- Ограниченные глобальные шорткаты во избежание конфликта с другими приложениями.
-- Partition per broker: `partition: 'persist:<brokerId>'` для раздельных сессий (кэш/куки) + исключение `dataservices` принудительно через аргумент.
+## 8) Excel Watcher (`modules/excelWatcher.js` + `Excel Extractor/`)
 
-## 18. Расширение (Adding New Broker)
-Шаги (согласно инструкциям):
-1. Добавить `{ id, url }` в массив `BROKERS` (`main.js`).
-2. Реализовать `extract<Name>` в `brokers/extractors.js` + добавить `test` / `fn` в `EXTRACTOR_TABLE`.
-3. При необходимости донастроить `getBrokerId` для hostname.
-4. Не рефакторить существующие селекторы без сохранения логики fallback и мягкого возврата `['-','-']`.
+Python-based watcher reads `current_state.json` and feeds odds as a pseudo-broker `excel`. The app can start/stop the watcher via the "S" button; status is shown in both odds board and stats. Last batch is cached into `latestOddsRef`.
 
-## 19. Добавление Новых Панелей / Отступов
-- Использовать `layoutManager.setDockOffsets({ side:'right', width })` или аналогично (пример board/stats) вместо ручного перерасчёта bounds.
+## 9) Stale monitor (`modules/staleMonitor/`)
 
-## 20. Ключевые Глобальные / Полуглобальные Структуры
-- `views` — реестр `BrowserView` (ключ = brokerId или `slot-*`).
-- `BROKERS` — статический список конфигураций брокеров.
-- `latestOddsRef.value` — объект кэшов по брокеру.
-- `brokerHealth` — время последнего изменения коэффициентов и последний reload.
-- `loadFailures` — счётчик неудачных загрузок для fallback страницы.
-- `statsState` — текущий режим stats.
-- `stageBoundsRef.value` — координаты/размер сцены для layout.
+Periodically checks `brokerHealth[id].lastChange` / `lastRefresh` and calls `reloadIgnoringCache()` if `now - lastChange > STALE_MS` (when auto-refresh is enabled). See images under `image/CODE_REVIEW_OVERVIEW/` for visuals.
 
-## 21. Логи и Диагностика
-- Авто-нажатия: `auto_press_debug.json`, `auto_press_confirm_debug.json`, `auto_press_signal.json`.
-- Глобальный объект `__oddsMoniSync` (не перечисляемый) для быстрого доступа к ref-флагам.
-- Возможность быстрого DevTools через F12 (активный брокер) или Ctrl+F12 (board webContents).
+## 10) Zoom manager (`modules/zoom/`)
 
-## 22. Потенциальные Риски / Области Внимания
-- Listener leak при неправильном удалении/повторном добавлении BrowserViews (уже исправлено в стратеги stats embed — не удалять брокеров).
-- Хрупкость селекторов в extractors при редизайне сайтов — важно иметь fallback слои, не уменьшать их.
-- Асинхронные вставки CSS (blur) — корректная очистка через ожидание `__dsBlurKeyPromise` при закрытии prompt.
-- Множественные timeouts для map/team replay — не сокращать без теста медленных брокеров (dataservices).
+Wraps `webContents.setZoomFactor` and per-broker user prefs; attached to each view by `brokerManager`.
 
-## 23. Рекомендации для Code Review
-- Проверять новое использование «магических» чисел — двигать в `constants.js`.
-- Убедиться, что любые новые IPC каналы оформлены отдельным файлом в `modules/ipc/` и инициализируются после зависимых менеджеров (см. порядок в `bootstrap()`).
-- Любые операции с коллекцией views должны обновлять соответствующие рефы (`activeBrokerIdsRef`) и при необходимости вызывать `layoutManager.applyLayoutPreset`.
-- При добавлении фоновой логики — учитывать `quittingRef` для корректного завершения.
-- В extraction функциях: NO throw; всегда `try/catch` и `['-','-']` при сбое.
+## 11) Settings / Overlay (`modules/settingsOverlay/`)
 
----
-Обновляйте этот файл при структурных изменениях (новые менеджеры, IPC модули, критические константы) для сохранения актуальности обзора.
+Renders `renderer/settings.html` as a BrowserView overlay with UI blur (`ui-blur-on/off`). Controls theme/contrast, layout presets, enable/disable brokers, and live auto settings.
+
+Recent: Auto settings use 0.1 precision (step) for tolerance/shock/burst. Safe defaults allow running auto when only tolerance is set.
+
+## 12) IPC modules (`modules/ipc/`)
+
+Channels include:
+
+- `brokers` (add/close/refresh/list)
+- `layout` (apply preset/update stage)
+- `map` and `mapAutoRefresh` (LoL map selection/refresh)
+- `teamNames` (persist/broadcast team names)
+- `board` (dock interactions)
+- `autoRefresh`
+- `stats` and `statsDebug`
+- `upscaler`
+- `early` (early channels before full init)
+
+## 13) Extractors (`brokers/extractors.js`)
+
+- `getBrokerId(host)`: hostname -> broker id
+- `collectOdds(host, desiredMap)`: selects extractor; returns `{ broker, odds:[o1,o2], frozen, ts, map }`
+- `deepQuery(selector, root)`: shadow DOM query helper (used e.g. in Rivalry)
+
+Guidelines: maximize resilience to DOM changes, use fallbacks, and return `['-','-']` on failure. `frozen` is derived from structural cues (pointer-events/opacity/classes/text). Strict map-market policy applied to several brokers (don’t swap to match-winner if a specific map market is absent).
+
+## 14) Preloads
+
+`preload.js`, `brokerPreload.js`, `slotPreload.js`, `addBrokerPreload.js`, `statsContentPreload.js` expose `window.desktopAPI` for safe IPC. `contextIsolation: true`.
+
+Recent: added aliases for Excel Extractor status (`getExcelExtractorStatus`, `onExcelExtractorStatus`) to unify board/stats.
+
+## 15) Renderer (`renderer/`)
+
+- `index.*`: main window shell
+- `board.*`: dockable odds board UI
+- `stats_*`: stats panel scripts (activity, collapse, config, theme, map, embedded)
+- `add_broker.*`: add-broker dialog (slot placeholder)
+- `settings.*`: settings overlay
+- `ds_url.*`: DataServices URL prompt
+- Global styles: `common.css`, `main.css`, `toolbar.css`, etc.
+
+Recent: odds board shows engine-effective tolerance (badge) and auto status; S-button starts/stops Python watcher and mirrors state from main.
+
+## 16) Map & team names
+
+Persist `lastMap`, `lolTeamNames`, and bet365-specific `isLast`. Rebroadcast after navigations with duplicated delays; send immediately on `dataservices` attach.
+
+## 17) Safety & robustness
+
+- Broad `try/catch` usage to avoid process crashes.
+- Limited global shortcuts to reduce conflicts with other apps.
+- `partition: 'persist:<brokerId>'` for per-broker sessions; `dataservices` handled as a special case.
+
+## 18) Adding a new broker
+
+1. List `{ id, url }` in `BROKERS` (`main.js`).
+2. Implement `extract<Name>` in `brokers/extractors.js`; register `{ test, fn }` in `EXTRACTOR_TABLE`.
+3. Extend `getBrokerId` if a new hostname mapping is needed.
+4. Preserve fallback behavior and soft failures (`['-','-']`).
+
+## 19) New panels / dock offsets
+
+Use `layoutManager.setDockOffsets({ side:'right', width })` (as board/stats do) rather than hardcoding margins.
+
+## 20) Key shared structures
+
+- `views`: broker/slot BrowserView registry
+- `BROKERS`: static broker definitions
+- `latestOddsRef.value`: broker odds cache
+- `brokerHealth`: last change/reload times
+- `loadFailures`: page load retry counter
+- `statsState`: current stats mode
+- `stageBoundsRef.value`: stage size/position
+
+## 21) Logs & diagnostics
+
+- Auto presses: `auto_press_debug.json`, `auto_press_confirm_debug.json`, `auto_press_signal.json`
+- Renderer -> main log forwarder: `renderer-log-forward`
+- DevTools: F12 (active broker) or Ctrl+F12 (board webContents)
+
+Recent shock diagnostics: detailed log includes prev/cur odds, per-side jumps, min-line jump, whether min-line switched, and threshold. F21 payload also carries `diffPct`.
+
+## 22) Risks / watch-outs
+
+- Listener leaks when removing/adding BrowserViews incorrectly — avoided by not removing brokers when embedding stats.
+- Fragile selectors in extractors — maintain multi-layer fallbacks.
+- Asynchronous CSS blur — clear on prompt close (await `__dsBlurKeyPromise`).
+- Multiple timeouts for map/team replay — do not shorten without testing slow/SPAs.
+
+## 23) Auto trading: hubs, guards, and de-dup
+
+- OddsCore hub: aggregates broker odds and computes derived values (mid/arb).
+- AutoCore engine: per-view auto with providers reading from shared state, no DOM parsing.
+- AutoHub orchestrator: creates engines per view, applies guards, syncs ON/OFF and Auto-Resume across windows.
+- Guards:
+  - Excel suspend/resume: turns engines off/on; sends F21 (suspend) with one retry after 500ms if still trading.
+  - Market guard: suspend on missing mid or `arbProfitPct >= 5%`; resume when market OK.
+  - Shock guard: triggers only on the minimum odds line jump meeting threshold; logs details; sends F21.
+- Main-level F21 de-dup: collapses near-simultaneous initial F21 and their retries coming from multiple windows (board + embedded stats).
+- Settings: live updates via IPC; tolerance/shock/burst precision 0.1; safe defaults allow running with tolerance only.
+- UI: engine-effective tolerance badges and auto status text on board and stats; explicit suspend reasons and retry labels in logs/UI.
+
+Keep this file updated whenever core managers, IPC modules, or critical constants change.
+
