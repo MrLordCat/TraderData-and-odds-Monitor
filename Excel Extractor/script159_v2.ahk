@@ -54,7 +54,7 @@ SaveLB(*) {
         modes := ModesFromName(T)
     M := GetEffectiveMap(T, Integer(modes))
     if !T {
-        Balloon("Пустой шаблон (template_sync.json?)")
+        Balloon("Empty template (template_sync.json?)")
         return
     }
     if (M < 1)
@@ -64,7 +64,7 @@ SaveLB(*) {
     MouseGetPos &x, &y
     IniWrite(x "," y, gIniPath, T, "LB" M)
     EnsureModesAtLeast(T, M)
-    Balloon("[" T "] LB" M " = " x "," y " (сохранено)")
+    Balloon("[" T "] LB" M " = " x "," y " (saved)")
 }
 
 SaveRB(*) {
@@ -75,7 +75,7 @@ SaveRB(*) {
         modes := ModesFromName(T)
     M := GetEffectiveMap(T, Integer(modes))
     if !T {
-        Balloon("Пустой шаблон (template_sync.json?)")
+        Balloon("Empty template (template_sync.json?)")
         return
     }
     if (M < 1)
@@ -85,21 +85,21 @@ SaveRB(*) {
     MouseGetPos &x, &y
     IniWrite(x "," y, gIniPath, T, "RB" M)
     EnsureModesAtLeast(T, M)
-    Balloon("[" T "] RB" M " = " x "," y " (сохранено)")
+    Balloon("[" T "] RB" M " = " x "," y " (saved)")
 }
 
 EnsureSection(*) {
     T := GetCurrentTemplate()
     M := GetCurrentMap()
     if !T {
-        Balloon("Пустой шаблон (template_sync.json?)")
+        Balloon("Empty template (template_sync.json?)")
         return
     }
     if !M
         M := 1
     ok := EnsureTemplateSection(T, M, true)
     if ok
-        Balloon("Секция [" T "] готова (Modes ≥ " M ")")
+        Balloon("Section [" T "] ready (Modes ≥ " M ")")
 }
 
 ReapplyModesFromName(*) {
@@ -129,12 +129,12 @@ DoClick(kind) {
     global gOverrideTpl, gOverrideMap
     ; Ensure Excel window is active before clicking
     if (!EnsureExcelActive()) {
-        Balloon("Excel не активен — попытка активации не удалась")
+        Balloon("Excel is not active — activation attempt failed")
         ; proceed anyway to avoid blocking, but likely click will miss target
     }
     T := GetEffectiveTemplate()
     if !T {
-        Balloon("Нет шаблона для клика")
+        Balloon("No template for click")
         return
     }
     modes := IniRead(gIniPath, T, "Modes", "")
@@ -144,11 +144,11 @@ DoClick(kind) {
     keyName := kind . M
     val := IniRead(gIniPath, T, keyName, "")
     if (val = "") {
-        Balloon("Нет координат " keyName " в [" T "]")
+        Balloon("No coordinates for " keyName " in [" T "]")
         return
     }
     if !RegExMatch(val, "^\s*(-?\d+)\s*,\s*(-?\d+)\s*$", &mm) {
-        Balloon("Неверный формат координат: " val)
+        Balloon("Invalid coordinates format: " val)
         return
     }
     x := Integer(mm[1])
@@ -158,7 +158,7 @@ DoClick(kind) {
     try MouseMove x, y, 0
     try Click "Left"
     try MouseMove ox, oy, 0
-    Balloon("Клик " kind M ": " x "," y " (возврат курсора)", 0.6)
+    Balloon("Click " kind M ": " x "," y " (cursor restored)", 0.6)
 }
 
 CycleTemplate(*) {
@@ -172,7 +172,7 @@ CycleTemplate(*) {
             arr.Push(p)
     }
     if (arr.Length = 0) {
-        Balloon("Список Templates пуст")
+        Balloon("Templates list is empty")
         return
     }
     cur := GetEffectiveTemplate()
@@ -187,14 +187,14 @@ CycleTemplate(*) {
     ; Persist as DefaultTemplate for next run
     IniWrite(gOverrideTpl, gIniPath, "Global", "DefaultTemplate")
     EnsureTemplateSection(gOverrideTpl, 1)
-    Balloon("Шаблон → [" gOverrideTpl "]")
+    Balloon("Template → [" gOverrideTpl "]")
 }
 
 CycleMap(*) {
     global gOverrideTpl, gOverrideMap
     T := GetEffectiveTemplate()
     if !T {
-        Balloon("Нет шаблона")
+        Balloon("No template")
         return
     }
     modes := IniRead(gIniPath, T, "Modes", "")
@@ -205,7 +205,7 @@ CycleMap(*) {
     newMap := Mod(curMap, modes) + 1
     gOverrideMap := newMap
     EnsureTemplateSection(T, newMap)
-    Balloon("Карта → " newMap)
+    Balloon("Map → " newMap)
 }
 
 GetCurrentTemplate() {
@@ -271,7 +271,7 @@ EnsureTemplateSection(section, minModes := 1, askIfNotFound := false) {
         modes := ModesFromName(section)
         if askIfNotFound {
             def := modes
-            ib := InputBox("Укажите Modes (1..5) для [" section "]", "Создать шаблон", "w320 h160", def)
+            ib := InputBox("Enter Modes (1..5) for [" section "]", "Create template", "w320 h160", def)
             if (ib.Result != "OK")
                 return false
             try modes := Integer(ib.Value)
@@ -360,7 +360,7 @@ WatchSync(*) {
     ; Ensure section exists and seeded
     EnsureTemplateSection(tpl, mp)
     ovr := (gOverrideTpl != "" || gOverrideMap > 0) ? " (OVR)" : ""
-    Balloon("Текущий шаблон: [" tpl "]  карта: " mp ovr, 1.2)
+    Balloon("Current template: [" tpl "]  map: " mp ovr, 1.2)
 }
 
 WatchIni(*) {
@@ -378,7 +378,7 @@ WatchIni(*) {
     if (cur != gIniMTime) {
         gIniMTime := cur
         RegisterHotkeys(true)
-        Balloon("INI обновлён — хоткеи перезагружены", 1.0)
+    Balloon("INI updated — hotkeys reloaded", 1.0)
     }
 }
 
@@ -429,37 +429,37 @@ RegisterHotkeys(rebind := false) {
 }
 
 EmergencyExit(*) {
-    Balloon("Экстренный выход", 0.6)
+    Balloon("Emergency exit", 0.6)
     ExitApp()
 }
 
 ShowHelp(*) {
     static help := 0
     if !IsObject(help) {
-        help := Gui("+AlwaysOnTop +MinSize400x300", "script159 — Инструкция")
-        txt := "Горячие клавиши:" . "`n" .
-               "  Ctrl+Numpad- — записать LB{map}" . "`n" .
-               "  Ctrl+Numpad+ — записать RB{map}" . "`n" .
-               "  Ctrl+Numpad/ — создать/обеспечить секцию" . "`n" .
-               "  Ctrl+Numpad* — пересчитать Modes по BoN" . "`n" .
-               "  Numpad- — клик LB{map}" . "`n" .
-               "  Numpad+ — клик RB{map}" . "`n" .
-               "  Numpad/ — переключить шаблон" . "`n" .
-               "  Numpad* — переключить карту" . "`n" .
-               "  Numpad1 — Suspend/Unsuspend (глобально)" . "`n" .
-               "  Numpad0 — Update (глобально)" . "`n" .
-               "  Внешние триггеры: F23=LB, F24=RB, F22=Update, F21=Suspend" . "`n" .
-               "  ` (или [Keyboard].ExitKey) — экстренный выход"
+     help := Gui("+AlwaysOnTop +MinSize400x300", "script159 — Help")
+     txt := "Hotkeys:" . "`n" .
+         "  Ctrl+Numpad- — save LB{map}" . "`n" .
+         "  Ctrl+Numpad+ — save RB{map}" . "`n" .
+         "  Ctrl+Numpad/ — create/ensure section" . "`n" .
+         "  Ctrl+Numpad* — recompute Modes by BoN" . "`n" .
+         "  Numpad- — click LB{map}" . "`n" .
+         "  Numpad+ — click RB{map}" . "`n" .
+         "  Numpad/ — cycle template" . "`n" .
+         "  Numpad* — cycle map" . "`n" .
+         "  Numpad1 — Suspend/Unsuspend (global)" . "`n" .
+         "  Numpad0 — Update (global)" . "`n" .
+         "  External triggers: F23=LB, F24=RB, F22=Update, F21=Suspend" . "`n" .
+         "  ` (or [Keyboard].ExitKey) — emergency exit"
         help.AddText("w360 h180", txt)
-        global gTplLabel := help.AddText("x10 y+10 w360", "Текущий шаблон: …")
-        btnOpen := help.AddButton("w140", "Открыть README")
-        btnClose := help.AddButton("x+10 w100", "Закрыть")
+     global gTplLabel := help.AddText("x10 y+10 w360", "Current template: …")
+     btnOpen := help.AddButton("w140", "Open README")
+     btnClose := help.AddButton("x+10 w100", "Close")
         btnOpen.OnEvent("Click", (*) => Run('"' . A_ScriptDir . "\\README-template-sync.md" . '"'))
         btnClose.OnEvent("Click", (*) => help.Hide())
         help.OnEvent("Escape", (*) => help.Hide())
         help.OnEvent("Close", (*) => help.Hide())
     }
-    try gTplLabel.Text := "Текущий шаблон: [" GetEffectiveTemplate() "]"
+    try gTplLabel.Text := "Current template: [" GetEffectiveTemplate() "]"
     help.Show()
 }
 
@@ -471,7 +471,7 @@ GlobalSuspend(*) {
     sx := IniRead(gIniPath, "Joy3", "SuspendX", "")
     sy := IniRead(gIniPath, "Joy3", "SuspendY", "")
     if (sx = "" or sy = "") {
-        Balloon("Нет координат SuspendX/SuspendY в [Joy3]")
+        Balloon("No SuspendX/SuspendY coordinates in [Joy3]")
         return
     }
     ux := IniRead(gIniPath, "Joy3", "UpdateX", "")
@@ -490,14 +490,14 @@ GlobalSuspend(*) {
     try {
         sxx := Integer(sx), syy := Integer(sy)
     } catch {
-        Balloon("Координаты Suspend неверны: " sx "," sy)
+        Balloon("Invalid Suspend coordinates: " sx "," sy)
         return
     }
     ; Perform two clicks with one save/restore of cursor
     MouseGetPos &ox, &oy
     try {
         if (!EnsureExcelActive()) {
-            Balloon("Excel не активен — попытка активации не удалась")
+            Balloon("Excel is not active — activation attempt failed")
         }
         MouseMove sxx, syy, 0
         Click "Left"
@@ -522,7 +522,7 @@ GlobalUpdate(*) {
     GuardEmit(300)
     try Send "{F22}"
     if (!EnsureExcelActive()) {
-        Balloon("Excel не активен — попытка активации не удалась")
+        Balloon("Excel is not active — activation attempt failed")
     }
     x := IniRead(gIniPath, "Joy3", "UpdateX", "")
     y := IniRead(gIniPath, "Joy3", "UpdateY", "")
@@ -532,11 +532,11 @@ GlobalUpdate(*) {
         y := IniRead(gIniPath, "Auto", "ClickY", "")
     }
     if (x = "" or y = "") {
-        Balloon("Нет координат Update (Joy3.UpdateX/Y или Auto.ClickX/Y)")
+        Balloon("No Update coordinates (Joy3.UpdateX/Y or Auto.ClickX/Y)")
         return
     }
     if !TryClickAt(x, y)
-        Balloon("Координаты Update неверны: " x "," y)
+        Balloon("Invalid Update coordinates: " x "," y)
     else
         Balloon("Update: " x "," y, 0.6)
 }
@@ -545,7 +545,7 @@ TryClickAt(x, y) {
     try {
         xx := Integer(x), yy := Integer(y)
         if (!EnsureExcelActive()) {
-            Balloon("Excel не активен — попытка активации не удалась")
+            Balloon("Excel is not active — activation attempt failed")
         }
         MouseGetPos &ox, &oy
         MouseMove xx, yy, 0
@@ -567,7 +567,7 @@ EnsureExcelActive() {
     try {
         if WinActive(crit)
             return true
-        ; Two activation attempts with brief delay (user requested "две нажатия")
+    ; Two activation attempts with brief delay (double activation as fallback)
         WinActivate crit
         Sleep 60
         WinActivate crit
@@ -639,11 +639,11 @@ OnF22(*) {
         y := IniRead(gIniPath, "Auto", "ClickY", "")
     }
     if (x = "" or y = "") {
-        Balloon("Нет координат Update (Joy3.UpdateX/Y или Auto.ClickX/Y)")
+        Balloon("No Update coordinates (Joy3.UpdateX/Y or Auto.ClickX/Y)")
         return
     }
     if !TryClickAt(x, y)
-        Balloon("Координаты Update неверны: " x "," y)
+        Balloon("Invalid Update coordinates: " x "," y)
     else
         Balloon("Update: " x "," y, 0.6)
 }
@@ -654,7 +654,7 @@ OnF21(*) {
     sx := IniRead(gIniPath, "Joy3", "SuspendX", "")
     sy := IniRead(gIniPath, "Joy3", "SuspendY", "")
     if (sx = "" or sy = "") {
-        Balloon("Нет координат SuspendX/SuspendY в [Joy3]")
+        Balloon("No SuspendX/SuspendY coordinates in [Joy3]")
         return
     }
     ux := IniRead(gIniPath, "Joy3", "UpdateX", "")
@@ -671,7 +671,7 @@ OnF21(*) {
     try {
         sxx := Integer(sx), syy := Integer(sy)
     } catch {
-        Balloon("Координаты Suspend неверны: " sx "," sy)
+        Balloon("Invalid Suspend coordinates: " sx "," sy)
         return
     }
     MouseGetPos &ox, &oy
