@@ -6,6 +6,28 @@ This is a development-oriented prototype with a clear separation between the mai
 
 Fonts: Inter (via CSS), falling back to system fonts (system-ui, Segoe UI, Roboto, Helvetica Neue, Arial). Font binaries are not included in the repo.
 
+## Background & Story
+
+This project started as a small browser extension that collected the specific League of Legends stats I needed from portal.grid. The information on the site was either incomplete or shown in a way that didn’t fit my workflow, so the extension normalized and reshaped it.
+
+Later I built another extension to scrape odds from multiple bookmakers and display them in one compact window instead of opening a dozen tabs that cover the entire screen. Over time, maintaining multiple extensions and adding the features I wanted became cumbersome. After finishing my studies at kood/, I decided I needed a full-fledged desktop application tailored to my workflow. That’s how this app was born. It’s still being refined and polished—and I’ve been building it in parallel with my day job.
+
+## Guiding Principles
+
+Because I frequently use an AI agent in VS Code, I optimized the codebase for:
+
+- Modularity: small, focused modules and files to enable targeted, low-risk edits.
+- Readability: clear separation between orchestration (main process) and lightweight UI (renderer).
+- Replaceable parts: IPC modules and managers are kept decoupled to evolve independently.
+
+## Key Capabilities (from the workflow)
+
+- Collect and normalize odds from multiple bookmakers and show them side-by-side in a table/board.
+- Gather the game data I care about for LoL and optionally open a second window dedicated to a stream.
+- An Auto Trader that uses mid/average values across books as a baseline and automatically adjusts my odds.
+  - It can act as an assistant or, in some scenarios, replace a manual trader.
+  - It still requires further tuning and guardrails.
+
 ## Highlights
 
 - Multiple brokers loaded into persistent BrowserViews with per-broker sessions.
@@ -18,6 +40,7 @@ Fonts: Inter (via CSS), falling back to system fonts (system-ui, Segoe UI, Robot
 ## Quick Start
 
 Prerequisites:
+ 
 - Node.js 18+ (recommended)
 - Windows 10/11 (primary dev target). macOS/Linux not validated.
 
@@ -44,12 +67,14 @@ npm run dist:portable
 ## Using the App
 
 Top toolbar groups:
+ 
 - Brokers: add broker, apply layout presets, refresh all.
 - Board: toggle dock side and resize with the vertical splitter.
 - Stats: toggle Stats embedded view, and (when in Stats) show the Hide/Unhide Panel button.
 - Dev/Settings: open DevTools for diagnostics; open UI settings.
 
 Stats (embedded) at a glance:
+ 
 - Two slots (A/B) for content like portal.grid.gg, twitch, or embedded LoL Stats.
 - Side panel on the left or right with layout/source controls.
 - Layout modes: split, vertical, focus A, focus B.
@@ -57,6 +82,7 @@ Stats (embedded) at a glance:
 - New: Hide/Unhide side panel (top toolbar button appears only in Stats). State persists across sessions.
 
 Board (odds):
+ 
 - Docked to the side of the stage; move between left/right; resize with the splitter.
 - Receives odds from brokers and from the optional Excel watcher.
 
@@ -70,6 +96,7 @@ Board (odds):
 - Alt+C: disable Auto across views.
 
 Notes
+ 
 - Global shortcuts are minimized; most keys are handled via per-window `before-input-event` to avoid unintended capture.
 
 ## Architecture (runtime overview)
@@ -87,6 +114,7 @@ Notes
 - Extractors: bookmaker-specific DOM parsers live in `brokers/extractors.js`.
 
 Data flow:
+ 
 1. Brokers load in BrowserViews, extract odds, and publish via IPC.
 2. Main distributes odds updates to the board and stats panel.
 3. Stats aggregates additional LoL information and can embed its own odds board.
@@ -94,6 +122,7 @@ Data flow:
 ## Persistent Settings (electron-store keys)
 
 Common keys (not exhaustive):
+ 
 - `layoutPreset` – current broker layout string (e.g., `2x2`).
 - `disabledBrokers`, `lastUrls` – per-broker controls and last visited URLs.
 - `lastMap`, `isLast` – map selection and bet365 “match vs final” flag.
@@ -111,6 +140,7 @@ Common keys (not exhaustive):
 An external Python script can feed odds to the app (embedded board & main board). The app manages basic start/stop and status reporting.
 
 Tips:
+ 
 - Ensure Python is installed and available as `python` in PATH.
 - The app tries to locate `excel_watcher.py` in common folders (root and `Excel Extractor/`).
 - On first run it will also try to set the default dump path to `current_state.json` next to the script.
