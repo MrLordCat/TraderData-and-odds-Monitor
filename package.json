@@ -38,6 +38,11 @@
       "blankPreload.js",
       "modules/**/*",
       "renderer/**/*",
+      "!renderer/ds_url.html",
+      "!renderer/ds_url.js",
+      "!modules/upscaler/**",
+      "!modules/ipc/upscaler.js",
+      "!modules/dataservices/**",
       "lolstats/**/*",
       "package.json"
     ],
@@ -54,8 +59,7 @@
     }
   },
   "dependencies": {
-    "electron-store": "^8.1.0",
-    "onnxruntime-web": "^1.20.0"
+    "electron-store": "^8.1.0"
   },
   "devDependencies": {
     "electron": "^38.0.0",

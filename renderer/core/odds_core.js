@@ -6,7 +6,7 @@
 
 (function(global){
   function computeDerivedFrom(records){
-    const vals = Object.values(records||{}).filter(r=> r && r.broker!=='excel' && r.broker!=='dataservices' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
+  const vals = Object.values(records||{}).filter(r=> r && r.broker!=='excel' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
     if(!vals.length){ return { hasMid:false, arbProfitPct:null, mid:null }; }
     const s1=vals.map(r=>parseFloat(r.odds[0]));
     const s2=vals.map(r=>parseFloat(r.odds[1]));

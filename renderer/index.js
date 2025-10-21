@@ -125,10 +125,10 @@ async function populateAddBrokerSelect(force=false){
     sel.innerHTML=''; sel.appendChild(placeholder);
     const { brokers=[], active=[] } = await window.desktopAPI.getBrokersForPicker();
     const activeSet = new Set(active);
-  // Excel feed now internal; no special dataservices pseudo-broker option.
+  // Excel feed now internal.
     for(const b of brokers){
       // Skip pseudo-broker duplication just in case
-      if(b.id === 'dataservices') continue;
+      
       const opt=document.createElement('option');
       opt.value=b.id; opt.textContent = activeSet.has(b.id) ? `${b.id} (added)` : b.id;
       if(b.inactive){ opt.disabled=true; opt.textContent = `${b.id} (inactive)`; }

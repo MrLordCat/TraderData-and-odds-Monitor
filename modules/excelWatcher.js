@@ -1,5 +1,5 @@
 // Excel JSON watcher: monitors excel_dump.json produced externally (VBA macros) and emits odds-update
-// Broker id: 'excel' (distinct from 'dataservices')
+// Broker id: 'excel'
 // Strategy: search common paths (Documents, cwd, configured path) & re-resolve dynamically.
 
 const fs = require('fs');

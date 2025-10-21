@@ -9,8 +9,20 @@
   document.getElementById('msg').innerHTML = `Could not load broker page.<br/>Error: <strong>${msg}</strong>`;
   document.getElementById('url').textContent = target;
   document.getElementById('code').textContent = 'Error code: ' + code;
+  try { document.body.setAttribute('data-bid', bid); } catch(_){}
   document.getElementById('reload').addEventListener('click', ()=>{
     // Just trigger a location reload (main process is still the same BrowserView)
     window.location.reload();
   });
+  const closeBtn = document.getElementById('close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', ()=>{
+      try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.send('close-broker', bid);
+      } catch(_){ }
+    });
+  }
+  // ESC closes as well
+  window.addEventListener('keydown', (e)=>{ try { if(e.key==='Escape'){ const { ipcRenderer } = require('electron'); ipcRenderer.send('close-broker', bid); } } catch(_){ } });
 })();

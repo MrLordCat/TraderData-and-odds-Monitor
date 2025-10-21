@@ -8,7 +8,7 @@ Exported values commonly used across the app:
 
 - `VIEW_GAP` (8): Horizontal gap between broker BrowserViews and layout cells.
 - `SNAP_DISTANCE` (12): Drag/resize snap threshold used by broker/layout managers.
-- `STALE_MS` (5 * 60 * 1000): Odds staleness timeout (stale monitor / auto-refresh).
+- `STALE_MS` (5*60*1000): Odds staleness timeout (stale monitor/auto-refresh).
 - `HEALTH_CHECK_INTERVAL` (60 * 1000): Broker health polling interval.
 - `STATS_PANEL_WIDTH` (360): Base width for the docked/embedded stats panel.
 - `STATS_VIEW_GAP` (4): Inner gap between stats subviews.
@@ -26,12 +26,12 @@ Responsibilities:
 - Odds cache `latestOddsRef` for re-renders after reconnect/reattach.
 - Freshness & auto-reload: `brokerHealth`, `STALE_MS`, `HEALTH_CHECK_INTERVAL`; `staleMonitor` auto-reloads stuck brokers.
 - Map/team reapply after navigations: `scheduleMapReapply(view)` with multiple delays (400/1400/3000/5000ms) to survive SPA/transitions.
-- DataServices URL prompt (`dsPromptView`) with global blur/unblur.
+- (Removed) DataServices URL prompt.
 - Hotkeys: window-level `before-input-event` (Space toggles stats; F12/Ctrl+F12 DevTools; Alt+C disables auto). Global shortcuts: `Control+Alt+L` (stats log) and `Num5` (auto toggle) with in-window fallback.
 - Auto press injection (`send-auto-press`) using PowerShell helper (`sendKeyInject.ps1`): schedules F22 confirm for F23/F24.
 - Central de-dup for F21 (suspend) requests: main collapses near-simultaneous initial and retry F21s coming from multiple windows.
-- Managers init order: `layoutManager`, `brokerManager`, `boardManager`, `statsManager`, `upscalerManager`, `excelWatcher`.
-- Modular IPC: `early`, `brokers`, `layout`, `settings`, `map`, `board`, `teamNames`, `autoRefresh`, `stats`, `upscaler`.
+- Managers init order: `layoutManager`, `brokerManager`, `boardManager`, `statsManager`, `excelWatcher`.
+- Modular IPC: `early`, `brokers`, `layout`, `settings`, `map`, `board`, `teamNames`, `autoRefresh`, `stats`.
 - Stats embedded vs window tracked in `statsState.mode` = `hidden|embedded|window`; embedding no longer removes broker views (prevents listener leaks).
 
 Shared refs passed as `{ value: ... }`:
@@ -43,7 +43,7 @@ Shared refs passed as `{ value: ... }`:
 - `autoRefreshEnabledRef`: auto-refresh flag
 - `quittingRef`: set on `before-quit` to stop background processes safely
 
-Persistence keys (via `electron-store`): `disabledBrokers`, `layout`, `layoutPreset`, `lastUrls`, `lastMap`, `lolTeamNames`, `autoRefreshEnabled`, `mainBounds`, `siteCredentials`, `lastDataservicesUrl`, etc.
+Persistence keys (via `electron-store`): `disabledBrokers`, `layout`, `layoutPreset`, `lastUrls`, `lastMap`, `lolTeamNames`, `autoRefreshEnabled`, `mainBounds`, `siteCredentials`, etc.
 
 ## 3) Broker manager (`modules/brokerManager/`)
 
@@ -55,15 +55,13 @@ Applies presets like `2x3` or `1x2x2`, creates `slot-*` placeholders for empty c
 
 ## 5) Board manager (`modules/board/`)
 
-Aggregates odds, computes best/mid/arb (excluding `dataservices`), and renders the dockable board BrowserView. Broadcasts odds updates to consumers.
+Aggregates odds, computes best/mid/arb, and renders the dockable board BrowserView. Broadcasts odds updates to consumers.
 
 ## 6) Stats manager (`modules/stats/`)
 
 Controls embedded/window/hidden modes, supports slots A/B plus the panel, and keeps stats on top with staggered timeouts.
 
-## 7) Upscaler / FrameGen (`modules/upscaler/`)
-
-Present (not removed). Currently injects only into slot A, guarded by `maybeInject(view, 'A')`.
+<!-- Upscaler removed -->
 
 ## 8) Excel Watcher (`modules/excelWatcher.js` + `Excel Extractor/`)
 
@@ -118,20 +116,20 @@ Recent: added aliases for Excel Extractor status (`getExcelExtractorStatus`, `on
 - `stats_*`: stats panel scripts (activity, collapse, config, theme, map, embedded)
 - `add_broker.*`: add-broker dialog (slot placeholder)
 - `settings.*`: settings overlay
-- `ds_url.*`: DataServices URL prompt
+  (DataServices prompt removed)
 - Global styles: `common.css`, `main.css`, `toolbar.css`, etc.
 
 Recent: odds board shows engine-effective tolerance (badge) and auto status; S-button starts/stops Python watcher and mirrors state from main.
 
 ## 16) Map & team names
 
-Persist `lastMap`, `lolTeamNames`, and bet365-specific `isLast`. Rebroadcast after navigations with duplicated delays; send immediately on `dataservices` attach.
+Persist `lastMap`, `lolTeamNames`, and bet365-specific `isLast`. Rebroadcast after navigations with duplicated delays.
 
 ## 17) Safety & robustness
 
 - Broad `try/catch` usage to avoid process crashes.
 - Limited global shortcuts to reduce conflicts with other apps.
-- `partition: 'persist:<brokerId>'` for per-broker sessions; `dataservices` handled as a special case.
+- `partition: 'persist:<brokerId>'` for per-broker sessions.
 
 ## 18) Adding a new broker
 

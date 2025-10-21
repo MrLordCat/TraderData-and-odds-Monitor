@@ -154,8 +154,8 @@ try {
 } catch(_){ }
 function renderEmbeddedOdds(){
   const rowsEl=document.getElementById('embeddedOddsRows'); if(!rowsEl) return;
-  const excelRec = embeddedOddsData['excel'] || embeddedOddsData['dataservices'];
-  const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel' && r.broker!=='dataservices');
+  const excelRec = embeddedOddsData['excel'];
+  const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel');
   const liveVals = vals.filter(r=>!r.frozen);
   const p1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
   const p2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
@@ -269,9 +269,9 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   // Sync with full active brokers list (drop any stale entries not present anymore)
   try {
     if(window.desktopAPI && window.desktopAPI.onBrokersSync){
-      window.desktopAPI.onBrokersSync(ids=>{ try { const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel'||k==='dataservices') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
+  window.desktopAPI.onBrokersSync(ids=>{ try { const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
     } else if(ipcRendererEmbedded){
-      ipcRendererEmbedded.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel'||k==='dataservices') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
+  ipcRendererEmbedded.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
     }
   } catch(_){ }
   // One-time attempt to fetch last Excel odds (if loaded after they were emitted) so user doesn't need to re-select map

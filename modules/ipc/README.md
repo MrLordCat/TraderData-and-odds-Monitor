@@ -11,7 +11,7 @@ Files:
 - `teamNames.js`: Team names persistence and broadcasts.
 - `autoRefresh.js`: Periodic reloads with guards.
 - `stats.js`, `statsDebug.js`: Stats panel/window state and diagnostics.
-- `upscaler.js`: FrameGen injection messages.
+
 
 Notes:
 

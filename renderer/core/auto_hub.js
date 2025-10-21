@@ -32,7 +32,7 @@
       } catch(_){ }
     }
 
-  function getExcelRecord(){ return state.records['excel'] || state.records['dataservices'] || null; }
+  function getExcelRecord(){ return state.records['excel'] || null; }
   let shockThresholdPct = null; // user-configurable
   let lastExcelForShock = null;
     function getMid(){ const d=state.derived; return (d && d.hasMid && Array.isArray(d.mid) && d.mid.length===2)? d.mid : null; }

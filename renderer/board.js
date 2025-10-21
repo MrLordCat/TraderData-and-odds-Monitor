@@ -22,8 +22,8 @@ function computeDerived(){
   if(!midRow || !arbRow) return;
   const midCell=midRow.children[1];
   const arbCell=arbRow.children[1];
-  // Exclude excel (and legacy dataservices) from aggregated mid/arb calculations
-  const active = Object.values(boardData).filter(r=> r.broker!=='excel' && r.broker!=='dataservices' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
+  // Exclude only excel from aggregated mid/arb calculations
+  const active = Object.values(boardData).filter(r=> r.broker!=='excel' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
   if (!active.length){
     midCell.textContent='-'; arbCell.textContent='-';
     try { window.__boardDerived = { hasMid:false, arbProfitPct:null }; } catch(_){ }
@@ -53,9 +53,8 @@ function renderBoard(){
   const tb = document.getElementById('rows');
   if(!tb) return;
   const excelRow = document.getElementById('excelRow');
-  const excelRecord = boardData['excel'] || boardData['dataservices']; // fall back to legacy key just in case
-  // Filter out dataservices from main list
-  const vals=Object.values(boardData).filter(r=>r.broker!=='excel' && r.broker!=='dataservices').sort((a,b)=> a.broker.localeCompare(b.broker));
+  const excelRecord = boardData['excel'];
+  const vals=Object.values(boardData).filter(r=>r.broker!=='excel').sort((a,b)=> a.broker.localeCompare(b.broker));
   // Best values consider only non-frozen brokers
   const liveVals = vals.filter(r=>!r.frozen);
   const parsed1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));

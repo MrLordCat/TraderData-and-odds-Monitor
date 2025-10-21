@@ -102,7 +102,7 @@ function createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBounds
     if (!mainWindowRef.value) { // window not ready yet
       return; }
     const activeBrokerIds = activeBrokerIdsRef.value;
-    // Support dynamic/pseudo brokers (e.g. dataservices) that are not present in static BROKERS list
+  // Support dynamic/pseudo brokers that are not present in static BROKERS list
     const activeBrokers = activeBrokerIds.map(id => {
       const def = BROKERS.find(b=>b.id===id);
       if(def) return def;

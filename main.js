@@ -39,17 +39,11 @@ function scheduleMapReapply(view){
     if(!view || view.isDestroyed()) return;
     const lastMap = store.get('lastMap');
     const teamNames = store.get('lolTeamNames');
-    // Determine broker id to pick a sane default when lastMap is undefined
-    let brokerId = null;
-    try {
-      const url = (view.webContents && view.webContents.getURL && view.webContents.getURL()) || '';
-      // crude hostname match; ok for our set of brokers
-      if(/dataservices|ds\.|data-services/i.test(url)) brokerId = 'dataservices';
-    } catch(_){ }
-    const defaultMap = (brokerId === 'dataservices') ? 0 : 1;
+    // Default map when nothing persisted yet
+    const defaultMap = 1;
     const mapToApply = (typeof lastMap !== 'undefined') ? lastMap : defaultMap;
     const isLastFlag = !!store.get('isLast');
-    const delays = [400, 1400, 3000, 5000]; // added 5000ms for slower brokers (e.g. dataservices) to catch late listeners
+    const delays = [400, 1400, 3000, 5000];
     delays.forEach(d=> setTimeout(()=>{
       try {
         if(view.isDestroyed()) return;
@@ -120,59 +114,7 @@ const BROKERS = [
 ];
 const INITIAL_URLS = BROKERS.reduce((acc,b)=>{acc[b.id]=b.url;return acc;},{});
 
-// DataServices URL prompt overlay BrowserView ref
-let dsPromptView = null;
-
-function openDsPrompt(){
-  if(!mainWindow || mainWindow.isDestroyed()) return;
-  if(dsPromptView) return; // already open
-  const last = store.get('lastDataservicesUrl') || '';
-  dsPromptView = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'preload.js'), nodeIntegration:false, contextIsolation:true } });
-  try { mainWindow.addBrowserView(dsPromptView); } catch(_){ }
-  try {
-    // Use content bounds (excludes window frame) for more accurate centering
-    const mb = (typeof mainWindow.getContentBounds === 'function') ? mainWindow.getContentBounds() : mainWindow.getBounds();
-    dsPromptView.setBounds({ x:0,y:0,width:mb.width,height:mb.height });
-    dsPromptView.setAutoResize({ width:true, height:true });
-    // Ensure prompt is on top of other BrowserViews (z-order). addBrowserView puts it last, but
-    // if future logic re-adds broker views after, explicitly re-append prompt to top.
-    try { if(mainWindow.getBrowserViews){ const all = mainWindow.getBrowserViews(); if(all[all.length-1]!==dsPromptView){ mainWindow.removeBrowserView(dsPromptView); mainWindow.addBrowserView(dsPromptView); } } } catch(_){ }
-  } catch(_){ }
-  const filePath = path.join(__dirname,'renderer','ds_url.html');
-  try { dsPromptView.webContents.loadFile(filePath, { query:{ last:last } }); } catch(e){ console.warn('ds prompt load failed', e); }
-  // Blur brokers (reuse settings overlay blur logic simplified: inject CSS into each broker view)
-  try {
-    const css='html,body{filter:blur(18px) brightness(.7) saturate(1.1)!important;transition:filter .18s ease;}';
-    Object.entries(views).forEach(([id,v])=>{ try { 
-      if(!v.__dsBlurKeys) v.__dsBlurKeys = [];
-      const p = v.webContents.insertCSS(css).then(k=>{ v.__dsBlurKeys.push(k); return k; });
-      v.__dsBlurKeyPromise = p; // keep last promise reference
-    } catch(_){ } });
-    try { mainWindow.webContents.send('ui-blur-on'); } catch(_){ }
-  } catch(_){ }
-}
-function closeDsPrompt(){
-  if(!dsPromptView) return;
-  try { mainWindow.removeBrowserView(dsPromptView); } catch(_){ }
-  try { dsPromptView.webContents.destroy(); } catch(_){ }
-  dsPromptView=null;
-  // Clear blur; wait for any pending insertCSS promises so late resolutions don't re-apply
-  const all = Object.values(views);
-  all.forEach(v=>{
-    const clearAll = ()=>{
-      if(Array.isArray(v.__dsBlurKeys)){
-        for(const k of v.__dsBlurKeys){ try { v.webContents.removeInsertedCSS(k); } catch(_){} }
-      } else if(v.__dsBlurKey){ // legacy single key
-        try { v.webContents.removeInsertedCSS(v.__dsBlurKey); } catch(_){}
-      }
-      v.__dsBlurKeys=[]; v.__dsBlurKey=null; v.__dsBlurKeyPromise=null;
-    };
-    if(v.__dsBlurKeyPromise && typeof v.__dsBlurKeyPromise.then==='function'){
-      v.__dsBlurKeyPromise.then(()=>{ clearAll(); }).catch(()=>{ clearAll(); });
-    } else clearAll();
-  });
-  try { mainWindow.webContents.send('ui-blur-off'); } catch(_){ }
-}
+// (Removed: DataServices URL prompt overlay and blur logic)
 
 // Subtle frame CSS injected into each broker view for consistent visual borders
 const BROKER_FRAME_CSS = `body::after{content:"";position:fixed;inset:0;pointer-events:none;border:1px solid rgba(255,255,255,0.08);border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset;}body{background-clip:padding-box !important;}`;
@@ -339,6 +281,16 @@ const { initLayoutIpc } = require('./modules/ipc/layout');
 // inline dev watcher removed (moved to modules/dev/devCssWatcher.js)
 
 function bootstrap() {
+  // First-run defaults: don't auto-open any brokers. Populate disabled list once.
+  try {
+    const hasLaunched = !!store.get('hasLaunched');
+    if (!hasLaunched) {
+      try { store.set('disabledBrokers', BROKERS.map(b => b.id)); } catch(_) {}
+      try { store.set('hasLaunched', true); } catch(_) {}
+    }
+    // Cleanup deprecated keys from older builds (dataservices overlay remnants)
+    try { if(store.get('lastDataservicesUrl')!==undefined) store.delete('lastDataservicesUrl'); } catch(_) {}
+  } catch(_) {}
   createMainWindow();
   // Remove application menu (hidden UI footprint)
   try { Menu.setApplicationMenu(null); } catch(_){}
@@ -357,23 +309,7 @@ function bootstrap() {
   initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, boardWindowRef:{ value: boardWindow }, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef });
   // Layout IPC (needs layoutManager + refs ready)
   initLayoutIpc({ ipcMain, store, layoutManager, views, stageBoundsRef, boardManager, statsManager });
-  // DataServices prompt IPC
-  ipcMain.on('open-dataservices-url-prompt', ()=> openDsPrompt());
-  ipcMain.on('dataservices-url-submit', (e,{ url })=>{
-    // Close prompt first to prevent blur race affecting new view
-    closeDsPrompt();
-    try {
-      if(typeof url === 'string'){
-        let u = url.trim();
-        if(!/^https?:\/\//i.test(u) && /[.]/.test(u)) u = 'https://'+u;
-        if(/^https?:\/\//i.test(u)){
-          try { store.set('lastDataservicesUrl', u); } catch(_){}
-          if(brokerManager && brokerManager.addBroker){ brokerManager.addBroker('dataservices', u); }
-        }
-      }
-    } catch(_){ }
-  });
-  ipcMain.on('dataservices-url-cancel', ()=> closeDsPrompt());
+  // (Removed: DataServices prompt IPC)
   // (Legacy Marathon migration logic removed – Marathon now treated like any other broker)
   brokerManager.createAll();
   // Board manager (docking system)

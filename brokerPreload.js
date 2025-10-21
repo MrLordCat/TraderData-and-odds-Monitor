@@ -1,15 +1,15 @@
 // Preload for each broker BrowserView (clean refactored version)
 const { ipcRenderer } = require('electron');
-// Initial desired map (generic). Dataservices-specific logic removed.
+// Initial desired map (generic)
 let desiredMap = 1;
 let isLast = false; // global flag from main indicating final map should use match market for certain brokers
 const HOST = location.host;
 const { collectOdds: collectOddsExt, getBrokerId } = require('./brokers/extractors');
 const { triggerMapChange } = require('./brokers/mapNav');
-// Allow main process to inject a forced broker id (e.g. dataservices) before DOM load
+// Allow main process to inject a forced broker id before DOM load
 let BROKER_ID = (window.__FORCED_BROKER_ID || '').trim();
 if(!BROKER_ID) BROKER_ID = getBrokerId(HOST);
-// (Removed dataservices bootstrap logic)
+// (No special bootstrap)
 function safe(fn){ try { return fn(); } catch(e){} }
 const safeSend = (channel, payload) => safe(()=> ipcRenderer.send(channel, payload));
 
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 // Light ping so main can replay last map/placeholder odds promptly
 window.addEventListener('DOMContentLoaded', ()=>{ try { ipcRenderer.send('bv-odds-update', { broker:'_ping' }); } catch(_){} });
 
-// (Removed dataservices fallback reassert logic)
+// (No special fallback logic)
 
 // (Removed legacy BrowserView drag bar injection)
 
@@ -198,6 +198,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btn) {
     btn.addEventListener('click', () => { try { location.reload(); } catch(e) {} });
   }
+  // Error page: Close helper button support (contextIsolation-safe)
+  try {
+    const closeBtn = document.getElementById('__close_btn') || document.getElementById('close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => { try { e.stopPropagation(); e.preventDefault(); safeSend('close-broker', BROKER_ID); } catch(_){} });
+    }
+  } catch(_){}
 });
 
 // Ensure map selection restored after reload if main already stored one

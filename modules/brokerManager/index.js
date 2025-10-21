@@ -30,9 +30,7 @@ function createBrokerManager(ctx){
   }
 
   function createSingleInternal(brokerDef, existingBounds, startUrl, cursorX){
-  const extraArgs = [];
-  if(brokerDef.id === 'dataservices') extraArgs.push('--forced-broker-id=dataservices');
-  const view = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','brokerPreload.js'), partition:'persist:'+brokerDef.id, nodeIntegration:false, contextIsolation:true, sandbox:false, javascript:true, backgroundThrottling:false, additionalArguments: extraArgs } });
+  const view = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','brokerPreload.js'), partition:'persist:'+brokerDef.id, nodeIntegration:false, contextIsolation:true, sandbox:false, javascript:true, backgroundThrottling:false } });
     views[brokerDef.id] = view;
   mainWindow.addBrowserView(view);
   try { if(ctx.statsManager && ctx.statsManager.ensureTopmost) ctx.statsManager.ensureTopmost(); } catch(_){ }
@@ -114,9 +112,7 @@ function createBrokerManager(ctx){
     view.setAutoResize({ width:false, height:false });
     layoutManager.clampViewToStage(brokerDef.id);
     view.webContents.loadURL(startUrl);
-    if(brokerDef.id==='dataservices'){
-      try { view.webContents.executeJavaScript(`window.__FORCED_BROKER_ID='dataservices';`, true).catch(()=>{}); } catch(_){ }
-    }
+    // (Removed: dataservices-specific injection)
     view.webContents.on('did-finish-load', ()=>{
       try { view.webContents.insertCSS(ctx.BROKER_FRAME_CSS); } catch(_){}
       scheduleMapReapply(view);
@@ -147,7 +143,7 @@ function createBrokerManager(ctx){
     view.webContents.on('did-navigate', (e,url)=>{
       try { const lu=store.get('lastUrls',{}); lu[brokerDef.id]=url; store.set('lastUrls', lu); } catch(_){}
       scheduleMapReapply(view);
-      // Try to auto-fill credentials on login/redirect pages (e.g., dataservices auth flow)
+  // Try to auto-fill credentials on login/redirect pages
       try {
         const credsAll = store.get('siteCredentials') || {};
         const host = new URL(url).hostname;
@@ -214,18 +210,11 @@ function createBrokerManager(ctx){
   }
 
   function addBroker(id, startUrlOverride){
-    if(views[id]){ // If dataservices exists and new URL override provided -> navigate
-      if(id==='dataservices' && startUrlOverride){
-        try { const cur=views[id].webContents.getURL(); if(cur!==startUrlOverride) views[id].webContents.loadURL(startUrlOverride); } catch(_){ }
-      }
+    if(views[id]){
       return;
     }
     let def = BROKERS.find(b=>b.id===id);
-    if(!def){
-      if(id==='dataservices'){
-        def = { id:'dataservices', url: startUrlOverride || 'about:blank' };
-      } else return; // unknown broker
-    }
+    if(!def){ return; }
     const dis = store.get('disabledBrokers', []);
     if(dis.includes(id)) store.set('disabledBrokers', dis.filter(d=>d!==id));
     activeBrokerIdsRef.value = activeBrokerIdsRef.value.concat(id);
@@ -237,25 +226,7 @@ function createBrokerManager(ctx){
       if(vid.startsWith('slot-')){ try { slotBounds = v.getBounds(); } catch(_){} claimedSlotId = vid; break; }
     }
     createSingleInternal(def, slotBounds, startUrlOverride || def.url, stageBoundsRef.value.x);
-    // Proactive immediate map/team replay for newly added dataservices broker (avoids waiting solely on did-finish-load scheduleMapReapply)
-    if(id==='dataservices'){
-      try {
-        const lastMap = store.get('lastMap');
-        const teamNames = store.get('lolTeamNames');
-        const wc = views[id] && views[id].webContents;
-        if(wc && !wc.isDestroyed()){
-          [250, 900, 1800].forEach(d=> setTimeout(()=>{
-            try {
-              if(wc.isDestroyed()) return;
-              if(typeof lastMap !== 'undefined') wc.send('set-map', lastMap);
-              if(teamNames) wc.send('set-team-names', teamNames);
-              // Light diagnostic
-              console.log('[map][ds][injectAddBrokerReplay]', d,'ms lastMap=', lastMap);
-            } catch(_){ }
-          }, d));
-        }
-      } catch(_){ }
-    }
+    // (Removed: dataservices-specific immediate map/team replay)
     // Remove the claimed slot after adding broker (so layout manager won't think it's still available)
     if(claimedSlotId){
       const sv = views[claimedSlotId];

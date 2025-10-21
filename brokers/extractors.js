@@ -12,7 +12,6 @@ function getBrokerId(host){
   if(/pari\.ru/i.test(host)) return 'pari';
   if(/marathonbet\./i.test(host)) return 'marathon';
   if(/bet365\./i.test(host)) return 'bet365';
-  if(/betgenius\.com$/i.test(host)) return 'dataservices';
   return host.split('.')[0] || 'generic';
 }
 
@@ -371,60 +370,6 @@ function extractBet365(mapNum=0, game='lol'){
   } catch(_){ return { odds:['-','-'], frozen:false }; }
 }
 
-// DataServices (BetGenius) dynamic page extractor
-// Markets of interest:
-//  Match Up Winner  (mapNum=0)
-//  Map N Winner     (mapNum>=1)
-// Strict: if a specific map market absent -> ['-','-']
-function extractDataServices(mapNum=0, game='lol'){
-  try {
-    const markets = Array.from(document.querySelectorAll('div.market'));
-    if(!markets.length) return { odds:['-','-'], frozen:false };
-    let target=null;
-    if(mapNum>=1){
-      const re = new RegExp('^Map\\s*'+mapNum+'\\s*Winner$','i');
-      target = markets.find(m=> re.test(getMarketName(m)) );
-      if(!target) return { odds:['-','-'], frozen:false };
-    } else {
-  // For most games DS uses "Match Up Winner"; allow broader pattern if adjusted later per game
-  target = markets.find(m=> /Match\s*Up\s*Winner/i.test(getMarketName(m)) );
-      if(!target) return { odds:['-','-'], frozen:false };
-    }
-    const items = Array.from(target.querySelectorAll('ul.selections-container li.selection-item')).slice(0,2);
-    if(items.length<2) return { odds:['-','-'], frozen:false };
-    const odds = items.map(li=>{
-      const val = li.querySelector('.current-odds .ng-binding, .current-odds');
-      if(!val) return '-';
-      let t = (val.textContent||'').trim().replace(/[\r\n]+/g,' ').replace(',', '.');
-      // If combined like "2.50 36.7%" or "2.50 (36.7%)" keep only the first decimal number
-      const m = t.match(/\d+(?:\.\d+)?/);
-      if(m) t = m[0];
-      if(/^[-–]$/.test(t)) return '-';
-      return t;
-    });
-    // Frozen detection (GLOBAL across all markets): if ANY market on page appears suspended (not just closed), we mark current odds as frozen.
-    // Rationale: need to reflect DS suspension even if it occurs in a different map market.
-    // Only consider truly suspended markets, not just closed ones.
-    let globalSuspended=false;
-    try {
-      for(const m of markets){
-        const c = m.className || '';
-        // Check specifically for suspended status (both MarketTradingStatus-Suspended AND UserSuspensionStatus-Suspended)
-        if(/flags-MarketTradingStatus-Suspended/.test(c) && /flags-UserSuspensionStatus-Suspended/.test(c)) { 
-          globalSuspended=true; 
-          break; 
-        }
-      }
-    } catch(_){ }
-    return { odds: odds.length===2?odds:['-','-'], frozen: globalSuspended };
-  } catch(_){ return { odds:['-','-'], frozen:false }; }
-
-  function getMarketName(m){
-    try {
-      return (m.querySelector('table.market-header td.market-name')?.textContent||'').trim();
-    } catch(_){ return ''; }
-  }
-}
 
 const EXTRACTOR_TABLE = [
   { test: /rivalry\.com$/i, fn: extractRivalry },
@@ -435,7 +380,6 @@ const EXTRACTOR_TABLE = [
   { test: /pari\.ru$/i, fn: extractPari },
   { test: /marathonbet\./i, fn: extractMarathon }
   ,{ test: /bet365\./i, fn: extractBet365 }
-  ,{ test: /betgenius\.com$/i, fn: extractDataServices }
 ];
 
 function collectOdds(host, desiredMap, game){

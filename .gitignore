@@ -57,7 +57,6 @@ electron-builder-debug.yml
 
 # Models / large binaries suggestion (consider Git LFS)
 *.onnx
-!modules/upscaler/Real-ESRGAN_x2plus.onnx
 
 # Fonts (removed from source control)
 renderer/fonts/

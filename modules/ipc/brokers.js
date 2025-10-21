@@ -63,14 +63,27 @@ function initBrokerIpc(ctx){
   ipcMain.on('refresh-all', () => { Object.values(views).forEach(v => { try { v.webContents.reloadIgnoringCache(); } catch(_){ } }); });
   ipcMain.on('close-broker', (e,id)=> {
     try {
-      if(!id) return;
-      brokerManager.closeBroker(id);
+      let brokerId = id;
+      try {
+        if(!brokerId || !views[brokerId]){
+          const wc = e && e.sender;
+          if(wc){
+            brokerId = Object.keys(views).find(k => views[k] && views[k].webContents === wc);
+            if(!brokerId){
+              const part = wc.session?.getPartition?.();
+              if(part && part.startsWith('persist:')) brokerId = part.slice('persist:'.length);
+            }
+          }
+        }
+      } catch(_){ }
+      if(!brokerId || !views[brokerId]) return;
+      brokerManager.closeBroker(brokerId);
       // Purge cached latest odds so replay won't resurrect removed broker
       try { if(latestOddsRef && latestOddsRef.value) delete latestOddsRef.value[id]; } catch(_){}
       // Build fresh active list (exclude slot-* views)
       const ids = Object.keys(views).filter(k=> !k.startsWith('slot-'));
       // Notify main window (some renderers may listen for brokers-sync to rebuild rows)
-      try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('brokers-sync', { ids }); } catch(_){ }
+  try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('brokers-sync', { ids }); } catch(_){ }
       // Explicit broker-closed event (some listeners rely on it for immediate row removal)
       try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('broker-closed', { id }); } catch(_){ }
       // Also proactively notify every slot-* view so its inline picker (if open) can refresh availability
@@ -85,13 +98,13 @@ function initBrokerIpc(ctx){
       // Notify board window / docked view via boardManager replay (will emit brokers-sync + remaining odds)
       try { const bm = boardManagerRef && boardManagerRef.value; if(bm && bm.replayOdds) bm.replayOdds(); } catch(_){ }
       // Emit placeholder removal marker so any listeners (board aggregation, stats panel) can drop it immediately
-      const removalPayload = { broker: id, odds:['-','-'], removed:true };
+  const removalPayload = { broker: brokerId, odds:['-','-'], removed:true };
       try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', removalPayload); } catch(_){ }
   // boardWindow removed
       try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('odds-update', removalPayload); } catch(_){ }
       // Direct broker-closed for stats panel (in case odds removal races with initial render)
-      try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('broker-closed', { id }); } catch(_){ }
-      try { console.log('[broker][close] cleaned', id); } catch(_){ }
+      try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('broker-closed', { id: brokerId }); } catch(_){ }
+      try { console.log('[broker][close] cleaned', brokerId); } catch(_){ }
     } catch(err){ try { console.warn('close-broker handling failed', err.message); } catch(_){ } }
   });
   // Deprecated popup path: ignore slot-request-add (inline picker handles UI)
@@ -108,13 +121,7 @@ function initBrokerIpc(ctx){
     } catch(err){ console.error('request-add-broker-data failed', err); }
   });
   ipcMain.on('add-broker-selected', (e,{ id })=> brokerManager.addBroker(id));
-  // DataServices dynamic pseudo-broker
-  ipcMain.on('add-broker-dataservices', (e,{ url })=>{
-    try {
-      if(!url || !/^https?:\/\//i.test(url)) return;
-      brokerManager.addBroker('dataservices', url);
-    } catch(err){ console.warn('add-broker-dataservices failed', err); }
-  });
+  // (Removed: dataservices pseudo-broker IPC)
 
   // Global toolbar trigger: open first empty slot picker (or force layout to create one if none)
   ipcMain.on('global-open-broker-picker', ()=>{

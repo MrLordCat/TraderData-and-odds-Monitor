@@ -6,13 +6,13 @@ Concise, project-specific guidance for AI assistants working in this Electron pr
 Electron desktop app that:
 - Opens multiple bookmaker sites as `BrowserView`s ("brokers") and extracts LoL match odds.
 - Normalizes & aggregates odds into a dockable "board" panel.
-- Provides an embedded / detachable stats panel + optional video FrameGen (slot A) and map selection sync.
+- Provides an embedded / detachable stats panel and map selection sync.
 - Strong separation: main process = orchestration + layout + IPC modules; renderer = lightweight DOM + event wiring; extraction runs inside broker pages via preload/injected scripts.
 
 ## 2. Key Directories / Entry Points
 - `main.js` – bootstrap, window creation, IPC module initialization, global state refs, hotkeys.
-- `modules/` – feature managers (layout, brokerManager, stats, board, upscaler, settingsOverlay, staleMonitor, zoom) and IPC submodules under `modules/ipc/*`.
-- `renderer/` – UI HTML/CSS/JS for main window (`index.*`), board (`board.*`), settings overlay, stats panels, slots, error & ds_url overlays.
+- `modules/` – feature managers (layout, brokerManager, stats, board, settingsOverlay, staleMonitor, zoom) and IPC submodules under `modules/ipc/*`.
+- `renderer/` – UI HTML/CSS/JS for main window (`index.*`), board (`board.*`), settings overlay, stats panels, slots, and error overlay.
 - `brokers/extractors.js` – DOM parsers per bookmaker + generic dispatcher (`collectOdds`). This file encodes bookmaker-specific resilience rules (don’t casually refactor selectors—comments explain invariants).
 - Preloads: `preload.js`, `brokerPreload.js`, `addBrokerPreload.js`, etc. Define `window.desktopAPI` bridge handlers used across renderer scripts.
 - `modules/utils/constants.js` centralizes shared numeric tunables (SNAP, VIEW_GAP, STALE_MS, etc.). Reference instead of re-defining magic numbers.
@@ -20,12 +20,12 @@ Electron desktop app that:
 ## 3. Runtime Architecture / Data Flow
 1. `bootstrap()` in `main.js` creates main window, instantiates managers, then `brokerManager.createAll()` builds Broker `BrowserView`s (skipping disabled ones) and applies layout preset.
 2. Each broker view loads remote URL with a dedicated persistent partition (`persist:<brokerId>`) and a preload that periodically extracts odds (see IPC modules; extraction logic lives in loaded page context calling back through preload IPC -> main -> board/stats renderers).
-3. Odds updates broadcast via `webContents.send('odds-update', payload)` to main window / board / stats panel; board aggregates best, mid, arb calculations (excluding `dataservices`).
+3. Odds updates broadcast via `webContents.send('odds-update', payload)` to main window / board / stats panel; board aggregates best, mid, arb calculations.
 4. Layout presets convert pattern strings like `2x3` -> row distribution. Empty grid cells become temporary `slot-*` BrowserViews (`slotPreload.js`) hosting add-broker controls.
 5. Map selection + team names + auto-refresh state persist in `electron-store` and rebroadcast after navigations (`scheduleMapReapply`).
 
 ## 4. IPC & Conventions
-- IPC is modular: look under `modules/ipc/*.js` (e.g. `brokers.js`, `layout.js`, `map.js`, `settings.js`, `teamNames.js`, `autoRefresh.js`, `stats.js`). Add new IPC in a new file; initialize it inside `bootstrap()` after required managers exist (respect ordering used now: broker, layout, map, upscaler, teamNames, autoRefresh, stats).
+- IPC is modular: look under `modules/ipc/*.js` (e.g. `brokers.js`, `layout.js`, `map.js`, `settings.js`, `teamNames.js`, `autoRefresh.js`, `stats.js`). Add new IPC in a new file; initialize it inside `bootstrap()` after required managers exist (respect ordering used now: broker, layout, map, teamNames, autoRefresh, stats).
 - Mutable shared objects passed as `{ value: ... }` refs so modules can observe updated state without circular requires (e.g. `stageBoundsRef`, `activeBrokerIdsRef`). Maintain this pattern when exposing new cross-module mutable state.
 - When sending UI blur or overlay events, follow existing channel names: `ui-blur-on` / `ui-blur-off`, `stats-state-updated`, `odds-update`.
 - Avoid adding global shortcuts; prefer `before-input-event` handlers on windows or specific BrowserViews (see space/F12 logic) to prevent unintended capture.
@@ -41,13 +41,13 @@ To add a bookmaker:
 2. Add extraction logic in `brokers/extractors.js`: implement `extractFoo(mapNum)` returning `{ odds:[s1,s2], frozen }`; add a `test` regex + `fn` entry in `EXTRACTOR_TABLE` and ensure `getBrokerId` maps hostname -> id.
 3. Prefer robust structural cues (data attributes, stable words) over brittle class names; mirror existing extractor style & defensive returns (`['-','-']`).
 
-## 7. Stats / Board / Upscaler
+## 7. Stats / Board
 - Stats embedded vs window modes tracked in `statsState.mode` (`hidden|embedded|window`). Toggling does NOT remove broker views anymore (prevents listener leaks)—preserve this.
 - Board docking manipulates effective stage via `layoutManager.setDockOffsets`; if introducing new side panels reuse this offset mechanism instead of hardcoding margins.
-- Upscaler (`createUpscalerManager`) currently only performs FrameGen injection for slot A. Respect guard: `maybeInject(view,'A')` only.
+	(Upscaler removed)
 
 ## 8. Persistence & Safety
-- Use `electron-store` via shared `store` instance (prefer storing small JSON). Keys already in use: `disabledBrokers`, `layout`, `layoutPreset`, `lastUrls`, `lastMap`, `lolTeamNames`, `autoRefreshEnabled`, upscaler keys, credentials, etc.—reuse if extending semantics.
+- Use `electron-store` via shared `store` instance (prefer storing small JSON). Keys already in use: `disabledBrokers`, `layout`, `layoutPreset`, `lastUrls`, `lastMap`, `lolTeamNames`, `autoRefreshEnabled`, credentials, etc.—reuse if extending semantics.
 - Wrap potentially fragile calls in `try/catch` (pattern is consistent across codebase) instead of central error boundary—follow style for resilience.
 
 ## 9. Hotkeys & Input
