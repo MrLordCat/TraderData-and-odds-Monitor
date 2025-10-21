@@ -13,6 +13,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   const urls = Object.assign({}, DEFAULT_URLS, store.get('statsUrls', {}));
   let mode = store.get('statsLayoutMode', 'split');               // split|focusA|focusB|vertical
   let side = store.get('statsPanelSide', 'right');                // left|right
+  let panelHidden = !!store.get('statsPanelHidden', false);       // hidden or visible
   let embedOffsetY = 0;                                           // toolbar offset
   let singleWindow = !!store.get('statsSingleWindow', false);     // when true, only one slot is active and others are stopped
 
@@ -34,6 +35,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     store.set('statsUrls', urls);
     store.set('statsLayoutMode', mode);
     store.set('statsPanelSide', side);
+    store.set('statsPanelHidden', panelHidden);
     store.set('statsSingleWindow', singleWindow);
     store.set('lolMetricVisibility', lolMetricVisibility);
     if(lolMetricOrder) store.set('lolMetricOrder', lolMetricOrder);
@@ -75,10 +77,11 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     if(!embedOffsetY) embedOffsetY = stage.y || 0;
     const baseY = embedOffsetY;
     const h = full.height - baseY;
-    const panelX = side==='left'?0:(full.width - PANEL_WIDTH);
-    const contentX = side==='left'? PANEL_WIDTH:0;
-    const contentW = full.width - PANEL_WIDTH;
-    try { views.panel.setBounds({ x:panelX, y:baseY, width:PANEL_WIDTH, height:h }); } catch(_){}
+    const curPanelWidth = panelHidden ? 0 : PANEL_WIDTH;
+    const panelX = side==='left'?0:(full.width - curPanelWidth);
+    const contentX = side==='left'? curPanelWidth:0;
+    const contentW = full.width - curPanelWidth;
+    try { views.panel.setBounds({ x:panelX, y:baseY, width:curPanelWidth, height:h }); } catch(_){}
     const setSafe=(v,r)=>{ if(v) try { v.setBounds(r); } catch(_){ } };
     const effectiveMode = singleWindow && (mode==='split' || mode==='vertical') ? (mode='focusA', persist(), 'focusA') : mode;
     if(effectiveMode==='split'){
@@ -108,6 +111,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     mode=m; persist(); layout();
   }
   function toggleSide(){ side = side==='left'?'right':'left'; persist(); layout(); }
+  function setPanelHidden(hidden){ panelHidden = !!hidden; persist(); layout(); }
+  function togglePanelHidden(){ setPanelHidden(!panelHidden); }
 
   function applySingleWindow(enabled){
     singleWindow = !!enabled; persist();
@@ -255,6 +260,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
         } catch(_){}
         break;
       case 'stats-toggle-side': toggleSide(); break;
+    case 'stats-panel-set-hidden': setPanelHidden(payload && payload.hidden); break;
+    case 'stats-panel-toggle': togglePanelHidden(); break;
   case 'stats-single-window': applySingleWindow(payload && payload.enabled); break;
       case 'stats-reload-slot':
         try { const slot=payload && payload.slot; if(['A','B'].includes(slot)){ const v=views[slot]; if(v) try { v.webContents.reloadIgnoringCache(); } catch(_){ try { v.webContents.reload(); } catch(_2){} } } } catch(_){}
@@ -285,7 +292,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   }
 
   // Public API (open kept as noop for backward compatibility)
-  return { open: ()=>{}, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost, setUrl, getMode:()=>mode, getSide:()=>side, maybeInstallUblock };
+  return { open: ()=>{}, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost, setUrl, getMode:()=>mode, getSide:()=>side, getPanelHidden:()=>panelHidden, maybeInstallUblock };
 }
 
 module.exports = { createStatsManager };

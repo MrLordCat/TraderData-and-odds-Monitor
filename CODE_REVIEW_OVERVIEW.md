@@ -183,4 +183,3 @@ Recent shock diagnostics: detailed log includes prev/cur odds, per-side jumps, m
 - UI: engine-effective tolerance badges and auto status text on board and stats; explicit suspend reasons and retry labels in logs/UI.
 
 Keep this file updated whenever core managers, IPC modules, or critical constants change.
-

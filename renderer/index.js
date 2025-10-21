@@ -75,6 +75,7 @@ window.addEventListener('mousemove', e=>{ if(!resizing) return; const dx=e.clien
 window.addEventListener('mouseup', ()=>{ if(resizing){ resizing=false; splitter.classList.remove('dragging'); document.body.style.userSelect=''; } });
 
 const statsToggleBtn = document.getElementById('statsToggle');
+const statsPanelToggleBtn = document.getElementById('statsPanelToggleBtn');
 // Stats: only embedded/hidden now.
 function applyStatsState(st){
   if(!st) return;
@@ -82,15 +83,23 @@ function applyStatsState(st){
   if(st.mode==='hidden'){
     statsToggleBtn.textContent='Stats';
     document.body.classList.remove('stats-embedded');
+    if(statsPanelToggleBtn){ statsPanelToggleBtn.classList.add('hidden'); }
   } else if(st.mode==='embedded'){
     statsToggleBtn.textContent='Back';
     document.body.classList.add('stats-embedded');
+    if(statsPanelToggleBtn){
+      statsPanelToggleBtn.classList.remove('hidden');
+      // Set label according to panelHidden flag
+      const hidden = !!st.panelHidden;
+      statsPanelToggleBtn.textContent = hidden ? 'Unhide Panel' : 'Hide Panel';
+    }
   }
   if(wasEmbedded !== document.body.classList.contains('stats-embedded')){
     setTimeout(computeStage, 0);
   }
 }
 statsToggleBtn.onclick=()=> window.desktopAPI.statsToggle();
+if(statsPanelToggleBtn){ statsPanelToggleBtn.onclick = ()=> window.desktopAPI.statsPanelToggle(); }
 window.desktopAPI.getStatsState().then(applyStatsState);
 window.desktopAPI.onStatsState(applyStatsState);
 

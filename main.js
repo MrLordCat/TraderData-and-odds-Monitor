@@ -209,7 +209,7 @@ const zoom = createZoomManager({ store, views });
 // Stats manager (initialized after stageBoundsRef defined; recreated once mainWindow exists)
 const { createStatsManager } = require('./modules/stats'); // modules/stats/index.js
 let statsManager; // temporary undefined until after stageBoundsRef creation
-let statsState = { mode: 'hidden' }; // 'hidden' | 'embedded' | 'window'
+let statsState = { mode: 'hidden', panelHidden: !!store.get('statsPanelHidden', false) }; // 'hidden' | 'embedded', plus panelHidden
 let lastStatsToggleTs = 0; // throttle for space hotkey
 // Dedicated stats log window (detached) - lightweight
 let statsLogWindow = null;
@@ -290,6 +290,7 @@ function createMainWindow() {
   statsManager = createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef });
     // Keep previous mode only if window mode requested; embedded cannot be auto-restored yet
     statsState.mode = (prevMode === 'window') ? 'window' : 'hidden';
+    try { statsState.panelHidden = !!statsManager.getPanelHidden?.(); } catch(_){ }
   } catch(e){ console.warn('Failed to re-init statsManager with mainWindow', e); }
 }
 
@@ -716,6 +717,7 @@ function toggleStatsEmbedded(){
     try { console.log('[stats][toggle] createEmbedded with offsetY', offsetY); } catch(_){ }
   statsManager.createEmbedded(offsetY);
   statsState.mode='embedded'; // (log window no longer auto-opens)
+  try { statsState.panelHidden = !!statsManager.getPanelHidden?.(); } catch(_){ }
   } else if(statsState.mode==='embedded') {
     statsManager.destroyEmbedded();
     // Брокерские вью никогда не удалялись -> не нужно addBrowserView, иначе снова накопим listeners.
@@ -726,7 +728,10 @@ function toggleStatsEmbedded(){
   try { statsManager.open(); } catch(_){ }
     return;
   }
-  try { mainWindow.webContents.send('stats-state-updated', statsState); } catch(_){ }
+  try {
+    if(statsManager && statsManager.getPanelHidden) statsState.panelHidden = !!statsManager.getPanelHidden();
+    mainWindow.webContents.send('stats-state-updated', statsState);
+  } catch(_){ }
 }
 // (duplicate early IPC init block removed; handled in bootstrap())
 

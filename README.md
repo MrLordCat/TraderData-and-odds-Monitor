@@ -1,142 +1,135 @@
 # OddsMoni Desktop (Prototype)
 
-Minimal Electron-based desktop application for monitoring sports betting odds and integrating a League of Legends statistics / stream helper module.
+Electron-based desktop app that opens multiple bookmaker sites as BrowserViews, extracts odds, and aggregates them into a dockable board with a lightweight embedded Stats panel (LoL-focused).
 
-Fonts used: Inter (variable + regular/semi-bold fallback) with system fallbacks (system-ui, Segoe UI, Roboto, Helvetica Neue, Arial). Font files are git-ignored — only the CSS references remain.
+This is a development-oriented prototype with a clear separation between the main process (orchestration/layout) and renderer (light UI). No bundler; hot-edit friendly.
 
-## What it does (current / planned core capabilities)
+Fonts: Inter (via CSS), falling back to system fonts (system-ui, Segoe UI, Roboto, Helvetica Neue, Arial). Font binaries are not included in the repo.
 
-This README intentionally kept short for now. More developer & build details will be added later.
+## Highlights
 
-—
-Work in progress.
+- Multiple brokers loaded into persistent BrowserViews with per-broker sessions.
+- Aggregated odds board docked to the main window (left/right adjustable).
+- Embedded Stats panel with two content slots (A/B) and a side panel.
+- New: Stats side panel Hide/Unhide button in the top toolbar (visible only when Stats is open).
+- Map sync and team names broadcast to brokers and the board.
+- Optional Excel-based odds feed watcher and basic auto-alignment signaling.
 
-## Auto Press / Alignment Trigger (F23/F24 Strategy)
+## Quick Start
 
-Автоматическое выравнивание теперь НЕ жмёт больше реальные '[' и ']'. Вместо этого:
+Prerequisites:
+- Node.js 18+ (recommended)
+- Windows 10/11 (primary dev target). macOS/Linux not validated.
 
-- side 0 -> F23 (VK 0x86)
-- side 1 -> F24 (VK 0x87)
+Install and run (dev):
 
-Инъекция делается через PowerShell + user32 `keybd_event` (скрипт `sendKeyInject.ps1` генерируется при старте). Это даёт глобальные события, которые легко перехватываются AutoHotkey (v2) независимо от фокуса.
-
-Если нужно вручную протестировать — нажмите '[' или ']' в окне приложения: внутренняя логика всё ещё вычислит side, и сгенерирует F23/F24 (но уже не отправит сами скобки программно).
-
-### AHK v2 Hook (рекомендуется)
-
-```ahk
-; AHK v2 script fragment
-; F23 -> '['  |  F24 -> ']'
-F23:: Send "["
-F24:: Send "]"
-
-; (Опционально) лог в консоль
-F23:: {
-  Send "["
-  ToolTip "F23 -> ["
-  SetTimer () => ToolTip(), -800
-}
-F24:: {
-  Send "]"
-  ToolTip "F24 -> ]"
-  SetTimer () => ToolTip(), -800
-}
+```powershell
+npm install
+npm run dev
 ```
 
-### JSON Файл Fallback
+Build portable artifacts (Windows):
 
-Если по какой-то причине F23/F24 не проходят (политика безопасности, PS заблокирован и т.п.), остаётся файл `auto_press_signal.json`:
+```powershell
+# Unpacked build directory
+npm run dist
 
-```json
-{"side":1,"ts":1700000000000}
+# Zip portable from dist/win-unpacked
+npm run dist:zip
+
+# Single portable zip (name/version inferred from package.json)
+npm run dist:portable
 ```
 
-AHK v2 пример опроса файла:
+## Using the App
 
-```ahk
-file := A_ScriptDir "\\auto_press_signal.json"
-lastTs := 0
-SetTimer(CheckAutoPress, 200)
+Top toolbar groups:
+- Brokers: add broker, apply layout presets, refresh all.
+- Board: toggle dock side and resize with the vertical splitter.
+- Stats: toggle Stats embedded view, and (when in Stats) show the Hide/Unhide Panel button.
+- Dev/Settings: open DevTools for diagnostics; open UI settings.
 
-CheckAutoPress() {
-  global file, lastTs
-  if !FileExist(file)
-    return
-  content := FileRead(file, "UTF-8")
-  if RegExMatch(content, '"side":(\d+)', &mSide) && RegExMatch(content, '"ts":(\d+)', &mTs) {
-    ts := mTs[1]
-    if (ts > lastTs) {
-      lastTs := ts
-      side := mSide[1]
-      key := (side = 1) ? "]" : "["
-      Send key
-    }
-  }
-}
-```
+Stats (embedded) at a glance:
+- Two slots (A/B) for content like portal.grid.gg, twitch, or embedded LoL Stats.
+- Side panel on the left or right with layout/source controls.
+- Layout modes: split, vertical, focus A, focus B.
+- Single-window mode to suspend the background slot when bandwidth/CPU constrained.
+- New: Hide/Unhide side panel (top toolbar button appears only in Stats). State persists across sessions.
 
-### Логи
+Board (odds):
+- Docked to the side of the stage; move between left/right; resize with the splitter.
+- Receives odds from brokers and from the optional Excel watcher.
 
-- `[autoSim][mode]` – смена режима авто.
-- `[autoSim][fireAttempt]` – попытка авто-триггера в рендерере.
-- `[auto-press][ipc]` – IPC запрос в main.
-- `[auto-press][ipc][si] SENT injVk …` – отправлен F23/F24 через SendInput.
-- `[auto-press][hotkey]` / `[auto-press][hotkey][si]` – ручное нажатие скобок пользователем -> преобразовано в F23/F24.
+## Hotkeys
 
-Если нет `[si] SENT`, значит упало и должен появиться файл fallback.
+- Space: toggle Stats embedded view (guarded to avoid capturing inside editable elements).
+- F12: open DevTools for the active broker (fallback to main window if none).
+- Ctrl+F12: open DevTools for the board view.
+- Ctrl+Alt+L: open the Stats Log window.
+- Numpad5: toggle Auto mode across views (fallback if global shortcut not registered).
+- Alt+C: disable Auto across views.
 
-## Burst Logic & Two-Step Confirm
+Notes
+- Global shortcuts are minimized; most keys are handled via per-window `before-input-event` to avoid unintended capture.
 
-Alignment now stages directional pulses (F23/F24 per side & raise/lower) followed by a single confirm key (F22). Renderers send directional presses with `noConfirm=true` so main does not auto-fire confirm; after all pulses the renderer explicitly schedules F22.
+## Architecture (runtime overview)
 
-Pulse count scale (diff% vs target):
+- Main process (`main.js`): bootstraps the main window, creates broker views, applies layout, wires IPC modules.
+- Modules (`modules/`):
+  - `layout` – view layout orchestration and presets (e.g., `2x3`, `1x2x2`).
+  - `brokerManager` – add/close brokers, per-broker sessions, extraction orchestration.
+  - `board` – docked odds board manager.
+  - `stats` – embedded Stats manager (A/B slots + panel); manages layout modes, panel side, and new hide/unhide logic.
+  - `ipc/*` – modular IPC endpoints (stats, layout, brokers, map, settings, etc.).
+  - `utils/constants.js` – common numeric tunables (gaps, panel widths, staleness MS, etc.).
+- Renderer (`renderer/`): toolbar UI (`index.*`), board UI, settings UI, Stats panel UI.
+- Preloads: `preload.js` bridges `desktopAPI` methods to renderer scripts.
+- Extractors: bookmaker-specific DOM parsers live in `brokers/extractors.js`.
 
-- >=15% -> 4 pulses
-- >=7% -> 3 pulses
-- >=5% -> 2 pulses
-- otherwise -> 1 pulse
+Data flow:
+1. Brokers load in BrowserViews, extract odds, and publish via IPC.
+2. Main distributes odds updates to the board and stats panel.
+3. Stats aggregates additional LoL information and can embed its own odds board.
 
-Confirm (F22) fires ~60–120ms after final directional pulse. AHK maps F22 to the commit action (e.g. controller macro). This lets large corrections complete faster while keeping minor tweaks light.
+## Persistent Settings (electron-store keys)
 
-## Suspension / Resume Semantics
+Common keys (not exhaustive):
+- `layoutPreset` – current broker layout string (e.g., `2x2`).
+- `disabledBrokers`, `lastUrls` – per-broker controls and last visited URLs.
+- `lastMap`, `isLast` – map selection and bet365 “match vs final” flag.
+- `lolTeamNames` – team name overrides.
+- `autoRefreshEnabled` – stale monitor auto-refresh.
+- `statsLayoutMode` – `split` | `vertical` | `focusA` | `focusB`.
+- `statsPanelSide` – `left` | `right`.
+- `statsPanelHidden` – whether the Stats side panel is hidden (drives the Hide/Unhide button text).
+- `statsSingleWindow` – single-window mode enabled.
+- `statsUrls` – last selected URLs for slots A/B.
+- `statsConfig` – visual config for stats animations & win/lose highlighting.
 
-Automation disables when the Excel/dataservices feed stops changing (freeze timeout). A localStorage intent flag ensures only automatically suspended sessions auto-resume on feed change; manual disables stay off until re-enabled.
+## Excel Extractor (optional)
 
-### New: Auto suspend by market state (R-mode)
+An external Python script can feed odds to the app (embedded board & main board). The app manages basic start/stop and status reporting.
 
-- When Auto is ON and Resume (R) is enabled, the app now automatically suspends Auto in two cases:
-  - All books are suspended so Mid cannot be computed (no live odds) — Auto OFF (reason: `no-mid`).
-  - A large cross-book arbitrage appears (>= 5%) — Auto OFF (reason: `arb-spike`).
-- It automatically resumes Auto once Mid is available again and there is no arbitrage (arb < 5%), but only if the last disable was automatic (one of the two reasons above) and the user previously enabled Auto.
-- The same behavior applies to the embedded stats panel.
+Tips:
+- Ensure Python is installed and available as `python` in PATH.
+- The app tries to locate `excel_watcher.py` in common folders (root and `Excel Extractor/`).
+- On first run it will also try to set the default dump path to `current_state.json` next to the script.
+- If `pywin32` is missing, use the settings in the board/UI to install dependencies (or install manually).
 
-## Map Auto-Restore & Dataservices Fallback
+## Development
 
-Map selection (`lastMap`) & team names persist. After any navigation the main process replays `set-map` at 400/1400/3000/5000ms. Each preload re-applies the map (plus SPA mutation observer). Sometimes dataservices misses all early broadcasts, so extra safeguards were added:
+- No bundler/minifier; ASAR disabled to keep hot-edit friendly.
+- `electron .` is used for both `start` and `dev`.
+- uBlock Origin can be injected into specific sessions for ad-heavy sources; the project includes a local extension stub.
 
-- Preload logs `[map][recv] set-map -> N` on receipt.
-- Extra reasserts at 4200/6000ms inside the handler.
-- DOMContentLoaded fallback reasserts at 800/2000/4000/7000ms with `_ping_ds` to provoke a resend.
+## Troubleshooting
 
-If you still need to manually re-select: capture `[map]` logs; absence of any `[map][recv]` means the view attached listeners after all sends — reload to reproduce with timings.
+- The Stats Hide/Unhide button is visible only when the app is in the embedded Stats mode; use the top “Stats” button first.
+- If brokers stop updating, check the stale monitor auto-refresh setting.
+- If DevTools don’t open for a specific view, use the general Dev button (main window) or Ctrl+F12 (board) or F12 fallback.
+- If Excel watcher does not start, verify Python availability, script path, and that `pywin32` is installed.
 
-## Testing Checklist
+## License
 
-1. Large diff (>=15%): expect 4 pulses then 1 confirm (see `[autoSim][fireAttempt] pulses=4`).
-2. Mid diff (6%): 2 pulses.
-3. Freeze suspend: stop Excel feed -> `[autoSim][suspend]`; no further pulses.
-4. Auto resume: resume feed -> `[autoSim][resume]` only if last disable was automatic.
-5. Map persistence: change to map 2, reload broker -> map 2 auto-restored <5s.
-6. Dataservices fallback: verify `[map][ds][fallback]` logs at staged times; odds correspond to correct map.
-7. Rivalry extraction: only winner market visible; no specials extracted.
-
-## Extended Logging Reference
-
-- `[map][recv]` – Preload received a `set-map` value.
-- `[map][ds][fallback]` – Dataservices forced map reassert attempt.
-- `[autoSim][fireAttempt]` – Renderer choosing pulse count.
-- `[auto-press][ipc][si] SENT injVk ...` – Successful low-level key injection.
-- `[autoSim][suspend]` / `[autoSim][resume]` – Freeze transitions.
-
-Use these markers when tuning timing or diagnosing missed confirms.
+MIT
 
