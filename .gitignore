@@ -67,6 +67,11 @@ renderer/fonts/
 auto_press_debug.json
 auto_press_confirm_debug.json
 
+# Runtime-generated state (app / Excel Extractor)
+auto_press_signal.json
+Excel Extractor/template_sync.json
+Excel Extractor/current_state.json
+
 # Python virtual environments (Excel Extractor)
 .venv/
 venv/
