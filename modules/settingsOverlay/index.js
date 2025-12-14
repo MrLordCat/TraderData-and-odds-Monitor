@@ -36,7 +36,7 @@ function createSettingsOverlay(ctx){
     settingsView.webContents.on('did-finish-load', ()=>{ try {
       const gsHeatBar = ctx.store ? ctx.store.get('gsHeatBar') : null;
       const statsConfig = ctx.store ? ctx.store.get('statsConfig') : null;
-      settingsView.webContents.send('settings-init', { contrast:100, gsHeatBar, statsConfig });
+      settingsView.webContents.send('settings-init', { gsHeatBar, statsConfig });
     } catch(_){ } });
   }
   function open(){

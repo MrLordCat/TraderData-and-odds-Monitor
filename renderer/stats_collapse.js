@@ -16,12 +16,14 @@
   function apply(root, id, animate){
     const btn=root.querySelector('.collapseBtn');
     const body = root.querySelector('.sectionBody') || root.querySelector('.statsBody');
-    if(!btn||!body) return;
+    if(!body) return;
     const collapsed = !!state[id];
     if(collapsed){
       root.classList.add('collapsed');
-      btn.textContent='▸';
-      btn.setAttribute('aria-expanded','false');
+      if(btn){
+		btn.textContent='▸';
+		btn.setAttribute('aria-expanded','false');
+	  }
       const wasAuto = body.style.maxHeight==='none' || body.style.maxHeight==='';
       if(animate){
         const h = wasAuto ? measure(body) : body.scrollHeight;
@@ -39,8 +41,10 @@
       }
     } else {
       root.classList.remove('collapsed');
-      btn.textContent='▾';
-      btn.setAttribute('aria-expanded','true');
+      if(btn){
+		btn.textContent='▾';
+		btn.setAttribute('aria-expanded','true');
+	  }
       const targetH = measure(body);
       if(animate){
         setMax(body,0);
@@ -71,11 +75,31 @@
     if(!root.id) root.id=id;
     const btn=root.querySelector('.collapseBtn');
     const body = root.querySelector('.sectionBody') || root.querySelector('.statsBody');
-    if(!btn||!body) return;
+    if(!body) return;
     if(!(id in state)) state[id] = root.classList.contains('collapsed');
     // initial apply without animation
     apply(root,id,false);
+    if(btn){
     btn.addEventListener('click', ()=>{ state[id]=!state[id]; apply(root,id,true); persist(); });
+  }
+  // Optional: toggle by clicking the section title (saves width in narrow panels)
+  try {
+    if(root.dataset.collapseOnHeader === '1'){
+      const header = root.querySelector('.sectionHeader');
+      const title = header && header.querySelector('.accent');
+      if(title){
+        title.style.cursor = 'pointer';
+        title.style.userSelect = 'none';
+        title.addEventListener('click', (ev)=>{
+          // Only title click toggles; avoid interfering with header controls
+          ev.preventDefault();
+          state[id]=!state[id];
+          apply(root,id,true);
+          persist();
+        });
+      }
+    }
+  } catch(_){ }
     window.addEventListener('resize', ()=>{ if(!state[id]){ const wasAuto = body.style.maxHeight==='none'; if(!wasAuto){ const h=measure(body); setMax(body,h); } } });
   }
 

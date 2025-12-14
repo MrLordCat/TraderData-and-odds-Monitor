@@ -18,11 +18,13 @@ html, body {
 .panel {
 	position: relative;
 	z-index: 2;
-	width: 520px;
-	max-width: calc(100% - 40px);
-	/* Fixed max height so window stops growing; center offset adjusts if taller */
-	max-height: 640px;
-	margin: 40px auto;
+	width: min(70vw, 980px);
+	height: min(80vh, 820px);
+	min-width: 520px;
+	min-height: 420px;
+	max-width: calc(100% - 28px);
+	max-height: calc(100% - 28px);
+	margin: 14px auto;
 	background: linear-gradient(160deg,#1d2736,#121922 70%);
 	border: 1px solid #2d3947;
 	border-radius: 18px;
@@ -30,6 +32,7 @@ html, body {
 	display: flex;
 	flex-direction: column;
 	animation: pop .35s cubic-bezier(.4,.12,.2,1);
+	resize: both;
 }
 @keyframes pop { 0% { transform:translateY(14px) scale(.94); opacity:0; } 60% { transform:translateY(-2px) scale(1); opacity:1; } 100% { transform:translateY(0) scale(1); } }
 .head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px 10px; }
@@ -37,11 +40,10 @@ h1 { margin:0; font-size:17px; font-weight:600; letter-spacing:.5px; }
 .x { background:#202b3a; border:1px solid #324150; color:#e4e7ef; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
 .x:hover { background:#2b394c; }
 .content { 
-	padding:4px 20px 4px; 
-	display:flex; 
-	flex-direction:column; 
-	gap:16px; 
-	overflow-y:auto; 
+	padding: 12px 20px 16px;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
 	/* Reserve space so footer stays visible */
 	scrollbar-gutter: stable;
 }
@@ -56,9 +58,10 @@ h1 { margin:0; font-size:17px; font-weight:600; letter-spacing:.5px; }
 .content::-webkit-scrollbar-track { background: #121922; border-radius:8px; }
 .content::-webkit-scrollbar-thumb { background:#2e3b4b; border-radius:8px; border:2px solid #121922; }
 .content::-webkit-scrollbar-thumb:hover { background:#3a4a5d; }
-.row { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:500; }
-.row input[type=range] { width:100%; }
-#cVal { font-size:11px; opacity:.65; margin-left:6px; }
+.segmentsScroll::-webkit-scrollbar { width:10px; }
+.segmentsScroll::-webkit-scrollbar-track { background: #121922; border-radius:8px; }
+.segmentsScroll::-webkit-scrollbar-thumb { background:#2e3b4b; border-radius:8px; border:2px solid #121922; }
+.segmentsScroll::-webkit-scrollbar-thumb:hover { background:#3a4a5d; }
 .hint { font-size:11px; opacity:.55; line-height:1.4; margin-top:-6px; }
 .foot { padding:12px 20px 18px; display:flex; justify-content:flex-end; gap:10px; }
 button { background:#233245; border:1px solid #303f51; color:#e4e7ef; border-radius:8px; padding:8px 18px; font:12px var(--font-sans); letter-spacing:.45px; cursor:pointer; transition:.18s background, .18s border-color; }
@@ -67,6 +70,63 @@ button.primary { background:#2f7cf6; border-color:#2f7cf6; box-shadow:0 0 0 1px 
 button.primary:hover { background:#378aff; }
 button:active { transform:translateY(1px); }
 /* Extracted inline styles */
-.sectionTitle { margin:8px 0 4px; font-size:14px; }
-.formGrid { display:grid; grid-template-columns:140px 1fr; gap:6px 12px; align-items:center; }
+.sectionTitle { margin: 6px 0 8px; font-size: 14px; }
+.formGrid { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; align-items: center; }
 .sepLine { margin:18px 0; border:none; border-top:1px solid #2c3649; }
+
+.segmentsScroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding-right: 2px;
+}
+
+.segments {
+	display: flex;
+	gap: 12px;
+	align-items: flex-start;
+	justify-content: center;
+}
+
+.segCol {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	flex: 1 1 0;
+	min-width: 0;
+	max-width: 420px;
+}
+
+.seg {
+	background: #121922;
+	border: 1px solid #2c3649;
+	border-radius: 14px;
+	padding: 10px 12px 12px;
+	display: block;
+}
+
+.seg .hint {
+	margin-top: 8px;
+}
+
+.formGrid input,
+.formGrid select,
+.formGrid button {
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+@media (max-width: 980px) {
+	.segCol { max-width: 440px; }
+}
+
+@media (max-width: 720px) {
+	.panel {
+		width: calc(100% - 40px);
+		height: calc(100% - 80px);
+	}
+	.segments { justify-content: stretch; }
+	.segCol { max-width: none; }
+	.formGrid { grid-template-columns: 1fr; }
+}

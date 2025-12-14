@@ -27,11 +27,10 @@
 
   <header>
     <div class="groupRow">
-  <div id="sourcesSection" class="sectionCard collapsible" data-sec="sourcesLayout">
+  <div id="sourcesSection" class="sectionCard collapsible" data-sec="sourcesLayout" data-collapse-on-header="1">
       <div class="sectionHeader" style="margin-bottom:8px;">
         <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
         <span class="accent">Sources & Layout</span>
-        <button id="sourcesCollapse" class="collapseBtn" title="Collapse/Expand" aria-expanded="true">▾</button>
       </div>
       <div class="sectionBody" id="sourcesBody" style="gap:8px;">
           <div class="sourcesGrid">
@@ -78,11 +77,10 @@
       </fieldset>
     </div>
   </header>
-  <div id="stats" class="collapsible sectionCard">
+  <div id="stats" class="collapsible sectionCard" data-collapse-on-header="1">
   <div class="sectionHeader">
     <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
     <span class="accent">Game Stats</span>
-    <button id="statsCollapse" class="collapseBtn" title="Collapse/Expand" aria-expanded="true">▾</button>
     <select id="lolGameSelect" class="font-11" style="padding:2px 6px;min-width:78px;vertical-align:middle;"><option value="" disabled selected>Game -</option></select>
     <button id="lolAddGameBtn" class="btn-sm font-11 addGameBtn" title="Add manual game" aria-disabled="true">+ Game</button>
   </div>
@@ -108,11 +106,10 @@
       </table>
   </div></div>
     <!-- Map Section -->
-  <div id="mapSection" class="mapSection sectionCard collapsible">
+  <div id="mapSection" class="mapSection sectionCard collapsible" data-collapse-on-header="1">
       <div class="sectionHeader" style="margin-bottom:6px;">
         <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
         <span class="accent">Map View</span>
-        <button id="mapCollapse" aria-expanded="false" class="collapseBtn">▸</button>
         <span id="mapGameLabel" class="statusSmall">Game -</span>
       </div>
   <div id="mapBody" class="mapBody sectionBody">
@@ -122,7 +119,7 @@
     </div>
   </div>
     <!-- Embedded Odds Board Section (collapsed by default) -->
-  <div id="embeddedOddsSection" class="embeddedOddsSection sectionCard collapsible collapsed" data-sec="embeddedOdds" style="margin-top:16px;">
+  <div id="embeddedOddsSection" class="embeddedOddsSection sectionCard collapsible collapsed" data-sec="embeddedOdds" data-collapse-on-header="1" style="margin-top:16px;">
       <div class="sectionHeader" style="margin-bottom:6px;">
         <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
   <span class="accent">Odds Board</span>
@@ -144,7 +141,6 @@
         </label>
         <button id="embeddedMapRefreshBtn" class="btn-sm font-11" title="Re-broadcast current map (refresh odds)" style="margin-left:4px;padding:2px 6px;line-height:1;cursor:pointer;">⟳</button>
     <span id="embeddedTolBadge" class="statusSmall" title="Auto tolerance (from Settings)" style="margin-left:8px;opacity:.8;">Tol: —</span>
-  <button id="embeddedOddsCollapse" aria-expanded="false" class="collapseBtn" title="Expand / Collapse">▸</button>
       </div>
   <div id="embeddedOddsBody" class="embeddedOddsBody sectionBody">
         <table id="embeddedOddsTable" class="embeddedOddsTable tblCompact">

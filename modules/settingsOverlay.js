@@ -34,7 +34,7 @@ function createSettingsOverlay(ctx){
       const statsConfig = ctx.store ? ctx.store.get('statsConfig') : null;
       const selectedGame = ctx.store ? (ctx.store.get('selectedGame') || 'lol') : 'lol';
       try { console.log('[settingsOverlay] init heatbar', gsHeatBar, 'statsConfig', statsConfig); } catch(_){ }
-      settingsView.webContents.send('settings-init', { contrast:100, gsHeatBar, statsConfig, selectedGame });
+      settingsView.webContents.send('settings-init', { gsHeatBar, statsConfig, selectedGame });
     } catch(_){ } });
     applyBlurToBrokers();
     try { ctx.mainWindow.webContents.send('ui-blur-on'); } catch(_){ }

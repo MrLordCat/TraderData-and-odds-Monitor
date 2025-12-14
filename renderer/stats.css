@@ -34,6 +34,26 @@ body {
 #embeddedOddsSection { border:1px solid #27313d; background:#1b232c; border-radius:6px; overflow:hidden; }
 #embeddedOddsSection.collapsed #embeddedOddsBody { max-height:0; padding:0; }
 #embeddedOddsBody { max-height:340px; overflow-y:auto; overflow-x:hidden; transition:max-height .25s ease; padding:6px 6px 8px; }
+
+/* Unified: collapse via title click (no separate button) */
+.collapsible[data-collapse-on-header="1"] .sectionHeader .accent{
+	position: relative;
+	padding-right: 14px;
+	cursor: pointer;
+	user-select: none;
+}
+.collapsible[data-collapse-on-header="1"] .sectionHeader .accent::after{
+	content: '▾';
+	position: absolute;
+	right: 0;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 11px;
+	opacity: .85;
+}
+.collapsible.collapsed[data-collapse-on-header="1"] .sectionHeader .accent::after{
+	content: '▸';
+}
 .embeddedOddsHeader { display:flex; align-items:center; gap:8px; font-size:13px; margin:0; padding:6px 8px; background:#212b35; border-bottom:1px solid #27313d; }
 .embeddedOddsHeader .accent { font-weight:600; }
 .embeddedOddsTable { width:100%; border-collapse:collapse; font-size:11px; }

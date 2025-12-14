@@ -1,16 +1,3 @@
-// Extracted from inline script in board.html
-(function(){
-  function applyContrast(v){
-    const c = Math.min(130, Math.max(70, Number(v)||100)) / 100;
-    document.documentElement.style.setProperty('--contrast-mult', c);
-  }
-  if(window.desktopAPI){
-    window.desktopAPI.onContrastPreview && window.desktopAPI.onContrastPreview(applyContrast);
-    window.desktopAPI.onContrastSaved && window.desktopAPI.onContrastSaved(applyContrast);
-    window.desktopAPI.getSetting && window.desktopAPI.getSetting('uiContrast').then(v=>{ if(v!=null) applyContrast(v); });
-  }
-})();
-
 // ================= Side-panel toolbar wiring (icons) =================
 let __boardDockState = null;
 function updateBoardSideIcon(state){
@@ -83,6 +70,25 @@ function bindTopbar(){
     if(setBtn){ setBtn.addEventListener('click', ()=>{ try { window.desktopAPI.openSettings && window.desktopAPI.openSettings(); } catch(_){ } }); }
   } catch(_){ }
 }
+
+// ===== Board collapse (title click) =====
+(function(){
+  try {
+    const title = document.querySelector('.boardTitle');
+    if(!title) return;
+    const KEY = 'boardCollapsed';
+    try {
+      const v = localStorage.getItem(KEY);
+      if(v === '1') document.body.classList.add('boardCollapsed');
+    } catch(_){ }
+    title.addEventListener('click', ()=>{
+      try {
+        document.body.classList.toggle('boardCollapsed');
+        try { localStorage.setItem(KEY, document.body.classList.contains('boardCollapsed') ? '1' : '0'); } catch(_){ }
+      } catch(_){ }
+    });
+  } catch(_){ }
+})();
 
 try { window.addEventListener('DOMContentLoaded', bindTopbar); } catch(_){ }
 

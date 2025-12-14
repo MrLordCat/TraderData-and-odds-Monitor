@@ -4,11 +4,50 @@ try {
 	const devBtn = document.getElementById('open-devtools');
 	if(devBtn){ devBtn.addEventListener('click', ()=>{ try { ipcRenderer.send('open-devtools'); } catch(_){ } }); }
 } catch(_){ }
-// Contrast stub
-const slider = document.getElementById('contrast');
-const cVal = document.getElementById('cVal');
-function updateContrast(){ cVal.textContent = slider.value + '%'; }
-slider.addEventListener('input', updateContrast);
+
+// ===== Masonry-like segments layout (no multi-column glitches) =====
+let __layoutRaf = null;
+function getDesiredCols(containerWidth){
+	// Match CSS breakpoints: 3 cols default, 2 on medium, 1 on small
+	if(containerWidth <= 720) return 1;
+	if(containerWidth <= 980) return 2;
+	return 3;
+}
+function layoutSegments(){
+	try {
+		const segments = document.querySelector('.segments');
+		if(!segments) return;
+		const allCards = Array.from(segments.querySelectorAll('.seg'));
+		if(allCards.length === 0) return;
+		const width = segments.clientWidth || segments.parentElement?.clientWidth || window.innerWidth;
+		const cols = getDesiredCols(width);
+		// Rebuild columns
+		segments.textContent = '';
+		const columns = [];
+		for(let i=0;i<cols;i++){
+			const col = document.createElement('div');
+			col.className = 'segCol';
+			segments.appendChild(col);
+			columns.push(col);
+		}
+		// Place cards into the shortest column (compact, avoids large gaps)
+		for(const card of allCards){
+			let best = columns[0];
+			let bestH = best.getBoundingClientRect().height;
+			for(let i=1;i<columns.length;i++){
+				const h = columns[i].getBoundingClientRect().height;
+				if(h < bestH){ best = columns[i]; bestH = h; }
+			}
+			best.appendChild(card);
+		}
+	} catch(_){ }
+}
+function queueLayout(){
+	if(__layoutRaf) return;
+	__layoutRaf = requestAnimationFrame(()=>{ __layoutRaf = null; layoutSegments(); });
+}
+window.addEventListener('resize', queueLayout);
+
 
 // (Removed) Game Stats table theme controls (deprecated)
 const fields = {}; // retain empty object to avoid ref errors if any leftover code executes
@@ -182,8 +221,6 @@ window.addEventListener('keydown', e=>{ if(e.key==='Escape') ipcRenderer.send('c
 document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-settings');
 
 	ipcRenderer.on('settings-init', (_e,cfg)=>{
-	if(cfg && typeof cfg.contrast!=='undefined'){ slider.value=cfg.contrast; } else { slider.value=100; }
-	updateContrast();
 	if(cfg && cfg.gsHeatBar){ currentHeatBar = { ...currentHeatBar, ...cfg.gsHeatBar }; }
 	hb.enabled.checked = !!currentHeatBar.enabled;
 	hb.decay.value = String(currentHeatBar.decayPerSec);
@@ -201,6 +238,7 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	if(anim.color2) anim.color2.value = currentStatsConfig.animationSecondaryColor;
 	emitHeatBar();
 	updateStatsConfigFromInputs(true); // push current values on open
+	queueLayout();
 	// Request stored auto tolerance & burst levels after initial settings applied
 	try { ipcRenderer.invoke('auto-tolerance-get').then(v=>{
 		if(typeof v === 'number' && !isNaN(v)) autoTolerancePct = clampTol(v);
@@ -214,6 +252,7 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		const sel = document.getElementById('game-select');
 		if(sel && cfg && cfg.selectedGame){ sel.value = cfg.selectedGame; }
 	} catch(_){ }
+	queueLayout();
 });
 
 // ===== Game selector (global) =====

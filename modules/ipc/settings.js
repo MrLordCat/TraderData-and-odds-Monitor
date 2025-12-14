@@ -12,8 +12,6 @@ function initSettingsIpc(ctx){
   ipcMain.on('gs-heatbar-save', (_e, cfg)=>{ try { store.set('gsHeatBar', cfg); } catch(_){} forwardHeatBar(cfg); });
   ipcMain.handle('get-setting', (e,key)=> store.get(key));
   ipcMain.on('set-setting', (e,{key,value})=>{ store.set(key,value); });
-  ipcMain.on('settings-contrast-preview', ()=>{});
-  ipcMain.on('settings-contrast-save', ()=>{});
 
   // ===== Global Game selection (affects extractors & UI consumers) =====
   const VALID_GAMES = new Set(['lol','cs2','dota2']);

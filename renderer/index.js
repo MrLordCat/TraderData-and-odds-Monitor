@@ -18,13 +18,6 @@ function queueStage(){
 window.addEventListener('resize', queueStage);
 window.addEventListener('load', computeStage);
 
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const stored = await window.desktopAPI.getSetting('uiContrast');
-    if(stored!=null){ applyContrast(+stored); }
-  } catch(_){ }
-});
-
 // Dev live CSS reload: if watcher signals change, bust cache on matching <link href>.
 try {
   window.desktopAPI.onDevCssChanged?.(files => {
@@ -58,11 +51,6 @@ window.desktopAPI.getBoardState().then(applyBoardState);
 splitter.addEventListener('mousedown', e=>{ if(!boardState) return; resizing=true; startX=e.clientX; startWidth=boardState.width; splitter.classList.add('dragging'); document.body.style.userSelect='none'; });
 window.addEventListener('mousemove', e=>{ if(!resizing) return; const dx=e.clientX-startX; let newW=startWidth; if(boardState.side==='left'){ newW = startWidth + dx; } else { newW = startWidth - dx; } newW=Math.max(240, Math.min(800, newW)); window.desktopAPI.boardSetWidth(newW); });
 window.addEventListener('mouseup', ()=>{ if(resizing){ resizing=false; splitter.classList.remove('dragging'); document.body.style.userSelect=''; } });
-
-function applyContrast(v){ v=Math.min(130,Math.max(70,v||100)); document.documentElement.style.setProperty('--ui-contrast', v/100); }
-window.applyContrast = applyContrast;
-window.desktopAPI.onContrastPreview?.(v=> applyContrast(+v));
-window.desktopAPI.onContrastSaved?.(v=> applyContrast(+v));
 window.desktopAPI.onUIBlurOn?.(()=> document.body.classList.add('overlay-blur'));
 window.desktopAPI.onUIBlurOff?.(()=> document.body.classList.remove('overlay-blur'));
 

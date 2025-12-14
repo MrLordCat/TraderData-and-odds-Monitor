@@ -122,6 +122,26 @@ body {
   flex:0 0 auto;
 }
 
+.boardTitle{
+  color: var(--accent);
+  font-weight: 600;
+  position: relative;
+  padding-right: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.boardTitle::after{
+  content: '▾';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  opacity: .85;
+}
+body.boardCollapsed .boardTitle::after{ content:'▸'; }
+body.boardCollapsed #tableContainer{ display:none; }
+
 /* Buttons & Select */
 button {
   background: var(--panel-alt);
