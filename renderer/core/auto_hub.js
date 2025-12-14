@@ -17,6 +17,85 @@
     let lastF21At = 0;
   let suppressResumeBroadcast = false;
 
+    // Excel extractor (python) процесс: Auto нельзя включать если скрипт не запущен.
+    // Также: если скрипт остановился — принудительно выключаем Auto (если был включен).
+    let excelProcRunning = null; // null=unknown yet, boolean after first status
+    let excelProcStarting = false;
+    let excelProcInstalling = false;
+
+    function broadcastAutoActiveOff(){
+      try {
+        if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); }
+        else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } }
+      } catch(_){ }
+    }
+
+    function disableAllAutoDueToExcelStop(){
+      let anyWasActive = false;
+      views.forEach(v=>{
+        try {
+          if(v && v.engine && v.engine.state && v.engine.state.active){
+            anyWasActive = true;
+            v.engine.setActive(false);
+          }
+        } catch(_){ }
+      });
+      if(anyWasActive){
+        // Ensure other windows (late loads) sync to OFF.
+        broadcastAutoActiveOff();
+      }
+    }
+
+    function statusAll(msg){
+      try { views.forEach(v=>{ try { v.ui && v.ui.status && v.ui.status(msg); } catch(_){ } }); } catch(_){ }
+    }
+
+    function canEnableAuto(){
+      // Block when status unknown (startup) OR when not running OR when starting/installing.
+      if(excelProcRunning !== true) return false;
+      if(excelProcStarting) return false;
+      if(excelProcInstalling) return false;
+      return true;
+    }
+
+    function applyExcelProcStatus(s){
+      try {
+        const prevRunning = excelProcRunning;
+        excelProcRunning = !!(s && s.running);
+        excelProcStarting = !!(s && s.starting);
+        excelProcInstalling = !!(s && s.installing);
+
+        // If python stopped (or not running) and auto is on — force off.
+        if(excelProcRunning !== true){
+          // If this is a transition from running -> not running, force-disable.
+          // If initial state is already not running, still force-disable to be safe.
+          if(prevRunning === true || prevRunning === null){
+            disableAllAutoDueToExcelStop();
+          }
+        }
+      } catch(_){ }
+    }
+
+    function attachExcelProcStatus(){
+      try {
+        if(!global.require) return;
+        const { ipcRenderer } = global.require('electron');
+        if(!ipcRenderer) return;
+        if(attachExcelProcStatus.__bound) return;
+        attachExcelProcStatus.__bound = true;
+        ipcRenderer.on('excel-extractor-status', (_e, s)=>{
+          applyExcelProcStatus(s);
+          // Optional hint in UI when user tries to use Auto while script is OFF.
+        });
+        // Initial fetch
+        try {
+          ipcRenderer.invoke('excel-extractor-status-get')
+            .then(s=> applyExcelProcStatus(s))
+            .catch(()=>{ applyExcelProcStatus({ running:false, starting:false, installing:false }); });
+        } catch(_){ }
+      } catch(_){ }
+    }
+
     function sendAutoPressF21(opts){
       try {
         const elapsed = now()-lastF21At; if(elapsed < 250) return; // debounce
@@ -159,7 +238,14 @@
         const applyConfigAll = (cfg)=>{ if(!cfg) return; views.forEach(v=>{ try { if(v.engine && v.engine.setConfig) v.engine.setConfig(cfg); } catch(_){ } }); };
         const handleToggle = ()=>{
           let after = null;
-          views.forEach(v=>{ try { const eng=v.engine; if(eng){ const next = !eng.state.active; eng.setActive(next); after = next; } } catch(_){ } });
+          // If toggling ON while python script is OFF — block and keep OFF.
+          if(!canEnableAuto()){
+            statusAll('Start Excel script');
+            disableAllAutoDueToExcelStop();
+            after = false;
+          } else {
+            views.forEach(v=>{ try { const eng=v.engine; if(eng){ const next = !eng.state.active; eng.setActive(next); after = next; } } catch(_){ } });
+          }
           // Inform other windows about resulting state so late loads sync (and main updates __autoLast)
           try {
             if(after!==null){
@@ -168,7 +254,17 @@
             }
           } catch(_){ }
         };
-        const handleSet = (p)=>{ const want=!!(p&&p.on); views.forEach(v=>{ try { const eng=v.engine; if(eng && want!==eng.state.active){ eng.setActive(want); } } catch(_){ } }); };
+        const handleSet = (p)=>{
+          const want=!!(p&&p.on);
+          if(want && !canEnableAuto()){
+            statusAll('Start Excel script');
+            disableAllAutoDueToExcelStop();
+            // Broadcast OFF so other windows converge.
+            broadcastAutoActiveOff();
+            return;
+          }
+          views.forEach(v=>{ try { const eng=v.engine; if(eng && want!==eng.state.active){ eng.setActive(want); } } catch(_){ } });
+        };
         const handleDisable = ()=>{ let changed=false; views.forEach(v=>{ try { const eng=v.engine; if(eng && eng.state.active){ eng.setActive(false); changed=true; } } catch(_){ } });
           // Notify others only if we actually disabled something
           try {
@@ -178,7 +274,18 @@
             }
           } catch(_){ }
         };
-        const handleActiveSet = (p)=>{ try { const want=!!(p&&p.on); views.forEach(v=>{ try { const eng=v.engine; if(eng && want!==eng.state.active){ eng.setActive(want); if(v.ui && typeof v.ui.onActiveChanged==='function'){ v.ui.onActiveChanged(want, eng.state); } } } catch(_){ } }); } catch(_){ } };
+        const handleActiveSet = (p)=>{
+          try {
+            const want=!!(p&&p.on);
+            if(want && !canEnableAuto()){
+              statusAll('Start Excel script');
+              disableAllAutoDueToExcelStop();
+              broadcastAutoActiveOff();
+              return;
+            }
+            views.forEach(v=>{ try { const eng=v.engine; if(eng && want!==eng.state.active){ eng.setActive(want); if(v.ui && typeof v.ui.onActiveChanged==='function'){ v.ui.onActiveChanged(want, eng.state); } } } catch(_){ } });
+          } catch(_){ }
+        };
         const handleResumeSet = (p)=>{ try {
           const val = !!(p && p.on);
           suppressResumeBroadcast = true;
@@ -289,6 +396,12 @@
         setConfig: (p)=>{ try { engine.setConfig(p||{}); } catch(_){ } },
         setActive: (on)=>{
           const val = !!on;
+          if(val && !canEnableAuto()){
+            try { ui && ui.status && ui.status('Start Excel script'); } catch(_){ }
+            disableAllAutoDueToExcelStop();
+            broadcastAutoActiveOff();
+            return;
+          }
           // Apply to all views uniformly
           views.forEach(v=>{ try {
             const was = !!v.engine.state.active;
@@ -325,6 +438,7 @@
 
     // bootstrap
     attachOdds();
+    attachExcelProcStatus();
     addBroadcastListeners();
 
     return { attachView, getState:()=> ({ records:state.records, derived:state.derived }) };

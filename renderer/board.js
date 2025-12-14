@@ -11,10 +11,88 @@ function updateBoardSideIcon(state){
 function bindTopbar(){
   if(!window.desktopAPI) return;
 
+  // Inline broker picker (dropdown) – opened by + button in the topbar
+  let __pickerEl = null;
+  let __pickerOpen = false;
+  function closePicker(){
+    __pickerOpen = false;
+    try { if(__pickerEl) __pickerEl.classList.add('hidden'); } catch(_){ }
+  }
+  function positionPicker(anchor){
+    try {
+      if(!__pickerEl || !anchor) return;
+      const r = anchor.getBoundingClientRect();
+      // Use fixed positioning inside the BrowserView
+      __pickerEl.style.left = Math.max(6, Math.min(window.innerWidth - 240, r.left)) + 'px';
+      __pickerEl.style.top = (r.bottom + 6) + 'px';
+    } catch(_){ }
+  }
+  async function openPicker(anchor){
+    try {
+      if(!__pickerEl){
+        __pickerEl = document.createElement('div');
+        __pickerEl.id = 'brokerPicker';
+        __pickerEl.className = 'brokerPicker panel-base hidden';
+        __pickerEl.innerHTML = '<div class="brokerPickerTitle">Add broker</div><div class="brokerPickerList" role="menu"></div>';
+        document.body.appendChild(__pickerEl);
+      }
+
+      const list = __pickerEl.querySelector('.brokerPickerList');
+      if(list) list.innerHTML = '<div class="brokerPickerEmpty muted">Loading…</div>';
+      positionPicker(anchor);
+      __pickerEl.classList.remove('hidden');
+      __pickerOpen = true;
+
+      const data = await (window.desktopAPI.getBrokersForPicker ? window.desktopAPI.getBrokersForPicker() : Promise.resolve({ brokers:[], active:[] }));
+      const brokers = Array.isArray(data && data.brokers) ? data.brokers : [];
+      const active = Array.isArray(data && data.active) ? data.active : [];
+      const inactive = brokers.filter(b => b && b.id && !active.includes(b.id));
+
+      if(!list) return;
+      if(!inactive.length){
+        list.innerHTML = '<div class="brokerPickerEmpty muted">Нет доступных брокеров</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      inactive.forEach(b => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'brokerPickBtn';
+        btn.setAttribute('role', 'menuitem');
+        btn.textContent = b.title || b.name || b.id;
+        btn.title = b.id;
+        btn.addEventListener('click', ()=>{
+          try { window.desktopAPI.addBroker && window.desktopAPI.addBroker(b.id); } catch(_){ }
+          closePicker();
+        });
+        list.appendChild(btn);
+      });
+    } catch(_){ }
+  }
+  function togglePicker(anchor){
+    if(__pickerOpen) closePicker();
+    else openPicker(anchor);
+  }
+
   // + Add broker (opens slot picker)
   try {
     const addBtn = document.getElementById('tbAddBroker');
-    if(addBtn){ addBtn.addEventListener('click', ()=>{ try { window.desktopAPI.requestAddBroker && window.desktopAPI.requestAddBroker(); } catch(_){ } }); }
+    if(addBtn){
+      addBtn.addEventListener('click', (e)=>{ try { e && e.stopPropagation && e.stopPropagation(); } catch(_){ } togglePicker(addBtn); });
+    }
+  } catch(_){ }
+
+  // Close picker on outside click / resize / Esc
+  try {
+    document.addEventListener('click', (e)=>{
+      if(!__pickerOpen) return;
+      const t = e && e.target;
+      if(__pickerEl && (t===__pickerEl || (__pickerEl.contains && __pickerEl.contains(t)))) return;
+      closePicker();
+    });
+    window.addEventListener('resize', ()=>{ try { if(__pickerOpen){ const a=document.getElementById('tbAddBroker'); positionPicker(a); } } catch(_){ } });
+    window.addEventListener('keydown', (e)=>{ try { if(__pickerOpen && e && e.key==='Escape'){ closePicker(); } } catch(_){ } });
   } catch(_){ }
 
   // Layout preset

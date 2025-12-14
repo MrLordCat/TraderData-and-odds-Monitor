@@ -101,6 +101,48 @@ body {
   box-shadow: 0 0 0 1px rgba(47,124,246,.35), 0 0 10px rgba(47,124,246,.35);
 }
 
+/* ================= Inline broker picker (opened by +) ================= */
+.brokerPicker{
+  position: fixed;
+  z-index: 50;
+  width: 230px;
+  max-height: 320px;
+  padding: 8px;
+  overflow: hidden;
+}
+.brokerPickerTitle{
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: .2px;
+  margin-bottom: 6px;
+  opacity: .92;
+}
+.brokerPickerList{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 270px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.brokerPickerList::-webkit-scrollbar{ width: 8px; }
+.brokerPickerList::-webkit-scrollbar-track{ background:#10151f; }
+.brokerPickerList::-webkit-scrollbar-thumb{ background:#243142; border-radius:4px; }
+.brokerPickBtn{
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel-alt);
+  border: 1px solid #2c3649;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 500;
+}
+.brokerPickBtn:hover{ background: #2a3344; border-color:#3a4960; }
+.brokerPickBtn:active{ transform: translateY(1px); }
+.brokerPickerEmpty{ padding: 6px 2px; }
+
 /* Arrow orientation reflects current dock side */
 #tbBoardSide[data-side="left"] .arrow{ transform: rotate(180deg); }
 
