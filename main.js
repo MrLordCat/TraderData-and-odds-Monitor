@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, screen, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, screen, Menu, globalShortcut, dialog } = require('electron');
 // Raise EventEmitter listener cap to 15 (requested) unconditionally (was env-gated before)
 try {
   const EventEmitter = require('events');
@@ -505,8 +505,42 @@ function bootstrap() {
       // Pick python executable: allow store override (excelPythonPath) else rely on 'python'
       let py = 'python';
       try { const pyOverride = store.get('excelPythonPath'); if(pyOverride) py = pyOverride; } catch(_){}
+
+      // Resolve workbook path (persisted). If missing/invalid, ask user to choose.
+      let workbookPath = null;
+      try {
+        const saved = store.get('excelWorkbookPath');
+        if(saved && typeof saved === 'string') workbookPath = saved.trim();
+      } catch(_){ }
+      try {
+        if(!workbookPath || !fs.existsSync(workbookPath)){
+          const picked = dialog && dialog.showOpenDialogSync ? dialog.showOpenDialogSync(mainWindow, {
+            title: 'Select Excel workbook for extractor',
+            properties: ['openFile'],
+            filters: [
+              { name: 'Excel', extensions: ['xlsm','xlsx','xls'] },
+              { name: 'All Files', extensions: ['*'] }
+            ]
+          }) : null;
+          if(!picked || !picked.length){
+            excelProcError = 'Excel file not selected';
+            excelProcStarting = false;
+            broadcastExcelStatus();
+            return;
+          }
+          workbookPath = picked[0];
+          store.set('excelWorkbookPath', workbookPath);
+          excelLog('excelWorkbookPath set', workbookPath);
+        }
+      } catch(err){
+        excelProcError = 'File picker failed: '+(err && err.message ? err.message : String(err));
+        excelProcStarting = false;
+        broadcastExcelStatus();
+        return;
+      }
+
       // Use unbuffered mode (-u) to force immediate flush of stdout/stderr (so logs visible in board DevTools)
-      const args = ['-u', scriptPath];
+      const args = ['-u', scriptPath, '--file', workbookPath];
       const cwd = path.dirname(scriptPath);
       // Log all details before spawn
       excelLog('spawn attempt', JSON.stringify({ python:py, args, cwd, scriptPath }));

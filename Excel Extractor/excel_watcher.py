@@ -14,6 +14,8 @@
 Изменить набор можно отредактировав константы ниже.
 """
 
+import argparse
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +26,7 @@ try:
 except ImportError:
     win32com = None  # type: ignore
 
-FILE_PATH = Path(r"C:\\Users\\kristian.vlassenko\\Documents\\Esports Excel Trading 16.04 mod.xlsm")
+DEFAULT_FILE_PATH = Path(r"C:\\Users\\kristian.vlassenko\\Documents\\Esports Excel Trading 16.04 mod.xlsm")
 SHEET_NAME = "InPlay FRONT"
 
 # Logical mapping:
@@ -69,7 +71,29 @@ def find_workbook(app, path: Path):
                 return wb
         except Exception:
             continue
-    raise SystemExit(f"Книга {path} не найдена среди открытых. Откройте её в Excel.")
+
+    # If the workbook isn't open yet but exists on disk, try opening it.
+    try:
+        if path.exists():
+            return app.Workbooks.Open(str(path))
+    except Exception:
+        pass
+
+    raise SystemExit(f"Книга {path} не найдена среди открытых. Откройте её в Excel или выберите правильный файл.")
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Excel watcher: reads odds cells and writes current_state.json"
+    )
+    p.add_argument(
+        "--file",
+        dest="file",
+        default=os.environ.get("ODDSMONI_EXCEL_FILE", ""),
+        help="Path to Excel workbook (.xlsm/.xlsx). If omitted, uses ODDSMONI_EXCEL_FILE or DEFAULT_FILE_PATH.",
+    )
+    p.add_argument("--sheet", dest="sheet", default=SHEET_NAME, help="Worksheet name")
+    return p.parse_args()
 
 
 def read_cells_batch(sheet, cells: List[str]):
@@ -168,16 +192,23 @@ def write_state(timestamp_str: str, full: dict, changed: dict | None, first: boo
 
 
 def main():
+    args = parse_args()
+    file_path = Path(args.file).expanduser() if args.file else DEFAULT_FILE_PATH
+    sheet_name = args.sheet or SHEET_NAME
+
+    if not file_path.exists():
+        raise SystemExit(f"Excel file not found: {file_path}")
+
     print("[INFO] Excel watcher start (attach-only, console only)...")
-    print(f"[INFO] File: {FILE_PATH}")
-    print(f"[INFO] Sheet: {SHEET_NAME}")
+    print(f"[INFO] File: {file_path}")
+    print(f"[INFO] Sheet: {sheet_name}")
     print(f"[INFO] Cells: {', '.join(CELLS)}")
     app = attach_excel_app()
-    wb = find_workbook(app, FILE_PATH)
+    wb = find_workbook(app, file_path)
     try:
-        sheet = wb.Worksheets(SHEET_NAME)
+        sheet = wb.Worksheets(sheet_name)
     except Exception:
-        raise SystemExit(f"Лист '{SHEET_NAME}' не найден. Проверьте имя.")
+        raise SystemExit(f"Лист '{sheet_name}' не найден. Проверьте имя.")
 
     prev = None
     try:
