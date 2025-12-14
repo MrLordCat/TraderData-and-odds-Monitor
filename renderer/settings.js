@@ -1,4 +1,9 @@
 const { ipcRenderer } = require('electron');
+// DevTools button (moved from main toolbar)
+try {
+	const devBtn = document.getElementById('open-devtools');
+	if(devBtn){ devBtn.addEventListener('click', ()=>{ try { ipcRenderer.send('open-devtools'); } catch(_){ } }); }
+} catch(_){ }
 // Contrast stub
 const slider = document.getElementById('contrast');
 const cVal = document.getElementById('cVal');

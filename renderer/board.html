@@ -7,6 +7,53 @@
 <link rel="stylesheet" href="board.css" />
 </head>
 <body>
+  <div id="topbar" class="topbar">
+    <div class="tbGroup" data-group="brokers">
+      <button id="tbAddBroker" class="iconBtn" title="Add broker" aria-label="Add broker">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>
+      </button>
+      <select id="tbLayoutPreset" class="tbSelect" title="Layout preset" aria-label="Layout preset">
+        <option value="">Layout</option>
+        <optgroup label="Horizontal">
+          <option value="2x2">2x2</option>
+          <option value="2x3">2x3</option>
+          <option value="3x3">3x3</option>
+          <option value="1x2">1x2</option>
+          <option value="1x2x2">1x2x2</option>
+          <option value="2">2</option>
+        </optgroup>
+        <optgroup label="Vertical">
+          <option value="1x1">1x1</option>
+          <option value="1x1x1">1x1x1</option>
+          <option value="1x1x2">1x1x2</option>
+          <option value="2x2x2">2x2x2</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="tbGroup" data-group="refresh">
+      <button id="tbRefreshAll" class="iconBtn" title="Refresh all brokers" aria-label="Refresh all brokers">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 6h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L14 10h6V4l-2.35 2.35z"/></svg>
+      </button>
+      <label class="tbCheck" title="Auto refresh" aria-label="Auto refresh">
+        <input type="checkbox" id="tbAutoReload" />
+        <span class="tbCheckMark" aria-hidden="true"></span>
+      </label>
+    </div>
+
+    <div class="tbGroup" data-group="ui">
+      <button id="tbBoardSide" class="iconBtn" title="Move board left/right" aria-label="Move board left/right" data-side="right">
+        <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6l6 6-6 6-1.4-1.4L13.2 12 8.6 7.4 10 6z"/></svg>
+      </button>
+      <button id="tbStats" class="iconBtn" title="Stats" aria-label="Stats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h3v10H5V9zm5-4h3v14h-3V5zm5 7h3v7h-3v-7z"/></svg>
+      </button>
+      <button id="tbSettings" class="iconBtn" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.1 7.1 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 12.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L1.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.39.32.6.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.21.1.47.01.6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM11 15.5A3.5 3.5 0 1 1 14.5 12 3.5 3.5 0 0 1 11 15.5z"/></svg>
+      </button>
+    </div>
+  </div>
+
   <div id="header">
   <span class="boardTitle">Aggregated Odds</span>
   <label class="mapLabel">Map

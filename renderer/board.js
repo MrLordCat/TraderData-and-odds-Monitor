@@ -11,6 +11,81 @@
   }
 })();
 
+// ================= Side-panel toolbar wiring (icons) =================
+let __boardDockState = null;
+function updateBoardSideIcon(state){
+  try {
+    const btn = document.getElementById('tbBoardSide');
+    if(!btn || !state) return;
+    btn.dataset.side = state.side === 'left' ? 'left' : 'right';
+  } catch(_){ }
+}
+
+function bindTopbar(){
+  if(!window.desktopAPI) return;
+
+  // + Add broker (opens slot picker)
+  try {
+    const addBtn = document.getElementById('tbAddBroker');
+    if(addBtn){ addBtn.addEventListener('click', ()=>{ try { window.desktopAPI.requestAddBroker && window.desktopAPI.requestAddBroker(); } catch(_){ } }); }
+  } catch(_){ }
+
+  // Layout preset
+  try {
+    const sel = document.getElementById('tbLayoutPreset');
+    if(sel){
+      window.desktopAPI.getLayoutPreset?.().then(p=>{ try { if(p) sel.value = p; } catch(_){ } }).catch(()=>{});
+      sel.addEventListener('change', ()=>{ try { if(sel.value) window.desktopAPI.applyLayoutPreset(sel.value); } catch(_){ } });
+    }
+  } catch(_){ }
+
+  // Refresh all
+  try {
+    const rBtn = document.getElementById('tbRefreshAll');
+    if(rBtn){ rBtn.addEventListener('click', ()=>{ try { window.desktopAPI.refreshAll && window.desktopAPI.refreshAll(); } catch(_){ } }); }
+  } catch(_){ }
+
+  // Auto refresh checkbox (next to refresh)
+  try {
+    const cb = document.getElementById('tbAutoReload');
+    if(cb){
+      window.desktopAPI.getAutoRefreshEnabled?.().then(v=>{ try { cb.checked = !!v; } catch(_){ } }).catch(()=>{});
+      cb.addEventListener('change', ()=>{ try { window.desktopAPI.setAutoRefreshEnabled && window.desktopAPI.setAutoRefreshEnabled(!!cb.checked); } catch(_){ } });
+      window.desktopAPI.onAutoRefreshUpdated?.(p=>{ try { cb.checked = !!(p && p.enabled); } catch(_){ } });
+    }
+  } catch(_){ }
+
+  // Board side arrow
+  try {
+    const sideBtn = document.getElementById('tbBoardSide');
+    if(sideBtn){
+      sideBtn.addEventListener('click', ()=>{
+        try {
+          const cur = (__boardDockState && __boardDockState.side) ? __boardDockState.side : (sideBtn.dataset.side || 'right');
+          const next = (cur === 'left') ? 'right' : 'left';
+          window.desktopAPI.boardSetSide && window.desktopAPI.boardSetSide(next);
+        } catch(_){ }
+      });
+      window.desktopAPI.getBoardState?.().then(st=>{ __boardDockState = st; updateBoardSideIcon(st); }).catch(()=>{});
+      window.desktopAPI.onBoardUpdated?.(st=>{ __boardDockState = st; updateBoardSideIcon(st); });
+    }
+  } catch(_){ }
+
+  // Stats
+  try {
+    const sBtn = document.getElementById('tbStats');
+    if(sBtn){ sBtn.addEventListener('click', ()=>{ try { window.desktopAPI.statsToggle && window.desktopAPI.statsToggle(); } catch(_){ } }); }
+  } catch(_){ }
+
+  // Settings
+  try {
+    const setBtn = document.getElementById('tbSettings');
+    if(setBtn){ setBtn.addEventListener('click', ()=>{ try { window.desktopAPI.openSettings && window.desktopAPI.openSettings(); } catch(_){ } }); }
+  } catch(_){ }
+}
+
+try { window.addEventListener('DOMContentLoaded', bindTopbar); } catch(_){ }
+
 const boardData = {};
 const swapped = new Set();
 try { (JSON.parse(localStorage.getItem('swappedBrokers')||'[]')||[]).forEach(b=>swapped.add(b)); } catch(e) {}

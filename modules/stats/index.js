@@ -12,7 +12,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   const DEFAULT_URLS = { A: 'https://portal.grid.gg', B: 'https://www.twitch.tv' };
   const urls = Object.assign({}, DEFAULT_URLS, store.get('statsUrls', {}));
   let mode = store.get('statsLayoutMode', 'split');               // split|focusA|focusB|vertical
-  let side = store.get('statsPanelSide', 'right');                // left|right
+  // Side is unified with docked board side to avoid mismatches between modes.
+  let side = store.get('boardSide') || store.get('statsPanelSide', 'right'); // left|right
   let panelHidden = !!store.get('statsPanelHidden', false);       // hidden or visible
   let embedOffsetY = 0;                                           // toolbar offset
   let singleWindow = !!store.get('statsSingleWindow', false);     // when true, only one slot is active and others are stopped
@@ -35,6 +36,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     store.set('statsUrls', urls);
     store.set('statsLayoutMode', mode);
     store.set('statsPanelSide', side);
+    // Keep canonical side in sync (used by board manager).
+    try { store.set('boardSide', side); } catch(_){ }
     store.set('statsPanelHidden', panelHidden);
     store.set('statsSingleWindow', singleWindow);
     store.set('lolMetricVisibility', lolMetricVisibility);
@@ -110,7 +113,20 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     }
     mode=m; persist(); layout();
   }
-  function toggleSide(){ side = side==='left'?'right':'left'; persist(); layout(); }
+  function broadcastSide(){
+    try { if(views.panel) views.panel.webContents.send('stats-side-updated', { side }); } catch(_){ }
+  }
+
+  function setSide(next){
+    if(next!=='left' && next!=='right') return;
+    if(next===side) return;
+    side = next;
+    persist();
+    layout();
+    broadcastSide();
+  }
+
+  function toggleSide(){ setSide(side==='left'?'right':'left'); }
   function setPanelHidden(hidden){ panelHidden = !!hidden; persist(); layout(); }
   function togglePanelHidden(){ setPanelHidden(!panelHidden); }
 
@@ -260,6 +276,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
         } catch(_){}
         break;
       case 'stats-toggle-side': toggleSide(); break;
+      case 'stats-set-side': setSide(payload && payload.side); break;
     case 'stats-panel-set-hidden': setPanelHidden(payload && payload.hidden); break;
     case 'stats-panel-toggle': togglePanelHidden(); break;
   case 'stats-single-window': applySingleWindow(payload && payload.enabled); break;
@@ -292,7 +309,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   }
 
   // Public API (open kept as noop for backward compatibility)
-  return { open: ()=>{}, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost, setUrl, getMode:()=>mode, getSide:()=>side, getPanelHidden:()=>panelHidden, maybeInstallUblock };
+  return { open: ()=>{}, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost, setUrl, getMode:()=>mode, getSide:()=>side, getPanelHidden:()=>panelHidden, maybeInstallUblock, setSide };
 }
 
 module.exports = { createStatsManager };

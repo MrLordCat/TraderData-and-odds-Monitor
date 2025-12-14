@@ -28,6 +28,82 @@ body {
   min-height:100%;
 }
 
+/* ================= Compact Top Toolbar (side panel only) ================= */
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(90deg, #1b2434, #141b29);
+  border-bottom: 1px solid #1f2a3c;
+  flex: 0 0 auto;
+}
+.topbar .tbGroup{ display:flex; align-items:center; gap:8px; }
+
+.iconBtn{
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid #2c3649;
+  border-radius: 8px;
+  cursor:pointer;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+.iconBtn:hover{ background:#2a3344; border-color:#3a4960; }
+.iconBtn:active{ transform: translateY(1px); }
+.iconBtn svg{ width: 18px; height: 18px; fill: currentColor; opacity: .92; }
+
+.tbSelect{
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #2c3649;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.tbCheck{
+  width: 34px;
+  height: 34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border: 1px solid #2c3649;
+  border-radius: 8px;
+  background: var(--panel);
+  cursor:pointer;
+  position: relative;
+}
+.tbCheck input{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  margin:0;
+  cursor:pointer;
+}
+.tbCheckMark{
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid #3a4960;
+  background: #121922;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
+}
+.tbCheck input:checked + .tbCheckMark{
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(47,124,246,.35), 0 0 10px rgba(47,124,246,.35);
+}
+
+/* Arrow orientation reflects current dock side */
+#tbBoardSide[data-side="left"] .arrow{ transform: rotate(180deg); }
+
 #tableContainer { flex:1; min-height:0; overflow:auto; scrollbar-width:thin; }
 #tableContainer::-webkit-scrollbar { width:8px; }
 #tableContainer::-webkit-scrollbar-track { background:#10151f; }

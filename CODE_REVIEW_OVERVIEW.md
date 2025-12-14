@@ -117,7 +117,7 @@ Recent: added aliases for Excel Extractor status (`getExcelExtractorStatus`, `on
 - `add_broker.*`: add-broker dialog (slot placeholder)
 - `settings.*`: settings overlay
   (DataServices prompt removed)
-- Global styles: `common.css`, `main.css`, `toolbar.css`, etc.
+- Global styles: `common.css`, `main.css`, etc.
 
 Recent: odds board shows engine-effective tolerance (badge) and auto status; S-button starts/stops Python watcher and mirrors state from main.
 

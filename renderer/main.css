@@ -34,7 +34,7 @@ body.overlay-blur {
 }
 html .overlay-blur #stageOutline { filter: none; }
 
-/* Top toolbar styles moved to toolbar.css */
+/* Top toolbar removed (controls live in docked board panel). */
 
 /* ------------------------------------------------------------------ */
 /* Form controls / buttons                                             */

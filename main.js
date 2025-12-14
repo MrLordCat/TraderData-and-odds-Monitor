@@ -2,7 +2,7 @@ const { app, BrowserWindow, BrowserView, ipcMain, screen, Menu, globalShortcut }
 // Raise EventEmitter listener cap to 15 (requested) unconditionally (was env-gated before)
 try {
   const EventEmitter = require('events');
-  const desired = 15;
+  const desired = 18;
   if (EventEmitter.defaultMaxListeners < desired) {
     EventEmitter.defaultMaxListeners = desired;
   }
@@ -122,6 +122,7 @@ const BROKER_FRAME_CSS = `body::after{content:"";position:fixed;inset:0;pointer-
 let mainWindow;
 let boardWindow; // secondary window displaying aggregated odds
 let boardManager; // docking/board manager
+const boardManagerRef = { value: null };
 let settingsOverlay; // module instance
 // BrowserView registry & state caches (restored after accidental removal in refactor)
 const views = {}; // id -> BrowserView
@@ -175,8 +176,7 @@ const layoutManager = createLayoutManager({ store, mainWindowRef, views, BROKERS
 
 // Early IPC handlers moved to modules/ipc/early.js
 const { initEarlyIpc } = require('./modules/ipc/early');
-const earlyBoardRef = { value: null };
-initEarlyIpc({ ipcMain, store, boardManagerRef: earlyBoardRef });
+initEarlyIpc({ ipcMain, store, boardManagerRef });
 
 // Stats debug & raw mirroring moved to modules/ipc/statsDebug.js (initialized after stats log window helper is defined)
 
@@ -305,7 +305,6 @@ function bootstrap() {
   onActiveListChanged: (list)=>{ activeBrokerIds = list; activeBrokerIdsRef.value = list; }
   });
   // Initialize broker-related IPC now that brokerManager exists
-  const boardManagerRef = { value: null };
   initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, boardWindowRef:{ value: boardWindow }, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef });
   // Layout IPC (needs layoutManager + refs ready)
   initLayoutIpc({ ipcMain, store, layoutManager, views, stageBoundsRef, boardManager, statsManager });
@@ -375,7 +374,7 @@ function bootstrap() {
   } catch(_){ }
   // Board IPC wiring now modular
   const { initBoardIpc } = require('./modules/ipc/board');
-  initBoardIpc({ ipcMain, boardManager });
+  initBoardIpc({ ipcMain, boardManager, statsManager });
   // Now that boardManager & statsManager are finalized, initialize IPC modules that depend on them
   try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
   try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: boardWindow }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }

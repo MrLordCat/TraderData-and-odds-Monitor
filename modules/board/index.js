@@ -3,13 +3,13 @@
 // Public API: createBoardManager({...}) -> { getState, init, setSide, setWidth, handleIpc, replayOdds, sendOdds, handleStageResized, applyDockLayout, getWebContents }
 
 const path = require('path');
-const { BrowserView, screen } = require('electron');
+const { BrowserView } = require('electron');
 const { ensureSingleClosedListener, hideView } = require('../utils/views');
 
 // ensureVisibleBounds removed (window mode dropped)
 
 function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, activeBrokerIdsRef, replayOddsFn, stageBoundsRef }){
-  let state = { side: store.get('boardSide') || 'right', width: store.get('boardWidth') || 320 };
+  let state = { mode: 'docked', side: store.get('boardSide') || 'right', width: store.get('boardWidth') || 320 };
   const MIN_W = 240; const MAX_W = 800;
   let dockView = null; // Single BrowserView
 
@@ -21,9 +21,11 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   function applyDockLayout(){
     if(!mainWindow || mainWindow.isDestroyed()) return;
     // shrink broker stage via layoutManager by adjusting stage bounds offset
-    const bounds = mainWindow.getContentBounds();
+    const size = mainWindow.getContentSize ? mainWindow.getContentSize() : [0,0];
+    const contentW = Math.max(0, Number(size[0])||0);
+    const contentH = Math.max(0, Number(size[1])||0);
     // Stage bounds (area brokers occupy) already exclude toolbar (renderer sends set-stage-bounds)
-    const stageBounds = stageBoundsRef && stageBoundsRef.value ? stageBoundsRef.value : { x:0, y:0, width:bounds.width, height:bounds.height };
+    const stageBounds = stageBoundsRef && stageBoundsRef.value ? stageBoundsRef.value : { x:0, y:0, width:contentW, height:contentH };
     const stage = { ...stageBounds };
     const w = Math.max(MIN_W, Math.min(MAX_W, state.width));
     if(state.side==='left') stage.x += w; // shift stage start
@@ -38,8 +40,8 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   const y = stageBounds.y; let h = stageBounds.height;
   // Extend by 1px to ensure no visible gap due to rounding
   h = h+1;
-  if(state.side==='left') dockView.setBounds({ x: bounds.x, y, width: w, height: h });
-  else dockView.setBounds({ x: bounds.x + bounds.width - w, y, width: w, height: h });
+  if(state.side==='left') dockView.setBounds({ x: 0, y, width: w, height: h });
+  else dockView.setBounds({ x: Math.max(0, contentW - w), y, width: w, height: h });
         // Ensure z-order (board should stay above brokers but below overlays added later).
         try {
           const all = mainWindow.getBrowserViews();
@@ -102,14 +104,28 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   }
 
   function ensureDocked(){
+    state.mode = 'docked';
     if(!dockView) createDockView(); else ensureDockViewAttached();
     setImmediate(applyDockLayout);
     [90,280,650].forEach(ms=> setTimeout(()=>{ try { applyDockLayout(); } catch(_){ } }, ms));
   }
-  function setSide(side){ if(side!=='left'&&side!=='right') return; state.side=side; persist(); if(state.mode==='docked'){ applyDockLayout(); broadcast(); } }
-  function setWidth(w){ const nw = Math.max(MIN_W, Math.min(MAX_W, Math.round(w))); if(nw===state.width) return; state.width=nw; persist(); if(state.mode==='docked'){ applyDockLayout(); broadcast(); } }
+  function setSide(side){
+    if(side!=='left'&&side!=='right') return;
+    state.side=side; persist();
+    if(dockView){ applyDockLayout(); broadcast(); }
+  }
+  function setWidth(w){
+    const nw = Math.max(MIN_W, Math.min(MAX_W, Math.round(w)));
+    if(nw===state.width) return;
+    state.width=nw; persist();
+    if(dockView){ applyDockLayout(); broadcast(); }
+  }
 
-  function broadcast(){ const payload = getState(); try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('board-updated', payload); } catch(_){} }
+  function broadcast(){
+    const payload = getState();
+    try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('board-updated', payload); } catch(_){}
+    try { if(dockView && dockView.webContents && !dockView.webContents.isDestroyed()) dockView.webContents.send('board-updated', payload); } catch(_){ }
+  }
 
   function init(){ ensureDocked(); }
 
@@ -122,7 +138,7 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
     }
   }
 
-  function handleStageResized(){ if(state.mode==='docked') applyDockLayout(); }
+  function handleStageResized(){ if(dockView) applyDockLayout(); }
 
   function getWebContents(){
     try {

@@ -10,9 +10,24 @@ function initStatsIpc(ctx){
   ipcMain.on('stats-toggle', ()=> toggleStatsEmbedded());
   // stats-detach / stats-attach removed (window mode deleted)
   // Forward common stats panel control channels + config/persistence updates to statsManager
-  ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings','stats-config-set','stats-single-window','stats-panel-set-hidden','stats-panel-toggle'].forEach(ch=>{
+  ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings','stats-config-set','stats-single-window','stats-panel-set-hidden','stats-panel-toggle','stats-set-side'].forEach(ch=>{
     ipcMain.on(ch, (e,p)=>{
       try {
+        // Unify side switching between board + stats.
+        if(ch==='stats-toggle-side'){
+          const cur = (boardManager && boardManager.getState && boardManager.getState().side) || (statsManager.getSide && statsManager.getSide()) || 'right';
+          const next = cur==='left' ? 'right' : 'left';
+          try { if(boardManager && boardManager.setSide) boardManager.setSide(next); else if(boardManager && boardManager.handleIpc) boardManager.handleIpc('board-set-side', { side: next }); } catch(_){ }
+          try { if(typeof statsManager.setSide==='function') statsManager.setSide(next); else statsManager.handleIpc('stats-set-side', { side: next }); } catch(_){ }
+          return;
+        }
+        if(ch==='stats-set-side'){
+          const side = p && p.side;
+          try { if(boardManager && boardManager.setSide) boardManager.setSide(side); else if(boardManager && boardManager.handleIpc) boardManager.handleIpc('board-set-side', { side }); } catch(_){ }
+          try { if(typeof statsManager.setSide==='function') statsManager.setSide(side); else statsManager.handleIpc('stats-set-side', { side }); } catch(_){ }
+          return;
+        }
+
         statsManager.handleIpc(ch, p);
         // After any panel visibility change, sync statsState.panelHidden and broadcast
         if((ch==='stats-panel-set-hidden' || ch==='stats-panel-toggle') && mainWindow && !mainWindow.isDestroyed()){

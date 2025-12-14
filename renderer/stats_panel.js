@@ -13,6 +13,59 @@ if(!ipcRenderer){
 let activityModule = (window.__activityModule)||null; if(!activityModule){ try { activityModule = require('./stats_activity'); } catch(_){ } }
 function send(ch,p){ ipcRenderer.send(ch,p); }
 
+// ================= Compact Topbar (icons) =================
+let __statsPanelSide = 'right';
+function __setPanelSideUi(side){
+  try {
+    __statsPanelSide = (side === 'left') ? 'left' : 'right';
+    const btn = document.getElementById('spPanelSide');
+    if(btn) btn.dataset.side = __statsPanelSide;
+  } catch(_){ }
+}
+
+function bindStatsTopbar(){
+  const byId = (id)=> document.getElementById(id);
+
+  try {
+    const sideBtn = byId('spPanelSide');
+    if(sideBtn){
+      sideBtn.addEventListener('click', ()=>{
+        try {
+          ipcRenderer.send('stats-toggle-side');
+          __setPanelSideUi(__statsPanelSide === 'left' ? 'right' : 'left');
+        } catch(_){ }
+      });
+    }
+  } catch(_){ }
+
+  try {
+    byId('spBack')?.addEventListener('click', ()=>{ try { ipcRenderer.send('stats-toggle'); } catch(_){ } });
+  } catch(_){ }
+
+  try {
+    byId('spSettings')?.addEventListener('click', ()=>{ try { ipcRenderer.send('open-settings'); } catch(_){ } });
+  } catch(_){ }
+}
+
+try {
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindStatsTopbar);
+  else bindStatsTopbar();
+} catch(_){ }
+
+// (Stats mode: broker controls are intentionally hidden in topbar)
+
+// Sync side changes coming from main (e.g., toggled in board view)
+try {
+  ipcRenderer.on('stats-side-updated', (_e, p)=>{
+    try {
+      const side = p && p.side;
+      __setPanelSideUi(side);
+      const dbg = document.getElementById('dbgSide');
+      if(dbg) dbg.textContent = __statsPanelSide;
+    } catch(_){ }
+  });
+} catch(_){ }
+
 // (Removed) Capture Data prototype wiring – feature deprecated.
 
 // (Theme logic moved to stats_theme.js)
@@ -394,6 +447,7 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
   buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); }
   if(document.getElementById('lolManualMode').checked){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
   try { ipcRenderer.send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE }); } catch(_){ }
+  try { __setPanelSideUi(cfg && cfg.side); } catch(_){ }
  } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
 
