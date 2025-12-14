@@ -25,58 +25,59 @@
     </div>
   </div>
 
-  <header>
-    <div class="groupRow">
   <div id="sourcesSection" class="sectionCard collapsible" data-sec="sourcesLayout" data-collapse-on-header="1">
-      <div class="sectionHeader" style="margin-bottom:8px;">
-        <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
-        <span class="accent">Sources & Layout</span>
-      </div>
-      <div class="sectionBody" id="sourcesBody" style="gap:8px;">
-          <div class="sourcesGrid">
-            <label for="srcA">A</label><select id="srcA">
-              <option value="https://portal.grid.gg">portal.grid.gg</option>
-              <option value="https://www.twitch.tv">twitch.tv</option>
-              <option value="https://www.youtube.com">youtube.com</option>
-              <option value="https://www.hltv.org">hltv.org</option>
-
-              <option value="embed:lolstats">LoL Stats (embed)</option>
-            </select>
-            <label for="srcB">B</label><select id="srcB">
-              <option value="https://portal.grid.gg">portal.grid.gg</option>
-              <option value="https://www.twitch.tv">twitch.tv</option>
-              <option value="https://www.youtube.com">youtube.com</option>
-              <option value="https://www.hltv.org">hltv.org</option>
-
-              <option value="embed:lolstats">LoL Stats (embed)</option>
-            </select>
-          </div>
-          <div class="divider"></div>
-          <label class="row" style="gap:8px;align-items:center;cursor:pointer;">
-            <input type="checkbox" id="singleWindowMode" />
-            <span class="muted">Single-window mode (A or B only)</span>
-          </label>
-          <div class="divider"></div>
-          <div class="modeButtons"><button id="modeSplit" title="Horizontal split">Split</button><button id="modeVertical" title="Vertical split">Vert</button><button id="modeA" title="A full height">A</button><button id="modeB" title="B full height">B</button></div>
-          <button id="toggleSide" class="panelSideBtn" title="Toggle panel side">Panel Side</button>
-          <div class="divider"></div>
-          <!-- Removed: FrameGen / upscaler controls -->
-          <div class="note">Layout: <span id="dbgLayout"></span><br/>Side: <span id="dbgSide"></span></div>
-      </div>
+    <div class="sectionHeader">
+      <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
+      <span class="accent">Sources & Layout</span>
     </div>
-      <fieldset id="devtoolsSection" class="statBlock" data-sec="devtools">
-        <legend><span class="accent">Dev Tools</span></legend>
-        <div class="secBody" style="max-height:none;overflow:visible;">
-          <div class="row" style="gap:6px;flex-wrap:wrap;">
-            <button id="btnOpenPanelDevTools" class="btn-sm font-11" title="Open DevTools for Stats Panel">Panel</button>
-            <button id="btnOpenSlotADevTools" class="btn-sm font-11" title="Open DevTools for Slot A">Slot A</button>
-            <button id="btnOpenSlotBDevTools" class="btn-sm font-11" title="Open DevTools for Slot B">Slot B</button>
-          </div>
-          <div class="note font-10" style="margin-top:6px;opacity:0.7;">For debugging only. Hidden in production builds if needed.</div>
-        </div>
-      </fieldset>
+    <div class="sectionBody" id="sourcesBody" style="gap:8px;">
+      <div class="sourcesGrid">
+        <label for="srcA">A</label><select id="srcA">
+          <option value="https://portal.grid.gg">portal.grid.gg</option>
+          <option value="https://www.twitch.tv">twitch.tv</option>
+          <option value="https://www.youtube.com">youtube.com</option>
+          <option value="https://www.hltv.org">hltv.org</option>
+
+          <option value="embed:lolstats">LoL Stats (embed)</option>
+        </select>
+        <label for="srcB">B</label><select id="srcB">
+          <option value="https://portal.grid.gg">portal.grid.gg</option>
+          <option value="https://www.twitch.tv">twitch.tv</option>
+          <option value="https://www.youtube.com">youtube.com</option>
+          <option value="https://www.hltv.org">hltv.org</option>
+
+          <option value="embed:lolstats">LoL Stats (embed)</option>
+        </select>
+      </div>
+      <div class="divider"></div>
+      <label class="row" style="gap:8px;align-items:center;cursor:pointer;">
+        <input type="checkbox" id="singleWindowMode" />
+        <span class="muted">Single-window mode (A or B only)</span>
+      </label>
+      <div class="divider"></div>
+      <div class="modeButtons"><button id="modeSplit" title="Horizontal split">Split</button><button id="modeVertical" title="Vertical split">Vert</button><button id="modeA" title="A full height">A</button><button id="modeB" title="B full height">B</button></div>
+      <button id="toggleSide" class="panelSideBtn" title="Toggle panel side">Panel Side</button>
+      <div class="divider"></div>
+      <!-- Removed: FrameGen / upscaler controls -->
+      <div class="note">Layout: <span id="dbgLayout"></span><br/>Side: <span id="dbgSide"></span></div>
     </div>
-  </header>
+  </div>
+
+  <div id="devtoolsSection" class="sectionCard collapsible" data-sec="devtools" data-collapse-on-header="1">
+    <div class="sectionHeader">
+      <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
+      <span class="accent">Dev Tools</span>
+    </div>
+    <div class="sectionBody" style="gap:6px;">
+      <div class="row" style="gap:6px;flex-wrap:wrap;">
+        <button id="btnOpenPanelDevTools" class="btn-sm font-11" title="Open DevTools for Stats Panel">Panel</button>
+        <button id="btnOpenSlotADevTools" class="btn-sm font-11" title="Open DevTools for Slot A">Slot A</button>
+        <button id="btnOpenSlotBDevTools" class="btn-sm font-11" title="Open DevTools for Slot B">Slot B</button>
+      </div>
+      <div class="note font-10" style="margin-top:2px;opacity:0.7;">For debugging only. Hidden in production builds if needed.</div>
+    </div>
+  </div>
+
   <div id="stats" class="collapsible sectionCard" data-collapse-on-header="1">
   <div class="sectionHeader">
     <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
@@ -105,65 +106,67 @@
         <tbody id="lt-body"></tbody>
       </table>
   </div></div>
-    <!-- Map Section -->
+  </div>
+
+  <!-- Map Section -->
   <div id="mapSection" class="mapSection sectionCard collapsible" data-collapse-on-header="1">
-      <div class="sectionHeader">
-        <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
-        <span class="accent">Map View</span>
-        <span id="mapGameLabel" class="statusSmall">Game -</span>
-      </div>
-  <div id="mapBody" class="mapBody sectionBody">
-    <div id="map-view" tabindex="0"></div>
-  <div id="mapLegendHint" class="mapLegendHint">Click = destroyed toggle, Drag = move marker. Stored per game locally.</div>
-      </div>
+    <div class="sectionHeader">
+      <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
+      <span class="accent">Map View</span>
+      <span id="mapGameLabel" class="statusSmall">Game -</span>
+    </div>
+    <div id="mapBody" class="mapBody sectionBody">
+      <div id="map-view" tabindex="0"></div>
+      <div id="mapLegendHint" class="mapLegendHint">Click = destroyed toggle, Drag = move marker. Stored per game locally.</div>
     </div>
   </div>
-    <!-- Embedded Odds Board Section (collapsed by default) -->
+
+  <!-- Embedded Odds Board Section (collapsed by default) -->
   <div id="embeddedOddsSection" class="embeddedOddsSection sectionCard collapsible collapsed" data-sec="embeddedOdds" data-collapse-on-header="1">
-      <div class="sectionHeader">
-        <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
-  <span class="accent">Odds Board</span>
-        <span id="embeddedMapTag" class="statusSmall" style="margin-left:8px;display:none;">Map -</span>
-        <label id="embeddedIsLastWrap" class="mapLabel" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;" title="Use match market for final map brokers (bet365)">
-          <input type="checkbox" id="embeddedIsLast" style="margin:0 4px 0 0;vertical-align:middle;" />
-          <span class="font-11 muted" style="opacity:.7;">Last</span>
-        </label>
-        <label class="mapLabel" style="margin-left:4px;display:inline-flex;align-items:center;gap:4px;">
-          <span class="font-11 muted" style="opacity:.7;">Set</span>
-          <select id="embeddedMapSelect" class="font-11" style="padding:2px 4px;">
-            <option value="0">Match</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-          </select>
-        </label>
-        <button id="embeddedMapRefreshBtn" class="btn-sm font-11" title="Re-broadcast current map (refresh odds)" style="margin-left:4px;padding:2px 6px;line-height:1;cursor:pointer;">⟳</button>
-    <span id="embeddedTolBadge" class="statusSmall" title="Auto tolerance (from Settings)" style="margin-left:8px;opacity:.8;">Tol: —</span>
-      </div>
-  <div id="embeddedOddsBody" class="embeddedOddsBody sectionBody">
-        <table id="embeddedOddsTable" class="embeddedOddsTable tblCompact">
-          <thead>
-            <tr>
-              <th class="eo-broker">Broker</th>
-              <th class="eo-side1" id="eo-side1">Side 1</th>
-              <th class="eo-swap eo-swap-header" title="Swap sides column"></th>
-              <th class="eo-side2" id="eo-side2">Side 2</th>
-            </tr>
-          </thead>
-          <tbody id="embeddedOddsRows"></tbody>
-          <tfoot>
-            <tr id="embeddedMidRow"><th>Mid</th><td colspan="3" id="embeddedMidCell">-</td></tr>
-            <tr id="embeddedExcelRow"><th><div class="excelControls">Excel <button id="embeddedAutoBtn" class="autoBtn" title="Auto align smallest Excel odd to Mid smallest">Auto</button><button id="embeddedAutoResumeBtn" class="autoSubBtn" title="Embedded auto-resume after suspend (on/off)">R</button><button id="embeddedExcelScriptBtn" class="autoSubBtn" title="Start/Stop Excel extractor script (Python)">S</button></div></th><td colspan="3" id="embeddedExcelCell">- <span id="embeddedExcelStatusCell" class="font-10 muted" style="margin-left:6px;">idle</span></td></tr>
-            <tr id="embeddedExcelAutoIndicatorsRow" style="display:none"><th></th><td colspan="3" class="excelAutoCell excelAutoIndicatorsCell"><div class="autoIndicators">
-              <span class="autoDot side1" title="Adjusting side 1"></span>
-              <span class="autoDot side2" title="Adjusting side 2"></span>
-            </div></td></tr>
-          </tfoot>
-        </table>
-      </div>
+    <div class="sectionHeader">
+      <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
+      <span class="accent">Odds Board</span>
+      <span id="embeddedMapTag" class="statusSmall" style="margin-left:8px;display:none;">Map -</span>
+      <label id="embeddedIsLastWrap" class="mapLabel" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;" title="Use match market for final map brokers (bet365)">
+        <input type="checkbox" id="embeddedIsLast" style="margin:0 4px 0 0;vertical-align:middle;" />
+        <span class="font-11 muted" style="opacity:.7;">Last</span>
+      </label>
+      <label class="mapLabel" style="margin-left:4px;display:inline-flex;align-items:center;gap:4px;">
+        <span class="font-11 muted" style="opacity:.7;">Set</span>
+        <select id="embeddedMapSelect" class="font-11" style="padding:2px 4px;">
+          <option value="0">Match</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+      <button id="embeddedMapRefreshBtn" class="btn-sm font-11" title="Re-broadcast current map (refresh odds)" style="margin-left:4px;padding:2px 6px;line-height:1;cursor:pointer;">⟳</button>
+      <span id="embeddedTolBadge" class="statusSmall" title="Auto tolerance (from Settings)" style="margin-left:8px;opacity:.8;">Tol: —</span>
     </div>
+    <div id="embeddedOddsBody" class="embeddedOddsBody sectionBody">
+      <table id="embeddedOddsTable" class="embeddedOddsTable tblCompact">
+        <thead>
+          <tr>
+            <th class="eo-broker">Broker</th>
+            <th class="eo-side1" id="eo-side1">Side 1</th>
+            <th class="eo-swap eo-swap-header" title="Swap sides column"></th>
+            <th class="eo-side2" id="eo-side2">Side 2</th>
+          </tr>
+        </thead>
+        <tbody id="embeddedOddsRows"></tbody>
+        <tfoot>
+          <tr id="embeddedMidRow"><th>Mid</th><td colspan="3" id="embeddedMidCell">-</td></tr>
+          <tr id="embeddedExcelRow"><th><div class="excelControls">Excel <button id="embeddedAutoBtn" class="autoBtn" title="Auto align smallest Excel odd to Mid smallest">Auto</button><button id="embeddedAutoResumeBtn" class="autoSubBtn" title="Embedded auto-resume after suspend (on/off)">R</button><button id="embeddedExcelScriptBtn" class="autoSubBtn" title="Start/Stop Excel extractor script (Python)">S</button></div></th><td colspan="3" id="embeddedExcelCell">- <span id="embeddedExcelStatusCell" class="font-10 muted" style="margin-left:6px;">idle</span></td></tr>
+          <tr id="embeddedExcelAutoIndicatorsRow" style="display:none"><th></th><td colspan="3" class="excelAutoCell excelAutoIndicatorsCell"><div class="autoIndicators">
+            <span class="autoDot side1" title="Adjusting side 1"></span>
+            <span class="autoDot side2" title="Adjusting side 2"></span>
+          </div></td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
   <script src="devcss-reload.js"></script>
   <script src="stats_config.js"></script>
   <script src="stats_theme.js"></script>

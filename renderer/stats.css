@@ -125,8 +125,7 @@ fieldset.statBlock[data-sec="devtools"] .dragHandleSec { display:none !important
 #sourcesSection { margin-bottom:0; }
 
 /* Flat: keep Map/Odds blocks flush like Game Stats */
-#mapSection.sectionCard, #embeddedOddsSection.sectionCard { padding:0; }
-#mapSection .sectionHeader, #embeddedOddsSection .sectionHeader { margin:0; }
+/* Use the same padding/margins as other section cards to avoid ultra-thin collapsed rows */
 
 /* DevTools buttons uniform */
 #btnOpenPanelDevTools,#btnOpenSlotADevTools,#btnOpenSlotBDevTools { min-width:58px; }
@@ -253,7 +252,7 @@ select:focus {
 #stats {
 	flex:1;
 	overflow:auto;
-	padding:0;
+	padding:10px 12px 12px;
 	font:12px/1.45 var(--font-sans);
 	background:#182230; /* unify with sectionCard */
 	border:1px solid #253041;
