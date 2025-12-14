@@ -124,6 +124,10 @@ fieldset.statBlock legend .accent { color:var(--accent); }
 fieldset.statBlock[data-sec="devtools"] .dragHandleSec { display:none !important; }
 #sourcesSection { margin-bottom:0; }
 
+/* Flat: keep Map/Odds blocks flush like Game Stats */
+#mapSection.sectionCard, #embeddedOddsSection.sectionCard { padding:0; }
+#mapSection .sectionHeader, #embeddedOddsSection .sectionHeader { margin:0; }
+
 /* DevTools buttons uniform */
 #btnOpenPanelDevTools,#btnOpenSlotADevTools,#btnOpenSlotBDevTools { min-width:58px; }
 
