@@ -5,7 +5,7 @@ const { BrowserView, Menu, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-function createStatsManager({ store, mainWindow, stageBoundsRef }) {
+function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys }) {
   // --- Persistent + session state ---------------------------------------------------------
   const { STATS_PANEL_WIDTH: PANEL_WIDTH } = require('../utils/constants');
   const GAP = 4;
@@ -30,6 +30,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   // Views container (embedded only)
   const views = { A:null, B:null, panel:null };
   let embeddedActive = false;
+
+  let hotkeysRef = hotkeys || null;
 
   // Temporary cover to avoid seeing underlying brokers while Stats views are initializing/loading.
   const COVER_BG = '#0d0f17';
@@ -310,7 +312,12 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
     // Always ensure background exists while Stats is active (it sits behind A/B/panel).
     showCover();
 
-    if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel'); try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ } views.panel.webContents.on('did-finish-load',()=>{ try { const hb=store.get('gsHeatBar'); views.panel.webContents.send('stats-init',{ urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar:hb, statsConfig, lolManualData, lolMetricMarks, singleWindow }); if(hb) views.panel.webContents.send('gs-heatbar-apply', hb); } catch(_){ } }); resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B); attachNavTracking('A', views.A); attachNavTracking('B', views.B); }
+    if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel');
+
+      // Unified window-active hotkeys (TAB/F1/F2/F3)
+      try { if(hotkeysRef && hotkeysRef.attachToWebContents){ hotkeysRef.attachToWebContents(views.panel.webContents); hotkeysRef.attachToWebContents(views.A.webContents); hotkeysRef.attachToWebContents(views.B.webContents); } } catch(_){ }
+
+      try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ } views.panel.webContents.on('did-finish-load',()=>{ try { const hb=store.get('gsHeatBar'); views.panel.webContents.send('stats-init',{ urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar:hb, statsConfig, lolManualData, lolMetricMarks, singleWindow }); if(hb) views.panel.webContents.send('gs-heatbar-apply', hb); } catch(_){ } }); resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B); attachNavTracking('A', views.A); attachNavTracking('B', views.B); }
 
     if(fresh){
       try { views.panel && views.panel.webContents && views.panel.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
@@ -373,7 +380,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   }
 
   // Public API (open kept as noop for backward compatibility)
-  return { open: ()=>{}, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost, setUrl, getMode:()=>mode, getSide:()=>side, getPanelHidden:()=>panelHidden, maybeInstallUblock, setSide };
+  function setHotkeys(h){ hotkeysRef = h || null; }
+
+  return { open: ()=>{}, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost, setUrl, getMode:()=>mode, getSide:()=>side, getPanelHidden:()=>panelHidden, maybeInstallUblock, setSide, setHotkeys };
 }
 
 module.exports = { createStatsManager };

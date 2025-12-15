@@ -130,6 +130,23 @@ button:active { transform:translateY(1px); }
 	display: block;
 }
 
+.hotkeyList{
+	margin: 0;
+	padding-left: 16px;
+	line-height: 1.45;
+}
+.hotkeyList li{ margin: 4px 0; }
+.hk{
+	display: inline-block;
+	min-width: 44px;
+	padding: 1px 6px;
+	border: 1px solid #2c3649;
+	background: #182230;
+	border-radius: 8px;
+	font-variant-numeric: tabular-nums;
+	opacity: .95;
+}
+
 .seg .hint {
 	margin-top: 8px;
 }

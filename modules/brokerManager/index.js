@@ -34,6 +34,9 @@ function createBrokerManager(ctx){
     views[brokerDef.id] = view;
   mainWindow.addBrowserView(view);
   try { if(ctx.statsManager && ctx.statsManager.ensureTopmost) ctx.statsManager.ensureTopmost(); } catch(_){ }
+
+    // Unified window-active hotkeys (TAB/F1/F2/F3)
+    try { if(ctx.hotkeys && ctx.hotkeys.attachToWebContents) ctx.hotkeys.attachToWebContents(view.webContents); } catch(_){ }
     // DevTools Network Conditions: принудительно имитируем снятую галочку "Use browser default" через CDP override.
     try {
       let chromeVer = (process.versions && process.versions.chrome) ? process.versions.chrome : '140.0.0.0';

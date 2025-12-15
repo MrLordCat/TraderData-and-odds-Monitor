@@ -124,6 +124,11 @@ let boardWindow; // secondary window displaying aggregated odds
 let boardManager; // docking/board manager
 const boardManagerRef = { value: null };
 let settingsOverlay; // module instance
+let hotkeys; // unified hotkey manager (TAB/F1/F2/F3)
+const hotkeysRef = { value: null };
+
+// Cross-window auto state snapshot (used by hotkeys and late-loaded views)
+let __autoLast = { active:false, resume:true };
 // BrowserView registry & state caches (restored after accidental removal in refactor)
 const views = {}; // id -> BrowserView
 let activeBrokerIds = []; // ordered list of currently opened broker ids
@@ -172,7 +177,7 @@ const { createLayoutManager } = require('./modules/layout');
 const activeBrokerIdsRef = { value: activeBrokerIds };
 const mainWindowRef = { value: null }; // passed for lazy use inside layout manager
 const GAP = constants.VIEW_GAP; // already centralized
-const layoutManager = createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBoundsRef, activeBrokerIdsRef, GAP });
+const layoutManager = createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBoundsRef, activeBrokerIdsRef, hotkeysRef, GAP });
 
 // Early IPC handlers moved to modules/ipc/early.js
 const { initEarlyIpc } = require('./modules/ipc/early');
@@ -239,6 +244,9 @@ function createMainWindow() {
 // Settings overlay now in module
 const { createSettingsOverlay } = require('./modules/settingsOverlay');
 
+// Hotkeys manager
+const { createHotkeyManager } = require('./modules/hotkeys');
+
 // Broker manager module
 const { createBrokerManager } = require('./modules/brokerManager');
 let brokerManager;
@@ -294,6 +302,53 @@ function bootstrap() {
   createMainWindow();
   // Remove application menu (hidden UI footprint)
   try { Menu.setApplicationMenu(null); } catch(_){}
+  // Unified window-active hotkeys (TAB/F1/F2/F3)
+  function broadcastAutoToggleAll(){
+    try {
+      const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
+      if(bwc && !bwc.isDestroyed()) bwc.send('auto-toggle-all');
+    } catch(_){ }
+    try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-toggle-all'); } catch(_){ }
+    try {
+      if(statsManager && statsManager.views){
+        const vs = statsManager.views;
+        ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-toggle-all'); } catch(_){ } } });
+      }
+    } catch(_){ }
+  }
+  function broadcastAutoResumeSet(on){
+    try { __autoLast.resume = !!on; } catch(_){ }
+    const p = { on: !!on };
+    try {
+      const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
+      if(bwc && !bwc.isDestroyed()) bwc.send('auto-resume-set', p);
+    } catch(_){ }
+    try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-resume-set', p); } catch(_){ }
+    try {
+      if(statsManager && statsManager.views){
+        const vs = statsManager.views;
+        ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-resume-set', p); } catch(_){ } } });
+      }
+    } catch(_){ }
+  }
+
+  hotkeys = createHotkeyManager({
+    actions: {
+      toggleStats: ()=>{ try { toggleStatsEmbedded(); } catch(_){ } },
+      toggleAuto: ()=>{ try { broadcastAutoToggleAll(); } catch(_){ } },
+      toggleAutoResume: ()=>{ try { broadcastAutoResumeSet(!__autoLast.resume); } catch(_){ } },
+	  startScript: ()=>{ try { if(typeof excelProc !== 'undefined' && excelProc){ stopExcelExtractor(); } else { startExcelExtractor(); } } catch(_){ } },
+    },
+    state: { __autoLast }
+  });
+
+  // Allow early-created slot-* views (placeholders) to receive hotkeys too.
+  try { hotkeysRef.value = hotkeys; } catch(_){ }
+  try { layoutManager && layoutManager.relayoutAll && layoutManager.relayoutAll(); } catch(_){ }
+
+  // Also attach to main window (covers cases where focus is on the base renderer).
+  try { hotkeys && hotkeys.attachToWebContents && hotkeys.attachToWebContents(mainWindow.webContents); } catch(_){ }
+
   settingsOverlay = createSettingsOverlay({ mainWindow, views, store });
   // Initialize settings-related IPC now (requires settingsOverlay)
   initSettingsIpc({ ipcMain, store, settingsOverlay, statsManager });
@@ -302,6 +357,7 @@ function bootstrap() {
     broadcastPlaceholderOdds, SNAP, GAP, stageBoundsRef, activeBrokerIdsRef,
     brokerHealth, loadFailures, BROKER_FRAME_CSS,
     mainWindow,
+    hotkeys,
   onActiveListChanged: (list)=>{ activeBrokerIds = list; activeBrokerIdsRef.value = list; }
   });
   // Initialize broker-related IPC now that brokerManager exists
@@ -320,10 +376,14 @@ function bootstrap() {
     latestOddsRef,
     activeBrokerIdsRef,
   stageBoundsRef,
+    hotkeys,
     replayOddsFn: (id)=> broadcastPlaceholderOdds(id)
   });
   boardManager.init();
   boardManagerRef.value = boardManager;
+
+  // Hotkeys were created after statsManager; inject so fresh stats views get handlers.
+  try { if(statsManager && typeof statsManager.setHotkeys==='function') statsManager.setHotkeys(hotkeys); } catch(_){ }
   // Cleanup stray bilibili/generic views (removed from supported sources). Closes any broker ids containing 'bilibili'.
   try {
     const stray = activeBrokerIdsRef.value.filter(id=> /bilibili/i.test(id));
@@ -848,7 +908,6 @@ app.whenReady().then(()=>{
       });
       ipcMain.on('auto-fire-attempt', (_e, payload)=>{ try { console.log('[autoSim][fireAttempt]', payload); } catch(_){ } });
       // Store last auto states to serve late-loaded windows
-      let __autoLast = { active:false, resume:true };
       ipcMain.on('auto-active-set', (_e, p)=>{ try { __autoLast.active = !!(p&&p.on); } catch(_){ } try {
         const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
         if(bwc && !bwc.isDestroyed()) bwc.send('auto-active-set', p);

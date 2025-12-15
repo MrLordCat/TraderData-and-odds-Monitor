@@ -2,7 +2,7 @@
 // Provides grid preset application, basic flow relayout, and helper bounds sanitation.
 
 const { constants } = require('..');
-function createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBoundsRef, activeBrokerIdsRef, GAP = constants.VIEW_GAP }) {
+function createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBoundsRef, activeBrokerIdsRef, hotkeysRef, GAP = constants.VIEW_GAP }) {
   // New semantics: preset id like "1x2x3" means rows with 1,2,3 brokers respectively.
   const LAYOUT_PRESETS = {
     '1x1': { pattern: [1,1] },
@@ -169,6 +169,15 @@ function createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBounds
           mainWindowRef.value.addBrowserView(slotView);
           try { slotView.webContents.loadFile(path.join(__dirname,'..','..','renderer','slot.html'), { query: { slot: String(idx), preset: presetId } }); } catch (e) {}
         }
+
+		// Unified window-active hotkeys should work even when only slot-* placeholders exist.
+		try {
+			const hk = hotkeysRef && hotkeysRef.value;
+			if(hk && hk.attachToWebContents && views[slotId] && views[slotId].webContents){
+				hk.attachToWebContents(views[slotId].webContents);
+			}
+		} catch(_){ }
+
         try { views[slotId].setBounds({ x, y, width: w, height: h }); } catch (e) {}
       }
     }

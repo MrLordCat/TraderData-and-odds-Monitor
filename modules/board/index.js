@@ -8,7 +8,7 @@ const { ensureSingleClosedListener, hideView } = require('../utils/views');
 
 // ensureVisibleBounds removed (window mode dropped)
 
-function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, activeBrokerIdsRef, replayOddsFn, stageBoundsRef }){
+function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, activeBrokerIdsRef, replayOddsFn, stageBoundsRef, hotkeys }){
   let state = { mode: 'docked', side: store.get('boardSide') || 'right', width: store.get('boardWidth') || 320 };
   const MIN_W = 240; const MAX_W = 800;
   let dockView = null; // Single BrowserView
@@ -60,6 +60,10 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   dockView = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','preload.js') } });
     try { dockView.setBackgroundColor('#10161f'); } catch(_){}
     mainWindow.addBrowserView(dockView);
+
+    // Unified window-active hotkeys (TAB/F1/F2/F3)
+    try { if(hotkeys && hotkeys.attachToWebContents) hotkeys.attachToWebContents(dockView.webContents); } catch(_){ }
+
     try { dockView.webContents.loadFile(path.join(__dirname,'..','..','renderer','board.html')); } catch(e){}
     dockView.webContents.on('did-finish-load', ()=> replayOdds());
     // Lightweight one-time diagnostic: log current 'closed' listener count on mainWindow (helps detect leak regressions)
