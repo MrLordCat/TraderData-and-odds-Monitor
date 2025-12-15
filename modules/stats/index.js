@@ -31,6 +31,50 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   const views = { A:null, B:null, panel:null };
   let embeddedActive = false;
 
+  // Temporary cover to avoid seeing underlying brokers while Stats views are initializing/loading.
+  const COVER_BG = '#0d0f17';
+  let coverView = null;
+  let coverShown = false;
+
+  function getCoverBounds(){
+    try {
+      if(!mainWindow || mainWindow.isDestroyed()) return null;
+      const full = mainWindow.getContentBounds();
+      const stage = stageBoundsRef && stageBoundsRef.value ? stageBoundsRef.value : full;
+      const baseY = (typeof embedOffsetY === 'number' && embedOffsetY) ? embedOffsetY : (stage.y || 0);
+      const h = full.height - baseY;
+      return { x:0, y:baseY, width: full.width, height: Math.max(0, h) };
+    } catch(_){ return null; }
+  }
+  // Persistent background layer while Stats is active.
+  function showCover(){
+    try {
+      if(!mainWindow || mainWindow.isDestroyed()) return;
+      const b = getCoverBounds();
+      if(!b) return;
+      if(!coverView){
+        coverView = new BrowserView({ webPreferences:{ contextIsolation:true, sandbox:true } });
+        try { coverView.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
+        try {
+          const html = `<!doctype html><html><head><meta charset="utf-8"/></head><body style="margin:0;background:${COVER_BG};"></body></html>`;
+          coverView.webContents.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+        } catch(_){ }
+      }
+      try { mainWindow.addBrowserView(coverView); } catch(_){ }
+      try { coverView.setBounds(b); } catch(_){ }
+      coverShown = true;
+    } catch(_){ }
+  }
+  function hideCover(){
+    try {
+      if(!coverView) return;
+      if(mainWindow && !mainWindow.isDestroyed()){
+        try { mainWindow.removeBrowserView(coverView); } catch(_){ }
+      }
+      coverShown = false;
+    } catch(_){ }
+  }
+
   // --- Persistence ------------------------------------------------------------------------
   function persist(){
     store.set('statsUrls', urls);
@@ -101,6 +145,11 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
       const wHalf = Math.floor((contentW-GAP)/2);
       setSafe(views.A,{ x:contentX,y:baseY,width:wHalf,height:h });
       setSafe(views.B,{ x:contentX+wHalf+GAP,y:baseY,width:contentW-wHalf-GAP,height:h });
+    }
+
+    // Keep background aligned while Stats is active.
+    if(coverShown && coverView){
+      try { coverView.setBounds({ x:0, y:baseY, width: full.width, height: Math.max(0, h) }); } catch(_){ }
     }
   }
   function setMode(m){
@@ -253,13 +302,25 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
 
 
   // --- Embedded lifecycle ----------------------------------------------------------------
-  function createEmbedded(offsetY){ if(embeddedActive) return; if(!mainWindow||mainWindow.isDestroyed()) return; const fresh = !(views.panel && views.A && views.B); if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel'); try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ } views.panel.webContents.on('did-finish-load',()=>{ try { const hb=store.get('gsHeatBar'); views.panel.webContents.send('stats-init',{ urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar:hb, statsConfig, lolManualData, lolMetricMarks, singleWindow }); if(hb) views.panel.webContents.send('gs-heatbar-apply', hb); } catch(_){ } }); resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B); attachNavTracking('A', views.A); attachNavTracking('B', views.B); }
+  function createEmbedded(offsetY){ if(embeddedActive) return; if(!mainWindow||mainWindow.isDestroyed()) return; const fresh = !(views.panel && views.A && views.B);
+
+    // Always ensure background exists while Stats is active (it sits behind A/B/panel).
+    showCover();
+
+    if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel'); try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','renderer','stats_panel.html')); } catch(_){ } views.panel.webContents.on('did-finish-load',()=>{ try { const hb=store.get('gsHeatBar'); views.panel.webContents.send('stats-init',{ urls, mode, side, lolManualMode, lolMetricVisibility, lolMetricOrder, gsHeatBar:hb, statsConfig, lolManualData, lolMetricMarks, singleWindow }); if(hb) views.panel.webContents.send('gs-heatbar-apply', hb); } catch(_){ } }); resolveAndLoad(views.A, urls.A); resolveAndLoad(views.B, urls.B); attachNavTracking('A', views.A); attachNavTracking('B', views.B); }
+
+    if(fresh){
+      try { views.panel && views.panel.webContents && views.panel.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
+      try { views.A && views.A.webContents && views.A.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
+      try { views.B && views.B.webContents && views.B.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
+    }
+
     embeddedActive=true; embedOffsetY = typeof offsetY==='number'? offsetY: embedOffsetY; layout(); setTimeout(layout,60);
     // Assert topmost ordering shortly after creation (and a few retries for late views)
     try { ['panel','A','B'].forEach(k=>{ const v=views[k]; if(v) try { mainWindow.setTopBrowserView(v); } catch(_){ } }); } catch(_){ }
     [0,80,200].forEach(d=> setTimeout(()=>{ try { ensureTopmost(); } catch(_){ } }, d));
   }
-  function destroyEmbedded(force){ if(!embeddedActive && !force) return; if(embeddedActive){ ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v) try { v.setBounds({ x:0,y:0,width:10,height:10 }); } catch(_){ } }); } if(force){ ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v) try { v.webContents.destroy(); } catch(_){ } }); } embeddedActive=false; }
+  function destroyEmbedded(force){ if(!embeddedActive && !force) return; try { hideCover(); } catch(_){ } if(embeddedActive){ ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v) try { v.setBounds({ x:0,y:0,width:10,height:10 }); } catch(_){ } }); } if(force){ ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v) try { v.webContents.destroy(); } catch(_){ } }); } embeddedActive=false; }
   function detachToWindow(){ /* noop (removed) */ }
   function handleStageResized(){ if(embeddedActive){ try { const sy = stageBoundsRef && stageBoundsRef.value? Number(stageBoundsRef.value.y): embedOffsetY; if(!isNaN(sy) && sy!==embedOffsetY) embedOffsetY=sy; } catch(_){ } layout(); } }
   function ensureTopmost(){ if(!embeddedActive) return; if(!mainWindow||mainWindow.isDestroyed()) return; if(typeof mainWindow.setTopBrowserView!=='function') return; ['A','B','panel'].forEach(k=>{ const v=views[k]; if(v) try { mainWindow.setTopBrowserView(v); } catch(_){ } }); }
