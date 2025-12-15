@@ -60,7 +60,11 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
           coverView.webContents.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
         } catch(_){ }
       }
-      try { mainWindow.addBrowserView(coverView); } catch(_){ }
+      // Attach only once; re-attaching every toggle can make Electron accumulate internal listeners.
+      try {
+        const attached = typeof mainWindow.getBrowserViews==='function' && mainWindow.getBrowserViews().includes(coverView);
+        if(!attached) mainWindow.addBrowserView(coverView);
+      } catch(_){ }
       try { coverView.setBounds(b); } catch(_){ }
       coverShown = true;
     } catch(_){ }
@@ -68,9 +72,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef }) {
   function hideCover(){
     try {
       if(!coverView) return;
-      if(mainWindow && !mainWindow.isDestroyed()){
-        try { mainWindow.removeBrowserView(coverView); } catch(_){ }
-      }
+      // Keep attached; just hide.
+      try { coverView.setBounds({ x:0, y:0, width:0, height:0 }); } catch(_){ }
       coverShown = false;
     } catch(_){ }
   }
