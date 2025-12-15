@@ -1,0 +1,128 @@
+/* Shared Odds Board styles used by: main board + stats embedded board */
+
+/* ===== Embedded Odds Board (Stats) wrapper ===== */
+#embeddedOddsSection { border:1px solid #27313d; background:#1b232c; border-radius:0; overflow:hidden; }
+#embeddedOddsSection.collapsed #embeddedOddsBody { max-height:0; padding:0; }
+#embeddedOddsBody { max-height:340px; overflow-y:auto; overflow-x:hidden; transition:max-height .25s ease; padding:0; }
+
+/* ===== Odds Table (shared look) ===== */
+.embeddedOddsTable,
+#table {
+	width:100%;
+	border-collapse:collapse;
+	font-size:11px;
+}
+
+.embeddedOddsTable th, .embeddedOddsTable td,
+#table th, #table td {
+	padding:3px 4px;
+	border-bottom:1px solid #24303b;
+	text-align:center;
+	vertical-align:middle;
+}
+
+.embeddedOddsTable tbody tr:last-child td,
+#table tbody tr:last-child td {
+	border-bottom:none;
+}
+
+.embeddedOddsTable th.eo-broker,
+#table th.c-broker {
+	text-align:left;
+}
+
+/* Default: keep broker name aligned left in first column */
+#table tbody td:first-child,
+#table tfoot th:first-child {
+	text-align:left;
+}
+
+/* Frozen / best highlighting */
+.embeddedOddsTable td.frozen,
+#table td.frozen {
+	opacity:.55;
+}
+
+.embeddedOddsTable tr.frozen td,
+#table tr.frozen td {
+	opacity:.45;
+	filter: grayscale(.4);
+	position:relative;
+}
+
+.embeddedOddsTable tr.frozen td:first-child .eo-broker-label::after,
+#table tr.frozen td:first-child .eo-broker-label::after{
+	content:' (susp)';
+	font-weight:400;
+	opacity:.8;
+	font-size:10px;
+	margin-left:4px;
+	color:#f8d774;
+}
+
+.embeddedOddsTable tr.frozen td.best,
+#table tr.frozen td.best {
+	box-shadow:none;
+}
+
+.embeddedOddsTable td.best,
+#table td.best {
+	color:#d4b14a;
+	font-weight:600;
+	text-shadow:none;
+}
+
+/* ===== Swap button (shared) ===== */
+.eo-swapBtn,
+.swapBtn {
+	background:#253143;
+	border:1px solid #314052;
+	color:#9fb6cc;
+	font-size:11px;
+	padding:2px 6px;
+	border-radius:6px;
+	cursor:pointer;
+	line-height:1;
+}
+.eo-swapBtn.on,
+.swapBtn.on {
+	background:#335477;
+	color:#d5e8ff;
+	border-color:#314052;
+	box-shadow:none;
+}
+.eo-swapBtn:hover,
+.swapBtn:hover { background:#2d3e52; }
+
+.eo-swap-header { opacity:.55; }
+
+/* ===== Embedded Mid row (Stats) + main Mid row ===== */
+#embeddedMidRow th,
+#midRow th {
+	text-align:left;
+	font-weight:500;
+}
+#embeddedMidCell {
+	text-align:center;
+	font-size:11px;
+}
+
+/* ===== Excel / Auto controls (shared) ===== */
+.excelControls { display:inline-flex; align-items:center; gap:4px; flex-wrap:nowrap; white-space:nowrap; }
+.excelControls .autoBtn { margin-left:6px; }
+.excelControls button { flex:0 0 auto; }
+
+.autoBtn, .autoSubBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 6px; font-size:10.5px; line-height:1; border-radius:5px; cursor:pointer; }
+.autoSubBtn { padding:2px 5px; }
+.autoBtn.on, .autoSubBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
+.autoBtn.paused { background:#6b5a2a; color:#fff; border-color:#8a7336; }
+.autoBtn.susp { background:#775c1f; color:#fff; border-color:#a9852f; box-shadow:0 0 0 1px rgba(169,133,47,.35) inset; }
+
+.excelAutoCell { background:transparent; font-size:11px; }
+.autoIndicators { display:flex; align-items:center; gap:12px; justify-content:center; width:100%; }
+.autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.38; transition:opacity .25s, background .25s; flex:0 0 auto; }
+.autoDot.active { opacity:1; background:var(--accent); box-shadow:0 0 6px var(--accent-glow),0 0 12px rgba(58,169,255,.4); }
+.autoStatus { font-size:11px; color:var(--muted); letter-spacing:.5px; min-width:120px; text-align:center; white-space:nowrap; flex:0 1 auto; }
+.excelAutoCell { padding:4px 6px; }
+.excelAutoIndicatorsCell { border-bottom:1px solid #273244; }
+.excelAutoStatusCell { padding-top:2px; }

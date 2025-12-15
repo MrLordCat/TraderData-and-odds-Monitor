@@ -191,6 +191,7 @@ const { ensureVisibleBounds } = require('./modules/utils/display');
 const { initStatsIpc } = require('./modules/ipc/stats');
 const { initTeamNamesIpc } = require('./modules/ipc/teamNames');
 const { initAutoRefreshIpc } = require('./modules/ipc/autoRefresh');
+const { initSwapIpc } = require('./modules/ipc/swap');
 // External Excel odds JSON watcher (pseudo broker 'excel')
 const { createExcelWatcher } = require('./modules/excelWatcher');
 const lolTeamNamesRef = { value: lolTeamNames };
@@ -437,6 +438,7 @@ function bootstrap() {
   initBoardIpc({ ipcMain, boardManager, statsManager });
   // Now that boardManager & statsManager are finalized, initialize IPC modules that depend on them
   try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
+  try { initSwapIpc({ ipcMain, store, boardManager, mainWindow, statsManager }); } catch(e){ console.warn('initSwapIpc failed', e); }
   try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: boardWindow }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
   try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs }, store }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
   // -------- Excel extractor (Python) process control --------

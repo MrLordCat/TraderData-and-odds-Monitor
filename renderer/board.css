@@ -1,4 +1,6 @@
 /* Extracted from inline <style> in board.html */
+
+@import url("./ui/odds_board_shared.css");
 /* ================= Theme Tokens (mirrors common) ================ */
 :root {
   --bg: #0d0f17;
@@ -208,26 +210,12 @@ select {
 }
 
 /* ================= Table Structure ================= */
-#table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 4px;
-  font-size: 12px;
-  padding: 4px 8px 10px;
-  table-layout: fixed;
-}
+#table { table-layout: fixed; }
 
 .c-broker { width: 44%; }
 .c-odds { width: 28%; }
 
-#table tbody td,
-#table thead th,
-#table tfoot td,
-#table tfoot th {
-  height: 34px;
-  vertical-align: middle;
-  padding: 4px 8px;
-}
+/* Cell sizing is shared via ui/odds_board_shared.css */
 
 /* Broker row layout */
 .brokerCell {
@@ -245,87 +233,9 @@ select {
   flex: 1;
 }
 
-/* Swap button */
-.swapBtn {
-  background: #243045;
-  border: 1px solid #314058;
-  border-radius: 5px;
-  color: #93a6c3;
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  min-width: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.swapBtn:hover { background: #2d3a4e; color: #cfe2ff; }
-.swapBtn.on { background: #36517a; color: #fff; border-color: #4870a8; box-shadow: 0 0 0 1px #4870a8 inset; }
+/* Swap button styling moved to ui/odds_board_shared.css */
 
-/* Table header cells */
-#table thead th {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .7px;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 3px 6px;
-  text-align: center;
-}
-
-/* Table body + footer cells */
-#table tbody td,
-#table tfoot td,
-#table tfoot th {
-  background: var(--panel);
-  border: 1px solid #222c3a;
-  border-left: none;
-  border-right: none;
-  padding: 6px 8px;
-  text-align: center;
-  position: relative;
-}
-
-#table tbody tr {
-  transition: background var(--transition), transform var(--transition);
-  position: relative;
-}
-
-#table tbody tr::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: var(--radius);
-  mix-blend-mode: overlay;
-}
-
-#table tbody tr:hover { background: var(--panel-alt); }
-
-#table tbody td:first-child,
-#table tfoot th:first-child {
-  border-top-left-radius: var(--radius);
-  border-bottom-left-radius: var(--radius);
-}
-
-#table tbody td:last-child,
-#table tfoot td:last-child {
-  border-top-right-radius: var(--radius);
-  border-bottom-right-radius: var(--radius);
-}
-
-/* State modifiers */
-.frozen { opacity: .35; filter: grayscale(.4); }
-.best { color: var(--good); font-weight: 600; text-shadow: 0 0 6px var(--good-glow), 0 0 12px rgba(52,255,141,.35); }
-
-/* Footer rows */
-tfoot tr#arbRow td,
-tfoot tr#arbRow th { background: #162024; }
-
-tfoot tr#midRow td,
-tfoot tr#midRow th { background: #1d2330; }
+/* Table visuals + best/frozen highlighting moved to ui/odds_board_shared.css */
 
 #table tfoot td { font-weight: 600; }
 
@@ -348,27 +258,4 @@ tfoot tr#midRow th { background: #1d2330; }
 .boardTitle { flex: 1; font-weight: 600; letter-spacing: .5px; }
 .mapLabel { display: flex; align-items: center; gap: 4px; }
 
-/* Auto trading simulation */
-.autoBtn {
-  background: #273244;
-  border: 1px solid #33455d;
-  color: #9fb6d4;
-  padding: 2px 8px;
-  font-size: 11px;
-  margin-left: 8px;
-  cursor: pointer;
-}
-.autoBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
-.autoBtn.paused { background:#6b5a2a; color:#fff; border-color:#8a7336; }
-/* Excel-suspended highlight */
-.autoBtn.susp { background:#775c1f; color:#fff; border-color:#a9852f; box-shadow:0 0 0 1px rgba(169,133,47,.35) inset; }
-.excelControls { display:inline-flex; align-items:center; gap:6px; flex-wrap:nowrap; }
-.excelControls button { margin-left:0; }
-.excelControls .autoBtn { margin-left:8px; }
-.autoSubBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 6px; font-size:11px; line-height:1; cursor:pointer; border-radius:6px; }
-.autoSubBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
-.excelAutoCell { background:transparent; font-size:11px; }
-.autoIndicators { display:flex; align-items:center; gap:10px; justify-content:center; }
-.autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.35; transition:opacity .25s, background .25s; }
-.autoDot.active { opacity:1; background:var(--accent); box-shadow:0 0 6px var(--accent-glow), 0 0 12px rgba(58,169,255,.4); }
-.autoStatus { font-size:11px; color:var(--muted); letter-spacing:.5px; min-width:150px; text-align:left; white-space:nowrap; }
+/* Auto / Excel control styling moved to ui/odds_board_shared.css */

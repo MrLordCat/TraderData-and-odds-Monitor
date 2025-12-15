@@ -118,6 +118,35 @@
 
     function computeDerived(){ try { state.derived = (global.OddsCore && global.OddsCore.computeDerivedFrom) ? global.OddsCore.computeDerivedFrom(state.records) : { hasMid:false, arbProfitPct:null, mid:null }; } catch(_){ state.derived={ hasMid:false, arbProfitPct:null, mid:null }; } }
 
+    function attachSwapSync(){
+      try {
+        const apply = (list)=>{
+          try {
+            if(!global.__swappedBrokers) global.__swappedBrokers = new Set();
+            global.__swappedBrokers.clear();
+            (list||[]).forEach(b=>{ try { const v=String(b||'').trim(); if(v) global.__swappedBrokers.add(v); } catch(_){ } });
+            computeDerived();
+            applyExcelGuard();
+            applyMarketGuard();
+            // If any engine is active, step so it uses new mid immediately.
+            views.forEach(v=>{ try { if(v && v.engine && v.engine.state && v.engine.state.active){ v.engine.step(); } } catch(_){ } });
+          } catch(_){ }
+        };
+        if(global.desktopAPI && global.desktopAPI.onSwappedBrokersUpdated){
+          global.desktopAPI.onSwappedBrokersUpdated(apply);
+          if(global.desktopAPI.getSwappedBrokers){ global.desktopAPI.getSwappedBrokers().then(apply).catch(()=>{}); }
+          return;
+        }
+        if(global.require){
+          const { ipcRenderer } = global.require('electron');
+          if(ipcRenderer && ipcRenderer.on){
+            ipcRenderer.on('swapped-brokers-updated', (_e, list)=> apply(list));
+            try { ipcRenderer.invoke('swapped-brokers-get').then(apply).catch(()=>{}); } catch(_){ }
+          }
+        }
+      } catch(_){ }
+    }
+
     function applyExcelGuard(){
       const ex = getExcelRecord(); if(!ex) return;
       let anyDisabled=false, anyEnabled=false;
@@ -232,6 +261,9 @@
     function onHubUpdate(st){ try { state.records = Object.assign({}, st.records||{}); computeDerived(); applyExcelGuard(); applyMarketGuard(); maybeShockSuspend(); } catch(_){ } }
 
     function attachOdds(){ if(!oddsHub) return; oddsHub.subscribe(onHubUpdate); oddsHub.start(); }
+
+    // Swap sync impacts derived (mid/arb) used by auto.
+    attachSwapSync();
 
   function addBroadcastListeners(){
       try {

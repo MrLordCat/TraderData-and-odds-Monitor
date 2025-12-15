@@ -6,10 +6,12 @@
 
 (function(global){
   function computeDerivedFrom(records){
-  const vals = Object.values(records||{}).filter(r=> r && r.broker!=='excel' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
+  const swapSet = global.__swappedBrokers;
+  const isSwapped = (broker)=>{ try { return !!(swapSet && swapSet.has && swapSet.has(broker)); } catch(_){ return false; } };
+  const vals = Object.values(records||{}).filter(r=> r && r.broker!=='excel' && !r.frozen && Array.isArray(r.odds) && r.odds.length===2 && r.odds.every(o=>!isNaN(parseFloat(o))));
     if(!vals.length){ return { hasMid:false, arbProfitPct:null, mid:null }; }
-    const s1=vals.map(r=>parseFloat(r.odds[0]));
-    const s2=vals.map(r=>parseFloat(r.odds[1]));
+    const s1=vals.map(r=>{ const sw=isSwapped(r.broker); return parseFloat(sw ? r.odds[1] : r.odds[0]); });
+    const s2=vals.map(r=>{ const sw=isSwapped(r.broker); return parseFloat(sw ? r.odds[0] : r.odds[1]); });
     const mid1=(Math.min(...s1)+Math.max(...s1))/2; const mid2=(Math.min(...s2)+Math.max(...s2))/2;
     const over=1/Math.max(...s1)+1/Math.max(...s2);
     const arbProfitPct = (over<1) ? (1-over)*100 : 0;

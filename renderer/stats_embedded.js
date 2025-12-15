@@ -146,14 +146,43 @@ try {
   else { ipcRendererEmbedded.on('map-auto-refresh-status', (_e,p)=> applyEmbeddedMapAutoRefreshVisual(p)); }
   if(window.desktopAPI && window.desktopAPI.getMapAutoRefreshStatus){ window.desktopAPI.getMapAutoRefreshStatus().then(p=>applyEmbeddedMapAutoRefreshVisual(p)).catch(()=>{}); }
 } catch(_){ }
-// Per-broker side swap (exclude excel). Persist in localStorage under embeddedSwappedBrokers
+// Per-broker side swap (exclude excel). Centralized via IPC and synced across views.
 try {
-  if(!window.__embeddedSwapped){
-    const set = new Set();
-    try { (JSON.parse(localStorage.getItem('embeddedSwappedBrokers')||'[]')||[]).forEach(b=> set.add(b)); } catch(_){ }
-    window.__embeddedSwapped = set;
-  }
+  if(!window.__swappedBrokers) window.__swappedBrokers = new Set();
 } catch(_){ }
+
+async function initEmbeddedSwapSync(){
+  try {
+    const apply = (list)=>{
+      try {
+        if(!window.__swappedBrokers) window.__swappedBrokers = new Set();
+        window.__swappedBrokers.clear();
+        (list||[]).forEach(b=>{ try { const v=String(b||'').trim(); if(v) window.__swappedBrokers.add(v); } catch(_){ } });
+        renderEmbeddedOdds();
+      } catch(_){ }
+    };
+    if(window.desktopAPI && window.desktopAPI.getSwappedBrokers){
+      try { const list = await window.desktopAPI.getSwappedBrokers(); apply(list); } catch(_){ }
+      try { if(window.desktopAPI.onSwappedBrokersUpdated){ window.desktopAPI.onSwappedBrokersUpdated(apply); } } catch(_){ }
+      return;
+    }
+    // Stats panel BrowserView has no preload bridge; use direct IPC.
+    try {
+      if(ipcRendererEmbedded && ipcRendererEmbedded.invoke){
+        try { const list = await ipcRendererEmbedded.invoke('swapped-brokers-get'); apply(list); } catch(_){ }
+        try { ipcRendererEmbedded.on('swapped-brokers-updated', (_e, list)=> apply(list)); } catch(_){ }
+        return;
+      }
+    } catch(_){ }
+
+    // Fallback localStorage (won't sync across file:// origins)
+    try {
+      const list = (JSON.parse(localStorage.getItem('swappedBrokers')||'[]')||[]);
+      apply(list);
+    } catch(_){ }
+  } catch(_){ }
+}
+try { initEmbeddedSwapSync(); } catch(_){ }
 function renderEmbeddedOdds(){
   const rowsEl=document.getElementById('embeddedOddsRows'); if(!rowsEl) return;
   const excelRec = embeddedOddsData['excel'];
@@ -161,7 +190,7 @@ function renderEmbeddedOdds(){
   let liveNums1 = [];
   let liveNums2 = [];
   if(OddsBoardShared && OddsBoardShared.buildRowsHtml){
-    const out = OddsBoardShared.buildRowsHtml(vals, { variant:'embedded', isSwapped: (b)=> !!(window.__embeddedSwapped && window.__embeddedSwapped.has(b)) });
+    const out = OddsBoardShared.buildRowsHtml(vals, { variant:'embedded', isSwapped: (b)=> !!(window.__swappedBrokers && window.__swappedBrokers.has(b)) });
     rowsEl.innerHTML = out.html;
     embeddedBest1 = out.best1;
     embeddedBest2 = out.best2;
@@ -236,8 +265,6 @@ try {
 function handleEmbeddedOdds(p){ try {
   if(!p||!p.broker) return;
   if(p.removed){ if(embeddedOddsData[p.broker]){ delete embeddedOddsData[p.broker]; renderEmbeddedOdds(); } return; }
-  // Apply swap if flagged (only for non-excel brokers)
-  try { if(p.broker!=='excel' && window.__embeddedSwapped && window.__embeddedSwapped.has(p.broker) && Array.isArray(p.odds) && p.odds.length===2){ p={ ...p, odds:[p.odds[1], p.odds[0]] }; } } catch(_){ }
   // If map not initialized yet and payload carries map, adopt it
   if((currentMap===undefined || currentMap===null) && (p.map!==undefined && p.map!==null)){
     currentMap = p.map; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue();
@@ -444,12 +471,18 @@ document.addEventListener('click', e=>{
   const broker = btn.getAttribute('data-broker');
   if(!broker || broker==='excel') return;
   try {
-    const set = window.__embeddedSwapped;
-    if(set.has(broker)) set.delete(broker); else set.add(broker);
-    localStorage.setItem('embeddedSwappedBrokers', JSON.stringify(Array.from(set)));
-    // If we already have odds for this broker – swap in-place and re-render
-    const rec = embeddedOddsData[broker];
-    if(rec && Array.isArray(rec.odds) && rec.odds.length===2){ rec.odds = [rec.odds[1], rec.odds[0]]; }
+    const set = window.__swappedBrokers || (window.__swappedBrokers = new Set());
+    const next = !set.has(broker);
+    if(next) set.add(broker); else set.delete(broker);
+    if(window.desktopAPI && window.desktopAPI.setBrokerSwap){
+      window.desktopAPI.setBrokerSwap(broker, next);
+    } else {
+      try { ipcRendererEmbedded.send('swapped-broker-set', { broker, swapped: next }); }
+      catch(_){
+        // Fallback localStorage
+        try { localStorage.setItem('swappedBrokers', JSON.stringify(Array.from(set))); } catch(_){ }
+      }
+    }
     renderEmbeddedOdds();
   } catch(_){ }
 });

@@ -3,6 +3,8 @@
 	 Expanded from previous minified form
 	 ========================================== */
 
+@import url("./ui/odds_board_shared.css");
+
 /* Theme Tokens */
 :root {
 	--bg: #0d0f17;
@@ -30,11 +32,6 @@ body {
 	scrollbar-gutter: stable both-edges;
 }
 
-/* Embedded Odds Board */
-#embeddedOddsSection { border:1px solid #27313d; background:#1b232c; border-radius:0; overflow:hidden; }
-#embeddedOddsSection.collapsed #embeddedOddsBody { max-height:0; padding:0; }
-#embeddedOddsBody { max-height:340px; overflow-y:auto; overflow-x:hidden; transition:max-height .25s ease; padding:0; }
-
 /* Unified: collapse via title click (no separate button) */
 .collapsible[data-collapse-on-header="1"] .sectionHeader .accent{
 	position: relative;
@@ -56,24 +53,6 @@ body {
 }
 .embeddedOddsHeader { display:flex; align-items:center; gap:8px; font-size:13px; margin:0; padding:0; background:#212b35; border-bottom:1px solid #27313d; }
 .embeddedOddsHeader .accent { font-weight:600; }
-.embeddedOddsTable { width:100%; border-collapse:collapse; font-size:11px; }
-.embeddedOddsTable th, .embeddedOddsTable td { padding:3px 4px; border-bottom:1px solid #24303b; text-align:center; }
-.embeddedOddsTable tbody tr:last-child td { border-bottom:none; }
-.embeddedOddsTable th.eo-broker { text-align:left; }
-.embeddedOddsTable td.frozen { opacity:.55; }
-/* Also handle class applied on <tr> (current render logic) */
-.embeddedOddsTable tr.frozen td { opacity:.45; filter: grayscale(.4); position:relative; }
-.embeddedOddsTable tr.frozen td:first-child .eo-broker-label::after{ content:' (susp)'; font-weight:400; opacity:.8; font-size:10px; margin-left:4px; color:#f8d774; }
-.embeddedOddsTable tr.frozen td.best { box-shadow:none; }
-.embeddedOddsTable td.best { color:#d4b14a; font-weight:600; }
-.embeddedOddsTable th.eo-swap, .embeddedOddsTable td.eo-swap-cell { width:26px; padding:0 2px; }
-.embeddedOddsTable td.eo-swap-cell { text-align:center; }
-.eo-swapBtn { background:#253143; border:1px solid #314052; color:#9fb6cc; font-size:11px; padding:2px 6px; border-radius:6px; cursor:pointer; line-height:1; }
-.eo-swapBtn.on { background:#335477; color:#d5e8ff; }
-.eo-swapBtn:hover { background:#2d3e52; }
-.eo-swap-header { opacity:.55; }
-#embeddedMidRow th { text-align:left; font-weight:500; }
-#embeddedMidCell { text-align:center; font-size:11px; }
 .dragHandleSec { cursor:grab; background:transparent; border:none; color:#8899aa; font-size:14px; line-height:1; padding:0 4px; }
 .dragHandleSec:active { cursor:grabbing; }
 .reorderGhost { opacity:.4 !important; }
@@ -269,15 +248,7 @@ select:focus {
 /* Slight inner padding to offset potential scrollbar overlay (fallback) */
 body { padding-right:2px; }
 
-/* Embedded Odds Excel control alignment */
-.excelControls { display:inline-flex; align-items:center; gap:4px; flex-wrap:nowrap; white-space:nowrap; }
-.excelControls .autoBtn { margin-left:6px; }
-.autoBtn, .autoSubBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 6px; font-size:10.5px; line-height:1; border-radius:5px; cursor:pointer; }
-.autoSubBtn { padding:2px 5px; }
-.autoBtn.on, .autoSubBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
-/* Excel-suspended marker for auto button (embedded) */
-.autoBtn.susp { background:#775c1f; color:#fff; border-color:#a9852f; box-shadow:0 0 0 1px rgba(169,133,47,.35) inset; }
-.excelControls button { flex:0 0 auto; }
+/* Embedded Odds Excel control alignment moved to ui/odds_board_shared.css */
 
 h1.statsHeader {
 	display: flex;

@@ -74,18 +74,4 @@
 }
 
 #spPanelSide[data-side="left"] .spArrow{ transform: rotate(180deg); }
-/* Auto simulation shared styles */
-.autoBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 8px; font-size:11px; margin-left:6px; cursor:pointer; border-radius:5px; }
-.autoBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
-.excelAutoCell { background:transparent; font-size:11px; }
-.autoIndicators { display:flex; align-items:center; gap:12px; justify-content:center; width:100%; }
-/* Keep dots tight but allow status to truly center */
-.autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.38; transition:opacity .25s, background .25s; flex:0 0 auto; }
-.autoDot.active { opacity:1; background:var(--accent); box-shadow:0 0 6px var(--accent-glow),0 0 12px rgba(58,169,255,.4); }
-/* Center status text; remove fixed left alignment causing visual shift when short words (Aligned) shown */
-.autoStatus { font-size:11px; color:var(--muted); letter-spacing:.5px; min-width:120px; text-align:center; white-space:nowrap; flex:0 1 auto; }
-/* Slight vertical padding so row height stable on toggle */
-.excelAutoCell { padding:4px 6px; }
-/* New split rows */
-.excelAutoIndicatorsCell { border-bottom:1px solid #273244; }
-.excelAutoStatusCell { padding-top:2px; }
+/* Auto / Excel simulation styles moved to ui/odds_board_shared.css */

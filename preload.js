@@ -94,6 +94,12 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // AutoHub state sync (board view relies on these because it has no window.require)
   ,onAutoResumeSet: (cb) => withUnsub('auto-resume-set', cb)
   ,onAutoActiveSet: (cb) => withUnsub('auto-active-set', cb)
+
+  // Per-broker swap (team orientation)
+  ,getSwappedBrokers: () => ipcRenderer.invoke('swapped-brokers-get')
+  ,setBrokerSwap: (broker, swapped) => { try { ipcRenderer.send('swapped-broker-set', { broker, swapped: !!swapped }); } catch(_){ } }
+  ,toggleBrokerSwap: (broker) => { try { ipcRenderer.send('swapped-broker-toggle', { broker }); } catch(_){ } }
+  ,onSwappedBrokersUpdated: (cb) => withUnsub('swapped-brokers-updated', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

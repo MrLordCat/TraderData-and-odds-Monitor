@@ -22,36 +22,54 @@ function calcMidFromLiveNums(nums1, nums2){
 function buildRowsHtml(records, opts){
   const variant = opts?.variant || 'board';
   const isSwapped = opts?.isSwapped || (()=>false);
-  const best = calcBestNonFrozen(records);
+  const liveNums1 = [];
+  const liveNums2 = [];
+  (records||[]).forEach(r=>{
+    try {
+      if(!r || r.frozen) return;
+      if(!Array.isArray(r.odds) || r.odds.length!==2) return;
+      const broker = r.broker;
+      const swappedOn = !!isSwapped(broker);
+      const v1 = swappedOn ? r.odds[1] : r.odds[0];
+      const v2 = swappedOn ? r.odds[0] : r.odds[1];
+      const n1 = toNum(v1);
+      const n2 = toNum(v2);
+      if(Number.isFinite(n1)) liveNums1.push(n1);
+      if(Number.isFinite(n2)) liveNums2.push(n2);
+    } catch(_){ }
+  });
+  const best1 = liveNums1.length ? Math.max(...liveNums1) : NaN;
+  const best2 = liveNums2.length ? Math.max(...liveNums2) : NaN;
 
   const html = (records||[]).map(r=>{
     const broker = r.broker;
-    const o1 = toNum(r.odds?.[0]);
-    const o2 = toNum(r.odds?.[1]);
+    const swappedOn = !!isSwapped(broker);
+    const d1 = swappedOn ? r.odds?.[1] : r.odds?.[0];
+    const d2 = swappedOn ? r.odds?.[0] : r.odds?.[1];
+    const o1 = toNum(d1);
+    const o2 = toNum(d2);
     const frozenCls = r.frozen ? 'frozen' : '';
-    const bestCls1 = (!r.frozen && o1===best.best1) ? 'best' : '';
-    const bestCls2 = (!r.frozen && o2===best.best2) ? 'best' : '';
+    const bestCls1 = (!r.frozen && Number.isFinite(o1) && o1===best1) ? 'best' : '';
+    const bestCls2 = (!r.frozen && Number.isFinite(o2) && o2===best2) ? 'best' : '';
 
     if(variant === 'embedded'){
-      const swappedOn = !!isSwapped(broker);
       const swapBtn = `<button class=\"eo-swapBtn ${swappedOn?'on':''}\" data-broker=\"${broker}\" title=\"Swap sides\">⇄</button>`;
       const suspTag = r.frozen ? ' eo-broker-label' : ' eo-broker-label';
       return `<tr class=\"${frozenCls}\">`+
         `<td class=\"eo-broker\"><span class=\"${suspTag}\" title=\"${r.frozen?'Suspended / stale':''}\">${broker}</span></td>`+
-        `<td class=\"${bestCls1} ${frozenCls}\">${r.odds[0]}</td>`+
+        `<td class=\"${bestCls1} ${frozenCls}\">${d1}</td>`+
         `<td class=\"eo-swap-cell\">${swapBtn}</td>`+
-        `<td class=\"${bestCls2} ${frozenCls}\">${r.odds[1]}</td>`+
+        `<td class=\"${bestCls2} ${frozenCls}\">${d2}</td>`+
       `</tr>`;
     }
 
     // default: board
-    const swappedOn = !!isSwapped(broker);
-    return `<tr><td><div class=\"brokerCell\"><span class=\"bName\" title=\"${broker}\">${broker}</span><button class=\"swapBtn ${swappedOn?'on':''}\" data-broker=\"${broker}\" title=\"Swap sides\">⇄</button></div></td>`+
-           `<td class=\"${bestCls1} ${frozenCls}\">${r.odds[0]}</td>`+
-           `<td class=\"${bestCls2} ${frozenCls}\">${r.odds[1]}</td></tr>`;
+    return `<tr class=\"${frozenCls}\"><td><div class=\"brokerCell\"><span class=\"bName eo-broker-label\" title=\"${broker}\">${broker}</span><button class=\"swapBtn ${swappedOn?'on':''}\" data-broker=\"${broker}\" title=\"Swap sides\">⇄</button></div></td>`+
+           `<td class=\"${bestCls1} ${frozenCls}\">${d1}</td>`+
+           `<td class=\"${bestCls2} ${frozenCls}\">${d2}</td></tr>`;
   }).join('');
 
-  return { html, best1: best.best1, best2: best.best2, liveNums1: best.nums1, liveNums2: best.nums2 };
+  return { html, best1, best2, liveNums1, liveNums2 };
 }
 
 module.exports = {

@@ -172,7 +172,31 @@ try { window.addEventListener('DOMContentLoaded', bindTopbar); } catch(_){ }
 
 const boardData = {};
 const swapped = new Set();
-try { (JSON.parse(localStorage.getItem('swappedBrokers')||'[]')||[]).forEach(b=>swapped.add(b)); } catch(e) {}
+// Centralized swap (team orientation) is synced via IPC; fallback to localStorage only if IPC unavailable.
+try { window.__swappedBrokers = swapped; } catch(_){ }
+
+async function initSwapSync(){
+  try {
+    const apply = (list)=>{
+      try {
+        swapped.clear();
+        (list||[]).forEach(b=>{ try { const v=String(b||'').trim(); if(v) swapped.add(v); } catch(_){ } });
+        try { window.__swappedBrokers = swapped; } catch(_){ }
+        renderBoard();
+      } catch(_){ }
+    };
+
+    if(window.desktopAPI && window.desktopAPI.getSwappedBrokers){
+      try { const list = await window.desktopAPI.getSwappedBrokers(); apply(list); } catch(_){ }
+      try { if(window.desktopAPI.onSwappedBrokersUpdated){ window.desktopAPI.onSwappedBrokersUpdated(apply); } } catch(_){ }
+      return;
+    }
+
+    // Fallback: per-view localStorage (may not sync across file:// origins)
+    try { (JSON.parse(localStorage.getItem('swappedBrokers')||'[]')||[]).forEach(b=>swapped.add(b)); } catch(_){ }
+  } catch(_){ }
+}
+try { initSwapSync(); } catch(_){ }
 
 let OddsBoardShared = null;
 try { OddsBoardShared = require('./ui/odds_board_shared'); } catch(_){ }
@@ -185,14 +209,20 @@ function computeDerived(){
   const midCell=midRow.children[1];
   const arbCell=arbRow.children[1];
   // Exclude only excel from aggregated mid/arb calculations
-  const active = Object.values(boardData).filter(r=> r.broker!=='excel' && !r.frozen && Array.isArray(r.odds) && r.odds.every(o=>!isNaN(parseFloat(o))));
+  const active = Object.values(boardData).filter(r=> r.broker!=='excel' && !r.frozen && Array.isArray(r.odds) && r.odds.length===2 && r.odds.every(o=>!isNaN(parseFloat(o))));
   if (!active.length){
     midCell.textContent='-'; arbCell.textContent='-';
     try { window.__boardDerived = { hasMid:false, arbProfitPct:null }; } catch(_){ }
     return;
   }
-  const s1=active.map(r=>parseFloat(r.odds[0]));
-  const s2=active.map(r=>parseFloat(r.odds[1]));
+  const s1=active.map(r=>{
+    const isS = swapped.has(r.broker);
+    return parseFloat(isS ? r.odds[1] : r.odds[0]);
+  });
+  const s2=active.map(r=>{
+    const isS = swapped.has(r.broker);
+    return parseFloat(isS ? r.odds[0] : r.odds[1]);
+  });
   // IMPORTANT: Mid is defined as the midpoint between the lowest and highest odds only
   // (NOT the average of all books). This matches product requirement #1.
   const mid1=(Math.min(...s1)+Math.max(...s1))/2; const mid2=(Math.min(...s2)+Math.max(...s2))/2;
@@ -222,21 +252,23 @@ function renderBoard(){
     tb.innerHTML = out.html;
   } else {
     // Fallback (legacy inline renderer)
-    const liveVals = vals.filter(r=>!r.frozen);
-    const parsed1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
-    const parsed2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
+    const liveVals = vals.filter(r=>!r.frozen && Array.isArray(r.odds) && r.odds.length===2);
+    const parsed1=liveVals.map(r=>parseFloat(swapped.has(r.broker) ? r.odds[1] : r.odds[0])).filter(n=>!isNaN(n));
+    const parsed2=liveVals.map(r=>parseFloat(swapped.has(r.broker) ? r.odds[0] : r.odds[1])).filter(n=>!isNaN(n));
     const best1=parsed1.length?Math.max(...parsed1):NaN;
     const best2=parsed2.length?Math.max(...parsed2):NaN;
     tb.innerHTML = vals.map(r=>{
-      const o1=parseFloat(r.odds?.[0]);
-      const o2=parseFloat(r.odds?.[1]);
       const isSwapped = swapped.has(r.broker);
+      const d1 = isSwapped ? r.odds?.[1] : r.odds?.[0];
+      const d2 = isSwapped ? r.odds?.[0] : r.odds?.[1];
+      const o1=parseFloat(d1);
+      const o2=parseFloat(d2);
       const bestCls1 = (!r.frozen && o1===best1)?'best':'';
       const bestCls2 = (!r.frozen && o2===best2)?'best':'';
       const frozenCls = r.frozen ? 'frozen' : '';
       return `<tr><td><div class="brokerCell"><span class="bName" title="${r.broker}">${r.broker}</span><button class="swapBtn ${isSwapped?'on':''}" data-broker="${r.broker}" title="Swap sides">⇄</button></div></td>`+
-            `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
-            `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td></tr>`;
+            `<td class="${bestCls1} ${frozenCls}">${d1}</td>`+
+            `<td class="${bestCls2} ${frozenCls}">${d2}</td></tr>`;
     }).join('');
   }
   // Update Excel row
@@ -414,10 +446,16 @@ document.addEventListener('click', e=>{
   if(!btn) return;
   const broker = btn.getAttribute('data-broker');
   if(!broker) return;
-  if(swapped.has(broker)) swapped.delete(broker); else swapped.add(broker);
-  try { localStorage.setItem('swappedBrokers', JSON.stringify(Array.from(swapped))); } catch(e) {}
-  const rec = boardData[broker];
-  if(rec && Array.isArray(rec.odds) && rec.odds.length===2){ rec.odds = [rec.odds[1], rec.odds[0]]; }
+  const next = !swapped.has(broker);
+  if(next) swapped.add(broker); else swapped.delete(broker);
+  try {
+    if(window.desktopAPI && window.desktopAPI.setBrokerSwap){
+      window.desktopAPI.setBrokerSwap(broker, next);
+    } else {
+      // Fallback localStorage only
+      try { localStorage.setItem('swappedBrokers', JSON.stringify(Array.from(swapped))); } catch(_){ }
+    }
+  } catch(_){ }
   renderBoard();
 });
 
