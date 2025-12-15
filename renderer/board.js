@@ -297,12 +297,45 @@ if(window.desktopAPI){
   } catch(_){ }
   // Excel extractor status updates (mirror embedded panel UI)
   try {
+    // Small ephemeral toast near the S button
+    let excelTogglePendingTs = 0;
+    let excelToggleToastEl = null;
+    function showMiniToastNear(el, lines, kind){
+      try {
+        if(excelToggleToastEl && excelToggleToastEl.parentNode) excelToggleToastEl.parentNode.removeChild(excelToggleToastEl);
+      } catch(_){ }
+      try {
+        if(!el) return;
+        const r = el.getBoundingClientRect();
+        const toast = document.createElement('div');
+        toast.className = 'miniToast ' + (kind||'') ;
+        (lines||[]).forEach(t=>{
+          const line = document.createElement('span');
+          line.className = 'line';
+          line.textContent = String(t);
+          toast.appendChild(line);
+        });
+        document.body.appendChild(toast);
+        const gap = 8;
+        const left = Math.min(Math.max(8, r.left), window.innerWidth - 300);
+        const top = Math.min(Math.max(8, r.bottom + gap), window.innerHeight - 80);
+        toast.style.left = left + 'px';
+        toast.style.top = top + 'px';
+        requestAnimationFrame(()=> toast.classList.add('show'));
+        excelToggleToastEl = toast;
+        const ttl = (kind==='err') ? 3800 : 2200;
+        setTimeout(()=>{ try { toast.classList.remove('show'); } catch(_){ } }, ttl);
+        setTimeout(()=>{ try { if(toast && toast.parentNode) toast.parentNode.removeChild(toast); } catch(_){ } }, ttl + 260);
+      } catch(_){ }
+    }
+
     // Bind S button click to toggle the Python extractor
     try {
       const sBtn = document.getElementById('excelScriptBtn');
       if(sBtn && !sBtn.dataset.bound){
         sBtn.dataset.bound = '1';
         sBtn.addEventListener('click', ()=>{
+          excelTogglePendingTs = Date.now();
           try { window.desktopAPI.excelScriptToggle && window.desktopAPI.excelScriptToggle(); } catch(_){ }
         });
       }
@@ -323,6 +356,21 @@ if(window.desktopAPI){
             statusEl.dataset.last=text;
             if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; statusEl.title='Excel extractor idle'; }
             else { statusEl.style.display='inline'; statusEl.textContent=text; statusEl.title='Excel extractor: '+text; }
+          }
+
+          // If user just clicked the toggle, show a compact status popup near the button
+          if(btn && excelTogglePendingTs && (Date.now() - excelTogglePendingTs) < 1800){
+            const pyOn = !!s.running;
+            const ahkOn = !!(s.ahk && s.ahk.running);
+            const pyErr = s.error ? String(s.error) : '';
+            const ahkErr = (s.ahk && s.ahk.error) ? String(s.ahk.error) : '';
+            const lines = [
+              'Python: ' + (pyOn ? 'ON' : 'OFF') + (pyErr ? ' ('+pyErr+')' : ''),
+              'AHK: ' + (ahkOn ? 'ON' : 'OFF') + (ahkErr ? ' ('+ahkErr+')' : '')
+            ];
+            const kind = (pyErr || ahkErr) ? 'err' : 'ok';
+            showMiniToastNear(btn, lines, kind);
+            excelTogglePendingTs = 0;
           }
         } catch(_){ }
       });

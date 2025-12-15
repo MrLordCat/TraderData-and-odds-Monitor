@@ -39,6 +39,9 @@ Hotkey("Numpad9", ShowHelp, "On")
 ; Global actions (fixed): Numpad1 = Suspend/Unsuspend, Numpad0 = Update
 Hotkey("Numpad1", GlobalSuspend, "On")
 Hotkey("Numpad0", GlobalUpdate, "On")
+; Coordinate learning for global actions: Ctrl+Numpad1 / Ctrl+Numpad0
+Hotkey("^Numpad1", SaveSuspend, "On")
+Hotkey("^Numpad0", SaveUpdate, "On")
 ; External triggers (fixed): F23/LB, F24/RB, F22/Update, F21/Suspend
 global gEmitGuardUntil := 0  ; timestamp (A_TickCount) until which inbound F-hotkeys are ignored
 Hotkey("F23", OnF23, "On")
@@ -86,6 +89,22 @@ SaveRB(*) {
     IniWrite(x "," y, gIniPath, T, "RB" M)
     EnsureModesAtLeast(T, M)
     Balloon("[" T "] RB" M " = " x "," y " (saved)")
+}
+
+SaveSuspend(*) {
+    global gIniPath
+    MouseGetPos &x, &y
+    IniWrite(x, gIniPath, "Joy3", "SuspendX")
+    IniWrite(y, gIniPath, "Joy3", "SuspendY")
+    Balloon("[Joy3] Suspend = " x "," y " (saved)")
+}
+
+SaveUpdate(*) {
+    global gIniPath
+    MouseGetPos &x, &y
+    IniWrite(x, gIniPath, "Joy3", "UpdateX")
+    IniWrite(y, gIniPath, "Joy3", "UpdateY")
+    Balloon("[Joy3] Update = " x "," y " (saved)")
 }
 
 EnsureSection(*) {
@@ -440,6 +459,8 @@ ShowHelp(*) {
      txt := "Hotkeys:" . "`n" .
          "  Ctrl+Numpad- — save LB{map}" . "`n" .
          "  Ctrl+Numpad+ — save RB{map}" . "`n" .
+         "  Ctrl+Numpad1 — save Suspend (Joy3)" . "`n" .
+         "  Ctrl+Numpad0 — save Update (Joy3)" . "`n" .
          "  Ctrl+Numpad/ — create/ensure section" . "`n" .
          "  Ctrl+Numpad* — recompute Modes by BoN" . "`n" .
          "  Numpad- — click LB{map}" . "`n" .

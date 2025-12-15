@@ -60,6 +60,29 @@ body {
 
 body { -webkit-font-smoothing: antialiased; }
 
+/* Small ephemeral toast near a UI control (used for extractor start feedback) */
+.miniToast {
+  position: fixed;
+  z-index: 999999;
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid #2c3649;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.25;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  max-width: 280px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.miniToast.show { opacity: 1; transform: translateY(0); }
+.miniToast .line { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.miniToast.ok { border-left: 4px solid var(--good); }
+.miniToast.err { border-left: 4px solid var(--danger); }
+
 /* Base buttons */
 /* Buttons */
 .btn {

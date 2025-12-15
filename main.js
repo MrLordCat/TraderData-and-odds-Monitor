@@ -449,6 +449,126 @@ function bootstrap() {
   let lastExcelStartTs = 0;
   let excelProcError = null; // last error message (non-zero exit or spawn failure)
   let excelDepsInstalling = false;
+
+  // Optional AHK helper (screen-click automation for Excel)
+  let ahkProc = null;
+  let ahkProcStarting = false;
+  let ahkProcError = null;
+
+  function resolveAhkScriptPath(){
+    // Store override
+    try {
+      const custom = store.get('ahkScriptPath');
+      if(custom && typeof custom === 'string' && fs.existsSync(custom.trim())) return custom.trim();
+    } catch(_){ }
+    // Default: Excel Extractor/script159_v2.ahk
+    try {
+      const appRoot = path.resolve(__dirname);
+      const candidates = [
+        path.join(appRoot, 'Excel Extractor', 'script159_v2.ahk'),
+        path.join(appRoot, 'Excel Extractor', 'script159.ahk'),
+        path.join(process.cwd(), 'Excel Extractor', 'script159_v2.ahk'),
+        path.join(process.cwd(), 'Excel Extractor', 'script159.ahk')
+      ];
+      for(const p of candidates){ try { if(fs.existsSync(p)) return p; } catch(_){ } }
+    } catch(_){ }
+    return null;
+  }
+
+  function resolveAhkExe(){
+    // User override
+    try {
+      const custom = store.get('ahkExePath');
+      if(custom && typeof custom === 'string' && custom.trim()) return custom.trim();
+    } catch(_){ }
+    // Fall back to PATH resolution
+    return 'AutoHotkey64.exe';
+  }
+
+  function startAhkHelper(){
+    if(ahkProc || ahkProcStarting) return;
+    ahkProcStarting = true;
+    ahkProcError = null;
+    broadcastExcelStatus();
+    try {
+      const scriptPath = resolveAhkScriptPath();
+      if(!scriptPath){
+        ahkProcError = 'AHK script not found (script159_v2.ahk)';
+        ahkProcStarting = false;
+        broadcastExcelStatus();
+        return;
+      }
+      let exe = resolveAhkExe();
+      const cwd = path.dirname(scriptPath);
+
+      function spawnAhk(exeToTry, secondTry){
+        try {
+          ahkProc = spawn(exeToTry, [scriptPath], { cwd, stdio:['ignore','pipe','pipe'], windowsHide:true });
+          let didFallback = false;
+          ahkProc.on('error', (err)=>{
+            try { console.warn('[ahk][error]', err && err.message ? err.message : String(err)); } catch(_){ }
+            // Most common case: ENOENT (AutoHotkey not installed / not in PATH)
+            if(secondTry && !didFallback){
+              didFallback = true;
+              try { if(ahkProc) ahkProc.removeAllListeners(); } catch(_){ }
+              try { ahkProc = null; } catch(_){ }
+              try { secondTry(); return; } catch(_){ }
+            }
+            ahkProc = null;
+            ahkProcStarting = false;
+            const msg = (err && err.code === 'ENOENT')
+              ? 'AutoHotkey not found (set ahkExePath)'
+              : ('AHK spawn error: ' + (err && err.message ? err.message : String(err)));
+            ahkProcError = msg;
+            broadcastExcelStatus();
+          });
+          ahkProc.on('spawn', ()=>{ ahkProcStarting = false; ahkProcError = null; broadcastExcelStatus(); });
+          let errBuf='';
+          ahkProc.stdout.on('data', d=>{ /* keep quiet by default */ try { const s=d.toString().trim(); if(s) console.log('[ahk][stdout]', s); } catch(_){ } });
+          ahkProc.stderr.on('data', d=>{ try { const s=d.toString(); errBuf += s; console.warn('[ahk][stderr]', s.trim()); } catch(_){ } });
+          ahkProc.on('exit', (code, sig)=>{
+            if(code && code !== 0){
+              ahkProcError = 'AHK exit code ' + code;
+              if(errBuf && /requires|error|cannot|failed/i.test(errBuf)){
+                ahkProcError = errBuf.trim().slice(0, 180);
+              }
+            } else if(sig){
+              ahkProcError = null;
+            }
+            ahkProc = null;
+            ahkProcStarting = false;
+            broadcastExcelStatus();
+          });
+          broadcastExcelStatus();
+        } catch(err){
+          ahkProc = null;
+          if(secondTry){
+            try { secondTry(); return; } catch(_){ }
+          }
+          ahkProcError = 'AHK spawn failed: ' + (err && err.message ? err.message : String(err));
+          ahkProcStarting = false;
+          broadcastExcelStatus();
+        }
+      }
+
+      // If AutoHotkey64.exe is not found, try AutoHotkey.exe
+      spawnAhk(exe, ()=>{
+        if(exe.toLowerCase() === 'autohotkey64.exe'){
+          spawnAhk('AutoHotkey.exe');
+        }
+      });
+    } catch(err){
+      ahkProc = null;
+      ahkProcError = 'AHK start error: ' + (err && err.message ? err.message : String(err));
+      ahkProcStarting = false;
+      broadcastExcelStatus();
+    }
+  }
+
+  function stopAhkHelper(){
+    if(!ahkProc) { ahkProcStarting = false; return; }
+    try { console.log('[ahk] stopping pid', ahkProc.pid); ahkProc.kill(); } catch(_){ }
+  }
     function excelLog(){
       const msg = Array.from(arguments).map(a=>{
         if(a instanceof Error) return a.stack||a.message;
@@ -532,7 +652,12 @@ function bootstrap() {
         running: !!excelProc,
         starting: excelProcStarting,
         error: excelProcError,
-        installing: excelDepsInstalling
+        installing: excelDepsInstalling,
+        ahk: {
+          running: !!ahkProc,
+          starting: ahkProcStarting,
+          error: ahkProcError
+        }
       };
       if(mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('excel-extractor-status', payload);
@@ -615,6 +740,9 @@ function bootstrap() {
       excelProc = spawn(py, args, { cwd, stdio:['ignore','pipe','pipe'], env: spawnEnv });
       excelLog('spawned pid', excelProc.pid, 'script', scriptPath);
       excelProc.on('spawn', ()=>{ excelProcStarting=false; broadcastExcelStatus(); });
+
+      // Start AHK helper alongside Python extractor (non-fatal if missing)
+      try { startAhkHelper(); } catch(_){ }
       // If user hasn't overridden excelDumpPath, set it to current script directory/current_state.json for watcher alignment
       try {
         const existingDump = store.get('excelDumpPath');
@@ -659,11 +787,18 @@ function bootstrap() {
     }
   }
   function stopExcelExtractor(){
-    if(!excelProc) return;
-    try { console.log('[excel-extractor] stopping pid', excelProc.pid); excelProc.kill(); } catch(_){ }
+    // Stop both Python extractor and AHK helper
+    try { if(excelProc){ console.log('[excel-extractor] stopping pid', excelProc.pid); excelProc.kill(); } } catch(_){ }
+    try { stopAhkHelper(); } catch(_){ }
   }
-  ipcMain.on('excel-extractor-toggle', ()=>{ try { if(excelProc){ stopExcelExtractor(); } else { startExcelExtractor(); } } catch(_){ } });
-  ipcMain.handle('excel-extractor-status-get', ()=> ({ running: !!excelProc, starting: excelProcStarting }));
+  ipcMain.on('excel-extractor-toggle', ()=>{ try { if(excelProc || ahkProc){ stopExcelExtractor(); } else { startExcelExtractor(); } } catch(_){ } });
+  ipcMain.handle('excel-extractor-status-get', ()=> ({
+    running: !!excelProc,
+    starting: excelProcStarting,
+    error: excelProcError,
+    installing: excelDepsInstalling,
+    ahk: { running: !!ahkProc, starting: ahkProcStarting, error: ahkProcError }
+  }));
   ipcMain.on('excel-extractor-set-path', (_e, p)=>{
     try {
       if(!p || typeof p !== 'string') return;

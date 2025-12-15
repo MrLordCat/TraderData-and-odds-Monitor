@@ -12,6 +12,8 @@ This adds automatic template creation and coordinate writing into `config159.ini
 
 - Ctrl + `LBKey2` (default: Ctrl+NumpadSub): write `LB{map}` using current mouse position.
 - Ctrl + `RBKey2` (default: Ctrl+NumpadAdd): write `RB{map}` using current mouse position.
+- Ctrl + Numpad1: save `SuspendX/SuspendY` (section `[Joy3]`) using current mouse position.
+- Ctrl + Numpad0: save `UpdateX/UpdateY` (section `[Joy3]`) using current mouse position.
 - Ctrl + `TemplateSwitchKey` (default: Ctrl+NumpadDiv): ensure section exists for current template (create if missing).
 - Ctrl + NumpadMult: re-derive `Modes` from template name (Bo1/Bo2/Bo3/Bo5 ⇒ 1/2/3/5) and seed LB/RB placeholders.
 
