@@ -128,6 +128,8 @@ function bindEmbeddedMapSelect(){
 }
 const { ipcRenderer: ipcRendererEmbedded } = require('electron');
 const embeddedOddsData = {}; let embeddedBest1=NaN, embeddedBest2=NaN;
+let OddsBoardShared = null;
+try { OddsBoardShared = require('./ui/odds_board_shared'); } catch(_){ }
 // Auto map rebroadcast status visual sync
 try {
   function applyEmbeddedMapAutoRefreshVisual(p){
@@ -156,25 +158,37 @@ function renderEmbeddedOdds(){
   const rowsEl=document.getElementById('embeddedOddsRows'); if(!rowsEl) return;
   const excelRec = embeddedOddsData['excel'];
   const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel');
-  const liveVals = vals.filter(r=>!r.frozen);
-  const p1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
-  const p2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
-  embeddedBest1=p1.length?Math.max(...p1):NaN; embeddedBest2=p2.length?Math.max(...p2):NaN;
-  rowsEl.innerHTML = vals.map(r=>{
-    const o1=parseFloat(r.odds[0]); const o2=parseFloat(r.odds[1]);
-    const frozenCls = r.frozen ? 'frozen' : '';
-    const suspTag = r.frozen ? ' eo-broker-label' : ' eo-broker-label';
-    const bestCls1 = (!r.frozen && o1===embeddedBest1)?'best':'';
-    const bestCls2 = (!r.frozen && o2===embeddedBest2)?'best':'';
-    const isSwapped = window.__embeddedSwapped && window.__embeddedSwapped.has(r.broker);
-    const swapBtn = `<button class=\"eo-swapBtn ${isSwapped?'on':''}\" data-broker=\"${r.broker}\" title=\"Swap sides\">⇄</button>`;
-    return `<tr class="${frozenCls}">`+
-      `<td class="eo-broker"><span class="${suspTag}" title="${r.frozen?'Suspended / stale':''}">${r.broker}</span></td>`+
-      `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
-      `<td class="eo-swap-cell">${swapBtn}</td>`+
-      `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td>`+
-      `</tr>`;
-  }).join('');
+  let liveNums1 = [];
+  let liveNums2 = [];
+  if(OddsBoardShared && OddsBoardShared.buildRowsHtml){
+    const out = OddsBoardShared.buildRowsHtml(vals, { variant:'embedded', isSwapped: (b)=> !!(window.__embeddedSwapped && window.__embeddedSwapped.has(b)) });
+    rowsEl.innerHTML = out.html;
+    embeddedBest1 = out.best1;
+    embeddedBest2 = out.best2;
+    liveNums1 = out.liveNums1 || [];
+    liveNums2 = out.liveNums2 || [];
+  } else {
+    const liveVals = vals.filter(r=>!r.frozen);
+    const p1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
+    const p2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
+    liveNums1 = p1; liveNums2 = p2;
+    embeddedBest1=p1.length?Math.max(...p1):NaN; embeddedBest2=p2.length?Math.max(...p2):NaN;
+    rowsEl.innerHTML = vals.map(r=>{
+      const o1=parseFloat(r.odds[0]); const o2=parseFloat(r.odds[1]);
+      const frozenCls = r.frozen ? 'frozen' : '';
+      const suspTag = r.frozen ? ' eo-broker-label' : ' eo-broker-label';
+      const bestCls1 = (!r.frozen && o1===embeddedBest1)?'best':'';
+      const bestCls2 = (!r.frozen && o2===embeddedBest2)?'best':'';
+      const isSwapped = window.__embeddedSwapped && window.__embeddedSwapped.has(r.broker);
+      const swapBtn = `<button class=\"eo-swapBtn ${isSwapped?'on':''}\" data-broker=\"${r.broker}\" title=\"Swap sides\">⇄</button>`;
+      return `<tr class="${frozenCls}">`+
+        `<td class="eo-broker"><span class="${suspTag}" title="${r.frozen?'Suspended / stale':''}">${r.broker}</span></td>`+
+        `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
+        `<td class="eo-swap-cell">${swapBtn}</td>`+
+        `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td>`+
+        `</tr>`;
+    }).join('');
+  }
   // Excel row update
   try {
     const excelCell=document.getElementById('embeddedExcelCell');
@@ -191,13 +205,11 @@ function renderEmbeddedOdds(){
   } catch(_){ }
   const midCell=document.getElementById('embeddedMidCell');
   if(midCell){
-    if(!p1.length||!p2.length){ midCell.textContent='-'; }
-    else {
-  // Mid is the midpoint between min and max of live books (not average of all)
-  const mid1=(Math.min(...p1)+Math.max(...p1))/2; const mid2=(Math.min(...p2)+Math.max(...p2))/2;
-      midCell.textContent=`${mid1.toFixed(2)} / ${mid2.toFixed(2)}`;
-  // Removed header Mid meta display (previously updated #embeddedOddsMeta)
-    }
+    const mid = (OddsBoardShared && OddsBoardShared.calcMidFromLiveNums)
+      ? OddsBoardShared.calcMidFromLiveNums(liveNums1, liveNums2)
+      : (liveNums1.length && liveNums2.length ? { mid1:(Math.min(...liveNums1)+Math.max(...liveNums1))/2, mid2:(Math.min(...liveNums2)+Math.max(...liveNums2))/2 } : null);
+    if(!mid){ midCell.textContent='-'; }
+    else { midCell.textContent=`${mid.mid1.toFixed(2)} / ${mid.mid2.toFixed(2)}`; }
   }
   try {
     const h1=document.querySelector('#lt-team1 .teamNameWrap')?.textContent || 'Side 1';

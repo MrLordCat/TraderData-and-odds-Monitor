@@ -174,6 +174,9 @@ const boardData = {};
 const swapped = new Set();
 try { (JSON.parse(localStorage.getItem('swappedBrokers')||'[]')||[]).forEach(b=>swapped.add(b)); } catch(e) {}
 
+let OddsBoardShared = null;
+try { OddsBoardShared = require('./ui/odds_board_shared'); } catch(_){ }
+
 
 function computeDerived(){
   const midRow = document.getElementById('midRow');
@@ -214,23 +217,28 @@ function renderBoard(){
   const excelRow = document.getElementById('excelRow');
   const excelRecord = boardData['excel'];
   const vals=Object.values(boardData).filter(r=>r.broker!=='excel').sort((a,b)=> a.broker.localeCompare(b.broker));
-  // Best values consider only non-frozen brokers
-  const liveVals = vals.filter(r=>!r.frozen);
-  const parsed1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
-  const parsed2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
-  const best1=parsed1.length?Math.max(...parsed1):NaN;
-  const best2=parsed2.length?Math.max(...parsed2):NaN;
-  tb.innerHTML = vals.map(r=>{
-    const o1=parseFloat(r.odds?.[0]);
-    const o2=parseFloat(r.odds?.[1]);
-    const isSwapped = swapped.has(r.broker);
-    const bestCls1 = (!r.frozen && o1===best1)?'best':'';
-    const bestCls2 = (!r.frozen && o2===best2)?'best':'';
-    const frozenCls = r.frozen ? 'frozen' : '';
-    return `<tr><td><div class="brokerCell"><span class="bName" title="${r.broker}">${r.broker}</span><button class="swapBtn ${isSwapped?'on':''}" data-broker="${r.broker}" title="Swap sides">⇄</button></div></td>`+
-           `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
-           `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td></tr>`;
-  }).join('');
+  if(OddsBoardShared && OddsBoardShared.buildRowsHtml){
+    const out = OddsBoardShared.buildRowsHtml(vals, { variant:'board', isSwapped: (b)=> swapped.has(b) });
+    tb.innerHTML = out.html;
+  } else {
+    // Fallback (legacy inline renderer)
+    const liveVals = vals.filter(r=>!r.frozen);
+    const parsed1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
+    const parsed2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
+    const best1=parsed1.length?Math.max(...parsed1):NaN;
+    const best2=parsed2.length?Math.max(...parsed2):NaN;
+    tb.innerHTML = vals.map(r=>{
+      const o1=parseFloat(r.odds?.[0]);
+      const o2=parseFloat(r.odds?.[1]);
+      const isSwapped = swapped.has(r.broker);
+      const bestCls1 = (!r.frozen && o1===best1)?'best':'';
+      const bestCls2 = (!r.frozen && o2===best2)?'best':'';
+      const frozenCls = r.frozen ? 'frozen' : '';
+      return `<tr><td><div class="brokerCell"><span class="bName" title="${r.broker}">${r.broker}</span><button class="swapBtn ${isSwapped?'on':''}" data-broker="${r.broker}" title="Swap sides">⇄</button></div></td>`+
+            `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
+            `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td></tr>`;
+    }).join('');
+  }
   // Update Excel row
   if(excelRow){
     const valSpan = document.getElementById('excelOddsVal');
@@ -276,6 +284,8 @@ if(window.desktopAPI){
   try {
     if(window.desktopAPI && window.desktopAPI.onAutoSetAll){ window.desktopAPI.onAutoSetAll(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
     if(window.desktopAPI && window.desktopAPI.onAutoToggleAll){ window.desktopAPI.onAutoToggleAll(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
+    if(window.desktopAPI && window.desktopAPI.onAutoActiveSet){ window.desktopAPI.onAutoActiveSet(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
+    if(window.desktopAPI && window.desktopAPI.onAutoResumeSet){ window.desktopAPI.onAutoResumeSet(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
   } catch(_){ }
   window.desktopAPI.onBrokerClosed && window.desktopAPI.onBrokerClosed((id)=>{ if (boardData[id]) { delete boardData[id]; renderBoard(); }});
   window.desktopAPI.onBrokersSync && window.desktopAPI.onBrokersSync((ids)=>{
