@@ -351,9 +351,9 @@
               cfg.stepMs = (typeof interval==='number' && !isNaN(interval)) ? interval : 500;
               cfg.adaptive = (typeof adaptive==='boolean') ? adaptive : false;
               cfg.burstLevels = (Array.isArray(levels) && levels.length) ? levels : [
-                { thresholdPct:15, pulses:4 },
-                { thresholdPct:7, pulses:3 },
-                { thresholdPct:5, pulses:2 }
+                { thresholdPct:20, pulses:4 },
+                { thresholdPct:12, pulses:3 },
+                { thresholdPct:6, pulses:2 }
               ];
               try { engine.setConfig(cfg); } catch(_){ }
               // If no tolerance configured at all, inform UI and keep auto off

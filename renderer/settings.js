@@ -84,17 +84,25 @@ if(autoAdaptiveInput){ autoAdaptiveInput.addEventListener('change', ()=>{ const 
 
 // Auto odds tolerance (percent difference threshold)
 const autoTolInput = document.getElementById('auto-tolerance');
-let autoTolerancePct = 0.1; // default display precision: tenths
-function clampTol(v){ return Math.max(0.01, Math.min(5, Math.round(v*10)/10)); }
+const autoTolVal = document.getElementById('auto-tolerance-val');
+let autoTolerancePct = 0.5; // percent
+function clampTol(v){ return Math.max(0.5, Math.min(10, Math.round(v*10)/10)); }
+function renderTol(){
+	try {
+		if(autoTolInput) autoTolInput.value = String(autoTolerancePct);
+		if(autoTolVal) autoTolVal.textContent = autoTolerancePct.toFixed(1) + '%';
+	} catch(_){ }
+}
 if(autoTolInput){
 	autoTolInput.addEventListener('input', ()=>{
 		const raw = parseFloat(autoTolInput.value);
 		if(!isNaN(raw)) autoTolerancePct = clampTol(raw);
+		renderTol();
 	});
 	autoTolInput.addEventListener('change', ()=>{
 		const raw = parseFloat(autoTolInput.value);
 		if(!isNaN(raw)) autoTolerancePct = clampTol(raw);
-		autoTolInput.value = autoTolerancePct.toFixed(1);
+		renderTol();
 		// Apply immediately (live) so auto engines react without pressing Save
 		try { ipcRenderer.send('auto-tolerance-set', { tolerancePct: autoTolerancePct }); } catch(_){ }
 	});
@@ -102,11 +110,27 @@ if(autoTolInput){
 
 // Shock suspend threshold (%) – auto suspends when Excel odds jump by >= this percent
 const shockInput = document.getElementById('auto-shock-threshold');
+const shockVal = document.getElementById('auto-shock-threshold-val');
 let shockThresholdPct = 40.0; // default UI suggestion
-function clampShock(v){ return Math.max(1, Math.min(100, Math.round(v*10)/10)); }
+function clampShock(v){ return Math.max(20, Math.min(80, Math.round(v*10)/10)); }
+function renderShock(){
+	try {
+		if(shockInput) shockInput.value = String(shockThresholdPct);
+		if(shockVal) shockVal.textContent = shockThresholdPct.toFixed(1) + '%';
+	} catch(_){ }
+}
 if(shockInput){
-	shockInput.addEventListener('input', ()=>{ const raw=parseFloat(shockInput.value); if(!isNaN(raw)) shockThresholdPct=clampShock(raw); });
-	shockInput.addEventListener('change', ()=>{ const raw=parseFloat(shockInput.value); if(!isNaN(raw)) shockThresholdPct=clampShock(raw); shockInput.value = shockThresholdPct.toFixed(1); try { ipcRenderer.send('auto-shock-threshold-set', { pct: shockThresholdPct }); } catch(_){ } });
+	shockInput.addEventListener('input', ()=>{
+		const raw=parseFloat(shockInput.value);
+		if(!isNaN(raw)) shockThresholdPct=clampShock(raw);
+		renderShock();
+	});
+	shockInput.addEventListener('change', ()=>{
+		const raw=parseFloat(shockInput.value);
+		if(!isNaN(raw)) shockThresholdPct=clampShock(raw);
+		renderShock();
+		try { ipcRenderer.send('auto-shock-threshold-set', { pct: shockThresholdPct }); } catch(_){ }
+	});
 }
 
 // Burst levels (3 tiers configurable)
@@ -115,38 +139,117 @@ const burstInputs = {
 	th2: document.getElementById('burst2-th'), pulses2: document.getElementById('burst2-pulses'),
 	th3: document.getElementById('burst3-th'), pulses3: document.getElementById('burst3-pulses'),
 };
-let burstLevels = [ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ];
+const burstVals = {
+	th1: document.getElementById('burst1-th-val'), pulses1: document.getElementById('burst1-pulses-val'),
+	th2: document.getElementById('burst2-th-val'), pulses2: document.getElementById('burst2-pulses-val'),
+	th3: document.getElementById('burst3-th-val'), pulses3: document.getElementById('burst3-pulses-val'),
+};
+
+// NOTE: Burst levels are applied by threshold descending internally.
+// UI now shows L1 as the LOWEST threshold and L3 as the HIGHEST (L1<->L3 rename).
+const BURST_UI = [
+	{ ui: 1, modelIndex: 2, thMin: 2, thMax: 10 },
+	{ ui: 2, modelIndex: 1, thMin: 7, thMax: 20 },
+	{ ui: 3, modelIndex: 0, thMin: 10, thMax: 30 },
+];
+
+let burstLevels = [
+	{ thresholdPct: 20, pulses: 4 },
+	{ thresholdPct: 12, pulses: 3 },
+	{ thresholdPct: 6, pulses: 2 },
+];
+
+function clampBurstThreshold(uiLevel, v){
+	const meta = BURST_UI.find(x=>x.ui===uiLevel);
+	const num = Number(v);
+	if(!meta || isNaN(num)) return null;
+	return Math.max(meta.thMin, Math.min(meta.thMax, Math.round(num)));
+}
+function clampBurstPulses(v){
+	const num = Math.round(Number(v));
+	if(isNaN(num)) return null;
+	return Math.max(1, Math.min(5, num));
+}
+
 function sanitizeBurst(list){
 	try {
 		if(!Array.isArray(list)) list = burstLevels;
-		const cleaned = list.map(l=>({ thresholdPct: Math.max(0.01, Math.min(100, Number(l.thresholdPct)||0)), pulses: Math.max(1, Math.min(10, Math.round(Number(l.pulses)||0))) }))
+		const cleaned = list.map(l=>({ thresholdPct: Math.max(1, Math.min(50, Number(l.thresholdPct)||0)), pulses: Math.max(1, Math.min(5, Math.round(Number(l.pulses)||0))) }))
 			.filter(l=> l.thresholdPct>0 && l.pulses>=1)
 			.sort((a,b)=> b.thresholdPct - a.thresholdPct)
 			.slice(0,3);
-		return cleaned.length? cleaned : [ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ];
-	} catch(_){ return [ { thresholdPct:15, pulses:4 }, { thresholdPct:7, pulses:3 }, { thresholdPct:5, pulses:2 } ]; }
+		return cleaned.length? cleaned : [
+			{ thresholdPct: 20, pulses: 4 },
+			{ thresholdPct: 12, pulses: 3 },
+			{ thresholdPct: 6, pulses: 2 },
+		];
+	} catch(_){
+		return [
+			{ thresholdPct: 20, pulses: 4 },
+			{ thresholdPct: 12, pulses: 3 },
+			{ thresholdPct: 6, pulses: 2 },
+		];
+	}
 }
 function applyBurstInputsFromModel(){
 	burstLevels = sanitizeBurst(burstLevels);
-	for(let i=0;i<3;i++){
-		const l = burstLevels[i];
-		const thEl = burstInputs['th'+(i+1)];
-		const puEl = burstInputs['pulses'+(i+1)];
-		if(thEl) thEl.value = l? Number(l.thresholdPct).toFixed(1) : '';
-		if(puEl) puEl.value = l? l.pulses : '';
+	for(const meta of BURST_UI){
+		const l = burstLevels[meta.modelIndex];
+		const thEl = burstInputs['th'+meta.ui];
+		const puEl = burstInputs['pulses'+meta.ui];
+		const thV = burstVals['th'+meta.ui];
+		const puV = burstVals['pulses'+meta.ui];
+		if(thEl) thEl.value = l ? String(Math.round(Number(l.thresholdPct))) : String(meta.thMin);
+		if(puEl) puEl.value = l ? String(Math.round(Number(l.pulses))) : '1';
+		if(thV) thV.textContent = (l ? String(Math.round(Number(l.thresholdPct))) : String(meta.thMin)) + '%';
+		if(puV) puV.textContent = (l ? String(Math.round(Number(l.pulses))) : '1');
 	}
 }
 function readBurstInputs(){
-	const tmp=[];
-	for(let i=1;i<=3;i++){
-		const th = parseFloat(burstInputs['th'+i]?.value);
-		const pu = parseInt(burstInputs['pulses'+i]?.value,10);
-		if(!isNaN(th) && !isNaN(pu)) tmp.push({ thresholdPct: th, pulses: pu });
+	const tmp = [null, null, null];
+	for(const meta of BURST_UI){
+		const thRaw = burstInputs['th'+meta.ui]?.value;
+		const puRaw = burstInputs['pulses'+meta.ui]?.value;
+		const th = clampBurstThreshold(meta.ui, thRaw);
+		const pu = clampBurstPulses(puRaw);
+		if(th!=null && pu!=null) tmp[meta.modelIndex] = { thresholdPct: th, pulses: pu };
 	}
-	if(tmp.length) burstLevels = tmp;
+	if(tmp.every(Boolean)) burstLevels = tmp;
 	burstLevels = sanitizeBurst(burstLevels);
 }
-Object.values(burstInputs).forEach(el=>{ if(el){ el.addEventListener('change', ()=>{ readBurstInputs(); applyBurstInputsFromModel(); try { ipcRenderer.send('auto-burst-levels-set', { levels: burstLevels }); } catch(_){ } }); }});
+function renderBurstOne(uiLevel){
+	try {
+		const thEl = burstInputs['th'+uiLevel];
+		const puEl = burstInputs['pulses'+uiLevel];
+		const thV = burstVals['th'+uiLevel];
+		const puV = burstVals['pulses'+uiLevel];
+		if(thEl && thV) thV.textContent = String(Math.round(Number(thEl.value))) + '%';
+		if(puEl && puV) puV.textContent = String(Math.round(Number(puEl.value)));
+	} catch(_){ }
+}
+
+for(let uiLevel=1; uiLevel<=3; uiLevel++){
+	const thEl = burstInputs['th'+uiLevel];
+	const puEl = burstInputs['pulses'+uiLevel];
+	if(thEl){
+		thEl.addEventListener('input', ()=> renderBurstOne(uiLevel));
+		thEl.addEventListener('change', ()=>{
+			renderBurstOne(uiLevel);
+			readBurstInputs();
+			applyBurstInputsFromModel();
+			try { ipcRenderer.send('auto-burst-levels-set', { levels: burstLevels }); } catch(_){ }
+		});
+	}
+	if(puEl){
+		puEl.addEventListener('input', ()=> renderBurstOne(uiLevel));
+		puEl.addEventListener('change', ()=>{
+			renderBurstOne(uiLevel);
+			readBurstInputs();
+			applyBurstInputsFromModel();
+			try { ipcRenderer.send('auto-burst-levels-set', { levels: burstLevels }); } catch(_){ }
+		});
+	}
+}
 
 function queueStatsConfigSend(){
 	if(!currentStatsConfig) return;
@@ -242,10 +345,10 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	// Request stored auto tolerance & burst levels after initial settings applied
 	try { ipcRenderer.invoke('auto-tolerance-get').then(v=>{
 		if(typeof v === 'number' && !isNaN(v)) autoTolerancePct = clampTol(v);
-		if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(1);
-	}).catch(()=>{ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(1); }); } catch(_){ if(autoTolInput) autoTolInput.value = autoTolerancePct.toFixed(1); }
+		renderTol();
+	}).catch(()=>{ renderTol(); }); } catch(_){ renderTol(); }
 	// Initialize shock threshold from store
-	try { ipcRenderer.invoke('auto-shock-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) shockThresholdPct=clampShock(v); if(shockInput) shockInput.value = shockThresholdPct.toFixed(1); }).catch(()=>{ if(shockInput) shockInput.value = shockThresholdPct.toFixed(1); }); } catch(_){ if(shockInput) shockInput.value = shockThresholdPct.toFixed(1); }
+	try { ipcRenderer.invoke('auto-shock-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) shockThresholdPct=clampShock(v); renderShock(); }).catch(()=>{ renderShock(); }); } catch(_){ renderShock(); }
 	try { ipcRenderer.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)) { burstLevels = v; } applyBurstInputsFromModel(); }).catch(()=> applyBurstInputsFromModel()); } catch(_){ applyBurstInputsFromModel(); }
 	// Pre-apply game selector from payload if present
 	try {

@@ -33,7 +33,7 @@ function initSettingsIpc(ctx){
   });
 
   // Auto odds tolerance (percent). Persist under key 'autoTolerancePct'.
-  function clampTol(v){ return Math.max(0.01, Math.min(5, v)); }
+  function clampTol(v){ return Math.max(0.5, Math.min(10, v)); }
   ipcMain.handle('auto-tolerance-get', ()=>{
     try {
       const v = store.get('autoTolerancePct');
@@ -69,8 +69,8 @@ function initSettingsIpc(ctx){
     try {
       if(!Array.isArray(levels)) return null;
       const cleaned = levels.map(l=>({
-        thresholdPct: Math.max(0.01, Math.min(100, Number(l.thresholdPct)||0)),
-        pulses: Math.max(1, Math.min(10, Math.round(Number(l.pulses)||0)))
+        thresholdPct: Math.max(1, Math.min(50, Number(l.thresholdPct)||0)),
+        pulses: Math.max(1, Math.min(5, Math.round(Number(l.pulses)||0)))
       })).filter(l=> l.thresholdPct>0 && l.pulses>=1);
       if(cleaned.length===0) return null;
       // Sort descending by threshold
@@ -157,7 +157,7 @@ function initSettingsIpc(ctx){
   });
 
   // === Auto shock suspend threshold (%) ===
-  function clampShock(v){ return Math.max(1, Math.min(100, Math.round(v*10)/10)); }
+  function clampShock(v){ return Math.max(20, Math.min(80, Math.round(v*10)/10)); }
   ipcMain.handle('auto-shock-threshold-get', ()=>{
     try {
       const v = store.get('autoShockThresholdPct');

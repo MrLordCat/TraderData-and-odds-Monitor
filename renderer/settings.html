@@ -32,16 +32,50 @@
 					<section class="seg">
 					<h2 class="sectionTitle">Auto Odds</h2>
 					<div class="grid formGrid">
-						<label for="auto-tolerance">Tolerance (%)</label><input id="auto-tolerance" type="number" min="0.01" max="5" step="0.1" />
-						<label for="auto-shock-threshold">Suspend on shock (%)</label><input id="auto-shock-threshold" type="number" min="1" max="100" step="0.1" />
-						<label>Burst L1 threshold (%)</label><input id="burst1-th" type="number" min="0.01" max="100" step="0.1" />
-						<label>Burst L1 pulses</label><input id="burst1-pulses" type="number" min="1" max="10" step="1" />
-						<label>Burst L2 threshold (%)</label><input id="burst2-th" type="number" min="0.01" max="100" step="0.1" />
-						<label>Burst L2 pulses</label><input id="burst2-pulses" type="number" min="1" max="10" step="1" />
-						<label>Burst L3 threshold (%)</label><input id="burst3-th" type="number" min="0.01" max="100" step="0.1" />
-						<label>Burst L3 pulses</label><input id="burst3-pulses" type="number" min="1" max="10" step="1" />
+						<label for="auto-tolerance">Tolerance (%)</label>
+						<div class="rangeWrap">
+							<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />
+							<span id="auto-tolerance-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-shock-threshold">Suspend on shock (%)</label>
+						<div class="rangeWrap">
+							<input id="auto-shock-threshold" type="range" min="20" max="80" step="0.1" />
+							<span id="auto-shock-threshold-val" class="rangeVal"></span>
+						</div>
+						<label for="burst1-th">Burst L1 threshold (%)</label>
+						<div class="rangeWrap">
+							<input id="burst1-th" type="range" min="2" max="10" step="1" />
+							<span id="burst1-th-val" class="rangeVal"></span>
+						</div>
+						<label for="burst1-pulses">Burst L1 pulses</label>
+						<div class="rangeWrap">
+							<input id="burst1-pulses" type="range" min="1" max="5" step="1" />
+							<span id="burst1-pulses-val" class="rangeVal"></span>
+						</div>
+						<div class="subRule" aria-hidden="true"></div>
+						<label for="burst2-th">Burst L2 threshold (%)</label>
+						<div class="rangeWrap">
+							<input id="burst2-th" type="range" min="7" max="20" step="1" />
+							<span id="burst2-th-val" class="rangeVal"></span>
+						</div>
+						<label for="burst2-pulses">Burst L2 pulses</label>
+						<div class="rangeWrap">
+							<input id="burst2-pulses" type="range" min="1" max="5" step="1" />
+							<span id="burst2-pulses-val" class="rangeVal"></span>
+						</div>
+						<div class="subRule" aria-hidden="true"></div>
+						<label for="burst3-th">Burst L3 threshold (%)</label>
+						<div class="rangeWrap">
+							<input id="burst3-th" type="range" min="10" max="30" step="1" />
+							<span id="burst3-th-val" class="rangeVal"></span>
+						</div>
+						<label for="burst3-pulses">Burst L3 pulses</label>
+						<div class="rangeWrap">
+							<input id="burst3-pulses" type="range" min="1" max="5" step="1" />
+							<span id="burst3-pulses-val" class="rangeVal"></span>
+						</div>
 					</div>
-					<div class="hint">Tolerance: diff% below this considered aligned. Shock: when Excel odds jump ≥ this %, auto suspends. Burst levels: when diff% ≥ threshold -> use pulses before confirm (F22). First matching level used. Defaults: 15%->4, 7%->3, 5%->2.</div>
+					<div class="hint">Tolerance: diff% below this considered aligned. Shock: when Excel odds jump ≥ this %, auto suspends. Burst levels: when diff% ≥ threshold -> use pulses before confirm (F22). First matching level used.</div>
 					</section>
 
 				<!-- Game Stats Theme section removed (LoL table theme controls deprecated) -->

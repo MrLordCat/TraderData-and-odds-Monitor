@@ -74,6 +74,30 @@ button:active { transform:translateY(1px); }
 .formGrid { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; align-items: center; }
 .sepLine { margin:18px 0; border:none; border-top:1px solid #2c3649; }
 
+.rangeWrap{
+	display:flex;
+	align-items:center;
+	gap:10px;
+	min-width:0;
+}
+.rangeWrap input[type="range"]{
+	flex:1;
+	min-width:0;
+}
+.rangeVal{
+	min-width: 56px;
+	text-align: right;
+	opacity: .7;
+	font-variant-numeric: tabular-nums;
+}
+
+.subRule{
+	grid-column: 1 / -1;
+	height: 1px;
+	background: #2c3649;
+	opacity: .9;
+}
+
 .segmentsScroll {
 	flex: 1 1 auto;
 	min-height: 0;
