@@ -1,1 +1,0 @@
-{"side":0,"key":"F21","direction":"market:no-mid:retry","diffPct":null,"tsStart":1765892899085,"injVk":132,"cmd":"powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\kristian.vlassenko\\Documents\\oddsMoni\\desktop\\sendKeyInject.ps1\" 132","ok":true,"err":null,"tsDone":1765892899664}
