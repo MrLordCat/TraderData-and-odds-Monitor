@@ -128,7 +128,8 @@ let hotkeys; // unified hotkey manager (TAB/F1/F2/F3)
 const hotkeysRef = { value: null };
 
 // Cross-window auto state snapshot (used by hotkeys and late-loaded views)
-let __autoLast = { active:false, resume:true };
+// Requirement: Auto Resume (R) must start OFF on every app launch.
+let __autoLast = { active:false, resume:false };
 // BrowserView registry & state caches (restored after accidental removal in refactor)
 const views = {}; // id -> BrowserView
 let activeBrokerIds = []; // ordered list of currently opened broker ids
@@ -292,10 +293,14 @@ const { initLayoutIpc } = require('./modules/ipc/layout');
 // inline dev watcher removed (moved to modules/dev/devCssWatcher.js)
 
 function bootstrap() {
-  // First-run defaults: don't auto-open any brokers. Populate disabled list once.
+  // First-run defaults: don't auto-open any brokers.
+  // Also handle upgrades/migrations where `disabledBrokers` key might be missing.
   try {
     const hasLaunched = !!store.get('hasLaunched');
-    if (!hasLaunched) {
+    const disabledRaw = store.get('disabledBrokers');
+    const disabledValid = Array.isArray(disabledRaw);
+    if (!hasLaunched || !disabledValid) {
+      // If it's truly first run OR legacy prefs are missing/invalid, start with 0 active brokers.
       try { store.set('disabledBrokers', BROKERS.map(b => b.id)); } catch(_) {}
       try { store.set('hasLaunched', true); } catch(_) {}
     }

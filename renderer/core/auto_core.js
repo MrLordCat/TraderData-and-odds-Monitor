@@ -45,11 +45,14 @@
       maxAdaptiveWaitMs: cfg.maxAdaptiveWaitMs,
       userWanted:false,
       lastDisableReason:null,
-      autoResume:true,
+      // Requirement: Auto Resume (R) must start OFF on every app launch.
+      // User can toggle it during the session, but it should not persist as ON across restarts.
+      autoResume:false,
     };
 
     // Restore persisted flags if keys provided
-    try { if(storage.autoResumeKey){ const v = localStorage.getItem(storage.autoResumeKey); if(v==='0') state.autoResume=false; } } catch(_){ }
+    // - autoResume is intentionally forced OFF on startup (do not restore from storage)
+    try { if(storage.autoResumeKey){ localStorage.setItem(storage.autoResumeKey, '0'); } } catch(_){ }
     try { if(storage.userWantedKey){ const v = localStorage.getItem(storage.userWantedKey); if(v==='1'){ state.userWanted=true; } } } catch(_){ }
 
     function schedule(delay){ if(!state.active) return; clearTimeout(state.timer); state.timer = setTimeout(step, typeof delay==='number'? delay: state.stepMs); }
