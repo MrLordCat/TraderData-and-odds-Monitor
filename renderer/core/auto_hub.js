@@ -22,6 +22,38 @@
     let excelProcRunning = null; // null=unknown yet, boolean after first status
     let excelProcStarting = false;
     let excelProcInstalling = false;
+    let excelProcError = null;
+
+    function getAutoEnableInfo(){
+      const info = {
+        canEnable: false,
+        reasonCode: null,
+        excel: {
+          running: excelProcRunning,
+          starting: excelProcStarting,
+          installing: excelProcInstalling,
+          error: excelProcError,
+        }
+      };
+      // Block when status unknown (startup) OR when not running OR when starting/installing.
+      if(excelProcRunning !== true){
+        info.reasonCode = (excelProcRunning === null) ? 'excel-unknown' : 'excel-off';
+        return info;
+      }
+      if(excelProcInstalling){ info.reasonCode = 'excel-installing'; return info; }
+      if(excelProcStarting){ info.reasonCode = 'excel-starting'; return info; }
+      info.canEnable = true;
+      return info;
+    }
+
+    function markAllDisableReason(reasonCode){
+      if(!reasonCode) return;
+      views.forEach(v=>{
+        try {
+          if(v && v.engine && v.engine.state){ v.engine.state.lastDisableReason = reasonCode; }
+        } catch(_){ }
+      });
+    }
 
     function broadcastAutoActiveOff(){
       try {
@@ -31,6 +63,10 @@
     }
 
     function disableAllAutoDueToExcelStop(){
+      try {
+        const info = getAutoEnableInfo();
+        if(info && info.reasonCode){ markAllDisableReason(info.reasonCode); }
+      } catch(_){ }
       let anyWasActive = false;
       views.forEach(v=>{
         try {
@@ -64,6 +100,7 @@
         excelProcRunning = !!(s && s.running);
         excelProcStarting = !!(s && s.starting);
         excelProcInstalling = !!(s && s.installing);
+        excelProcError = (s && s.error) ? String(s.error) : null;
 
         // If python stopped (or not running) and auto is on — force off.
         if(excelProcRunning !== true){
@@ -78,16 +115,31 @@
 
     function attachExcelProcStatus(){
       try {
+        if(attachExcelProcStatus.__bound) return;
+        attachExcelProcStatus.__bound = true;
+
+        // Prefer desktopAPI bridge (works even when ipcRenderer/require is not available)
+        try {
+          if(global.desktopAPI && typeof global.desktopAPI.onExcelExtractorStatus==='function'){
+            global.desktopAPI.onExcelExtractorStatus((s)=>{
+              applyExcelProcStatus(s);
+            });
+            if(typeof global.desktopAPI.getExcelExtractorStatus==='function'){
+              global.desktopAPI.getExcelExtractorStatus().then(s=> applyExcelProcStatus(s)).catch(()=>{
+                applyExcelProcStatus({ running:false, starting:false, installing:false });
+              });
+            }
+            return;
+          }
+        } catch(_){ }
+
+        // Fallback to raw ipcRenderer
         if(!global.require) return;
         const { ipcRenderer } = global.require('electron');
         if(!ipcRenderer) return;
-        if(attachExcelProcStatus.__bound) return;
-        attachExcelProcStatus.__bound = true;
         ipcRenderer.on('excel-extractor-status', (_e, s)=>{
           applyExcelProcStatus(s);
-          // Optional hint in UI when user tries to use Auto while script is OFF.
         });
-        // Initial fetch
         try {
           ipcRenderer.invoke('excel-extractor-status-get')
             .then(s=> applyExcelProcStatus(s))
@@ -145,6 +197,21 @@
           }
         }
       } catch(_){ }
+    }
+
+    function invokeSetting(channel){
+      try {
+        if(global.desktopAPI && typeof global.desktopAPI.invoke==='function'){
+          return global.desktopAPI.invoke(channel);
+        }
+      } catch(_){ }
+      try {
+        if(global.require){
+          const { ipcRenderer } = global.require('electron');
+          if(ipcRenderer && typeof ipcRenderer.invoke==='function') return ipcRenderer.invoke(channel);
+        }
+      } catch(_){ }
+      return Promise.reject(new Error('invoke unavailable'));
     }
 
     function applyExcelGuard(){
@@ -272,7 +339,11 @@
           let after = null;
           // If toggling ON while python script is OFF — block and keep OFF.
           if(!canEnableAuto()){
-            statusAll('Start Excel script');
+            try {
+              const info = getAutoEnableInfo();
+              if(info && info.reasonCode) markAllDisableReason(info.reasonCode);
+              statusAll(info && info.reasonCode ? ('Auto blocked: '+info.reasonCode) : 'Start Excel script');
+            } catch(_){ statusAll('Start Excel script'); }
             disableAllAutoDueToExcelStop();
             after = false;
           } else {
@@ -289,15 +360,23 @@
         const handleSet = (p)=>{
           const want=!!(p&&p.on);
           if(want && !canEnableAuto()){
-            statusAll('Start Excel script');
+            try {
+              const info = getAutoEnableInfo();
+              if(info && info.reasonCode) markAllDisableReason(info.reasonCode);
+              statusAll(info && info.reasonCode ? ('Auto blocked: '+info.reasonCode) : 'Start Excel script');
+            } catch(_){ statusAll('Start Excel script'); }
             disableAllAutoDueToExcelStop();
             // Broadcast OFF so other windows converge.
             broadcastAutoActiveOff();
             return;
           }
-          views.forEach(v=>{ try { const eng=v.engine; if(eng && want!==eng.state.active){ eng.setActive(want); } } catch(_){ } });
+          views.forEach(v=>{ try {
+            const eng=v.engine; if(!eng) return;
+            if(!want){ try { eng.state.lastDisableReason = 'manual'; } catch(_){ } }
+            if(want!==eng.state.active){ eng.setActive(want); }
+          } catch(_){ } });
         };
-        const handleDisable = ()=>{ let changed=false; views.forEach(v=>{ try { const eng=v.engine; if(eng && eng.state.active){ eng.setActive(false); changed=true; } } catch(_){ } });
+        const handleDisable = ()=>{ let changed=false; views.forEach(v=>{ try { const eng=v.engine; if(eng && eng.state.active){ try { eng.state.lastDisableReason = 'manual'; } catch(_){ } eng.setActive(false); changed=true; } } catch(_){ } });
           // Notify others only if we actually disabled something
           try {
             if(changed){
@@ -310,12 +389,20 @@
           try {
             const want=!!(p&&p.on);
             if(want && !canEnableAuto()){
-              statusAll('Start Excel script');
+              try {
+                const info = getAutoEnableInfo();
+                if(info && info.reasonCode) markAllDisableReason(info.reasonCode);
+                statusAll(info && info.reasonCode ? ('Auto blocked: '+info.reasonCode) : 'Start Excel script');
+              } catch(_){ statusAll('Start Excel script'); }
               disableAllAutoDueToExcelStop();
               broadcastAutoActiveOff();
               return;
             }
-            views.forEach(v=>{ try { const eng=v.engine; if(eng && want!==eng.state.active){ eng.setActive(want); if(v.ui && typeof v.ui.onActiveChanged==='function'){ v.ui.onActiveChanged(want, eng.state); } } } catch(_){ } });
+            views.forEach(v=>{ try {
+              const eng=v.engine; if(!eng) return;
+              if(!want){ try { eng.state.lastDisableReason = 'manual'; } catch(_){ } }
+              if(eng && want!==eng.state.active){ eng.setActive(want); if(v.ui && typeof v.ui.onActiveChanged==='function'){ v.ui.onActiveChanged(want, eng.state); } }
+            } catch(_){ } });
           } catch(_){ }
         };
         const handleResumeSet = (p)=>{ try {
@@ -332,6 +419,14 @@
           if(global.desktopAPI.onAutoDisableAll) global.desktopAPI.onAutoDisableAll(handleDisable);
           if(global.desktopAPI.onAutoResumeSet) global.desktopAPI.onAutoResumeSet(handleResumeSet);
           if(global.desktopAPI.onAutoActiveSet) global.desktopAPI.onAutoActiveSet(handleActiveSet);
+
+          // Settings live updates via bridge
+          try {
+            if(global.desktopAPI.onAutoToleranceUpdated){ global.desktopAPI.onAutoToleranceUpdated((v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ tolerancePct:v }); }); }
+            if(global.desktopAPI.onAutoIntervalUpdated){ global.desktopAPI.onAutoIntervalUpdated((v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ stepMs:v }); }); }
+            if(global.desktopAPI.onAutoAdaptiveUpdated){ global.desktopAPI.onAutoAdaptiveUpdated((v)=>{ if(typeof v==='boolean') applyConfigAll({ adaptive:v }); }); }
+            if(global.desktopAPI.onAutoBurstLevelsUpdated){ global.desktopAPI.onAutoBurstLevelsUpdated((levels)=>{ if(Array.isArray(levels)) applyConfigAll({ burstLevels:levels }); }); }
+          } catch(_){ }
         } else if(global.require){
           const { ipcRenderer } = global.require('electron');
           if(ipcRenderer){
@@ -367,35 +462,31 @@
       });
       // Initialize engine config from persisted global settings (tolerance, interval, adaptive, burstLevels)
       try {
-        if(global.require){
-          const { ipcRenderer } = global.require('electron');
-          if(ipcRenderer && typeof ipcRenderer.invoke==='function'){
-            Promise.all([
-              ipcRenderer.invoke('auto-tolerance-get').catch(()=>null),
-              ipcRenderer.invoke('auto-interval-get').catch(()=>null),
-              ipcRenderer.invoke('auto-adaptive-get').catch(()=>null),
-              ipcRenderer.invoke('auto-burst-levels-get').catch(()=>null),
-            ]).then(([tol, interval, adaptive, levels])=>{
-              const cfg = {};
-              const missing = [];
-              if(typeof tol==='number' && !isNaN(tol)) cfg.tolerancePct = tol; else missing.push('Tolerance');
-              // Provide safe defaults for missing params so auto can run once Tolerance is set
-              cfg.stepMs = (typeof interval==='number' && !isNaN(interval)) ? interval : 500;
-              cfg.adaptive = (typeof adaptive==='boolean') ? adaptive : false;
-              cfg.burstLevels = (Array.isArray(levels) && levels.length) ? levels : [
-                { thresholdPct:20, pulses:4 },
-                { thresholdPct:12, pulses:3 },
-                { thresholdPct:6, pulses:2 }
-              ];
-              try { engine.setConfig(cfg); } catch(_){ }
-              // If no tolerance configured at all, inform UI and keep auto off
-              if(missing.length){
-                try { ui && ui.status && ui.status('Set in Settings: '+missing.join(', ')); } catch(_){ }
-                try { engine.setActive(false); } catch(_){ }
-              }
-            }).catch(()=>{});
+        Promise.all([
+          invokeSetting('auto-tolerance-get').catch(()=>null),
+          invokeSetting('auto-interval-get').catch(()=>null),
+          invokeSetting('auto-adaptive-get').catch(()=>null),
+          invokeSetting('auto-burst-levels-get').catch(()=>null),
+        ]).then(([tol, interval, adaptive, levels])=>{
+          const cfg = {};
+          const missing = [];
+          if(typeof tol==='number' && !isNaN(tol)) cfg.tolerancePct = tol; else missing.push('Tolerance');
+          // Provide safe defaults for missing params so auto can run once Tolerance is set
+          cfg.stepMs = (typeof interval==='number' && !isNaN(interval)) ? interval : 500;
+          cfg.adaptive = (typeof adaptive==='boolean') ? adaptive : false;
+          cfg.burstLevels = (Array.isArray(levels) && levels.length) ? levels : [
+            { thresholdPct:20, pulses:4 },
+            { thresholdPct:12, pulses:3 },
+            { thresholdPct:6, pulses:2 }
+          ];
+          try { engine.setConfig(cfg); } catch(_){ }
+          try { if(engine && engine.state && engine.state.active){ engine.step(); } } catch(_){ }
+          // If no tolerance configured at all, inform UI and keep auto off
+          if(missing.length){
+            try { ui && ui.status && ui.status('Set in Settings: '+missing.join(', ')); } catch(_){ }
+            try { engine.setActive(false); } catch(_){ }
           }
-        }
+        }).catch(()=>{});
       } catch(_){ }
       // If other views already exist, align this engine to their canonical state (first found)
       const first = views.values().next();
@@ -429,7 +520,15 @@
         setActive: (on)=>{
           const val = !!on;
           if(val && !canEnableAuto()){
-            try { ui && ui.status && ui.status('Start Excel script'); } catch(_){ }
+            try {
+              const info = getAutoEnableInfo();
+              if(info && info.reasonCode){
+                try { engine.state.lastDisableReason = info.reasonCode; } catch(_){ }
+                try { ui && ui.status && ui.status('Auto blocked: '+info.reasonCode); } catch(_){ }
+              } else {
+                try { ui && ui.status && ui.status('Start Excel script'); } catch(_){ }
+              }
+            } catch(_){ try { ui && ui.status && ui.status('Start Excel script'); } catch(_){ } }
             disableAllAutoDueToExcelStop();
             broadcastAutoActiveOff();
             return;
@@ -437,6 +536,7 @@
           // Apply to all views uniformly
           views.forEach(v=>{ try {
             const was = !!v.engine.state.active;
+            if(!val){ try { v.engine.state.lastDisableReason = 'manual'; } catch(_){ } }
             if(was !== val){ v.engine.setActive(val); }
             if(v.ui && typeof v.ui.onActiveChanged==='function'){ v.ui.onActiveChanged(val, v.engine.state); }
           } catch(_){ } });
@@ -473,7 +573,11 @@
     attachExcelProcStatus();
     addBroadcastListeners();
 
-    return { attachView, getState:()=> ({ records:state.records, derived:state.derived }) };
+    return {
+      attachView,
+      getState:()=> ({ records:state.records, derived:state.derived }),
+      getAutoEnableInfo,
+    };
   }
 
   global.AutoHub = createAutoHub();

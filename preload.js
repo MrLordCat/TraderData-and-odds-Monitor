@@ -95,6 +95,12 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,onAutoResumeSet: (cb) => withUnsub('auto-resume-set', cb)
   ,onAutoActiveSet: (cb) => withUnsub('auto-active-set', cb)
 
+  // Auto settings live updates (for views without direct ipcRenderer)
+  ,onAutoToleranceUpdated: (cb) => withUnsub('auto-tolerance-updated', cb)
+  ,onAutoIntervalUpdated: (cb) => withUnsub('auto-interval-updated', cb)
+  ,onAutoAdaptiveUpdated: (cb) => withUnsub('auto-adaptive-updated', cb)
+  ,onAutoBurstLevelsUpdated: (cb) => withUnsub('auto-burst-levels-updated', cb)
+
   // Per-broker swap (team orientation)
   ,getSwappedBrokers: () => ipcRenderer.invoke('swapped-brokers-get')
   ,setBrokerSwap: (broker, swapped) => { try { ipcRenderer.send('swapped-broker-set', { broker, swapped: !!swapped }); } catch(_){ } }

@@ -342,6 +342,10 @@ if(window.desktopAPI){
     // Small ephemeral toast near the S button
     let excelTogglePendingTs = 0;
     let excelToggleToastEl = null;
+    let lastStatusSig = '';
+    let lastAutoToastTs = 0;
+    let lastHoverLines = null;
+    let lastHoverKind = 'ok';
     function showMiniToastNear(el, lines, kind){
       try {
         if(excelToggleToastEl && excelToggleToastEl.parentNode) excelToggleToastEl.parentNode.removeChild(excelToggleToastEl);
@@ -380,6 +384,14 @@ if(window.desktopAPI){
           excelTogglePendingTs = Date.now();
           try { window.desktopAPI.excelScriptToggle && window.desktopAPI.excelScriptToggle(); } catch(_){ }
         });
+        // Hover tooltip: show current status near the button
+        sBtn.addEventListener('mouseenter', ()=>{
+          try {
+            if(lastHoverLines && lastHoverLines.length){
+              showMiniToastNear(sBtn, lastHoverLines, lastHoverKind);
+            }
+          } catch(_){ }
+        });
       }
     } catch(_){ }
     if(window.desktopAPI.onExcelExtractorStatus){
@@ -396,23 +408,47 @@ if(window.desktopAPI){
             else if(s.error) text='error';
             else text='idle';
             statusEl.dataset.last=text;
-            if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; statusEl.title='Excel extractor idle'; }
-            else { statusEl.style.display='inline'; statusEl.textContent=text; statusEl.title='Excel extractor: '+text; }
+            if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; }
+            else { statusEl.style.display='inline'; statusEl.textContent=text; }
           }
+
+          const pyOn = !!s.running;
+          const ahkOn = !!(s.ahk && s.ahk.running);
+          const pyErr = s.error ? String(s.error) : '';
+          const ahkErr = (s.ahk && s.ahk.error) ? String(s.ahk.error) : '';
+          const lines = [
+            'Python: ' + (pyOn ? 'ON' : 'OFF') + (pyErr ? ' ('+pyErr+')' : ''),
+            'AHK: ' + (ahkOn ? 'ON' : 'OFF') + (ahkErr ? ' ('+ahkErr+')' : '')
+          ];
+          const kind = (pyErr || ahkErr) ? 'err' : 'ok';
+          lastHoverLines = lines;
+          lastHoverKind = kind;
+          // Intentionally no native tooltip (title). Status is shown via miniToast only.
 
           // If user just clicked the toggle, show a compact status popup near the button
           if(btn && excelTogglePendingTs && (Date.now() - excelTogglePendingTs) < 1800){
-            const pyOn = !!s.running;
-            const ahkOn = !!(s.ahk && s.ahk.running);
-            const pyErr = s.error ? String(s.error) : '';
-            const ahkErr = (s.ahk && s.ahk.error) ? String(s.ahk.error) : '';
-            const lines = [
-              'Python: ' + (pyOn ? 'ON' : 'OFF') + (pyErr ? ' ('+pyErr+')' : ''),
-              'AHK: ' + (ahkOn ? 'ON' : 'OFF') + (ahkErr ? ' ('+ahkErr+')' : '')
-            ];
-            const kind = (pyErr || ahkErr) ? 'err' : 'ok';
             showMiniToastNear(btn, lines, kind);
             excelTogglePendingTs = 0;
+          }
+
+          // Also show the same toast when toggled via hotkeys (status transition), to match click UX.
+          if(btn && !excelTogglePendingTs){
+            const sig = [
+              s.installing ? 'I' : '',
+              s.starting ? 'S' : '',
+              s.running ? 'R' : '',
+              pyErr ? ('E:'+pyErr) : '',
+              ahkOn ? 'A' : '',
+              ahkErr ? ('AE:'+ahkErr) : ''
+            ].join('|');
+            const changed = !!lastStatusSig && sig !== lastStatusSig;
+            const important = !!(s.starting || s.running || pyErr || ahkErr);
+            const now = Date.now();
+            if(changed && important && (now - lastAutoToastTs) > 1200){
+              showMiniToastNear(btn, lines, kind);
+              lastAutoToastTs = now;
+            }
+            lastStatusSig = sig;
           }
         } catch(_){ }
       });
@@ -431,9 +467,11 @@ if(window.desktopAPI){
               else if(s.error) text='error';
               else text='idle';
               statusEl.dataset.last=text;
-              if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; statusEl.title='Excel extractor idle'; }
-              else { statusEl.style.display='inline'; statusEl.textContent=text; statusEl.title='Excel extractor: '+text; }
+              if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; }
+              else { statusEl.style.display='inline'; statusEl.textContent=text; }
             }
+
+            // Intentionally no native tooltip (title). Status is shown via miniToast only.
           } catch(_){ }
         }).catch(()=>{});
       }

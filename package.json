@@ -36,6 +36,7 @@
       "statsContentPreload.js",
       "stealthPreload.js",
       "blankPreload.js",
+      "Excel Extractor/**/*",
       "modules/**/*",
       "renderer/**/*",
       "!renderer/ds_url.html",

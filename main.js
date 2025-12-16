@@ -17,7 +17,7 @@ const fs = require('fs');
 const constants = require('./modules/utils/constants');
 // Local constants (some consumed by modularized managers)
 const SNAP = constants.SNAP_DISTANCE; // snap threshold for drag/resize logic (needed by brokerManager ctx)
-2
+
 // Allow renderer toolbar 'Dev' button to open main window DevTools
 ipcMain.on('open-devtools', () => {
   try {
@@ -192,8 +192,10 @@ const { initStatsIpc } = require('./modules/ipc/stats');
 const { initTeamNamesIpc } = require('./modules/ipc/teamNames');
 const { initAutoRefreshIpc } = require('./modules/ipc/autoRefresh');
 const { initSwapIpc } = require('./modules/ipc/swap');
+const { initExcelExtractorIpc } = require('./modules/ipc/excelExtractor');
 // External Excel odds JSON watcher (pseudo broker 'excel')
 const { createExcelWatcher } = require('./modules/excelWatcher');
+const { createExcelExtractorController } = require('./modules/excelExtractorController');
 const lolTeamNamesRef = { value: lolTeamNames };
 const autoRefreshEnabledRef = { value: autoRefreshEnabled };
 function createMainWindow() {
@@ -441,408 +443,38 @@ function bootstrap() {
   try { initSwapIpc({ ipcMain, store, boardManager, mainWindow, statsManager }); } catch(e){ console.warn('initSwapIpc failed', e); }
   try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: boardWindow }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
   try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs }, store }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
-  // -------- Excel extractor (Python) process control --------
-  // Lightweight toggle: user triggers start/stop via board "S" button.
-  // We spawn a detached python process reading the workbook and writing current_state.json.
-  // Guard against rapid respawn; maintain status broadcast to renderer.
-  const { spawn } = require('child_process');
-  let excelProc = null;
-  let excelProcStarting = false;
-  let lastExcelStartTs = 0;
-  let excelProcError = null; // last error message (non-zero exit or spawn failure)
-  let excelDepsInstalling = false;
-
-  // Optional AHK helper (screen-click automation for Excel)
-  let ahkProc = null;
-  let ahkProcStarting = false;
-  let ahkProcError = null;
-
-  function resolveAhkScriptPath(){
-    // Store override
-    try {
-      const custom = store.get('ahkScriptPath');
-      if(custom && typeof custom === 'string' && fs.existsSync(custom.trim())) return custom.trim();
-    } catch(_){ }
-    // Default: Excel Extractor/script159_v2.ahk
-    try {
-      const appRoot = path.resolve(__dirname);
-      const candidates = [
-        path.join(appRoot, 'Excel Extractor', 'script159_v2.ahk'),
-        path.join(appRoot, 'Excel Extractor', 'script159.ahk'),
-        path.join(process.cwd(), 'Excel Extractor', 'script159_v2.ahk'),
-        path.join(process.cwd(), 'Excel Extractor', 'script159.ahk')
-      ];
-      for(const p of candidates){ try { if(fs.existsSync(p)) return p; } catch(_){ } }
-    } catch(_){ }
-    return null;
-  }
-
-  function resolveAhkExe(){
-    // User override
-    try {
-      const custom = store.get('ahkExePath');
-      if(custom && typeof custom === 'string' && custom.trim()) return custom.trim();
-    } catch(_){ }
-    // Fall back to PATH resolution
-    return 'AutoHotkey64.exe';
-  }
-
-  function startAhkHelper(){
-    if(ahkProc || ahkProcStarting) return;
-    ahkProcStarting = true;
-    ahkProcError = null;
-    broadcastExcelStatus();
-    try {
-      const scriptPath = resolveAhkScriptPath();
-      if(!scriptPath){
-        ahkProcError = 'AHK script not found (script159_v2.ahk)';
-        ahkProcStarting = false;
-        broadcastExcelStatus();
-        return;
-      }
-      let exe = resolveAhkExe();
-      const cwd = path.dirname(scriptPath);
-
-      function spawnAhk(exeToTry, secondTry){
-        try {
-          ahkProc = spawn(exeToTry, [scriptPath], { cwd, stdio:['ignore','pipe','pipe'], windowsHide:true });
-          let didFallback = false;
-          ahkProc.on('error', (err)=>{
-            try { console.warn('[ahk][error]', err && err.message ? err.message : String(err)); } catch(_){ }
-            // Most common case: ENOENT (AutoHotkey not installed / not in PATH)
-            if(secondTry && !didFallback){
-              didFallback = true;
-              try { if(ahkProc) ahkProc.removeAllListeners(); } catch(_){ }
-              try { ahkProc = null; } catch(_){ }
-              try { secondTry(); return; } catch(_){ }
-            }
-            ahkProc = null;
-            ahkProcStarting = false;
-            const msg = (err && err.code === 'ENOENT')
-              ? 'AutoHotkey not found (set ahkExePath)'
-              : ('AHK spawn error: ' + (err && err.message ? err.message : String(err)));
-            ahkProcError = msg;
-            broadcastExcelStatus();
-          });
-          ahkProc.on('spawn', ()=>{ ahkProcStarting = false; ahkProcError = null; broadcastExcelStatus(); });
-          let errBuf='';
-          ahkProc.stdout.on('data', d=>{ /* keep quiet by default */ try { const s=d.toString().trim(); if(s) console.log('[ahk][stdout]', s); } catch(_){ } });
-          ahkProc.stderr.on('data', d=>{ try { const s=d.toString(); errBuf += s; console.warn('[ahk][stderr]', s.trim()); } catch(_){ } });
-          ahkProc.on('exit', (code, sig)=>{
-            if(code && code !== 0){
-              ahkProcError = 'AHK exit code ' + code;
-              if(errBuf && /requires|error|cannot|failed/i.test(errBuf)){
-                ahkProcError = errBuf.trim().slice(0, 180);
-              }
-            } else if(sig){
-              ahkProcError = null;
-            }
-            ahkProc = null;
-            ahkProcStarting = false;
-            broadcastExcelStatus();
-          });
-          broadcastExcelStatus();
-        } catch(err){
-          ahkProc = null;
-          if(secondTry){
-            try { secondTry(); return; } catch(_){ }
-          }
-          ahkProcError = 'AHK spawn failed: ' + (err && err.message ? err.message : String(err));
-          ahkProcStarting = false;
-          broadcastExcelStatus();
-        }
-      }
-
-      // If AutoHotkey64.exe is not found, try AutoHotkey.exe
-      spawnAhk(exe, ()=>{
-        if(exe.toLowerCase() === 'autohotkey64.exe'){
-          spawnAhk('AutoHotkey.exe');
-        }
-      });
-    } catch(err){
-      ahkProc = null;
-      ahkProcError = 'AHK start error: ' + (err && err.message ? err.message : String(err));
-      ahkProcStarting = false;
-      broadcastExcelStatus();
-    }
-  }
-
-  function stopAhkHelper(){
-    if(!ahkProc) { ahkProcStarting = false; return; }
-    try { console.log('[ahk] stopping pid', ahkProc.pid); ahkProc.kill(); } catch(_){ }
-  }
-    function excelLog(){
-      const msg = Array.from(arguments).map(a=>{
-        if(a instanceof Error) return a.stack||a.message;
-        if(typeof a==='object'){ try { return JSON.stringify(a); } catch(_){ return String(a); } }
-        return String(a);
-      }).join(' ');
-      try { console.log('[excel-extractor][log]', msg); } catch(_){ }
-      try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('excel-extractor-log', { ts:Date.now(), msg }); } catch(_){ }
+  // -------- Excel extractor (Python + AHK) process control --------
+  // Thin wiring: controller owns process lifecycle & status broadcasting.
+  const excelExtractorController = createExcelExtractorController({
+    app,
+    store,
+    dialog,
+    getMainWindow: () => mainWindow,
+    getBoardWebContents: () => {
       try {
-        if(typeof boardManager?.getWebContents==='function'){
-          const bwc = boardManager.getWebContents();
-          if(bwc && !bwc.isDestroyed()) bwc.send('excel-extractor-log', { ts:Date.now(), msg });
-        }
-      } catch(_){ }
-    }
-  
-  function resolveExcelScriptPath(){
-    // 1. Store override
-    try { const custom = store.get('excelScriptPath'); if(custom && fs.existsSync(custom)) return custom; } catch(_){}
-    // 2. Common filenames & subfolders inside project
-    const names = ['excel_watcher.py','excel-watcher.py','excelWatcher.py'];
-    const dirs = ['', 'scripts', 'script', 'python', 'excel', 'Excel Extractor', 'extractor'];
-    const isDev = !app.isPackaged;
-    if(isDev){
-      // In dev часто нужно добавить корень проекта и cwd варианты
+        if (boardManager && typeof boardManager.getWebContents === 'function') return boardManager.getWebContents();
+      } catch (_) { }
+      return null;
+    },
+    getStatsWebContentsList: () => {
       try {
-        const cwd = process.cwd();
-        dirs.push(cwd);
-        dirs.push(path.join(cwd, 'Excel Extractor'));
-      } catch(_){ }
-    }
-    // When packaged, __dirname points at resources/app; also attempt explicit resources/app and resources/app/Excel Extractor
-    try {
-      if(process.resourcesPath){
-        const base = path.join(process.resourcesPath, 'app');
-        dirs.push(base);
-        dirs.push(path.join(base, 'Excel Extractor'));
-      }
-    } catch(_){}
-  const tried = [];
-    for(const d of dirs){
-      for(const n of names){
-        const p = path.join(__dirname, d, n);
-        tried.push(p);
-        try { if(fs.existsSync(p)) { 
-          console.warn('[excel-extractor] resolveExcelScriptPath: found', p);
-          return p; 
-        }} catch(_){}
-      }
-    }
-    // 3. Shallow recursive scan (depth 2) to be more forgiving
-    try {
-      const scanDirs=[__dirname];
-      const visited=new Set();
-      while(scanDirs.length){
-        const cur=scanDirs.shift();
-        if(visited.has(cur)) continue; visited.add(cur);
-        let entries=[]; try { entries = fs.readdirSync(cur, { withFileTypes:true }); } catch(_){ continue; }
-        for(const ent of entries){
-          if(ent.isDirectory()){
-            const relDepth = cur.replace(__dirname,'').split(path.sep).filter(Boolean).length;
-            if(relDepth < 2) scanDirs.push(path.join(cur, ent.name));
-          } else if(/excel[_-]?watcher\.py$/i.test(ent.name)){
-            const full = path.join(cur, ent.name);
-            console.warn('[excel-extractor] resolveExcelScriptPath: found (scan)', full);
-            return full;
-          }
-        }
-      }
-    } catch(_){}
-    // Log what we tried for diagnostics
-    try { console.warn('[excel-extractor] script not found, tried:', tried); } catch(_){}
-    if(isDev){
-      console.warn('[excel-extractor] DEV HINT: размести excel_watcher.py в корень или папку "Excel Extractor" либо укажи путь через IPC excel-extractor-set-path');
-    }
-    return null;
-  }
-  function broadcastExcelStatus(){
-    try {
-      const payload = {
-        running: !!excelProc,
-        starting: excelProcStarting,
-        error: excelProcError,
-        installing: excelDepsInstalling,
-        ahk: {
-          running: !!ahkProc,
-          starting: ahkProcStarting,
-          error: ahkProcError
-        }
-      };
-      if(mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('excel-extractor-status', payload);
-      }
-      // Also broadcast to board BrowserView if present
-      try {
-        if(typeof boardManager?.getWebContents === 'function'){
-          const bwc = boardManager.getWebContents();
-          if(bwc && !bwc.isDestroyed()) bwc.send('excel-extractor-status', payload);
-        }
-      } catch(_){ }
-      // And to stats panel / slots if present
-      try {
-        if(statsManager && statsManager.views){
+        const out = [];
+        if (statsManager && statsManager.views) {
           const vs = statsManager.views;
-          ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('excel-extractor-status', payload); } catch(_){ } } });
+          ['panel', 'A', 'B'].forEach(k => {
+            try {
+              const v = vs[k];
+              if (v && v.webContents && !v.webContents.isDestroyed()) out.push(v.webContents);
+            } catch (_) { }
+          });
         }
-      } catch(_){ }
-    } catch(_){ }
-  }
-  function startExcelExtractor(){
-    if(excelProc || excelProcStarting) return;
-    const now=Date.now(); if(now - lastExcelStartTs < 1500) { return; }
-    lastExcelStartTs = now;
-    excelProcStarting = true; excelProcError=null; broadcastExcelStatus();
-    try {
-      // Resolve script path: prefer user override from store key excelScriptPath else fallback to ./excel_watcher.py
-      let scriptPath = resolveExcelScriptPath();
-      if(!scriptPath){ excelLog('script not found (resolveExcelScriptPath returned null)'); excelProcStarting=false; broadcastExcelStatus(); return; }
-      // Pick python executable: allow store override (excelPythonPath) else rely on 'python'
-      let py = 'python';
-      try { const pyOverride = store.get('excelPythonPath'); if(pyOverride) py = pyOverride; } catch(_){}
-
-      // Resolve workbook path (persisted). If missing/invalid, ask user to choose.
-      let workbookPath = null;
-      try {
-        const saved = store.get('excelWorkbookPath');
-        if(saved && typeof saved === 'string') workbookPath = saved.trim();
-      } catch(_){ }
-      try {
-        if(!workbookPath || !fs.existsSync(workbookPath)){
-          const picked = dialog && dialog.showOpenDialogSync ? dialog.showOpenDialogSync(mainWindow, {
-            title: 'Select Excel workbook for extractor',
-            properties: ['openFile'],
-            filters: [
-              { name: 'Excel', extensions: ['xlsm','xlsx','xls'] },
-              { name: 'All Files', extensions: ['*'] }
-            ]
-          }) : null;
-          if(!picked || !picked.length){
-            excelProcError = 'Excel file not selected';
-            excelProcStarting = false;
-            broadcastExcelStatus();
-            return;
-          }
-          workbookPath = picked[0];
-          store.set('excelWorkbookPath', workbookPath);
-          excelLog('excelWorkbookPath set', workbookPath);
-        }
-      } catch(err){
-        excelProcError = 'File picker failed: '+(err && err.message ? err.message : String(err));
-        excelProcStarting = false;
-        broadcastExcelStatus();
-        return;
+        return out;
+      } catch (_) {
+        return [];
       }
-
-      // Use unbuffered mode (-u) to force immediate flush of stdout/stderr (so logs visible in board DevTools)
-      const args = ['-u', scriptPath, '--file', workbookPath];
-      const cwd = path.dirname(scriptPath);
-      // Log all details before spawn
-      excelLog('spawn attempt', JSON.stringify({ python:py, args, cwd, scriptPath }));
-      // Quick absolute path existence check if user provided full path
-      if(/[\\/]/.test(py)){
-        try { if(!fs.existsSync(py)) excelLog('warning: python path does not exist:', py); } catch(_){ }
-      }
-      const spawnEnv = Object.assign({}, process.env, {
-        PYTHONUNBUFFERED: '1',
-        PYTHONIOENCODING: 'utf-8'
-      });
-      excelProc = spawn(py, args, { cwd, stdio:['ignore','pipe','pipe'], env: spawnEnv });
-      excelLog('spawned pid', excelProc.pid, 'script', scriptPath);
-      excelProc.on('spawn', ()=>{ excelProcStarting=false; broadcastExcelStatus(); });
-
-      // Start AHK helper alongside Python extractor (non-fatal if missing)
-      try { startAhkHelper(); } catch(_){ }
-      // If user hasn't overridden excelDumpPath, set it to current script directory/current_state.json for watcher alignment
-      try {
-        const existingDump = store.get('excelDumpPath');
-        const dumpCandidate = path.join(cwd, 'current_state.json');
-        const needReset = !existingDump || path.dirname(existingDump) !== cwd || !fs.existsSync(existingDump);
-        if(needReset){
-          store.set('excelDumpPath', dumpCandidate);
-          excelLog('excelDumpPath synced to', dumpCandidate, '(needReset=', needReset, ')');
-        } else {
-          excelLog('excelDumpPath ok', existingDump);
-        }
-      } catch(_){ }
-      let stderrBuf='';
-      let gotAnyOutput = false;
-      let firstOutputTimer = setTimeout(()=>{
-        if(!gotAnyOutput && excelProc){
-          excelLog('no-output-first-4s: возможно скрипт ждёт Excel или не установлен pywin32. Убедитесь что: Excel открыт с нужной книгой и выполнен pip install pywin32');
-        }
-      }, 4000);
-      function markOutput(){ if(!gotAnyOutput){ gotAnyOutput=true; try { clearTimeout(firstOutputTimer); } catch(_){ } } }
-      excelProc.stdout.on('data', d=>{ try { markOutput(); const s=d.toString(); excelLog('[stdout]', s.trim()); if(/ERROR|Traceback|exception/i.test(s)) console.warn('[excel-extractor][stdout]', s.trim()); } catch(_){ } });
-      excelProc.stderr.on('data', d=>{ try { markOutput(); const t=d.toString(); stderrBuf += t; excelLog('[stderr]', t.trim()); } catch(_){ } });
-      excelProc.on('exit', (code, sig)=>{ 
-        excelLog('exit code', code, 'sig', sig||'');
-        try { clearTimeout(firstOutputTimer); } catch(_){ }
-        if(code && code!==0){
-          // Detect missing pywin32
-          if(/pywin32/i.test(stderrBuf)){
-            excelProcError = 'pywin32 не установлен (pip install pywin32)';
-          } else {
-            excelProcError = 'Exit code '+code;
-          }
-        } else if(sig){
-          excelProcError = null; // normal manual stop
-        }
-        excelProc=null; excelProcStarting=false; broadcastExcelStatus();
-      });
-      broadcastExcelStatus();
-    } catch(err){
-      excelLog('spawn failed', err.message);
-      excelProcError = err.message; excelProcStarting=false; excelProc=null; broadcastExcelStatus();
     }
-  }
-  function stopExcelExtractor(){
-    // Stop both Python extractor and AHK helper
-    try { if(excelProc){ console.log('[excel-extractor] stopping pid', excelProc.pid); excelProc.kill(); } } catch(_){ }
-    try { stopAhkHelper(); } catch(_){ }
-  }
-  ipcMain.on('excel-extractor-toggle', ()=>{ try { if(excelProc || ahkProc){ stopExcelExtractor(); } else { startExcelExtractor(); } } catch(_){ } });
-  ipcMain.handle('excel-extractor-status-get', ()=> ({
-    running: !!excelProc,
-    starting: excelProcStarting,
-    error: excelProcError,
-    installing: excelDepsInstalling,
-    ahk: { running: !!ahkProc, starting: ahkProcStarting, error: ahkProcError }
-  }));
-  ipcMain.on('excel-extractor-set-path', (_e, p)=>{
-    try {
-      if(!p || typeof p !== 'string') return;
-      const trimmed = p.trim();
-      if(fs.existsSync(trimmed)){
-        store.set('excelScriptPath', trimmed);
-        console.log('[excel-extractor] custom path set', trimmed);
-        // if process not running attempt immediate start for feedback
-        if(!excelProc) startExcelExtractor(); else broadcastExcelStatus();
-      } else {
-        console.warn('[excel-extractor] set-path file does not exist', trimmed);
-      }
-    } catch(err){ console.warn('[excel-extractor] set-path error', err.message); }
   });
-  // Broadcast initial status (not running)
-  setTimeout(()=> broadcastExcelStatus(), 500);
-  app.on('before-quit', ()=>{ try { stopExcelExtractor(); } catch(_){ } });
-  // Dependency installer (currently only pywin32)
-  ipcMain.on('excel-extractor-install-deps', ()=>{
-    if(excelDepsInstalling) return;
-    // Determine python exe (same logic as spawn)
-    let py='python';
-    try { const pyOverride = store.get('excelPythonPath'); if(pyOverride) py=pyOverride; } catch(_){ }
-    excelDepsInstalling = true; excelProcError=null; broadcastExcelStatus();
-    try {
-      const inst = spawn(py, ['-m','pip','install','pywin32'], { stdio:['ignore','pipe','pipe'] });
-      let errBuf='';
-      inst.stdout.on('data', d=>{ try { console.log('[excel-extractor][install][stdout]', d.toString().trim()); } catch(_){ } });
-      inst.stderr.on('data', d=>{ try { const s=d.toString(); errBuf+=s; console.warn('[excel-extractor][install][stderr]', s.trim()); } catch(_){ } });
-      inst.on('exit', (code)=>{
-        excelDepsInstalling=false;
-        if(code===0){
-          excelProcError=null;
-          // Auto-start after successful install if not running
-          setTimeout(()=>{ if(!excelProc) startExcelExtractor(); }, 400);
-        } else {
-          excelProcError = 'Install failed (code '+code+')';
-        }
-        broadcastExcelStatus();
-      });
-    } catch(err){ excelDepsInstalling=false; excelProcError = 'Install spawn err: '+err.message; broadcastExcelStatus(); }
-  });
+  initExcelExtractorIpc({ ipcMain, controller: excelExtractorController });
   // Expose mutable refs for diagnostic / future module hot-swap
   try { Object.defineProperty(global, '__oddsMoniSync', { value:{ autoRefreshEnabledRef, lolTeamNamesRef }, enumerable:false }); } catch(_){}
   staleMonitor = createStaleMonitor({ intervalMs: HEALTH_CHECK_INTERVAL, staleMs: STALE_MS, brokerHealth, views, enabledRef:{ value:autoRefreshEnabled }, onReload:(id)=>{ try { views[id].webContents.reloadIgnoringCache(); } catch(e){} } });

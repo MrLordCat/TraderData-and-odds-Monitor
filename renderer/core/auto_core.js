@@ -118,7 +118,11 @@
       try { onActiveChanged(state.active, state); } catch(_){ }
       try {
         if(storage.userWantedKey){ localStorage.setItem(storage.userWantedKey, state.active? '1':'0'); }
-        if(!state.active){ state.lastDisableReason = 'manual'; }
+        // Preserve externally supplied disable reasons (e.g., guards from AutoHub).
+        // Only mark as manual if no other reason is already set.
+        if(!state.active){
+          if(!state.lastDisableReason || state.lastDisableReason === 'manual') state.lastDisableReason = 'manual';
+        }
       } catch(_){ }
       if(state.active){ step(); } else { clearTimeout(state.timer); state.timer=null; }
     }

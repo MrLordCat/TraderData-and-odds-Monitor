@@ -287,6 +287,8 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
           const cnt = Object.keys(st.records||{}).length;
           try { console.log('[embeddedOdds][hub][first] records:', cnt, 'derived.hasMid:', !!(st && st.derived && st.derived.hasMid)); } catch(_){ }
         }
+          let lastStatusSig = '';
+          let lastAutoToastTs = 0;
         Object.assign(embeddedOddsData, st.records||{}); renderEmbeddedOdds();
       } catch(_){ } });
       hub.start();
@@ -322,8 +324,15 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   try {
     const { ipcRenderer } = require('electron');
     const btn = document.getElementById('embeddedExcelScriptBtn');
+    const statusCell = document.getElementById('embeddedExcelStatusCell');
+
     let excelTogglePendingTs = 0;
     let excelToggleToastEl = null;
+    let lastStatusSig = '';
+    let lastAutoToastTs = 0;
+    let lastHoverLines = null;
+    let lastHoverKind = 'ok';
+
     function showMiniToastNear(el, lines, kind){
       try {
         if(excelToggleToastEl && excelToggleToastEl.parentNode) excelToggleToastEl.parentNode.removeChild(excelToggleToastEl);
@@ -352,16 +361,10 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
         setTimeout(()=>{ try { if(toast && toast.parentNode) toast.parentNode.removeChild(toast); } catch(_){ } }, ttl + 260);
       } catch(_){ }
     }
-    if(btn && !btn.dataset.bound){
-      btn.dataset.bound='1';
-      btn.addEventListener('click', ()=>{
-        excelTogglePendingTs = Date.now();
-        try { ipcRenderer.send('excel-extractor-toggle'); } catch(_){ }
-      });
-    }
-    const statusCell = document.getElementById('embeddedExcelStatusCell');
-    ipcRenderer.on('excel-extractor-status', (_e, s)=>{
+
+    function applyStatus(s){
       try {
+        if(!s) return;
         if(statusCell){
           if(s.installing) statusCell.textContent='installing...';
           else if(s.starting) statusCell.textContent='starting';
@@ -371,23 +374,66 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
         }
         if(btn) btn.classList.toggle('on', !!s.running);
 
+        const pyOn = !!s.running;
+        const ahkOn = !!(s.ahk && s.ahk.running);
+        const pyErr = s.error ? String(s.error) : '';
+        const ahkErr = (s.ahk && s.ahk.error) ? String(s.ahk.error) : '';
+        const lines = [
+          'Python: ' + (pyOn ? 'ON' : 'OFF') + (pyErr ? ' ('+pyErr+')' : ''),
+          'AHK: ' + (ahkOn ? 'ON' : 'OFF') + (ahkErr ? ' ('+ahkErr+')' : '')
+        ];
+        const kind = (pyErr || ahkErr) ? 'err' : 'ok';
+        lastHoverLines = lines;
+        lastHoverKind = kind;
+
+        // Intentionally no native tooltip (title). Status is shown via miniToast only.
+
+        // If user just clicked toggle, show toast immediately
         if(btn && excelTogglePendingTs && (Date.now() - excelTogglePendingTs) < 1800){
-          const pyOn = !!s.running;
-          const ahkOn = !!(s.ahk && s.ahk.running);
-          const pyErr = s.error ? String(s.error) : '';
-          const ahkErr = (s.ahk && s.ahk.error) ? String(s.ahk.error) : '';
-          const lines = [
-            'Python: ' + (pyOn ? 'ON' : 'OFF') + (pyErr ? ' ('+pyErr+')' : ''),
-            'AHK: ' + (ahkOn ? 'ON' : 'OFF') + (ahkErr ? ' ('+ahkErr+')' : '')
-          ];
-          const kind = (pyErr || ahkErr) ? 'err' : 'ok';
           showMiniToastNear(btn, lines, kind);
           excelTogglePendingTs = 0;
         }
+
+        // Also show toast when toggled via hotkeys (status transition)
+        if(btn && !excelTogglePendingTs){
+          const sig = [
+            s.installing ? 'I' : '',
+            s.starting ? 'S' : '',
+            s.running ? 'R' : '',
+            pyErr ? ('E:'+pyErr) : '',
+            ahkOn ? 'A' : '',
+            ahkErr ? ('AE:'+ahkErr) : ''
+          ].join('|');
+          const changed = !!lastStatusSig && sig !== lastStatusSig;
+          const important = !!(s.starting || s.running || pyErr || ahkErr);
+          const now = Date.now();
+          if(changed && important && (now - lastAutoToastTs) > 1200){
+            showMiniToastNear(btn, lines, kind);
+            lastAutoToastTs = now;
+          }
+          lastStatusSig = sig;
+        }
       } catch(_){ }
-    });
+    }
+
+    if(btn && !btn.dataset.bound){
+      btn.dataset.bound='1';
+      btn.addEventListener('click', ()=>{
+        excelTogglePendingTs = Date.now();
+        try { ipcRenderer.send('excel-extractor-toggle'); } catch(_){ }
+      });
+      btn.addEventListener('mouseenter', ()=>{
+        try {
+          if(lastHoverLines && lastHoverLines.length){
+            showMiniToastNear(btn, lastHoverLines, lastHoverKind);
+          }
+        } catch(_){ }
+      });
+    }
+
+    ipcRenderer.on('excel-extractor-status', (_e, s)=> applyStatus(s));
     // Initial status fetch
-    try { ipcRenderer.invoke('excel-extractor-status-get').then(s=>{ ipcRenderer.emit('excel-extractor-status', null, s); }).catch(()=>{}); } catch(_){ }
+    try { ipcRenderer.invoke('excel-extractor-status-get').then(s=> applyStatus(s)).catch(()=>{}); } catch(_){ }
   } catch(_){ }
 }
 function initSectionReorder(){
@@ -487,4 +533,4 @@ document.addEventListener('click', e=>{
   } catch(_){ }
 });
 
-// (Legacy embedded auto code removed – unified Auto Core is used via auto_trader_embedded.js)
+// (Legacy embedded auto code removed – unified Auto Core is used via auto_trader.js)
