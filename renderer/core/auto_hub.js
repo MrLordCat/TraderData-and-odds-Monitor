@@ -457,7 +457,19 @@
         parseExcel: ()=>{ const ex=getExcelRecord(); if(ex && Array.isArray(ex.odds) && ex.odds.length===2){ const n1=parseFloat(ex.odds[0]), n2=parseFloat(ex.odds[1]); if(!isNaN(n1)&&!isNaN(n2)) return [n1,n2]; } return null; },
         flash: (idx)=>{ try { ui.flash && ui.flash(idx); } catch(_){ } },
         status: (msg)=>{ try { ui.status && ui.status(msg); } catch(_){ } },
-        onActiveChanged: (active, st)=>{ try { ui.onActiveChanged && ui.onActiveChanged(active, st); } catch(_){ } },
+        onActiveChanged: (active, st, meta)=>{
+          try { ui.onActiveChanged && ui.onActiveChanged(active, st, meta); } catch(_){ }
+          // Handle excel-no-change suspend: send F21 and broadcast OFF
+          if(!active && st && st.lastDisableReason === 'excel-no-change'){
+            try {
+              console.log('[autoHub][excelNoChangeGuard] suspend after', st.excelNoChangeCount, 'failed attempts');
+              sendAutoPressF21({ reason: 'excel-no-change:x'+st.excelNoChangeCount });
+              // Broadcast OFF to all windows
+              if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); }
+              else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } }
+            } catch(_){ }
+          }
+        },
         storageKeys: { autoResumeKey: ns+':autoResumeEnabled', userWantedKey: ns+':autoUserWanted' },
       });
       // Initialize engine config from persisted global settings (tolerance, interval, adaptive, burstLevels)

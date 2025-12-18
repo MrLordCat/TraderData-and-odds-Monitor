@@ -48,6 +48,9 @@
       // Requirement: Auto Resume (R) must start OFF on every app launch.
       // User can toggle it during the session, but it should not persist as ON across restarts.
       autoResume:false,
+      // Excel change fail protection: count consecutive failures when Excel doesn't change after adjustment
+      excelNoChangeCount: 0,
+      maxExcelNoChangeAttempts: 2, // suspend after this many consecutive failures
     };
 
     // Restore persisted flags if keys provided
@@ -60,9 +63,11 @@
     function burstAndConfirm(sideToAdjust, direction, diffPct){
       // Determine key per side/direction
       const keyLabel = (sideToAdjust===0) ? (direction==='raise' ? 'F24' : 'F23') : (direction==='raise' ? 'F23' : 'F24');
-      // Cooldown check
+      // Cooldown check — return false if skipped due to cooldown
       const now = Date.now();
-      if(now - state.lastFireTs < state.fireCooldownMs && state.lastFireSide===sideToAdjust && state.lastFireKey===keyLabel){ return; }
+      if(now - state.lastFireTs < state.fireCooldownMs && state.lastFireSide===sideToAdjust && state.lastFireKey===keyLabel){
+        return false; // Did not fire due to cooldown
+      }
       state.lastFireTs = now; state.lastFireSide = sideToAdjust; state.lastFireKey = keyLabel;
       // Pulses based on thresholds
       let pulses = 1;
@@ -75,10 +80,16 @@
       // Confirm F22
       const confirmDelay = cfg.pulseGap*(pulses-1) + cfg.confirmBase;
       setTimeout(()=>{ try { press({ side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true }); } catch(_){ } }, confirmDelay);
+      return true; // Successfully fired
     }
 
     function step(){
       if(!state.active) return;
+      // If adaptive mode is on and we're still waiting for Excel to change — skip this step
+      if(state.adaptive && state.waitingForExcel){
+        // Don't send new presses, just wait for the check() to complete
+        return;
+      }
       const mid = parseMid && parseMid();
       const ex = parseExcel && parseExcel();
       // Require config before operating
@@ -93,11 +104,26 @@
       // Min-only alignment
       const sideToAdjust = (mid[0] <= mid[1]) ? 0 : 1;
       const diffPct = Math.abs(ex[sideToAdjust] - mid[sideToAdjust]) / mid[sideToAdjust] * 100;
-      if(diffPct <= state.tolerancePct){ status('Aligned (min side)'); return schedule(); }
+      if(diffPct <= state.tolerancePct){
+        // Aligned — reset failure counter
+        state.excelNoChangeCount = 0;
+        status('Aligned (min side)');
+        return schedule();
+      }
       const direction = (ex[sideToAdjust] < mid[sideToAdjust]) ? 'raise' : 'lower';
       try { flash(sideToAdjust); } catch(_){ }
       status(`Align ${direction} S${sideToAdjust+1} ${diffPct.toFixed(2)}% (min)`);
-      try { burstAndConfirm(sideToAdjust, direction, diffPct); } catch(_){ }
+      
+      // Try to send key presses — may be blocked by cooldown
+      let fired = false;
+      try { fired = burstAndConfirm(sideToAdjust, direction, diffPct); } catch(_){ fired = false; }
+      
+      // If cooldown blocked the fire, just schedule next step without waiting for Excel
+      if(!fired){
+        status(`Cooldown (wait ${state.fireCooldownMs}ms)`);
+        return schedule();
+      }
+      
       if(state.adaptive){
         state.waitingForExcel = true;
         state.excelSnapshotKey = (ex[0]+'|'+ex[1]);
@@ -105,8 +131,31 @@
         const check = ()=>{
           if(!state.active || !state.waitingForExcel || myToken!==state.waitToken) return;
           const cur = parseExcel && parseExcel();
-          if(cur){ const kk = cur[0]+'|'+cur[1]; if(kk !== state.excelSnapshotKey){ state.waitingForExcel=false; return schedule(50); } }
-          if(Date.now()-startTs >= state.maxAdaptiveWaitMs){ state.waitingForExcel=false; return schedule(); }
+          if(cur){
+            const kk = cur[0]+'|'+cur[1];
+            if(kk !== state.excelSnapshotKey){
+              // Excel changed — reset failure counter and continue
+              state.excelNoChangeCount = 0;
+              state.waitingForExcel=false;
+              return schedule(50);
+            }
+          }
+          if(Date.now()-startTs >= state.maxAdaptiveWaitMs){
+            // Excel did NOT change within timeout — increment failure counter
+            state.excelNoChangeCount++;
+            state.waitingForExcel=false;
+            // Check if we hit max failures — suspend auto
+            if(state.excelNoChangeCount >= state.maxExcelNoChangeAttempts){
+              status('SUSPEND: Excel no change x'+state.excelNoChangeCount);
+              state.lastDisableReason = 'excel-no-change';
+              setActive(false);
+              // Notify via callback so UI can show reason
+              try { onActiveChanged(false, state, { excelNoChange: true, attempts: state.excelNoChangeCount }); } catch(_){ }
+              return;
+            }
+            status('Excel no change ('+state.excelNoChangeCount+'/'+state.maxExcelNoChangeAttempts+')');
+            return schedule();
+          }
           setTimeout(check, 120);
         };
         setTimeout(check, 150);

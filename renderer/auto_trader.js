@@ -105,6 +105,10 @@
       if(reason==='shock'){
         return { kind:'err', lines:[ 'Auto: PAUSED', 'Reason: shock (odds jump)', 'Guard: please wait' ] };
       }
+      if(reason==='excel-no-change'){
+        const attempts = st && st.excelNoChangeCount ? st.excelNoChangeCount : 2;
+        return { kind:'err', lines:[ 'Auto: SUSPENDED', 'Reason: Excel odds did not change', 'Failed attempts: '+attempts ] };
+      }
       if(/^excel-/.test(reason)){
         return { kind:'err', lines:[ 'Auto: BLOCKED', 'Reason: '+reason, 'Click S to start' ] };
       }

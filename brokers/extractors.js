@@ -73,27 +73,86 @@ function extractRivalry(mapNum=0, game='lol'){
       }
   } else {
       const idx = mapNum-1; if(idx<0||idx>=ORD.length) return { odds:['-','-'], frozen:false };
-      const ordWord = ORD[idx].toLowerCase();
+      const ordWord = ORD[idx].toLowerCase(); // 'first', 'second', etc.
       const num = idx+1;
+      // Regex to detect map indicator in header (e.g. "First map", "Map 1", "1st map")
+      const mapHeaderRe = new RegExp('('+ordWord+'\\s+map|map\\s*'+num+'(?:st|nd|rd|th)?|'+num+'(?:st|nd|rd|th)?\\s+map)', 'i');
+      const badRe = /both\s+teams|first\s+(?:blood|tower|dragon)|to\s+slay|baron|dragon/i;
+      
+      // Strategy 1: Old format — single line has both map phrase + "winner"
       const mapPhraseRe = new RegExp('^('+
         ordWord.replace(/([.*+?^${}()|\[\]\\])/g,'\\$1')+'\\s+map|map\\s+'+num+'(?:st|nd|rd|th)?'+')');
-      const badRe = /both\s+teams|first\s+(?:blood|tower|dragon)|to\s+slay|handicap|total|baron|dragon/i;
-      function looksWinner(line){
+      function looksWinnerOld(line){
         if(!line) return false;
         const n=norm(line);
         if(!/winner/.test(n)) return false;
         if(badRe.test(n)) return false;
         if(!mapPhraseRe.test(n)) return false;
-        // must contain winner token after phrase
-        return /winner/.test(n);
+        return true;
       }
       outer: for(const w of wrappers){
         const lines=(w.textContent||'').split('\n').map(l=>l.trim()).filter(l=>l.length).slice(0,12);
-        for(const line of lines){ if(looksWinner(line)){ target=w; break outer; } }
+        for(const line of lines){ if(looksWinnerOld(line)){ target=w; break outer; } }
+      }
+      
+      // Strategy 2: New Rivalry format — wrapper header says "First map - main lines" (no "winner"),
+      // but inside there's a separate "Winner" market row. Look for wrapper whose header matches map
+      // and contains a "Winner" section (not handicap/total/etc).
+      if(!target){
+        for(const w of wrappers){
+          const txt = w.textContent || '';
+          const txtLower = norm(txt);
+          // Check header contains map indicator
+          if(!mapHeaderRe.test(txt)) continue;
+          // Must have "Winner" somewhere (as a separate market label inside)
+          if(!/\bwinner\b/i.test(txt)) continue;
+          // Exclude if it's only handicap/total/etc markets (no plain Winner)
+          // Look for a "Winner" that's NOT preceded by "kill" (Kill handicap) or "total"
+          // The structure has "Winner" as a standalone market type
+          const hasPlainWinner = /\bwinner\b/i.test(txt) && !/kill\s*winner|winner\s*handicap/i.test(txtLower);
+          if(!hasPlainWinner) continue;
+          // Exclude bad markets
+          if(badRe.test(txtLower)) continue;
+          // Found a candidate — but verify it has outcome plates
+          const plates = w.querySelectorAll('[data-editor-id="tableOutcomePlate"]');
+          if(plates.length >= 2) { target = w; break; }
+        }
       }
     }
     if(!target) return { odds:['-','-'], frozen:false };
-    const plates = Array.from(target.querySelectorAll('[data-editor-id="tableOutcomePlate"]')).slice(0,2);
+    
+    // Find the "Winner" market label inside target and get the 2 plates immediately after it
+    // Structure: <div>Winner</div> <div tableOutcomePlate>...</div> <div tableOutcomePlate>...</div> <div>Kill handicap</div> ...
+    let plates = [];
+    const allChildren = Array.from(target.querySelectorAll('*'));
+    // Find element whose trimmed text is exactly "Winner" (case-insensitive)
+    const winnerLabel = allChildren.find(el => {
+      const t = (el.textContent || '').trim().toLowerCase();
+      return t === 'winner' && el.children.length === 0; // leaf node with just "Winner"
+    });
+    if(winnerLabel){
+      // Traverse siblings after winnerLabel to collect plates
+      let sibling = winnerLabel.nextElementSibling;
+      while(sibling && plates.length < 2){
+        if(sibling.matches('[data-editor-id="tableOutcomePlate"]')){
+          plates.push(sibling);
+        } else if(sibling.querySelector('[data-editor-id="tableOutcomePlate"]')){
+          // Plate might be nested
+          plates.push(...Array.from(sibling.querySelectorAll('[data-editor-id="tableOutcomePlate"]')).slice(0, 2 - plates.length));
+        } else {
+          // Hit another market label (e.g. "Kill handicap"), stop
+          const sibText = (sibling.textContent || '').trim().toLowerCase();
+          if(sibText && !/^\d/.test(sibText) && sibText !== 'winner' && sibling.children.length === 0){
+            break;
+          }
+        }
+        sibling = sibling.nextElementSibling;
+      }
+    }
+    // Fallback: if no winnerLabel found or not enough plates, use old method (first 2 plates)
+    if(plates.length < 2){
+      plates = Array.from(target.querySelectorAll('[data-editor-id="tableOutcomePlate"]')).slice(0,2);
+    }
     if(plates.length<2) return { odds:['-','-'], frozen:false };
     const extractPrice=(plate)=>{
       const spans=[...plate.querySelectorAll('span')];
