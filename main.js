@@ -202,6 +202,7 @@ const { initExcelExtractorIpc } = require('./modules/ipc/excelExtractor');
 // External Excel odds JSON watcher (pseudo broker 'excel')
 const { createExcelWatcher } = require('./modules/excelWatcher');
 const { createExcelExtractorController } = require('./modules/excelExtractorController');
+let excelExtractorController = null; // initialized in bootstrap()
 const lolTeamNamesRef = { value: lolTeamNames };
 const autoRefreshEnabledRef = { value: autoRefreshEnabled };
 function createMainWindow() {
@@ -237,6 +238,10 @@ function createMainWindow() {
   } catch(_) {}
   mainWindow.on('close', () => {
     try { store.set('mainBounds', mainWindow.getBounds()); } catch(e) {}
+  });
+  // Auto-focus mainWindow webContents after load so hotkeys work immediately
+  mainWindow.webContents.once('did-finish-load', () => {
+    try { setTimeout(()=>{ if(mainWindow && !mainWindow.isDestroyed()) { mainWindow.focus(); mainWindow.webContents.focus(); } }, 100); } catch(_){ }
   });
   // late injection for layout manager (mutable ref)
   layoutManager.setMainWindow(mainWindow);
@@ -350,7 +355,7 @@ function bootstrap() {
   onActiveListChanged: (list)=>{ activeBrokerIds = list; activeBrokerIdsRef.value = list; }
   });
   // Initialize broker-related IPC now that brokerManager exists
-  initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, boardWindowRef:{ value: boardWindow }, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef });
+  initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, boardWindowRef:{ value: null }, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef });
   // Layout IPC (needs layoutManager + refs ready)
   initLayoutIpc({ ipcMain, store, layoutManager, views, stageBoundsRef, boardManager, statsManager });
   // (Removed: DataServices prompt IPC)
@@ -411,7 +416,7 @@ function bootstrap() {
     }
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
   // Initialize map selection IPC (needs boardManager, statsManager, mainWindow references)
-  initMapIpc({ ipcMain, store, views, mainWindow, boardWindowRef:{ value: boardWindow }, boardManager, statsManager });
+  initMapIpc({ ipcMain, store, views, mainWindow, boardWindowRef:{ value: null }, boardManager, statsManager });
   // Initialize periodic map re-broadcast (odds refresh auto loop)
   try {
     const { initMapAutoRefreshIpc } = require('./modules/ipc/mapAutoRefresh');
@@ -425,13 +430,13 @@ function bootstrap() {
   const { initBoardIpc } = require('./modules/ipc/board');
   initBoardIpc({ ipcMain, boardManager, statsManager });
   // Now that boardManager & statsManager are finalized, initialize IPC modules that depend on them
-  try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
+  try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: null }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
   try { initSwapIpc({ ipcMain, store, boardManager, mainWindow, statsManager }); } catch(e){ console.warn('initSwapIpc failed', e); }
-  try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: boardWindow }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
+  try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: null }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
   try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs }, store }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
   // -------- Excel extractor (Python + AHK) process control --------
   // Thin wiring: controller owns process lifecycle & status broadcasting.
-  const excelExtractorController = createExcelExtractorController({
+  excelExtractorController = createExcelExtractorController({
     app,
     store,
     dialog,
@@ -462,6 +467,13 @@ function bootstrap() {
       }
     }, 1200);
   }
+  // Auto-focus board webContents after initial load so hotkeys work immediately
+  setTimeout(()=>{
+    try {
+      const bwc = boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null;
+      if(bwc && !bwc.isDestroyed()){ bwc.focus(); console.log('[startup] auto-focused board webContents'); }
+    } catch(_){ }
+  }, 800);
   // Menu intentionally suppressed (user prefers F12 only)
   // Removed broker-id partition probing to avoid creating unused persistent profiles
 }
@@ -500,7 +512,7 @@ function toggleStatsEmbedded(){
 
 app.whenReady().then(()=>{
   bootstrap();
-  initDevCssWatcher({ app, mainWindow, boardWindowRef:{ value: boardWindow }, statsManager, baseDir: __dirname });
+  initDevCssWatcher({ app, mainWindow, boardWindowRef:{ value: null }, statsManager, baseDir: __dirname });
   // Expose manual auto-press IPC for external automation or future menus
   try {
     const { ipcMain } = require('electron');
@@ -670,11 +682,47 @@ app.whenReady().then(()=>{
 // Optional future fallback (example):
 //  if(false){ /* re-enable guarded global shortcut */ /* globalShortcut.register('Space', () => { ... guarded toggle ... }); */ }
 app.on('will-quit', ()=>{ try { globalShortcut.unregisterAll(); } catch(_){} });
+// Hotkey throttle state (prevents duplicate triggers)
+let __lastHotkeyTs = { tab:0, f1:0, f2:0, f3:0 };
 // Global space hotkey (throttled) to toggle stats embedded view
 app.on('browser-window-created', (_e, win)=>{
   try {
     win.webContents.on('before-input-event', (_event, input)=>{
       if(input.type==='keyDown' && !input.isAutoRepeat){
+        // Skip if modifier keys pressed (allow normal shortcuts)
+        const hasModifier = input.alt || input.control || input.meta;
+        // Tab -> toggle stats embedded (same as Space but more reliable without modifier guard)
+        if(!hasModifier && input.key==='Tab'){
+          const now=Date.now();
+          if(now - __lastHotkeyTs.tab < 300) return;
+          __lastHotkeyTs.tab = now;
+          try { toggleStatsEmbedded(); } catch(_){ }
+          return;
+        }
+        // F1 -> toggle auto mode
+        if(!hasModifier && input.key==='F1'){
+          const now=Date.now();
+          if(now - __lastHotkeyTs.f1 < 300) return;
+          __lastHotkeyTs.f1 = now;
+          try { broadcastAutoToggleAll(); } catch(_){ }
+          return;
+        }
+        // F2 -> toggle auto resume
+        if(!hasModifier && input.key==='F2'){
+          const now=Date.now();
+          if(now - __lastHotkeyTs.f2 < 300) return;
+          __lastHotkeyTs.f2 = now;
+          try { __autoLast.resume = !__autoLast.resume; broadcastToAll(getBroadcastCtx(), 'auto-resume-set', { on: __autoLast.resume }); } catch(_){ }
+          return;
+        }
+        // F3 -> start/stop excel extractor script
+        if(!hasModifier && input.key==='F3'){
+          const now=Date.now();
+          if(now - __lastHotkeyTs.f3 < 500) return;
+          __lastHotkeyTs.f3 = now;
+          try { if(excelExtractorController && excelExtractorController.toggle) excelExtractorController.toggle(); } catch(_){ }
+          return;
+        }
         // Space toggles embedded stats
         if(input.key===' '){
           const now=Date.now();

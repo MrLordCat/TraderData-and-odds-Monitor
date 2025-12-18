@@ -65,7 +65,11 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
     try { if(hotkeys && hotkeys.attachToWebContents) hotkeys.attachToWebContents(dockView.webContents); } catch(_){ }
 
     try { dockView.webContents.loadFile(path.join(__dirname,'..','..','renderer','board.html')); } catch(e){}
-    dockView.webContents.on('did-finish-load', ()=> replayOdds());
+    dockView.webContents.on('did-finish-load', ()=> {
+      replayOdds();
+      // Auto-focus board view so hotkeys work immediately after app start
+      try { setTimeout(()=>{ if(dockView && dockView.webContents && !dockView.webContents.isDestroyed()) dockView.webContents.focus(); }, 200); } catch(_){ }
+    });
     // Lightweight one-time diagnostic: log current 'closed' listener count on mainWindow (helps detect leak regressions)
     try {
       if(!createDockView.__diagLogged){
