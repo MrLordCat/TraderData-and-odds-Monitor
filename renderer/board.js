@@ -1,4 +1,10 @@
 // ================= Side-panel toolbar wiring (icons) =================
+// Load shared UI helpers
+let MiniToast = null;
+let ApiHelpers = null;
+try { MiniToast = require('./ui/toast'); } catch(_){ }
+try { ApiHelpers = require('./ui/api_helpers'); } catch(_){ }
+
 let __boardDockState = null;
 function updateBoardSideIcon(state){
   try {
@@ -97,28 +103,32 @@ function bindTopbar(){
 
   // Layout preset
   try {
-    const sel = document.getElementById('tbLayoutPreset');
-    if(sel){
-      window.desktopAPI.getLayoutPreset?.().then(p=>{ try { if(p) sel.value = p; } catch(_){ } }).catch(()=>{});
-      sel.addEventListener('change', ()=>{ try { if(sel.value) window.desktopAPI.applyLayoutPreset(sel.value); } catch(_){ } });
+    if(ApiHelpers){ ApiHelpers.bindSelectToApi('tbLayoutPreset', 'getLayoutPreset', 'applyLayoutPreset'); }
+    else {
+      const sel = document.getElementById('tbLayoutPreset');
+      if(sel){
+        window.desktopAPI.getLayoutPreset?.().then(p=>{ try { if(p) sel.value = p; } catch(_){ } }).catch(()=>{});
+        sel.addEventListener('change', ()=>{ try { if(sel.value) window.desktopAPI.applyLayoutPreset(sel.value); } catch(_){ } });
+      }
     }
   } catch(_){ }
 
   // Refresh all
-  try {
-    const rBtn = document.getElementById('tbRefreshAll');
-    if(rBtn){ rBtn.addEventListener('click', ()=>{ try { window.desktopAPI.refreshAll && window.desktopAPI.refreshAll(); } catch(_){ } }); }
-  } catch(_){ }
+  if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbRefreshAll', 'refreshAll'); }
+  else { try { document.getElementById('tbRefreshAll')?.addEventListener('click', ()=>{ window.desktopAPI.refreshAll?.(); }); } catch(_){ } }
 
-  // Auto refresh checkbox (next to refresh)
-  try {
-    const cb = document.getElementById('tbAutoReload');
-    if(cb){
-      window.desktopAPI.getAutoRefreshEnabled?.().then(v=>{ try { cb.checked = !!v; } catch(_){ } }).catch(()=>{});
-      cb.addEventListener('change', ()=>{ try { window.desktopAPI.setAutoRefreshEnabled && window.desktopAPI.setAutoRefreshEnabled(!!cb.checked); } catch(_){ } });
-      window.desktopAPI.onAutoRefreshUpdated?.(p=>{ try { cb.checked = !!(p && p.enabled); } catch(_){ } });
-    }
-  } catch(_){ }
+  // Auto refresh checkbox
+  if(ApiHelpers){ ApiHelpers.bindCheckboxToApi('tbAutoReload', 'getAutoRefreshEnabled', 'setAutoRefreshEnabled', 'onAutoRefreshUpdated'); }
+  else {
+    try {
+      const cb = document.getElementById('tbAutoReload');
+      if(cb){
+        window.desktopAPI.getAutoRefreshEnabled?.().then(v=>{ try { cb.checked = !!v; } catch(_){ } }).catch(()=>{});
+        cb.addEventListener('change', ()=>{ try { window.desktopAPI.setAutoRefreshEnabled && window.desktopAPI.setAutoRefreshEnabled(!!cb.checked); } catch(_){ } });
+        window.desktopAPI.onAutoRefreshUpdated?.(p=>{ try { cb.checked = !!(p && p.enabled); } catch(_){ } });
+      }
+    } catch(_){ }
+  }
 
   // Board side arrow
   try {
@@ -137,16 +147,12 @@ function bindTopbar(){
   } catch(_){ }
 
   // Stats
-  try {
-    const sBtn = document.getElementById('tbStats');
-    if(sBtn){ sBtn.addEventListener('click', ()=>{ try { window.desktopAPI.statsToggle && window.desktopAPI.statsToggle(); } catch(_){ } }); }
-  } catch(_){ }
+  if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbStats', 'statsToggle'); }
+  else { try { document.getElementById('tbStats')?.addEventListener('click', ()=>{ window.desktopAPI.statsToggle?.(); }); } catch(_){ } }
 
   // Settings
-  try {
-    const setBtn = document.getElementById('tbSettings');
-    if(setBtn){ setBtn.addEventListener('click', ()=>{ try { window.desktopAPI.openSettings && window.desktopAPI.openSettings(); } catch(_){ } }); }
-  } catch(_){ }
+  if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbSettings', 'openSettings'); }
+  else { try { document.getElementById('tbSettings')?.addEventListener('click', ()=>{ window.desktopAPI.openSettings?.(); }); } catch(_){ } }
 }
 
 // ===== Board collapse (title click) =====
@@ -341,39 +347,27 @@ if(window.desktopAPI){
   try {
     // Small ephemeral toast near the S button
     let excelTogglePendingTs = 0;
-    let excelToggleToastEl = null;
     let lastStatusSig = '';
     let lastAutoToastTs = 0;
     let lastHoverLines = null;
     let lastHoverKind = 'ok';
-    function showMiniToastNear(el, lines, kind){
+    
+    // Use shared toast utility
+    const showToast = MiniToast ? MiniToast.showMiniToastNear : function(el, lines, kind){
+      // Minimal inline fallback if module not loaded
       try {
-        if(excelToggleToastEl && excelToggleToastEl.parentNode) excelToggleToastEl.parentNode.removeChild(excelToggleToastEl);
-      } catch(_){ }
-      try {
-        if(!el) return;
-        const r = el.getBoundingClientRect();
         const toast = document.createElement('div');
-        toast.className = 'miniToast ' + (kind||'') ;
-        (lines||[]).forEach(t=>{
-          const line = document.createElement('span');
-          line.className = 'line';
-          line.textContent = String(t);
-          toast.appendChild(line);
-        });
+        toast.className = 'miniToast ' + (kind||'');
+        (lines||[]).forEach(t=>{ const s=document.createElement('span'); s.className='line'; s.textContent=t; toast.appendChild(s); });
         document.body.appendChild(toast);
-        const gap = 8;
-        const left = Math.min(Math.max(8, r.left), window.innerWidth - 300);
-        const top = Math.min(Math.max(8, r.bottom + gap), window.innerHeight - 80);
-        toast.style.left = left + 'px';
-        toast.style.top = top + 'px';
+        const r = el.getBoundingClientRect();
+        toast.style.left = Math.min(Math.max(8, r.left), window.innerWidth - 300) + 'px';
+        toast.style.top = (r.bottom + 8) + 'px';
         requestAnimationFrame(()=> toast.classList.add('show'));
-        excelToggleToastEl = toast;
-        const ttl = (kind==='err') ? 3800 : 2200;
-        setTimeout(()=>{ try { toast.classList.remove('show'); } catch(_){ } }, ttl);
-        setTimeout(()=>{ try { if(toast && toast.parentNode) toast.parentNode.removeChild(toast); } catch(_){ } }, ttl + 260);
+        const ttl = kind==='err' ? 3800 : 2200;
+        setTimeout(()=>{ try { toast.remove(); } catch(_){} }, ttl + 260);
       } catch(_){ }
-    }
+    };
 
     // Bind S button click to toggle the Python extractor
     try {
@@ -388,7 +382,7 @@ if(window.desktopAPI){
         sBtn.addEventListener('mouseenter', ()=>{
           try {
             if(lastHoverLines && lastHoverLines.length){
-              showMiniToastNear(sBtn, lastHoverLines, lastHoverKind);
+              showToast(sBtn, lastHoverLines, lastHoverKind);
             }
           } catch(_){ }
         });
@@ -427,7 +421,7 @@ if(window.desktopAPI){
 
           // If user just clicked the toggle, show a compact status popup near the button
           if(btn && excelTogglePendingTs && (Date.now() - excelTogglePendingTs) < 1800){
-            showMiniToastNear(btn, lines, kind);
+            showToast(btn, lines, kind);
             excelTogglePendingTs = 0;
           }
 
@@ -445,7 +439,7 @@ if(window.desktopAPI){
             const important = !!(s.starting || s.running || pyErr || ahkErr);
             const now = Date.now();
             if(changed && important && (now - lastAutoToastTs) > 1200){
-              showMiniToastNear(btn, lines, kind);
+              showToast(btn, lines, kind);
               lastAutoToastTs = now;
             }
             lastStatusSig = sig;
@@ -497,14 +491,7 @@ document.addEventListener('click', e=>{
   renderBoard();
 });
 
-function applyPersistedHeaders(){
-  try {
-    const s1 = localStorage.getItem('teamLabel1');
-    const s2 = localStorage.getItem('teamLabel2');
-    if (s1) document.getElementById('side1Header').textContent = s1;
-    if (s2) document.getElementById('side2Header').textContent = s2;
-  } catch(e) {}
-}
+// Persisted headers function removed — team names are now synced via IPC API
 
 let currentMapBoard = undefined;
 let mapForceToken = 0; // increments each external update to cancel older retries
@@ -616,24 +603,25 @@ if(window.desktopAPI && window.desktopAPI.onMap){
       const sel=document.getElementById('mapSelect');
       if(sel && sel.value!==v){ sel.value=v; }
       forceBoardMapSelect(v);
-      try { console.debug('[board] onMap received', v); } catch(_){ }
     } catch(_){ }
   });
+}
+
+// Unified team names updater (used by both initial fetch and live updates)
+function updateTeamHeaders(names){
+  try {
+    if(!names) return;
+    const s1=document.getElementById('side1Header');
+    const s2=document.getElementById('side2Header');
+    if(s1 && names.team1) s1.textContent = names.team1;
+    if(s2 && names.team2) s2.textContent = names.team2;
+  } catch(_){ }
 }
 
 window.addEventListener('DOMContentLoaded', ()=>{
   // Initial sync from main for team names (new API)
   if(window.desktopAPI && window.desktopAPI.getTeamNames){
-    window.desktopAPI.getTeamNames().then(names=>{
-      try {
-        if(names){
-          const s1=document.getElementById('side1Header');
-          const s2=document.getElementById('side2Header');
-          if(s1 && names.team1) s1.textContent = names.team1;
-          if(s2 && names.team2) s2.textContent = names.team2;
-        }
-      } catch(_){ }
-    }).catch(()=>{});
+    window.desktopAPI.getTeamNames().then(updateTeamHeaders).catch(()=>{});
   }
   restoreMapAndBroadcast();
   // If external map arrived before DOM ready, enforce it now
@@ -646,21 +634,10 @@ window.addEventListener('DOMContentLoaded', ()=>{
   } catch(_){ }
 });
 
-// Remove manual editable headers; rely on synced names from stats panel.
-// Listen for updates pushed from main via dedicated API.
+// Listen for team name updates pushed from main via dedicated API
 if(window.desktopAPI && window.desktopAPI.onTeamNames){
-  window.desktopAPI.onTeamNames((names)=>{
-    try {
-      if(!names) return;
-      const s1=document.getElementById('side1Header');
-      const s2=document.getElementById('side2Header');
-      if(s1 && names.team1) s1.textContent = names.team1;
-      if(s2 && names.team2) s2.textContent = names.team2;
-    } catch(_){ }
-  });
+  window.desktopAPI.onTeamNames(updateTeamHeaders);
 }
-
-// Backward compatibility: if older localStorage labels exist, ignore them now.
 
 // Visual state helpers for Auto/R buttons (kept for board UI)
 function refreshAutoButtonsVisual(){

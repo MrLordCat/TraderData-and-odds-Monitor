@@ -5,6 +5,12 @@
   if(window.__autoTraderUnifiedLoaded) return;
   window.__autoTraderUnifiedLoaded = true;
 
+  // Load shared toast utility
+  let MiniToast = null;
+  try { MiniToast = require('./ui/toast'); } catch(_){ }
+  // Also try window.MiniToast if loaded via script tag
+  if(!MiniToast && window.MiniToast) MiniToast = window.MiniToast;
+
   function byId(id){ try { return document.getElementById(id); } catch(_){ return null; } }
 
   const isBoard = !!byId('autoBtn');
@@ -42,10 +48,9 @@
 
   let pauseToastTs = 0;
   let pauseSig = '';
-  let whyToastEl = null;
 
-  function showMiniToastNear(el, lines, kind){
-    try { if(whyToastEl && whyToastEl.parentNode) whyToastEl.parentNode.removeChild(whyToastEl); } catch(_){ }
+  // Use shared toast or inline fallback
+  const showMiniToastNear = MiniToast ? MiniToast.showMiniToastNear : function(el, lines, kind){
     try {
       if(!el) return;
       const r = el.getBoundingClientRect();
@@ -64,12 +69,11 @@
       toast.style.left = left + 'px';
       toast.style.top = top + 'px';
       requestAnimationFrame(()=> toast.classList.add('show'));
-      whyToastEl = toast;
       const ttl = (kind==='err') ? 4200 : 2400;
       setTimeout(()=>{ try { toast.classList.remove('show'); } catch(_){ } }, ttl);
       setTimeout(()=>{ try { if(toast && toast.parentNode) toast.parentNode.removeChild(toast); } catch(_){ } }, ttl + 260);
     } catch(_){ }
-  }
+  };
 
   function computeWhyLines(engineState){
     const st = engineState;

@@ -15,6 +15,8 @@ const store = new Store({ name: 'prefs' });
 const fs = require('fs');
 // Centralized shared constants (direct import to avoid circular barrel dependency)
 const constants = require('./modules/utils/constants');
+// Broadcast helper (eliminates repeated board/main/stats iteration)
+const { broadcastToAll, getBoardWebContents, getStatsWebContentsList } = require('./modules/utils/broadcast');
 // Local constants (some consumed by modularized managers)
 const SNAP = constants.SNAP_DISTANCE; // snap threshold for drag/resize logic (needed by brokerManager ctx)
 
@@ -80,10 +82,8 @@ const { makePlaceholderOdds } = require('./modules/utils/odds');
 function broadcastPlaceholderOdds(id){
   try {
     const payload = makePlaceholderOdds(id);
-    if (mainWindow && !mainWindow.isDestroyed()) { try { mainWindow.webContents.send('odds-update', payload); } catch(_){} }
-    if (boardWindow && !boardWindow.isDestroyed()) { try { boardWindow.webContents.send('odds-update', payload); } catch(_){} }
+    broadcastToAll(getBroadcastCtx(), 'odds-update', payload);
     try { if(boardManager && boardManager.sendOdds) boardManager.sendOdds(payload); } catch(_){ }
-    try { if(statsManager && statsManager.views && statsManager.views.panel){ statsManager.views.panel.webContents.send('odds-update', payload); } } catch(_){ }
   } catch(err){ try { console.warn('broadcastPlaceholderOdds failed', err); } catch(_){} }
 }
 // (Removed stray early key injection block from previous patch attempt)
@@ -120,12 +120,17 @@ const INITIAL_URLS = BROKERS.reduce((acc,b)=>{acc[b.id]=b.url;return acc;},{});
 const BROKER_FRAME_CSS = `body::after{content:"";position:fixed;inset:0;pointer-events:none;border:1px solid rgba(255,255,255,0.08);border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset;}body{background-clip:padding-box !important;}`;
 
 let mainWindow;
-let boardWindow; // secondary window displaying aggregated odds
-let boardManager; // docking/board manager
+let boardManager; // docking/board manager (docked panel replaced separate boardWindow)
 const boardManagerRef = { value: null };
 let settingsOverlay; // module instance
 let hotkeys; // unified hotkey manager (TAB/F1/F2/F3)
 const hotkeysRef = { value: null };
+// Helper to get broadcast context (avoids inline repetition)
+const getBroadcastCtx = () => ({ mainWindow, boardManager, statsManager });
+// Unified broadcast for auto-toggle-all across board/main/stats views
+function broadcastAutoToggleAll(){
+  broadcastToAll(getBroadcastCtx(), 'auto-toggle-all');
+}
 
 // Cross-window auto state snapshot (used by hotkeys and late-loaded views)
 // Requirement: Auto Resume (R) must start OFF on every app launch.
@@ -160,8 +165,8 @@ const { createStatsManager } = require('./modules/stats'); // modules/stats/inde
 let statsManager; // temporary undefined until after stageBoundsRef creation
 let statsState = { mode: 'hidden', panelHidden: !!store.get('statsPanelHidden', false) }; // 'hidden' | 'embedded', plus panelHidden
 let lastStatsToggleTs = 0; // throttle for space hotkey
-// Dedicated stats log window (detached) - lightweight
-let statsLogWindow = null;
+// Stub for stats log window (feature deprecated but references remain)
+function openStatsLogWindow(){ try { console.log('[stats-log] feature deprecated'); } catch(_){} }
 // Dev helper moved to dev/devCssWatcher.js
 const { initDevCssWatcher } = require('./modules/dev/devCssWatcher');
 // Early refs required by statsManager; define before first createStatsManager call
@@ -310,34 +315,10 @@ function bootstrap() {
   createMainWindow();
   // Remove application menu (hidden UI footprint)
   try { Menu.setApplicationMenu(null); } catch(_){}
-  // Unified window-active hotkeys (TAB/F1/F2/F3)
-  function broadcastAutoToggleAll(){
-    try {
-      const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
-      if(bwc && !bwc.isDestroyed()) bwc.send('auto-toggle-all');
-    } catch(_){ }
-    try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-toggle-all'); } catch(_){ }
-    try {
-      if(statsManager && statsManager.views){
-        const vs = statsManager.views;
-        ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-toggle-all'); } catch(_){ } } });
-      }
-    } catch(_){ }
-  }
+  // Unified broadcast helper for auto resume state
   function broadcastAutoResumeSet(on){
     try { __autoLast.resume = !!on; } catch(_){ }
-    const p = { on: !!on };
-    try {
-      const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
-      if(bwc && !bwc.isDestroyed()) bwc.send('auto-resume-set', p);
-    } catch(_){ }
-    try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-resume-set', p); } catch(_){ }
-    try {
-      if(statsManager && statsManager.views){
-        const vs = statsManager.views;
-        ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-resume-set', p); } catch(_){ } } });
-      }
-    } catch(_){ }
+    broadcastToAll(getBroadcastCtx(), 'auto-resume-set', { on: !!on });
   }
 
   hotkeys = createHotkeyManager({
@@ -455,29 +436,8 @@ function bootstrap() {
     store,
     dialog,
     getMainWindow: () => mainWindow,
-    getBoardWebContents: () => {
-      try {
-        if (boardManager && typeof boardManager.getWebContents === 'function') return boardManager.getWebContents();
-      } catch (_) { }
-      return null;
-    },
-    getStatsWebContentsList: () => {
-      try {
-        const out = [];
-        if (statsManager && statsManager.views) {
-          const vs = statsManager.views;
-          ['panel', 'A', 'B'].forEach(k => {
-            try {
-              const v = vs[k];
-              if (v && v.webContents && !v.webContents.isDestroyed()) out.push(v.webContents);
-            } catch (_) { }
-          });
-        }
-        return out;
-      } catch (_) {
-        return [];
-      }
-    }
+    getBoardWebContents: () => getBoardWebContents(getBroadcastCtx()),
+    getStatsWebContentsList: () => getStatsWebContentsList(getBroadcastCtx())
   });
   initExcelExtractorIpc({ ipcMain, controller: excelExtractorController });
   // Expose mutable refs for diagnostic / future module hot-swap
@@ -604,22 +564,8 @@ app.whenReady().then(()=>{
         }
         const ts = Date.now();
         try { console.log('[auto-press][ipc] request', { side, key:keyLabel, vk: '0x'+vk.toString(16), direction, diffPct, ts }); } catch(_){ }
-        try {
-          // Board (odds) view
-          if(boardManager && boardManager.getWebContents){
-            const bwc = boardManager.getWebContents();
-            if(bwc && !bwc.isDestroyed()) bwc.send('auto-press', { side, key:keyLabel, direction });
-          }
-          // Main window (embedded stats lives here)
-          if(mainWindow && !mainWindow.isDestroyed()){
-            mainWindow.webContents.send('auto-press', { side, key:keyLabel, direction });
-          }
-          // Stats panel/window + slots if present
-          if(statsManager && statsManager.views){
-            const vs = statsManager.views;
-            ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-press', { side, key:keyLabel, direction }); } catch(_){ } } });
-          }
-        } catch(err){ try { console.warn('[auto-press][ipc] send fail', err); } catch(_){ } }
+        // Broadcast to all views (board, main, stats)
+        try { broadcastToAll(getBroadcastCtx(), 'auto-press', { side, key:keyLabel, direction }); } catch(err){ try { console.warn('[auto-press][ipc] send fail', err); } catch(_){ } }
         let sent=false;
   // Always write a file signal so AHK can react even if virtual key injection is blocked
   try { fs.writeFileSync(path.join(__dirname,'auto_press_signal.json'), JSON.stringify({ side, key:keyLabel, direction, ts })); } catch(_){ }
@@ -663,48 +609,20 @@ app.whenReady().then(()=>{
       ipcMain.on('auto-mode-changed', (_e, payload)=>{ try { console.log('[autoSim][mode]', payload); } catch(_){ } });
       // Relay auto mode ON/OFF across views so board and embedded stay in sync
       ipcMain.on('auto-mode-changed', (_e, payload)=>{
-        try {
-          const on = !!(payload && payload.active);
-          // send to board
-          try {
-            const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
-            if(bwc && !bwc.isDestroyed()) bwc.send('auto-set-all', { on });
-          } catch(_){ }
-          // send to main window (embedded) + stats views
-          try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-set-all', { on }); } catch(_){ }
-          try {
-            if(statsManager && statsManager.views){
-              const vs = statsManager.views;
-              ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-set-all', { on }); } catch(_){ } } });
-            }
-          } catch(_){ }
-        } catch(_){ }
+        try { broadcastToAll(getBroadcastCtx(), 'auto-set-all', { on: !!(payload && payload.active) }); } catch(_){ }
       });
       ipcMain.on('auto-fire-attempt', (_e, payload)=>{ try { console.log('[autoSim][fireAttempt]', payload); } catch(_){ } });
       // Store last auto states to serve late-loaded windows
-      ipcMain.on('auto-active-set', (_e, p)=>{ try { __autoLast.active = !!(p&&p.on); } catch(_){ } try {
-        const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
-        if(bwc && !bwc.isDestroyed()) bwc.send('auto-active-set', p);
-        mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-active-set', p);
-        if(statsManager && statsManager.views){ const vs=statsManager.views; ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ v.webContents.send('auto-active-set', p); } }); }
-      } catch(_){ } });
-      ipcMain.on('auto-resume-set', (_e, p)=>{ try { __autoLast.resume = !!(p&&p.on); } catch(_){ } });
-  ipcMain.handle('auto-state-get', ()=> { try { console.log('[auto][state-get] return', { active: __autoLast.active, resume: __autoLast.resume }); } catch(_){ } return ({ active: __autoLast.active, resume: __autoLast.resume }); });
-      // Cross-window sync for Auto Resume (R)
+      ipcMain.on('auto-active-set', (_e, p)=>{
+        try { __autoLast.active = !!(p&&p.on); } catch(_){ }
+        try { broadcastToAll(getBroadcastCtx(), 'auto-active-set', p); } catch(_){ }
+      });
       ipcMain.on('auto-resume-set', (_e, p)=>{
-        try {
-          const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
-          if(bwc && !bwc.isDestroyed()) bwc.send('auto-resume-set', p);
-        } catch(_){ }
-        try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-resume-set', p); } catch(_){ }
-        try {
-          if(statsManager && statsManager.views){
-            const vs = statsManager.views;
-            ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-resume-set', p); } catch(_){ } } });
-          }
-        } catch(_){ }
+        try { __autoLast.resume = !!(p&&p.on); } catch(_){ }
+        try { broadcastToAll(getBroadcastCtx(), 'auto-resume-set', p); } catch(_){ }
         try { console.log('[auto][resume-broadcast]', p); } catch(_){ }
       });
+      ipcMain.handle('auto-state-get', ()=> { try { console.log('[auto][state-get] return', { active: __autoLast.active, resume: __autoLast.resume }); } catch(_){ } return ({ active: __autoLast.active, resume: __autoLast.resume }); });
       // Forwarded renderer console lines (selective)
       ipcMain.on('renderer-log-forward', (_e, payload)=>{
         try {
@@ -729,19 +647,6 @@ app.whenReady().then(()=>{
       const candidates = ['Num5','Numpad5','num5'];
       const handler = () => {
         try {
-          const broadcastAutoToggleAll = ()=>{
-            try {
-              const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
-              if(bwc && !bwc.isDestroyed()) bwc.send('auto-toggle-all');
-            } catch(_){ }
-            try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-toggle-all'); } catch(_){ }
-            try {
-              if(statsManager && statsManager.views){
-                const vs = statsManager.views;
-                ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-toggle-all'); } catch(_){ } } });
-              }
-            } catch(_){ }
-          };
           broadcastAutoToggleAll();
           try { console.log('[hotkey][global][Num5] broadcast auto-toggle-all'); } catch(_){ }
         } catch(err){ console.warn('[hotkey][global][Num5] failed', err); }
@@ -782,20 +687,7 @@ app.on('browser-window-created', (_e, win)=>{
         try {
           const isNum5 = (String(input.code||'').toLowerCase()==='numpad5') || ((input.key==='5' || input.key==='Num5') && input.location===3);
           if(isNum5){
-            const broadcast = ()=>{
-              try {
-                const bwc = (typeof boardWindow!=='undefined' && boardWindow && !boardWindow.isDestroyed()) ? boardWindow.webContents : (boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null);
-                if(bwc && !bwc.isDestroyed()) bwc.send('auto-toggle-all');
-              } catch(_){ }
-              try { mainWindow && mainWindow.webContents && mainWindow.webContents.send('auto-toggle-all'); } catch(_){ }
-              try {
-                if(statsManager && statsManager.views){
-                  const vs = statsManager.views;
-                  ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-toggle-all'); } catch(_){ } } });
-                }
-              } catch(_){ }
-            };
-            broadcast();
+            broadcastAutoToggleAll();
             try { console.log('[hotkey][window][Num5] broadcast auto-toggle-all'); } catch(_){ }
             return;
           }
@@ -803,10 +695,8 @@ app.on('browser-window-created', (_e, win)=>{
         // Ctrl+F12 -> open Board (odds) BrowserView DevTools
         if(input.key==='F12' && input.control){
           try {
-            if(boardManager && boardManager.getWebContents){
-              const bwc = boardManager.getWebContents();
-              if(bwc) bwc.openDevTools({ mode:'detach' });
-            }
+            const bwc = getBoardWebContents(getBroadcastCtx());
+            if(bwc) bwc.openDevTools({ mode:'detach' });
           } catch(e){ console.warn('[hotkey][Ctrl+F12][board] failed', e); }
           return;
         }
@@ -826,16 +716,7 @@ app.on('browser-window-created', (_e, win)=>{
         // Alt+C -> disable all auto modes (board + embedded stats)
         if(input.alt && (input.key==='C' || input.key==='c')){
           try {
-            // Broadcast to board window if open
-            if(boardWindow && !boardWindow.isDestroyed()) boardWindow.webContents.send('auto-disable-all');
-            // Broadcast to main window embedded stats panel & stats window BrowserViews
-            try { mainWindow && mainWindow.webContents.send('auto-disable-all'); } catch(_){ }
-            try {
-              if(statsManager && statsManager.views){
-                const vs = statsManager.views;
-                ['panel','A','B'].forEach(k=>{ const v=vs[k]; if(v && v.webContents && !v.webContents.isDestroyed()){ try { v.webContents.send('auto-disable-all'); } catch(_){ } } });
-              }
-            } catch(_){ }
+            broadcastToAll(getBroadcastCtx(), 'auto-disable-all');
             console.log('[hotkey][Alt+C] broadcast auto-disable-all');
           } catch(e){ console.warn('[hotkey][Alt+C] failed', e); }
           return;
