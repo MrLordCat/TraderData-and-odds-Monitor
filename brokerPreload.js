@@ -46,16 +46,26 @@ function effectiveMap(){
 let __selectedGame = 'lol';
 try { ipcRenderer.invoke('game-get').then(v=>{ if(v) __selectedGame=v; }).catch(()=>{}); } catch(_){ }
 ipcRenderer.on('game-changed', (_e, game)=>{ try { if(typeof game==='string') __selectedGame=game; } catch(_){ } });
+
+// Odds deduplication signature
+let __lastOddsSig = '';
+
 function getCurrentOdds(){
   const data = collectOddsExt(HOST, effectiveMap(), __selectedGame);
   try { if(BROKER_ID && data && typeof data==='object') data.broker = BROKER_ID; } catch(_){ }
   return data;
 }
-ipcRenderer.on('collect-now', ()=> safe(()=> safeSend('bv-odds-update', getCurrentOdds())));
+// Force collect (always sends, updates signature)
+ipcRenderer.on('collect-now', ()=> safe(()=>{
+  const odds = getCurrentOdds();
+  __lastOddsSig = odds?.odds ? JSON.stringify(odds.odds) : '';
+  safeSend('bv-odds-update', odds);
+}));
 
-// Map change listener
+// Map change listener (reset signature to force fresh send)
 ipcRenderer.on('set-map', (_e, mapVal)=>{
   const n=parseInt(mapVal,10); desiredMap=Number.isNaN(n)?1:n;
+  __lastOddsSig = ''; // Reset to ensure new odds are sent
   triggerMapChange(HOST, desiredMap);
   [600,1500,3000].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap)), d));
 });
@@ -63,8 +73,19 @@ ipcRenderer.on('set-is-last', (_e, flag)=>{
   try { isLast = !!flag; } catch(_){ }
 });
 
-// Periodic odds loop
-setInterval(()=> safe(()=> safeSend('bv-odds-update', getCurrentOdds())), 1500);
+// Periodic odds loop with deduplication (only send if changed)
+function sendOddsIfChanged(){
+  try {
+    const odds = getCurrentOdds();
+    // Create signature from odds array only (skip broker/map metadata)
+    const sig = odds?.odds ? JSON.stringify(odds.odds) : '';
+    if(sig && sig !== __lastOddsSig){
+      __lastOddsSig = sig;
+      safeSend('bv-odds-update', odds);
+    }
+  } catch(_){ }
+}
+setInterval(sendOddsIfChanged, 1500);
 
 // SPA URL watcher -> reassert map
 let lastHref=location.href;

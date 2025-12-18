@@ -1,32 +1,8 @@
 // Embedded odds board + section reorder extracted
 // Polyfill: stats panel BrowserView does NOT use the main preload (no window.desktopAPI)
-// so we expose a minimal bridge to keep existing code paths working.
-try {
-  if(!window.desktopAPI){
-    const { ipcRenderer } = require('electron');
-    if(ipcRenderer){
-      window.desktopAPI = {
-        invoke: (...args)=>{ try { return ipcRenderer.invoke(...args); } catch(e){ console.error('[embeddedOdds][polyfill][invokeErr]', e); throw e; } },
-        send: (...args)=>{ try { return ipcRenderer.send(...args); } catch(e){ console.error('[embeddedOdds][polyfill][sendErr]', e); } },
-        autoSendPress: (side)=>{ try { ipcRenderer.invoke('send-auto-press', side); } catch(e){ console.error('[embeddedOdds][polyfill][autoSendPressErr]', e); } },
-        // Added Last map helpers to mirror main preload API
-        getIsLast: ()=>{ try { return ipcRenderer.invoke('get-is-last'); } catch(e){ console.error('[embeddedOdds][polyfill][getIsLastErr]', e); return Promise.resolve(false); } },
-        setIsLast: (v)=>{ try { ipcRenderer.send('set-is-last', !!v); } catch(e){ console.error('[embeddedOdds][polyfill][setIsLastErr]', e); } },
-        onIsLast: (cb)=>{ try { const h=(_e,val)=>{ try { cb(val); } catch(_){ } }; ipcRenderer.on('set-is-last', h); return ()=> ipcRenderer.removeListener('set-is-last', h); } catch(e){ console.error('[embeddedOdds][polyfill][onIsLastErr]', e); return ()=>{}; } }
-      };
-      try { console.log('[embeddedOdds][polyfill] desktopAPI shim installed'); } catch(_){ }
-    }
-  }
-} catch(_){ }
-// If preload desktopAPI already existed (unlikely here) but lacked Last helpers, patch them in.
-try {
-  const { ipcRenderer } = require('electron');
-  if(window.desktopAPI && ipcRenderer){
-    if(!window.desktopAPI.getIsLast) window.desktopAPI.getIsLast = ()=> ipcRenderer.invoke('get-is-last').catch(()=>false);
-    if(!window.desktopAPI.setIsLast) window.desktopAPI.setIsLast = (v)=>{ try { ipcRenderer.send('set-is-last', !!v); } catch(_){ } };
-    if(!window.desktopAPI.onIsLast) window.desktopAPI.onIsLast = (cb)=>{ const h=(_e,val)=>{ try { cb(val);}catch(_){ } }; ipcRenderer.on('set-is-last', h); return ()=> ipcRenderer.removeListener('set-is-last', h); };
-  }
-} catch(_){ }
+// so we use the shared shim to create a minimal bridge.
+try { require('./ui/desktop_api_shim'); } catch(_){ }
+
 let currentMap = undefined; // shared map number propagated from main / board
 function updateEmbeddedMapTag(){
   try {
@@ -126,11 +102,10 @@ function bindEmbeddedMapSelect(){
     } catch(_){ }
   } catch(_){ }
 }
-const { ipcRenderer: ipcRendererEmbedded } = require('electron');
 const embeddedOddsData = {}; let embeddedBest1=NaN, embeddedBest2=NaN;
 let OddsBoardShared = null;
 try { OddsBoardShared = require('./ui/odds_board_shared'); } catch(_){ }
-// Auto map rebroadcast status visual sync
+// Auto map rebroadcast status visual sync (shim guarantees desktopAPI)
 try {
   function applyEmbeddedMapAutoRefreshVisual(p){
     try {
@@ -142,9 +117,8 @@ try {
       btn.title = enabled ? 'Auto odds refresh: ON (right-click to disable)' : 'Re-broadcast current map (refresh odds) (right-click to enable auto)';
     } catch(_){ }
   }
-  if(window.desktopAPI && window.desktopAPI.onMapAutoRefreshStatus){ window.desktopAPI.onMapAutoRefreshStatus(applyEmbeddedMapAutoRefreshVisual); }
-  else { ipcRendererEmbedded.on('map-auto-refresh-status', (_e,p)=> applyEmbeddedMapAutoRefreshVisual(p)); }
-  if(window.desktopAPI && window.desktopAPI.getMapAutoRefreshStatus){ window.desktopAPI.getMapAutoRefreshStatus().then(p=>applyEmbeddedMapAutoRefreshVisual(p)).catch(()=>{}); }
+  if(window.desktopAPI?.onMapAutoRefreshStatus) window.desktopAPI.onMapAutoRefreshStatus(applyEmbeddedMapAutoRefreshVisual);
+  if(window.desktopAPI?.getMapAutoRefreshStatus) window.desktopAPI.getMapAutoRefreshStatus().then(p=>applyEmbeddedMapAutoRefreshVisual(p)).catch(()=>{});
 } catch(_){ }
 // Per-broker side swap (exclude excel). Centralized via IPC and synced across views.
 try {
@@ -161,19 +135,12 @@ async function initEmbeddedSwapSync(){
         renderEmbeddedOdds();
       } catch(_){ }
     };
-    if(window.desktopAPI && window.desktopAPI.getSwappedBrokers){
+    // Use shim-provided desktopAPI (guaranteed by stats_panel.html script order)
+    if(window.desktopAPI?.getSwappedBrokers){
       try { const list = await window.desktopAPI.getSwappedBrokers(); apply(list); } catch(_){ }
-      try { if(window.desktopAPI.onSwappedBrokersUpdated){ window.desktopAPI.onSwappedBrokersUpdated(apply); } } catch(_){ }
+      if(window.desktopAPI.onSwappedBrokersUpdated) window.desktopAPI.onSwappedBrokersUpdated(apply);
       return;
     }
-    // Stats panel BrowserView has no preload bridge; use direct IPC.
-    try {
-      if(ipcRendererEmbedded && ipcRendererEmbedded.invoke){
-        try { const list = await ipcRendererEmbedded.invoke('swapped-brokers-get'); apply(list); } catch(_){ }
-        try { ipcRendererEmbedded.on('swapped-brokers-updated', (_e, list)=> apply(list)); } catch(_){ }
-        return;
-      }
-    } catch(_){ }
 
     // Fallback localStorage (won't sync across file:// origins)
     try {
@@ -293,26 +260,22 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
       } catch(_){ } });
       hub.start();
     } else {
-      try { console.log('[embeddedOdds][init] Fallback odds wiring (desktopAPI/ipcRenderer)'); } catch(_){ }
-      if(window.desktopAPI && window.desktopAPI.onOdds){ window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update via desktopAPI', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); } else { ipcRendererEmbedded.on('odds-update', (_e,p)=>{ try { console.debug('[embeddedOdds] odds-update via ipcRenderer', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); }); }
+      try { console.log('[embeddedOdds][init] Fallback odds wiring (desktopAPI)'); } catch(_){ }
+      if(window.desktopAPI?.onOdds) window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); });
     }
   } catch(_){ }
-  try { if(window.desktopAPI && window.desktopAPI.onTeamNames){ window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } else { ipcRendererEmbedded.on('lol-team-names-update', ()=> renderEmbeddedOdds()); } } catch(_){ }
-  try { if(window.desktopAPI && window.desktopAPI.getTeamNames){ window.desktopAPI.getTeamNames().then(()=>renderEmbeddedOdds()).catch(()=>{}); } } catch(_){ }
+  try { if(window.desktopAPI?.onTeamNames) window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } catch(_){ }
+  try { if(window.desktopAPI?.getTeamNames) window.desktopAPI.getTeamNames().then(()=>renderEmbeddedOdds()).catch(()=>{}); } catch(_){ }
   // Remove broker rows when a broker is closed (mirror board behavior)
   try {
-    if(window.desktopAPI && window.desktopAPI.onBrokerClosed){
+    if(window.desktopAPI?.onBrokerClosed){
       window.desktopAPI.onBrokerClosed(id=>{ try { if(id && embeddedOddsData[id]){ delete embeddedOddsData[id]; renderEmbeddedOdds(); } } catch(_){ } });
-    } else if(ipcRendererEmbedded){
-      ipcRendererEmbedded.on('broker-closed', (_e,p)=>{ try { const id=p&&p.id; if(id && embeddedOddsData[id]){ delete embeddedOddsData[id]; renderEmbeddedOdds(); } } catch(_){ } });
     }
   } catch(_){ }
   // Sync with full active brokers list (drop any stale entries not present anymore)
   try {
-    if(window.desktopAPI && window.desktopAPI.onBrokersSync){
-  window.desktopAPI.onBrokersSync(ids=>{ try { const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
-    } else if(ipcRendererEmbedded){
-  ipcRendererEmbedded.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
+    if(window.desktopAPI?.onBrokersSync){
+      window.desktopAPI.onBrokersSync(ids=>{ try { const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
     }
   } catch(_){ }
   // One-time attempt to fetch last Excel odds (if loaded after they were emitted) so user doesn't need to re-select map
@@ -520,14 +483,11 @@ document.addEventListener('click', e=>{
     const set = window.__swappedBrokers || (window.__swappedBrokers = new Set());
     const next = !set.has(broker);
     if(next) set.add(broker); else set.delete(broker);
-    if(window.desktopAPI && window.desktopAPI.setBrokerSwap){
+    if(window.desktopAPI?.setBrokerSwap){
       window.desktopAPI.setBrokerSwap(broker, next);
     } else {
-      try { ipcRendererEmbedded.send('swapped-broker-set', { broker, swapped: next }); }
-      catch(_){
-        // Fallback localStorage
-        try { localStorage.setItem('swappedBrokers', JSON.stringify(Array.from(set))); } catch(_){ }
-      }
+      // Fallback localStorage (won't sync)
+      try { localStorage.setItem('swappedBrokers', JSON.stringify(Array.from(set))); } catch(_){ }
     }
     renderEmbeddedOdds();
   } catch(_){ }

@@ -331,7 +331,7 @@ function bootstrap() {
       toggleStats: ()=>{ try { toggleStatsEmbedded(); } catch(_){ } },
       toggleAuto: ()=>{ try { broadcastAutoToggleAll(); } catch(_){ } },
       toggleAutoResume: ()=>{ try { broadcastAutoResumeSet(!__autoLast.resume); } catch(_){ } },
-	  startScript: ()=>{ try { if(typeof excelProc !== 'undefined' && excelProc){ stopExcelExtractor(); } else { startExcelExtractor(); } } catch(_){ } },
+      startScript: ()=>{ try { if(excelExtractorController && excelExtractorController.toggle) excelExtractorController.toggle(); } catch(_){ } },
     },
     state: { __autoLast }
   });
