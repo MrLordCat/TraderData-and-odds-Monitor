@@ -36,6 +36,7 @@
       "statsContentPreload.js",
       "stealthPreload.js",
       "blankPreload.js",
+      "brokers/**/*",
       "Excel Extractor/**/*",
       "modules/**/*",
       "renderer/**/*",
@@ -45,6 +46,7 @@
       "!modules/ipc/upscaler.js",
       "!modules/dataservices/**",
       "lolstats/**/*",
+      "sendKeyInject.ps1",
       "package.json"
     ],
     "extraMetadata": {
