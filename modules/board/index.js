@@ -57,8 +57,9 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
 
   function createDockView(){
     if(dockView) return;
-  dockView = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','preload.js') } });
+  dockView = new BrowserView({ webPreferences:{ preload: path.join(__dirname,'..','..','preload.js'), backgroundThrottling: false } });
     try { dockView.setBackgroundColor('#10161f'); } catch(_){}
+    try { dockView.webContents.setBackgroundThrottling(false); } catch(_){}
     mainWindow.addBrowserView(dockView);
 
     // Unified window-active hotkeys (TAB/F1/F2/F3)

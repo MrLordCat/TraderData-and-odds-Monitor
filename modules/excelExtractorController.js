@@ -17,6 +17,10 @@ function createExcelExtractorController({
     excelProcError: null,
     excelDepsInstalling: false,
 
+    // Hotkey controller process (excel_hotkey_controller.py)
+    hotkeyProc: null,
+    hotkeyProcError: null,
+
     // AHK is managed by the Python extractor. We only surface its status (from current_state.json).
     ahkStatus: { running: false, starting: false, error: null, pid: null, exe: 'python', script: null, cwd: null, lastStderr: null },
   };
@@ -99,6 +103,141 @@ function createExcelExtractorController({
     return null;
   }
 
+  function resolveHotkeyControllerPath() {
+    const base = getExcelExtractorDir();
+    const candidates = [
+      path.join(base, 'excel_hotkey_controller.py'),
+      path.join(base, 'excel-hotkey-controller.py'),
+    ];
+    for (const p of candidates) {
+      try { if (fs.existsSync(p)) return p; } catch (_) { }
+    }
+    return null;
+  }
+
+  // Проверка и установка pip зависимостей
+  const REQUIRED_PACKAGES = ['pywin32', 'openpyxl', 'watchdog', 'keyboard'];
+  let depsChecked = false;
+
+  function checkAndInstallDeps(py, callback) {
+    if (depsChecked) {
+      callback(null);
+      return;
+    }
+
+    state.excelDepsInstalling = true;
+    broadcastExcelStatus();
+    excelLog('Checking Python dependencies...');
+
+    // Проверяем какие пакеты отсутствуют
+    const checkScript = `
+import sys
+missing = []
+try:
+    import win32com.client
+except ImportError:
+    missing.append('pywin32')
+try:
+    import openpyxl
+except ImportError:
+    missing.append('openpyxl')
+try:
+    import watchdog
+except ImportError:
+    missing.append('watchdog')
+try:
+    import keyboard
+except ImportError:
+    missing.append('keyboard')
+print('MISSING:' + ','.join(missing) if missing else 'OK')
+`;
+
+    const checkProc = spawn(py, ['-c', checkScript], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+
+    checkProc.stdout.on('data', d => { stdout += d.toString(); });
+    checkProc.stderr.on('data', d => { stderr += d.toString(); });
+
+    checkProc.on('close', (code) => {
+      const output = stdout.trim();
+      
+      if (output === 'OK') {
+        excelLog('All Python dependencies are installed');
+        depsChecked = true;
+        state.excelDepsInstalling = false;
+        broadcastExcelStatus();
+        callback(null);
+        return;
+      }
+
+      // Парсим отсутствующие пакеты
+      const match = output.match(/MISSING:(.+)/);
+      if (!match) {
+        // Python не найден или ошибка
+        excelLog('Failed to check dependencies:', stderr || output || 'unknown error');
+        state.excelDepsInstalling = false;
+        broadcastExcelStatus();
+        callback(new Error('Failed to check Python dependencies'));
+        return;
+      }
+
+      const missing = match[1].split(',').filter(p => p.trim());
+      if (missing.length === 0) {
+        depsChecked = true;
+        state.excelDepsInstalling = false;
+        broadcastExcelStatus();
+        callback(null);
+        return;
+      }
+
+      excelLog('Installing missing packages:', missing.join(', '));
+
+      // Устанавливаем отсутствующие пакеты
+      const installArgs = ['-m', 'pip', 'install', '--upgrade', ...missing];
+      const installProc = spawn(py, installArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+      
+      let installOut = '';
+      let installErr = '';
+      installProc.stdout.on('data', d => { 
+        installOut += d.toString();
+        excelLog('[pip]', d.toString().trim());
+      });
+      installProc.stderr.on('data', d => { 
+        installErr += d.toString();
+      });
+
+      installProc.on('close', (installCode) => {
+        state.excelDepsInstalling = false;
+        broadcastExcelStatus();
+
+        if (installCode === 0) {
+          excelLog('Successfully installed:', missing.join(', '));
+          depsChecked = true;
+          callback(null);
+        } else {
+          const errMsg = installErr || installOut || 'pip install failed';
+          excelLog('Failed to install packages:', errMsg);
+          callback(new Error('pip install failed: ' + errMsg.slice(0, 200)));
+        }
+      });
+
+      installProc.on('error', (err) => {
+        state.excelDepsInstalling = false;
+        broadcastExcelStatus();
+        excelLog('pip spawn error:', err.message);
+        callback(err);
+      });
+    });
+
+    checkProc.on('error', (err) => {
+      state.excelDepsInstalling = false;
+      broadcastExcelStatus();
+      excelLog('Python check spawn error:', err.message);
+      callback(err);
+    });
+  }
+
   function readAhkFromCurrentState() {
     try {
       const file = (() => {
@@ -147,13 +286,17 @@ function createExcelExtractorController({
       error: state.excelProcError,
       installing: !!state.excelDepsInstalling,
       ahk: Object.assign({}, state.ahkStatus, { lastStderr: short(state.ahkStatus.lastStderr, 220) }),
+      hotkey: {
+        running: !!state.hotkeyProc,
+        error: state.hotkeyProcError,
+      },
     };
 
     broadcast('excel-extractor-status', payload);
   }
 
   function startExcelExtractor() {
-    if (state.excelProc || state.excelProcStarting) return;
+    if (state.excelProc || state.excelProcStarting || state.excelDepsInstalling) return;
 
     const now = Date.now();
     if (now - state.lastExcelStartTs < 1500) return;
@@ -175,6 +318,28 @@ function createExcelExtractorController({
       let py = 'python';
       try { const pyOverride = store.get('excelPythonPath'); if (pyOverride) py = pyOverride; } catch (_) { }
 
+      // Сначала проверяем и устанавливаем зависимости
+      checkAndInstallDeps(py, (depsErr) => {
+        if (depsErr) {
+          state.excelProcError = 'Deps install failed: ' + depsErr.message;
+          state.excelProcStarting = false;
+          broadcastExcelStatus();
+          return;
+        }
+
+        // Продолжаем запуск после установки зависимостей
+        startExcelExtractorAfterDeps(py, scriptPath);
+      });
+
+    } catch (err) {
+      state.excelProcError = 'Startup error: ' + (err && err.message ? err.message : String(err));
+      state.excelProcStarting = false;
+      broadcastExcelStatus();
+    }
+  }
+
+  function startExcelExtractorAfterDeps(py, scriptPath) {
+    try {
       // Resolve workbook path (persisted). If missing/invalid, ask user once.
       let workbookPath = null;
       try {
@@ -295,8 +460,15 @@ function createExcelExtractorController({
 
         state.excelProc = null;
         state.excelProcStarting = false;
+        
+        // Also stop hotkey controller when watcher exits
+        stopHotkeyController();
+        
         broadcastExcelStatus();
       });
+
+      // Start hotkey controller after watcher is running
+      setTimeout(() => startHotkeyController(), 500);
 
       broadcastExcelStatus();
     } catch (err) {
@@ -308,7 +480,72 @@ function createExcelExtractorController({
     }
   }
 
+  function startHotkeyController() {
+    if (state.hotkeyProc) return; // Already running
+
+    const scriptPath = resolveHotkeyControllerPath();
+    if (!scriptPath) {
+      excelLog('[hotkey] excel_hotkey_controller.py not found');
+      state.hotkeyProcError = 'excel_hotkey_controller.py not found';
+      return;
+    }
+
+    let py = 'python';
+    try { const pyOverride = store.get('excelPythonPath'); if (pyOverride) py = pyOverride; } catch (_) { }
+
+    const cwd = path.dirname(scriptPath);
+    const args = ['-u', scriptPath];
+
+    excelLog('[hotkey] starting', scriptPath);
+
+    const spawnEnv = Object.assign({}, process.env, {
+      PYTHONUNBUFFERED: '1',
+      PYTHONIOENCODING: 'utf-8',
+    });
+
+    try {
+      state.hotkeyProc = spawn(py, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: spawnEnv, windowsHide: true });
+      state.hotkeyProcError = null;
+
+      excelLog('[hotkey] spawned pid', state.hotkeyProc.pid);
+
+      state.hotkeyProc.stdout.on('data', d => {
+        try { excelLog('[hotkey][stdout]', d.toString().trim()); } catch (_) { }
+      });
+
+      state.hotkeyProc.stderr.on('data', d => {
+        try { excelLog('[hotkey][stderr]', d.toString().trim()); } catch (_) { }
+      });
+
+      state.hotkeyProc.on('exit', (code, sig) => {
+        excelLog('[hotkey] exit code', code, 'sig', sig || '');
+        state.hotkeyProc = null;
+        if (code && code !== 0) {
+          state.hotkeyProcError = 'Hotkey controller exit code ' + code;
+        }
+      });
+
+    } catch (err) {
+      excelLog('[hotkey] spawn failed', err && err.message ? err.message : String(err));
+      state.hotkeyProcError = err && err.message ? err.message : String(err);
+      state.hotkeyProc = null;
+    }
+  }
+
+  function stopHotkeyController() {
+    try {
+      if (state.hotkeyProc) {
+        excelLog('[hotkey] stopping pid', state.hotkeyProc.pid);
+        state.hotkeyProc.kill();
+        state.hotkeyProc = null;
+      }
+    } catch (_) { }
+  }
+
   function stopExcelExtractor() {
+    // Stop hotkey controller first
+    stopHotkeyController();
+
     const ahkPid = (() => {
       try {
         const v = state.ahkStatus && state.ahkStatus.pid;
@@ -343,6 +580,9 @@ function createExcelExtractorController({
         spawn('taskkill', ['/IM', 'AutoHotkey*.exe', '/T', '/F'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       }
     } catch (_) { }
+
+    state.excelProc = null;
+    state.excelProcStarting = false;
   }
 
   function toggle() {

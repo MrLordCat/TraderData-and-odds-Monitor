@@ -1,0 +1,510 @@
+"""Excel Odds Hotkey Controller - Python replacement for AHK to control odds via hotkeys.
+
+Hotkeys:
+    NumpadSub (Numpad-) -> PreviousOddsHome (decrease home odds)
+    NumpadAdd (Numpad+) -> NextOddsHome (increase home odds)
+    NumpadMul (Numpad*) -> Cycle map (1->2->...->max->1, respects Bo1/Bo3/Bo5)
+    Numpad0 -> Send Update (Add-in button)
+    Numpad1 -> Suspend current map (CurrentMapSuspend button)
+    F21 -> Suspend + Send Update (auto mode trigger)
+    F22 -> Send Update only (auto mode confirm)
+    F23 -> PreviousOddsHome (external trigger)
+    F24 -> NextOddsHome (external trigger)
+    Numpad9 -> Show status
+    Esc or Ctrl+C -> Exit
+
+Reads current map from template_sync.json.
+Detects max maps from template (C1): Bo1=1, Bo3=3, Bo5=5.
+Blocks changes to cells with WIN/LOSE values.
+
+Map Winner rows:
+    Map 1: row 44
+    Map 2: row 190  
+    Map 3: row 336
+    Map 4: row 482
+    Map 5: row 628
+
+Run:
+    python excel_hotkey_controller.py
+"""
+
+import json
+import time
+import sys
+import re
+from pathlib import Path
+from typing import Optional, List
+from queue import Queue, Empty
+import win32com.client
+import win32gui
+import win32con
+import win32api
+import pythoncom
+
+# Try to import keyboard (requires: pip install keyboard)
+try:
+    import keyboard
+except ImportError:
+    print("ERROR: keyboard library required")
+    print("Install: pip install keyboard")
+    sys.exit(1)
+
+# Configuration
+SHEET_NAME = "InPlay FRONT"
+TEMPLATE_CELL = "C1"  # Template name cell (LoL Bo3, LoL Bo5, etc.)
+SYNC_FILE = Path(__file__).parent / "template_sync.json"
+
+# Map Winner rows (1-indexed)
+MAP_WINNER_ROWS = {
+    1: 44,   # Map 1 Winner
+    2: 190,  # Map 2 Winner
+    3: 336,  # Map 3 Winner
+    4: 482,  # Map 4 Winner
+    5: 628,  # Map 5 Winner
+}
+
+# Values that block cell modification
+BLOCKED_VALUES = {'WIN', 'LOSE', 'win', 'lose', 'Win', 'Lose'}
+
+
+class ExcelOddsHotkeyController:
+    """Hotkey controller for Excel odds management."""
+    
+    def __init__(self):
+        self._xl = None
+        self._wb = None
+        self._ws = None
+        self._odds_home: List = []
+        self._odds_away: List = []
+        self._current_map = 1
+        self._max_maps = 5  # Updated from template
+        self._connected = False
+        self._command_queue = Queue()  # Command queue for main thread execution
+        self._running = True
+        self._manual_map_override = 0  # If >0, use instead of template_sync.json
+        
+    def connect(self) -> bool:
+        """Connect to Excel (call only from main thread!)."""
+        try:
+            pythoncom.CoInitialize()
+            self._xl = win32com.client.GetActiveObject("Excel.Application")
+            self._wb = self._xl.ActiveWorkbook
+            self._ws = self._wb.Worksheets(SHEET_NAME)
+            
+            # Load odds tables
+            self._load_odds_tables()
+            
+            # Detect max maps from template
+            self._update_max_maps()
+            
+            print(f"[OK] Connected to: {self._wb.Name}")
+            self._connected = True
+            return True
+        except Exception as e:
+            print(f"ERROR connecting to Excel: {e}")
+            return False
+    
+    def _load_odds_tables(self):
+        """Load ODDSHOME and ODDSAWAY tables."""
+        try:
+            home_range = self._wb.Names('ODDSHOME').RefersToRange
+            self._odds_home = [cell.Value for cell in home_range if cell.Value is not None]
+            
+            away_range = self._wb.Names('ODDSAWAY').RefersToRange
+            self._odds_away = [cell.Value for cell in away_range if cell.Value is not None]
+        except Exception as e:
+            print(f"Warning: Could not load odds tables: {e}")
+    
+    def _get_template_name(self) -> str:
+        """Get template name from cell C1."""
+        try:
+            value = self._ws.Range(TEMPLATE_CELL).Value
+            return str(value).strip() if value else ""
+        except:
+            return ""
+    
+    def _update_max_maps(self):
+        """Update max maps based on template."""
+        template = self._get_template_name().lower()
+        if 'bo1' in template:
+            self._max_maps = 1
+        elif 'bo3' in template:
+            self._max_maps = 3
+        elif 'bo5' in template:
+            self._max_maps = 5
+        else:
+            self._max_maps = 5  # Default
+        print(f"[i] Template: {self._get_template_name()} -> Max maps: {self._max_maps}")
+    
+    def _find_odds_index(self, value, odds_list: List) -> int:
+        """Find index of value in odds list."""
+        if value in odds_list:
+            return odds_list.index(value)
+        for i, v in enumerate(odds_list):
+            if isinstance(v, (int, float)) and isinstance(value, (int, float)):
+                if abs(v - value) < 0.001:
+                    return i
+        return -1
+    
+    def read_current_map(self) -> int:
+        """Read current map from template_sync.json or use manual override."""
+        # If manual override set - use it
+        if self._manual_map_override > 0:
+            return self._manual_map_override
+        
+        try:
+            if SYNC_FILE.exists():
+                data = json.loads(SYNC_FILE.read_text(encoding='utf-8'))
+                map_num = data.get('map', 1)
+                if isinstance(map_num, int) and 1 <= map_num <= self._max_maps:
+                    return map_num
+        except:
+            pass
+        return self._current_map
+    
+    def cycle_map(self):
+        """Cycle map (1->2->...->max->1) respecting Bo1/Bo3/Bo5."""
+        # Update max_maps in case template changed
+        self._update_max_maps()
+        
+        current = self.read_current_map()
+        
+        # Cycle within max_maps
+        if current >= self._max_maps:
+            new_map = 1
+        else:
+            new_map = current + 1
+        
+        self._manual_map_override = new_map
+        self._current_map = new_map
+        print(f"[MAP] Switched: Map {current} -> Map {new_map} (max: {self._max_maps})")
+    
+    def get_row_for_current_map(self) -> int:
+        """Get row for current map."""
+        map_num = self.read_current_map()
+        self._current_map = map_num
+        return MAP_WINNER_ROWS.get(map_num, 44)
+    
+    def get_current_odds(self, row: int) -> tuple:
+        """Get current odds for row."""
+        try:
+            home = self._ws.Cells(row, 13).Value  # M column
+            away = self._ws.Cells(row, 14).Value  # N column
+            return home, away
+        except:
+            return None, None
+    
+    def is_cell_blocked(self, row: int) -> bool:
+        """Check if cell is blocked (WIN/LOSE)."""
+        home, away = self.get_current_odds(row)
+        # Check both values
+        home_str = str(home).strip().upper() if home else ""
+        away_str = str(away).strip().upper() if away else ""
+        return home_str in {'WIN', 'LOSE'} or away_str in {'WIN', 'LOSE'}
+    
+    def previous_odds_home(self) -> bool:
+        """Decrease home odds (PreviousOddsHome)."""
+        row = self.get_row_for_current_map()
+        
+        # Check for WIN/LOSE
+        if self.is_cell_blocked(row):
+            home, away = self.get_current_odds(row)
+            print(f"[BLOCKED] Map {self._current_map}: Cell locked (WIN/LOSE): Home={home}, Away={away}")
+            return False
+        
+        current, _ = self.get_current_odds(row)
+        
+        if current is None:
+            print(f"[X] Could not read M{row}")
+            return False
+        
+        idx = self._find_odds_index(current, self._odds_home)
+        if idx < 0:
+            print(f"[X] Value {current} not found in ODDSHOME")
+            return False
+        
+        if idx <= 0:
+            print(f"[!] Map {self._current_map}: Already at minimum ({current})")
+            return False
+        
+        new_value = self._odds_home[idx - 1]
+        
+        # Block WIN/LOSE - only manual input allowed
+        if str(new_value).upper() in {'WIN', 'LOSE'}:
+            print(f"[BLOCKED] Map {self._current_map}: Cannot set {new_value} via hotkey (manual only)")
+            return False
+        
+        self._ws.Cells(row, 13).Value = new_value
+        
+        new_home, new_away = self.get_current_odds(row)
+        print(f"[-] Map {self._current_map} (row {row}): {current} -> {new_value} | Away: {new_away}")
+        return True
+    
+    def next_odds_home(self) -> bool:
+        """Increase home odds (NextOddsHome)."""
+        row = self.get_row_for_current_map()
+        
+        # Check for WIN/LOSE
+        if self.is_cell_blocked(row):
+            home, away = self.get_current_odds(row)
+            print(f"[BLOCKED] Map {self._current_map}: Cell locked (WIN/LOSE): Home={home}, Away={away}")
+            return False
+        
+        current, _ = self.get_current_odds(row)
+        
+        if current is None:
+            print(f"[X] Could not read M{row}")
+            return False
+        
+        idx = self._find_odds_index(current, self._odds_home)
+        if idx < 0:
+            print(f"[X] Value {current} not found in ODDSHOME")
+            return False
+        
+        if idx >= len(self._odds_home) - 1:
+            print(f"[!] Map {self._current_map}: Already at maximum ({current})")
+            return False
+        
+        new_value = self._odds_home[idx + 1]
+        
+        # Block WIN/LOSE - only manual input allowed
+        if str(new_value).upper() in {'WIN', 'LOSE'}:
+            print(f"[BLOCKED] Map {self._current_map}: Cannot set {new_value} via hotkey (manual only)")
+            return False
+        
+        self._ws.Cells(row, 13).Value = new_value
+        
+        new_home, new_away = self.get_current_odds(row)
+        print(f"[+] Map {self._current_map} (row {row}): {current} -> {new_value} | Away: {new_away}")
+        return True
+    
+    def click_suspend_button(self) -> bool:
+        """Click CurrentMapSuspend button (toggle suspend/trade), then auto-send update."""
+        try:
+            ole = self._ws.OLEObjects('CurrentMapSuspend')
+            btn = ole.Object
+            old_caption = btn.Caption
+            btn.Value = not btn.Value  # Toggle = single click
+            new_caption = btn.Caption
+            print(f"[SUSPEND] {old_caption} -> {new_caption}")
+            
+            # Auto-send update after 100ms
+            time.sleep(0.1)
+            self.click_send_update_button()
+            
+            return True
+        except Exception as e:
+            print(f"[X] Suspend button error: {e}")
+            return False
+    
+    def click_send_update_button(self) -> bool:
+        """Click Send Update button in Add-in panel (via PostMessage, no cursor move)."""
+        try:
+            # Find Excel window
+            excel_hwnd = win32gui.FindWindow('XLMAIN', None)
+            if not excel_hwnd:
+                print("[X] Excel window not found")
+                return False
+            
+            # Find ExcelTradingAddIn WebView
+            addin_hwnd = None
+            def find_addin(hwnd, _):
+                nonlocal addin_hwnd
+                title = win32gui.GetWindowText(hwnd)
+                if 'ExcelTradingAddIn' in title:
+                    addin_hwnd = hwnd
+                    return False
+                return True
+            
+            win32gui.EnumChildWindows(excel_hwnd, find_addin, None)
+            
+            if not addin_hwnd:
+                print("[X] Add-in panel not found")
+                return False
+            
+            # Send Update button position (relative to panel)
+            btn_x = 55
+            btn_y = 280
+            
+            # Send click via PostMessage (no cursor movement)
+            lParam = win32api.MAKELONG(btn_x, btn_y)
+            win32gui.PostMessage(addin_hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lParam)
+            time.sleep(0.05)
+            win32gui.PostMessage(addin_hwnd, win32con.WM_LBUTTONUP, 0, lParam)
+            
+            print("[UPDATE] Clicked Send Update button")
+            return True
+        except Exception as e:
+            print(f"[X] Send Update error: {e}")
+            return False
+    
+    def show_status(self):
+        """Show current status."""
+        # Update max_maps in case template changed
+        self._update_max_maps()
+        
+        print("\n" + "="*50)
+        print("Excel Odds Hotkey Controller - Status")
+        print("="*50)
+        print(f"Workbook: {self._wb.Name}")
+        print(f"Template: {self._get_template_name()}")
+        print(f"Current map: {self.read_current_map()} (max: {self._max_maps})")
+        print()
+        for map_num, row in MAP_WINNER_ROWS.items():
+            if map_num > self._max_maps:
+                continue  # Don't show maps beyond limit
+            home, away = self.get_current_odds(row)
+            marker = ">>>" if map_num == self._current_map else "   "
+            blocked = " [BLOCKED]" if self.is_cell_blocked(row) else ""
+            print(f"{marker} Map {map_num} (row {row}): Home={home}, Away={away}{blocked}")
+        print("="*50)
+        print("Hotkeys: Numpad- (prev), Numpad+ (next), Numpad* (map), Numpad0 (update), Numpad1 (suspend)")
+        print("         F21 (suspend+update), F22 (update), F23 (prev), F24 (next), Numpad9 (status), Esc (exit)")
+        print()
+    
+    # Hotkey handlers - only add command to queue!
+    def on_hotkey_prev(self):
+        """Handler for Numpad- / F23."""
+        self._command_queue.put('prev')
+    
+    def on_hotkey_next(self):
+        """Handler for Numpad+ / F24."""
+        self._command_queue.put('next')
+    
+    def on_hotkey_status(self):
+        """Handler for Numpad9."""
+        self._command_queue.put('status')
+    
+    def on_hotkey_cycle_map(self):
+        """Handler for Numpad* - map cycling."""
+        self._command_queue.put('cycle_map')
+    
+    def on_hotkey_suspend(self):
+        """Handler for Numpad1 - suspend current map."""
+        self._command_queue.put('suspend')
+    
+    def on_hotkey_send_update(self):
+        """Handler for Numpad0 - send update."""
+        self._command_queue.put('send_update')
+    
+    def on_hotkey_exit(self):
+        """Handler for Esc."""
+        self._running = False
+        self._command_queue.put('exit')
+    
+    def process_commands(self):
+        """Process commands from queue (called in main thread)."""
+        try:
+            while True:
+                cmd = self._command_queue.get_nowait()
+                # Handle both tuple and string commands
+                cmd_name = cmd[0] if isinstance(cmd, tuple) else cmd
+                if cmd_name == 'prev':
+                    self.previous_odds_home()
+                elif cmd_name == 'next':
+                    self.next_odds_home()
+                elif cmd_name == 'status':
+                    self.show_status()
+                elif cmd_name == 'cycle_map':
+                    self.cycle_map()
+                elif cmd_name == 'suspend':
+                    self.click_suspend_button()
+                elif cmd_name == 'send_update':
+                    self.click_send_update_button()
+                elif cmd_name == 'exit':
+                    pass  # Just exit loop
+        except Empty:
+            pass  # Queue empty - normal
+    
+    def run(self):
+        """Start hotkey controller."""
+        print("\n" + "="*50)
+        print("Excel Odds Hotkey Controller")
+        print("="*50)
+        
+        if not self.connect():
+            print("Failed to connect to Excel. Make sure Excel is open.")
+            return
+        
+        print()
+        print("Hotkeys active:")
+        print("  Numpad-  -> Decrease Home odds (PreviousOddsHome)")
+        print("  Numpad+  -> Increase Home odds (NextOddsHome)")
+        print(f"  Numpad*  -> Cycle map (1->...>{self._max_maps}->1)")
+        print("  Numpad0  -> Send Update (Add-in)")
+        print("  Numpad1  -> Suspend current map")
+        print("  F21      -> Suspend + Update (auto mode)")
+        print("  F22      -> Send Update (auto confirm)")
+        print("  F23      -> Decrease (external trigger)")
+        print("  F24      -> Increase (external trigger)")
+        print("  Numpad9  -> Show status")
+        print("  Esc      -> Exit")
+        print()
+        print(f"Template: {self._get_template_name()}")
+        print(f"Current map: {self.read_current_map()} (max: {self._max_maps})")
+        print("Waiting for hotkeys...")
+        print()
+        
+        # Register hotkeys
+        keyboard.add_hotkey('num minus', self.on_hotkey_prev, suppress=True)
+        keyboard.add_hotkey('num plus', self.on_hotkey_next, suppress=True)
+        # Numpad* - try multiple methods
+        try:
+            keyboard.on_press_key(55, lambda _: self.on_hotkey_cycle_map())  # scan_code 55 = Numpad*
+        except:
+            pass
+        # F21-F24 for auto mode - use hook because SendInput sends virtual keys with negative scan codes
+        def on_fkey(e):
+            if e.event_type != 'down':
+                return
+            if e.name == 'f23':
+                self._command_queue.put(('prev',))
+            elif e.name == 'f24':
+                self._command_queue.put(('next',))
+            elif e.name == 'f21':
+                self._command_queue.put(('suspend',))
+            elif e.name == 'f22':
+                self._command_queue.put(('send_update',))
+        keyboard.hook(on_fkey)
+        keyboard.add_hotkey('num 9', self.on_hotkey_status, suppress=True)
+        
+        # Numpad0 (Send Update) and Numpad1 (Suspend) - use add_hotkey with suppress
+        keyboard.add_hotkey(82, self.on_hotkey_send_update, suppress=True)  # Numpad0 scan code
+        keyboard.add_hotkey(79, self.on_hotkey_suspend, suppress=True)  # Numpad1 scan code
+        
+        keyboard.add_hotkey('esc', self.on_hotkey_exit, suppress=False)
+        
+        try:
+            # Main loop - process commands in main thread
+            while self._running:
+                self.process_commands()
+                time.sleep(0.05)  # 50ms polling
+        except KeyboardInterrupt:
+            print("\nExit by Ctrl+C...")
+        finally:
+            print("Shutting down...")
+            keyboard.unhook_all()
+            self.disconnect()
+    
+    def disconnect(self):
+        """Disconnect from Excel."""
+        try:
+            if self._xl:
+                self._xl.Interactive = True
+                self._xl.ScreenUpdating = True
+            self._ws = None
+            self._wb = None
+            self._xl = None
+            self._connected = False
+            pythoncom.CoUninitialize()
+        except:
+            pass
+
+
+def main():
+    controller = ExcelOddsHotkeyController()
+    controller.run()
+
+
+if __name__ == "__main__":
+    main()

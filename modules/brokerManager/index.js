@@ -269,6 +269,24 @@ function createBrokerManager(ctx){
     syncBoard();
   }
 
+  // Периодическое "пробуждение" broker views - борьба с Chromium throttling для фоновых вкладок
+  // Каждые 2 секунды отправляем collect-now, что заставляет broker views отправить свежие odds
+  let wakeUpInterval = null;
+  function startWakeUpLoop(){
+    if(wakeUpInterval) return;
+    wakeUpInterval = setInterval(()=>{
+      Object.entries(views).forEach(([id, v])=>{
+        try {
+          if(v && v.webContents && !v.webContents.isDestroyed()){
+            v.webContents.send('collect-now');
+          }
+        } catch(_){}
+      });
+    }, 2000);
+  }
+  // Запускаем loop сразу при создании manager
+  startWakeUpLoop();
+
   // Deprecated: inline picker now used instead of popup dialog.
   function openAddBrokerDialog(){ /* no-op retained for backward IPC compatibility */ }
 

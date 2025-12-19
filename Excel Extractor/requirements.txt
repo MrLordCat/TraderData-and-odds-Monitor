@@ -1,3 +1,4 @@
 pywin32>=306
 openpyxl>=3.1.5
 watchdog>=4.0.0
+keyboard>=0.13.5

@@ -237,9 +237,14 @@
       btn.addEventListener('mouseenter', ()=>{
         try {
           const st = engine && engine.state;
-          if(!st || st.active) return;
+          // Always show status on hover (not just when inactive)
           const info = computeWhyLines(st);
           if(info && info.lines && info.lines.length) showMiniToastNear(btn, info.lines, info.kind);
+        } catch(_){ }
+      });
+      btn.addEventListener('mouseleave', ()=>{
+        try {
+          document.querySelectorAll('.miniToast').forEach(t=>t.remove());
         } catch(_){ }
       });
     }

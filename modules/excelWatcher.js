@@ -212,7 +212,7 @@ function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
         readAndEmit('map-change');
       }
     } catch(_){ }
-    mapPollTimer = setTimeout(mapPoll, 400); // lightweight
+    mapPollTimer = setTimeout(mapPoll, 100); // fast response to hotkey changes
   }
   mapPoll();
 

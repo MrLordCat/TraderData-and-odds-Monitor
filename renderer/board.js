@@ -343,131 +343,27 @@ if(window.desktopAPI){
       }
     }
   } catch(_){ }
-  // Excel extractor status updates (mirror embedded panel UI)
+  // Excel extractor status updates - using shared module
   try {
-    // Small ephemeral toast near the S button
-    let excelTogglePendingTs = 0;
-    let lastStatusSig = '';
-    let lastAutoToastTs = 0;
-    let lastHoverLines = null;
-    let lastHoverKind = 'ok';
+    let ExcelStatusUI = null;
+    try { ExcelStatusUI = require('./ui/excel_status'); } catch(_){ }
+    if(!ExcelStatusUI && window.ExcelStatusUI) ExcelStatusUI = window.ExcelStatusUI;
     
-    // Use shared toast utility
-    const showToast = MiniToast ? MiniToast.showMiniToastNear : function(el, lines, kind){
-      // Minimal inline fallback if module not loaded
-      try {
-        const toast = document.createElement('div');
-        toast.className = 'miniToast ' + (kind||'');
-        (lines||[]).forEach(t=>{ const s=document.createElement('span'); s.className='line'; s.textContent=t; toast.appendChild(s); });
-        document.body.appendChild(toast);
-        const r = el.getBoundingClientRect();
-        toast.style.left = Math.min(Math.max(8, r.left), window.innerWidth - 300) + 'px';
-        toast.style.top = (r.bottom + 8) + 'px';
-        requestAnimationFrame(()=> toast.classList.add('show'));
-        const ttl = kind==='err' ? 3800 : 2200;
-        setTimeout(()=>{ try { toast.remove(); } catch(_){} }, ttl + 260);
-      } catch(_){ }
-    };
-
-    // Bind S button click to toggle the Python extractor
-    try {
-      const sBtn = document.getElementById('excelScriptBtn');
-      if(sBtn && !sBtn.dataset.bound){
-        sBtn.dataset.bound = '1';
-        sBtn.addEventListener('click', ()=>{
-          excelTogglePendingTs = Date.now();
-          try { window.desktopAPI.excelScriptToggle && window.desktopAPI.excelScriptToggle(); } catch(_){ }
-        });
-        // Hover tooltip: show current status near the button
-        sBtn.addEventListener('mouseenter', ()=>{
-          try {
-            if(lastHoverLines && lastHoverLines.length){
-              showToast(sBtn, lastHoverLines, lastHoverKind);
-            }
-          } catch(_){ }
-        });
-      }
-    } catch(_){ }
-    if(window.desktopAPI.onExcelExtractorStatus){
-      window.desktopAPI.onExcelExtractorStatus(s=>{
-        try {
-          const statusEl=document.getElementById('excelStatusCell');
-          const btn=document.getElementById('excelScriptBtn');
-          if(btn) btn.classList.toggle('on', !!s.running);
-          if(statusEl){
-            let text='';
-            if(s.installing) text='installing...';
-            else if(s.starting) text='starting';
-            else if(s.running) text='running';
-            else if(s.error) text='error';
-            else text='idle';
-            statusEl.dataset.last=text;
-            if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; }
-            else { statusEl.style.display='inline'; statusEl.textContent=text; }
-          }
-
-          const pyOn = !!s.running;
-          const ahkOn = !!(s.ahk && s.ahk.running);
-          const pyErr = s.error ? String(s.error) : '';
-          const ahkErr = (s.ahk && s.ahk.error) ? String(s.ahk.error) : '';
-          const lines = [
-            'Python: ' + (pyOn ? 'ON' : 'OFF') + (pyErr ? ' ('+pyErr+')' : ''),
-            'AHK: ' + (ahkOn ? 'ON' : 'OFF') + (ahkErr ? ' ('+ahkErr+')' : '')
-          ];
-          const kind = (pyErr || ahkErr) ? 'err' : 'ok';
-          lastHoverLines = lines;
-          lastHoverKind = kind;
-          // Intentionally no native tooltip (title). Status is shown via miniToast only.
-
-          // If user just clicked the toggle, show a compact status popup near the button
-          if(btn && excelTogglePendingTs && (Date.now() - excelTogglePendingTs) < 1800){
-            showToast(btn, lines, kind);
-            excelTogglePendingTs = 0;
-          }
-
-          // Also show the same toast when toggled via hotkeys (status transition), to match click UX.
-          if(btn && !excelTogglePendingTs){
-            const sig = [
-              s.installing ? 'I' : '',
-              s.starting ? 'S' : '',
-              s.running ? 'R' : '',
-              pyErr ? ('E:'+pyErr) : '',
-              ahkOn ? 'A' : '',
-              ahkErr ? ('AE:'+ahkErr) : ''
-            ].join('|');
-            const changed = !!lastStatusSig && sig !== lastStatusSig;
-            const important = !!(s.starting || s.running || pyErr || ahkErr);
-            const now = Date.now();
-            if(changed && important && (now - lastAutoToastTs) > 1200){
-              showToast(btn, lines, kind);
-              lastAutoToastTs = now;
-            }
-            lastStatusSig = sig;
-          }
-        } catch(_){ }
+    const sBtn = document.getElementById('excelScriptBtn');
+    const statusEl = document.getElementById('excelStatusCell');
+    
+    if(ExcelStatusUI && sBtn){
+      const { applyStatus } = ExcelStatusUI.bindExcelStatusButton({
+        btn: sBtn,
+        statusEl: statusEl,
+        toggle: ()=> window.desktopAPI.excelScriptToggle && window.desktopAPI.excelScriptToggle()
       });
-      // Initial fetch if API supports
+      
+      if(window.desktopAPI.onExcelExtractorStatus){
+        window.desktopAPI.onExcelExtractorStatus(applyStatus);
+      }
       if(window.desktopAPI.getExcelExtractorStatus){
-        window.desktopAPI.getExcelExtractorStatus().then(s=>{
-          try {
-            const statusEl=document.getElementById('excelStatusCell');
-            const btn=document.getElementById('excelScriptBtn');
-            if(btn) btn.classList.toggle('on', !!(s && s.running));
-            if(statusEl && s){
-              let text='';
-              if(s.installing) text='installing...';
-              else if(s.starting) text='starting';
-              else if(s.running) text='running';
-              else if(s.error) text='error';
-              else text='idle';
-              statusEl.dataset.last=text;
-              if(text==='idle'){ statusEl.style.display='none'; statusEl.textContent='idle'; }
-              else { statusEl.style.display='inline'; statusEl.textContent=text; }
-            }
-
-            // Intentionally no native tooltip (title). Status is shown via miniToast only.
-          } catch(_){ }
-        }).catch(()=>{});
+        window.desktopAPI.getExcelExtractorStatus().then(applyStatus).catch(()=>{});
       }
     }
   } catch(_){ }
@@ -650,7 +546,7 @@ function refreshAutoButtonsVisual(){
       const paused = !sim.active && !!sim.userWanted && (sim.lastDisableReason && !/^manual/.test(sim.lastDisableReason));
       autoBtn.classList.toggle('paused', paused);
       autoBtn.classList.toggle('susp', !!sim.lastDisableReason && sim.lastDisableReason==='excel-suspended');
-      autoBtn.title = paused ? `Auto paused (${sim.lastDisableReason||''})` : (sim.active? 'Auto: ON' : 'Auto: OFF');
+      // No native title - miniToast handles tooltip on hover
     }
     if(rBtn && sim){ rBtn.classList.toggle('on', !!sim.autoResume); }
   } catch(_){ }

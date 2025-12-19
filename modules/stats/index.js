@@ -312,7 +312,12 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys }) {
     // Always ensure background exists while Stats is active (it sits behind A/B/panel).
     showCover();
 
-    if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js') } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel');
+    if(fresh){ views.panel=new BrowserView({ webPreferences:{ partition:'persist:statsPanel', contextIsolation:false, nodeIntegration:true, backgroundThrottling:false } }); views.A=new BrowserView({ webPreferences:{ partition:'persist:statsA', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js'), backgroundThrottling:false } }); views.B=new BrowserView({ webPreferences:{ partition:'persist:statsB', contextIsolation:true, sandbox:false, preload:path.join(__dirname,'..','..','statsContentPreload.js'), backgroundThrottling:false } }); try { mainWindow.addBrowserView(views.panel); mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ } attachContextMenu(views.A,'A'); attachContextMenu(views.B,'B'); attachContextMenu(views.panel,'Panel');
+
+      // Disable background throttling for all stats views
+      try { views.panel.webContents.setBackgroundThrottling(false); } catch(_){ }
+      try { views.A.webContents.setBackgroundThrottling(false); } catch(_){ }
+      try { views.B.webContents.setBackgroundThrottling(false); } catch(_){ }
 
       // Unified window-active hotkeys (TAB/F1/F2/F3)
       try { if(hotkeysRef && hotkeysRef.attachToWebContents){ hotkeysRef.attachToWebContents(views.panel.webContents); hotkeysRef.attachToWebContents(views.A.webContents); hotkeysRef.attachToWebContents(views.B.webContents); } } catch(_){ }

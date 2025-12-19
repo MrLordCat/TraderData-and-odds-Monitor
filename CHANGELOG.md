@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.4]
+
+### 🚀 New Features
+- **Python-only hotkey controller**: Replaced AHK with pure Python using `keyboard` library
+  - F21-F24 virtual key support via `keyboard.hook()` for auto mode
+  - Numpad0/1 key suppression to prevent digit typing
+  - WIN/LOSE protection: hotkeys cannot override WIN/LOSE values
+- **Auto pip install**: Dependencies automatically installed on first launch (pywin32, openpyxl, watchdog, keyboard)
+- **Broker wake-up loop**: Periodic `collect-now` signal every 2s to prevent Chromium throttling
+
+### ⚡ Improvements
+- **Background throttling disabled**: Added `backgroundThrottling: false` to board and stats views for instant odds updates
+- **Shared Excel status module**: New `renderer/ui/excel_status.js` eliminates code duplication
+- **Tooltip behavior**: Shows only on hover, hides immediately on mouseleave
+- **Removed AHK from status display**: UI now shows Python-only status
+
+### 🐛 Bug Fixes
+- Fixed duplicate tooltips (removed native HTML `title` attribute from Auto buttons)
+- Fixed slow odds appearing in stats board when switching views
+- Fixed broker views "sleeping" when main window loses focus
+
+### 🧹 Code Quality
+- Removed AHK status tracking (no longer needed)
+- Centralized Excel status button logic into shared module
+- Added keyboard package to requirements.txt
+
+---
+
 ## [0.0.3] - 2024-12-18
 
 ### 🚀 New Features
