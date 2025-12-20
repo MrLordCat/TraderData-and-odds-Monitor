@@ -108,18 +108,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys }) {
     } catch(_) { return h; }
   }
 
-  // uBlock (manual on-demand only)
-  const UBLOCK_DIR = path.join(__dirname,'..','..','ublock');
-  function maybeInstallUblock(view, host){
-    try {
-      if(!view||!host) return; if(!fs.existsSync(UBLOCK_DIR)) return;
-      const sess = view.webContents.session; if(!sess || sess.__ublockLoaded) return;
-      const loader = (sess.extensions && sess.extensions.loadExtension) ? (p)=> sess.extensions.loadExtension(p,{allowFileAccess:true}) : (p)=> sess.loadExtension(p,{ allowFileAccess:true });
-      sess.__ublockLoaded = 'pending';
-      loader(UBLOCK_DIR).then(ext=>{ sess.__ublockLoaded=true; try { sess.__ublockExtInfo=ext; } catch(_){ } }).catch(()=>{ try { sess.__ublockLoaded=false; } catch(_){ } });
-    } catch(_){}
-  }
-
   function layout(){
     if(!embeddedActive) return;
     if(!mainWindow || mainWindow.isDestroyed()) return;
@@ -303,7 +291,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys }) {
   }
 
   // --- Context menu ----------------------------------------------------------------------
-  function attachContextMenu(view,label){ if(!view || view.__statsCtxMenuAttached) return; view.__statsCtxMenuAttached=true; view.webContents.on('context-menu',(e,params)=>{ try { const template=[]; const nav=view.webContents.navigationHistory; const canBack= nav? nav.canGoBack(): (view.webContents.canGoBack && view.webContents.canGoBack()); const canFwd= nav? nav.canGoForward(): (view.webContents.canGoForward && view.webContents.canGoForward()); if(canBack) template.push({ label:'Back', click:()=>{ try { nav? nav.goBack(): view.webContents.goBack(); } catch(_){ } } }); if(canFwd) template.push({ label:'Forward', click:()=>{ try { nav? nav.goForward(): view.webContents.goForward(); } catch(_){ } } }); template.push({ label:'Reload', click:()=>{ try { view.webContents.reload(); } catch(_){ } } }); try { const curUrl=view.webContents.getURL(); if(curUrl) template.push({ label:'Copy Page URL', click:()=>{ try { clipboard.writeText(curUrl); } catch(_){ } } }); } catch(_){ } if(params.linkURL) template.push({ label:'Copy Link URL', click:()=>{ try { clipboard.writeText(params.linkURL); } catch(_){ } } }); template.push({ type:'separator' }); if(params.isEditable) template.push({ role:'cut' }); template.push({ role:'copy' }); if(params.isEditable) template.push({ role:'paste' }); template.push({ role:'selectAll' }); template.push({ type:'separator' }); template.push({ label:'Open DevTools', click:()=>{ try { view.webContents.openDevTools({ mode:'detach' }); } catch(_){ } } }); if(typeof params.x==='number' && typeof params.y==='number') template.push({ label:'Inspect Element', click:()=>{ try { view.webContents.inspectElement(params.x, params.y); } catch(_){ } } }); template.push({ type:'separator' }); const sess=view.webContents.session; const stateRaw=sess && sess.__ublockLoaded; if(stateRaw){ template.push({ label:'uBlock: '+(stateRaw===true?'loaded': stateRaw==='pending'?'loading…':'not loaded'), enabled:false }); } if(!stateRaw) template.push({ label:'Enable uBlock', click:()=>{ try { const host=new URL(view.webContents.getURL()).hostname; maybeInstallUblock(view,host); } catch(_){ } } }); template.push({ type:'separator' }); template.push({ label:'Stats Slot: '+(label||'?'), enabled:false }); const menu=Menu.buildFromTemplate(template); menu.popup({ window: mainWindow }); } catch(err){ try { console.warn('[stats][ctxmenu] build fail', err.message); } catch(_){ } } }); }
+  function attachContextMenu(view,label){ if(!view || view.__statsCtxMenuAttached) return; view.__statsCtxMenuAttached=true; view.webContents.on('context-menu',(e,params)=>{ try { const template=[]; const nav=view.webContents.navigationHistory; const canBack= nav? nav.canGoBack(): (view.webContents.canGoBack && view.webContents.canGoBack()); const canFwd= nav? nav.canGoForward(): (view.webContents.canGoForward && view.webContents.canGoForward()); if(canBack) template.push({ label:'Back', click:()=>{ try { nav? nav.goBack(): view.webContents.goBack(); } catch(_){ } } }); if(canFwd) template.push({ label:'Forward', click:()=>{ try { nav? nav.goForward(): view.webContents.goForward(); } catch(_){ } } }); template.push({ label:'Reload', click:()=>{ try { view.webContents.reload(); } catch(_){ } } }); try { const curUrl=view.webContents.getURL(); if(curUrl) template.push({ label:'Copy Page URL', click:()=>{ try { clipboard.writeText(curUrl); } catch(_){ } } }); } catch(_){ } if(params.linkURL) template.push({ label:'Copy Link URL', click:()=>{ try { clipboard.writeText(params.linkURL); } catch(_){ } } }); template.push({ type:'separator' }); if(params.isEditable) template.push({ role:'cut' }); template.push({ role:'copy' }); if(params.isEditable) template.push({ role:'paste' }); template.push({ role:'selectAll' }); template.push({ type:'separator' }); template.push({ label:'Open DevTools', click:()=>{ try { view.webContents.openDevTools({ mode:'detach' }); } catch(_){ } } }); if(typeof params.x==='number' && typeof params.y==='number') template.push({ label:'Inspect Element', click:()=>{ try { view.webContents.inspectElement(params.x, params.y); } catch(_){ } } }); template.push({ type:'separator' }); template.push({ label:'Stats Slot: '+(label||'?'), enabled:false }); const menu=Menu.buildFromTemplate(template); menu.popup({ window: mainWindow }); } catch(err){ try { console.warn('[stats][ctxmenu] build fail', err.message); } catch(_){ } } }); }
 
 
   // --- Embedded lifecycle ----------------------------------------------------------------
@@ -387,7 +375,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys }) {
   // Public API (open kept as noop for backward compatibility)
   function setHotkeys(h){ hotkeysRef = h || null; }
 
-  return { open: ()=>{}, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost, setUrl, getMode:()=>mode, getSide:()=>side, getPanelHidden:()=>panelHidden, maybeInstallUblock, setSide, setHotkeys };
+  return { open: ()=>{}, handleIpc, views, createEmbedded, destroyEmbedded, detachToWindow, handleStageResized, ensureTopmost, setUrl, getMode:()=>mode, getSide:()=>side, getPanelHidden:()=>panelHidden, setSide, setHotkeys };
 }
 
 module.exports = { createStatsManager };
