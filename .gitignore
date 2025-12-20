@@ -41,6 +41,12 @@ coverage/
 .cache/
 .tmp/
 .eslintcache
+.npm-cache/
+
+# Electron builder cache
+.electron-builder-cache/
+~/.cache/electron-builder/
+cache/
 
 # Electron specific
 *.pid

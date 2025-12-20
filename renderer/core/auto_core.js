@@ -42,6 +42,14 @@
       waitingForExcel:false,
       waitToken:0,
       excelSnapshotKey:null,
+      // Pulse cooldown: wait for odds changes or minimum delay after sending pulses
+      pulseCooldownActive: false,
+      pulseCooldownPulsesSent: 0,
+      pulseCooldownStartTs: 0,
+      pulseCooldownExcelSnapshot: null,
+      pulseCooldownChangesNeeded: 0,
+      pulseCooldownChangesObserved: 0,
+      pulseCooldownMinDelayMs: 300,
       maxAdaptiveWaitMs: cfg.maxAdaptiveWaitMs,
       userWanted:false,
       lastDisableReason:null,
@@ -66,7 +74,7 @@
       // Cooldown check — return false if skipped due to cooldown
       const now = Date.now();
       if(now - state.lastFireTs < state.fireCooldownMs && state.lastFireSide===sideToAdjust && state.lastFireKey===keyLabel){
-        return false; // Did not fire due to cooldown
+        return { fired: false, pulses: 0 }; // Did not fire due to cooldown
       }
       state.lastFireTs = now; state.lastFireSide = sideToAdjust; state.lastFireKey = keyLabel;
       // Pulses based on thresholds
@@ -80,7 +88,7 @@
       // Confirm F22
       const confirmDelay = cfg.pulseGap*(pulses-1) + cfg.confirmBase;
       setTimeout(()=>{ try { press({ side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true }); } catch(_){ } }, confirmDelay);
-      return true; // Successfully fired
+      return { fired: true, pulses }; // Successfully fired with pulse count
     }
 
     function step(){
@@ -92,6 +100,34 @@
       }
       const mid = parseMid && parseMid();
       const ex = parseExcel && parseExcel();
+      
+      // Check pulse cooldown — must wait for odds changes or minimum delay after sending pulses
+      if(state.pulseCooldownActive){
+        const elapsedMs = Date.now() - state.pulseCooldownStartTs;
+        const exKey = ex ? (ex[0]+'|'+ex[1]) : null;
+        // Count changes if excel odds differ from last snapshot
+        if(exKey && exKey !== state.pulseCooldownExcelSnapshot){
+          state.pulseCooldownChangesObserved++;
+          state.pulseCooldownExcelSnapshot = exKey;
+        }
+        // Exit cooldown if: (1) enough changes observed, OR (2) minimum delay passed
+        const minDelayMet = elapsedMs >= state.pulseCooldownMinDelayMs;
+        const changesMetOrTimeout = state.pulseCooldownChangesObserved >= state.pulseCooldownChangesNeeded;
+        // Also exit cooldown after max wait (2x pulses * 300ms)
+        const maxWaitMs = Math.max(state.pulseCooldownMinDelayMs, state.pulseCooldownPulsesSent * 300);
+        const maxWaitMet = elapsedMs >= maxWaitMs;
+        
+        if((minDelayMet && changesMetOrTimeout) || maxWaitMet){
+          // Exit cooldown
+          state.pulseCooldownActive = false;
+          status(`Cooldown done (${state.pulseCooldownChangesObserved}/${state.pulseCooldownChangesNeeded} chg, ${elapsedMs}ms)`);
+        } else {
+          // Still in cooldown — report status and reschedule
+          status(`Pulse cooldown (${state.pulseCooldownChangesObserved}/${state.pulseCooldownChangesNeeded} chg, ${elapsedMs}ms)`);
+          return schedule(80);
+        }
+      }
+      
       // Require config before operating
       if(!(typeof state.tolerancePct==='number' && !isNaN(state.tolerancePct)) || !(typeof state.stepMs==='number' && !isNaN(state.stepMs)) || typeof state.adaptive!=='boolean' || !Array.isArray(state.burstLevels) || state.burstLevels.length===0){
         status('Set Auto config in Settings');
@@ -105,8 +141,9 @@
       const sideToAdjust = (mid[0] <= mid[1]) ? 0 : 1;
       const diffPct = Math.abs(ex[sideToAdjust] - mid[sideToAdjust]) / mid[sideToAdjust] * 100;
       if(diffPct <= state.tolerancePct){
-        // Aligned — reset failure counter
+        // Aligned — reset failure counter and pulse cooldown
         state.excelNoChangeCount = 0;
+        state.pulseCooldownActive = false;
         status('Aligned (min side)');
         return schedule();
       }
@@ -115,14 +152,22 @@
       status(`Align ${direction} S${sideToAdjust+1} ${diffPct.toFixed(2)}% (min)`);
       
       // Try to send key presses — may be blocked by cooldown
-      let fired = false;
-      try { fired = burstAndConfirm(sideToAdjust, direction, diffPct); } catch(_){ fired = false; }
+      let result = { fired: false, pulses: 0 };
+      try { result = burstAndConfirm(sideToAdjust, direction, diffPct); } catch(_){ result = { fired: false, pulses: 0 }; }
       
       // If cooldown blocked the fire, just schedule next step without waiting for Excel
-      if(!fired){
+      if(!result.fired){
         status(`Cooldown (wait ${state.fireCooldownMs}ms)`);
         return schedule();
       }
+      
+      // Activate pulse cooldown — wait for changes proportional to pulses sent
+      state.pulseCooldownActive = true;
+      state.pulseCooldownPulsesSent = result.pulses;
+      state.pulseCooldownStartTs = Date.now();
+      state.pulseCooldownExcelSnapshot = ex[0]+'|'+ex[1];
+      state.pulseCooldownChangesNeeded = result.pulses; // Need N changes for N pulses
+      state.pulseCooldownChangesObserved = 0;
       
       if(state.adaptive){
         state.waitingForExcel = true;

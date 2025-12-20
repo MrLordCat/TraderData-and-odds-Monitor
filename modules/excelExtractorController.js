@@ -523,6 +523,13 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
         if (code && code !== 0) {
           state.hotkeyProcError = 'Hotkey controller exit code ' + code;
         }
+        // When hotkey controller exits (e.g., ESC pressed), also stop the watcher
+        // This ensures proper cleanup and status update in the board
+        if (state.excelProc) {
+          excelLog('[hotkey] stopping watcher due to hotkey controller exit');
+          stopExcelExtractor();
+        }
+        broadcastExcelStatus();
       });
 
     } catch (err) {

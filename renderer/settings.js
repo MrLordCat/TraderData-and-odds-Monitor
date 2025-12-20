@@ -147,16 +147,17 @@ const burstVals = {
 
 // NOTE: Burst levels are applied by threshold descending internally.
 // UI now shows L1 as the LOWEST threshold and L3 as the HIGHEST (L1<->L3 rename).
+// L1: 7%-15%, L2: 10%-20%, L3: 20%-40%
 const BURST_UI = [
-	{ ui: 1, modelIndex: 2, thMin: 2, thMax: 10 },
-	{ ui: 2, modelIndex: 1, thMin: 7, thMax: 20 },
-	{ ui: 3, modelIndex: 0, thMin: 10, thMax: 30 },
+	{ ui: 1, modelIndex: 2, thMin: 7, thMax: 15 },
+	{ ui: 2, modelIndex: 1, thMin: 10, thMax: 20 },
+	{ ui: 3, modelIndex: 0, thMin: 20, thMax: 40 },
 ];
 
 let burstLevels = [
-	{ thresholdPct: 20, pulses: 4 },
-	{ thresholdPct: 12, pulses: 3 },
-	{ thresholdPct: 6, pulses: 2 },
+	{ thresholdPct: 25, pulses: 4 },
+	{ thresholdPct: 15, pulses: 3 },
+	{ thresholdPct: 10, pulses: 2 },
 ];
 
 function clampBurstThreshold(uiLevel, v){
@@ -179,15 +180,15 @@ function sanitizeBurst(list){
 			.sort((a,b)=> b.thresholdPct - a.thresholdPct)
 			.slice(0,3);
 		return cleaned.length? cleaned : [
-			{ thresholdPct: 20, pulses: 4 },
-			{ thresholdPct: 12, pulses: 3 },
-			{ thresholdPct: 6, pulses: 2 },
+			{ thresholdPct: 25, pulses: 4 },
+			{ thresholdPct: 15, pulses: 3 },
+			{ thresholdPct: 10, pulses: 2 },
 		];
 	} catch(_){
 		return [
-			{ thresholdPct: 20, pulses: 4 },
-			{ thresholdPct: 12, pulses: 3 },
-			{ thresholdPct: 6, pulses: 2 },
+			{ thresholdPct: 25, pulses: 4 },
+			{ thresholdPct: 15, pulses: 3 },
+			{ thresholdPct: 10, pulses: 2 },
 		];
 	}
 }

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.5]
+
+### ⚡ Improvements
+- **Pulse cooldown system**: After sending N pulses, system now waits for N odds changes (or min 300ms) before sending new pulses — prevents over-correction
+- **Updated burst threshold ranges**:
+  - L1: 7% – 15% (was 2% – 10%)
+  - L2: 10% – 20% (was 7% – 20%)
+  - L3: 20% – 40% (was 10% – 30%)
+
+### 🐛 Bug Fixes
+- **ESC exit handling**: When hotkey controller exits (ESC), watcher now properly stops and Auto mode disables correctly in Odds Board
+
+---
+
 ## [0.0.4]
 
 ### 🚀 New Features
