@@ -48,11 +48,9 @@
 
     function markAllDisableReason(reasonCode){
       if(!reasonCode) return;
-      views.forEach(v=>{
-        try {
-          if(v && v.engine && v.engine.state){ v.engine.state.lastDisableReason = reasonCode; }
-        } catch(_){ }
-      });
+      if(sharedEngine && sharedEngine.state){
+        sharedEngine.state.lastDisableReason = reasonCode;
+      }
     }
 
     function broadcastAutoActiveOff(){
@@ -68,14 +66,11 @@
         if(info && info.reasonCode){ markAllDisableReason(info.reasonCode); }
       } catch(_){ }
       let anyWasActive = false;
-      views.forEach(v=>{
-        try {
-          if(v && v.engine && v.engine.state && v.engine.state.active){
-            anyWasActive = true;
-            v.engine.setActive(false);
-          }
-        } catch(_){ }
-      });
+      if(sharedEngine && sharedEngine.state && sharedEngine.state.active){
+        anyWasActive = true;
+        sharedEngine.setActive(false);
+        notifyAllUIs('onActiveChanged', false, sharedEngine.state);
+      }
       if(anyWasActive){
         // Ensure other windows (late loads) sync to OFF.
         broadcastAutoActiveOff();
@@ -83,7 +78,7 @@
     }
 
     function statusAll(msg){
-      try { views.forEach(v=>{ try { v.ui && v.ui.status && v.ui.status(msg); } catch(_){ } }); } catch(_){ }
+      try { viewUIs.forEach((ui)=>{ try { ui && ui.status && ui.status(msg); } catch(_){ } }); } catch(_){ }
     }
 
     function canEnableAuto(){
@@ -180,8 +175,8 @@
             computeDerived();
             applyExcelGuard();
             applyMarketGuard();
-            // If any engine is active, step so it uses new mid immediately.
-            views.forEach(v=>{ try { if(v && v.engine && v.engine.state && v.engine.state.active){ v.engine.step(); } } catch(_){ } });
+            // If engine is active, step so it uses new mid immediately.
+            if(sharedEngine && sharedEngine.state && sharedEngine.state.active){ try { sharedEngine.step(); } catch(_){ } }
           } catch(_){ }
         };
         if(global.desktopAPI && global.desktopAPI.onSwappedBrokersUpdated){
@@ -216,17 +211,29 @@
 
     function applyExcelGuard(){
       const ex = getExcelRecord(); if(!ex) return;
+      if(!sharedEngine || !sharedEngine.state) return;
+      const eng = sharedEngine;
+      const st = eng.state;
       let anyDisabled=false, anyEnabled=false;
-      views.forEach(v=>{
-        const eng=v.engine, ui=v.ui; if(!eng||!eng.state) return;
-        const st=eng.state;
-        // Suspend
-        if(ex.frozen && st.active){ st.lastDisableReason='excel-suspended'; eng.setActive(false); anyDisabled=true; try { ui.onActiveChanged && ui.onActiveChanged(false, st, { excelSuspended:true }); } catch(_){ } try { ui && ui.status && ui.status('Suspended: excel'); } catch(_){ } }
-        // Resume
-        else if(!ex.frozen && !st.active && st.userWanted && st.lastDisableReason==='excel-suspended'){
-          if(st.autoResume){ eng.setActive(true); anyEnabled=true; st.lastDisableReason='excel-resumed'; try { ui.onActiveChanged && ui.onActiveChanged(true, st, { excelResumed:true }); } catch(_){ } try { ui && ui.status && ui.status('Resumed: excel'); } catch(_){ } try { eng.step(); } catch(_){ } }
+      // Suspend
+      if(ex.frozen && st.active){
+        st.lastDisableReason='excel-suspended';
+        eng.setActive(false);
+        anyDisabled=true;
+        notifyAllUIs('onActiveChanged', false, st, { excelSuspended:true });
+        statusAll('Suspended: excel');
+      }
+      // Resume
+      else if(!ex.frozen && !st.active && st.userWanted && st.lastDisableReason==='excel-suspended'){
+        if(st.autoResume){
+          eng.setActive(true);
+          anyEnabled=true;
+          st.lastDisableReason='excel-resumed';
+          notifyAllUIs('onActiveChanged', true, st, { excelResumed:true });
+          statusAll('Resumed: excel');
+          try { eng.step(); } catch(_){ }
         }
-      });
+      }
       // Broadcast state change across windows so late-loaded views sync
       try {
         if(anyDisabled){ if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } } }
@@ -237,16 +244,23 @@
     const ARB_SUSPEND_PCT = 5.0;
     function applyMarketGuard(){
       const d=state.derived; if(!d) return;
+      if(!sharedEngine || !sharedEngine.state) return;
+      const eng = sharedEngine;
+      const st = eng.state;
       const shouldSuspend = (!d.hasMid) || (typeof d.arbProfitPct==='number' && d.arbProfitPct >= ARB_SUSPEND_PCT);
       if(shouldSuspend){
+        if(!st.autoResume) return;
         let anyDisabled=false;
-        views.forEach(v=>{
-          const eng=v.engine, ui=v.ui; if(!eng||!eng.state) return; const st=eng.state; if(!st.autoResume) return; if(st.active){ anyDisabled=true; st.lastDisableReason = (!d.hasMid)?'no-mid':'arb-spike'; eng.setActive(false); try { ui.onActiveChanged && ui.onActiveChanged(false, st, { marketSuspended:true }); } catch(_){ } }
-        });
+        if(st.active){
+          anyDisabled=true;
+          st.lastDisableReason = (!d.hasMid)?'no-mid':'arb-spike';
+          eng.setActive(false);
+          notifyAllUIs('onActiveChanged', false, st, { marketSuspended:true });
+        }
         if(anyDisabled){
           try { console.log('[autoHub][marketGuard] suspend', { noMid: !d.hasMid, arbProfitPct: d.arbProfitPct }); } catch(_){ }
           const reason = !d.hasMid ? 'market:no-mid' : ('market:arb-'+(typeof d.arbProfitPct==='number'? Number(d.arbProfitPct).toFixed(1): 'n/a'));
-          try { views.forEach(v=>{ try { v.ui && v.ui.status && v.ui.status(!d.hasMid? 'Suspended: no mid' : ('Suspended: arb spike '+Number(d.arbProfitPct).toFixed(1)+'%')); } catch(_){ } }); } catch(_){ }
+          statusAll(!d.hasMid? 'Suspended: no mid' : ('Suspended: arb spike '+Number(d.arbProfitPct).toFixed(1)+'%'));
           sendAutoPressF21({ reason });
           // Broadcast OFF so other windows reflect true state
           try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } } } catch(_){ }
@@ -255,17 +269,18 @@
         }
       } else {
         // Resume if previously disabled due to market and userWanted=true
-        views.forEach(v=>{
-          const eng=v.engine, ui=v.ui; if(!eng||!eng.state) return; const st=eng.state; if(!st.autoResume) return;
-          if(!st.active && st.userWanted && (st.lastDisableReason==='no-mid' || st.lastDisableReason==='arb-spike')){
-            eng.setActive(true); st.lastDisableReason='market-resumed'; try { ui.onActiveChanged && ui.onActiveChanged(true, st, { marketResumed:true }); } catch(_){ }
-            // Broadcast ON so other windows reflect true state
-            try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:true }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:true }); } } } catch(_){ }
-            try { views.forEach(x=>{ try { x.ui && x.ui.status && x.ui.status('Resumed: market OK'); } catch(_){ } }); } catch(_){ }
-            sendAutoPressF21({ reason:'market:resume', resume:true }); setTimeout(()=>{ try { const d2=state.derived; const ok = d2 && d2.hasMid && (!d2.arbProfitPct || d2.arbProfitPct < ARB_SUSPEND_PCT); if(ok && eng.state.active){ sendAutoPressF21({ reason:'market:resume:retry', resume:true, retry:true }); } } catch(_){ } }, 500);
-            try { eng.step(); } catch(_){ }
-          }
-        });
+        if(!st.autoResume) return;
+        if(!st.active && st.userWanted && (st.lastDisableReason==='no-mid' || st.lastDisableReason==='arb-spike')){
+          eng.setActive(true);
+          st.lastDisableReason='market-resumed';
+          notifyAllUIs('onActiveChanged', true, st, { marketResumed:true });
+          // Broadcast ON so other windows reflect true state
+          try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:true }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:true }); } } } catch(_){ }
+          statusAll('Resumed: market OK');
+          sendAutoPressF21({ reason:'market:resume', resume:true });
+          setTimeout(()=>{ try { const d2=state.derived; const ok = d2 && d2.hasMid && (!d2.arbProfitPct || d2.arbProfitPct < ARB_SUSPEND_PCT); if(ok && eng.state.active){ sendAutoPressF21({ reason:'market:resume:retry', resume:true, retry:true }); } } catch(_){ } }, 500);
+          try { eng.step(); } catch(_){ }
+        }
       }
     }
 
@@ -288,12 +303,18 @@
           if(!(prevMinVal>0)) { lastExcelForShock = cur; return; }
           const jumpMin = Math.abs((curMinVal - prevMinVal) / prevMinVal) * 100;
           if(jumpMin >= shockThresholdPct){
-            // Suspend all active engines
-            let anyDisabled=false;
-            views.forEach(v=>{ try {
-              const eng=v.engine; if(!eng||!eng.state) return; const st=eng.state;
-              if(st.active){ eng.setActive(false); st.lastDisableReason='shock'; anyDisabled=true; try { v.ui.onActiveChanged && v.ui.onActiveChanged(false, st, { shock:true, jump: jumpMin }); } catch(_){ } try { v.ui && v.ui.status && v.ui.status('Suspended: shock '+jumpMin.toFixed(1)+'%'); } catch(_){ } }
-            } catch(_){ } });
+            // Suspend active engine
+            if(!sharedEngine || !sharedEngine.state) { lastExcelForShock = cur; return; }
+            const eng = sharedEngine;
+            const st = eng.state;
+            let anyDisabled = false;
+            if(st.active){
+              eng.setActive(false);
+              st.lastDisableReason='shock';
+              anyDisabled=true;
+              notifyAllUIs('onActiveChanged', false, st, { shock:true, jump: jumpMin });
+              statusAll('Suspended: shock '+jumpMin.toFixed(1)+'%');
+            }
             if(anyDisabled){
               // Detailed diagnostics с упором на минимальный оддс
               const details = {
@@ -334,7 +355,8 @@
 
   function addBroadcastListeners(){
       try {
-        const applyConfigAll = (cfg)=>{ if(!cfg) return; views.forEach(v=>{ try { if(v.engine && v.engine.setConfig) v.engine.setConfig(cfg); } catch(_){ } }); };
+        // Use shared engine directly instead of iterating views
+        const applyConfigAll = (cfg)=>{ if(!cfg || !sharedEngine) return; try { sharedEngine.setConfig(cfg); } catch(_){ } };
         const handleToggle = ()=>{
           let after = null;
           // If toggling ON while python script is OFF — block and keep OFF.
@@ -346,8 +368,11 @@
             } catch(_){ statusAll('Start Excel script'); }
             disableAllAutoDueToExcelStop();
             after = false;
-          } else {
-            views.forEach(v=>{ try { const eng=v.engine; if(eng){ const next = !eng.state.active; eng.setActive(next); after = next; } } catch(_){ } });
+          } else if(sharedEngine) {
+            const next = !sharedEngine.state.active;
+            sharedEngine.setActive(next);
+            after = next;
+            notifyAllUIs('onActiveChanged', next, sharedEngine.state);
           }
           // Inform other windows about resulting state so late loads sync (and main updates __autoLast)
           try {
@@ -370,13 +395,20 @@
             broadcastAutoActiveOff();
             return;
           }
-          views.forEach(v=>{ try {
-            const eng=v.engine; if(!eng) return;
-            if(!want){ try { eng.state.lastDisableReason = 'manual'; } catch(_){ } }
-            if(want!==eng.state.active){ eng.setActive(want); }
-          } catch(_){ } });
+          if(sharedEngine){
+            if(!want){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
+            if(want!==sharedEngine.state.active){ sharedEngine.setActive(want); }
+            notifyAllUIs('onActiveChanged', want, sharedEngine.state);
+          }
         };
-        const handleDisable = ()=>{ let changed=false; views.forEach(v=>{ try { const eng=v.engine; if(eng && eng.state.active){ try { eng.state.lastDisableReason = 'manual'; } catch(_){ } eng.setActive(false); changed=true; } } catch(_){ } });
+        const handleDisable = ()=>{
+          let changed=false;
+          if(sharedEngine && sharedEngine.state.active){
+            try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ }
+            sharedEngine.setActive(false);
+            changed=true;
+            notifyAllUIs('onActiveChanged', false, sharedEngine.state);
+          }
           // Notify others only if we actually disabled something
           try {
             if(changed){
@@ -398,20 +430,19 @@
               broadcastAutoActiveOff();
               return;
             }
-            views.forEach(v=>{ try {
-              const eng=v.engine; if(!eng) return;
-              if(!want){ try { eng.state.lastDisableReason = 'manual'; } catch(_){ } }
-              if(eng && want!==eng.state.active){ eng.setActive(want); if(v.ui && typeof v.ui.onActiveChanged==='function'){ v.ui.onActiveChanged(want, eng.state); } }
-            } catch(_){ } });
+            if(sharedEngine){
+              if(!want){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
+              if(want!==sharedEngine.state.active){ sharedEngine.setActive(want); notifyAllUIs('onActiveChanged', want, sharedEngine.state); }
+            }
           } catch(_){ }
         };
         const handleResumeSet = (p)=>{ try {
           const val = !!(p && p.on);
           suppressResumeBroadcast = true;
-          views.forEach(v=>{ try {
-            v.engine.setAutoResume(val);
-            if(v.ui && typeof v.ui.onAutoResumeChanged==='function'){ v.ui.onAutoResumeChanged(val, v.engine.state); }
-          } catch(_){ } });
+          if(sharedEngine){
+            sharedEngine.setAutoResume(val);
+            notifyAllUIs('onAutoResumeChanged', val, sharedEngine.state);
+          }
         } finally { suppressResumeBroadcast = false; } };
         if(global.desktopAPI){
           if(global.desktopAPI.onAutoToggleAll) global.desktopAPI.onAutoToggleAll(handleToggle);
@@ -449,109 +480,119 @@
       } catch(_){ }
     }
 
+  // Single shared engine - only one engine exists, multiple views share it
+  let sharedEngine = null;
+  const viewUIs = new Map(); // id -> ui callbacks only
+
+  function notifyAllUIs(method, ...args){
+    viewUIs.forEach((ui, id)=>{
+      try { if(ui && typeof ui[method]==='function') ui[method](...args); } catch(_){ }
+    });
+  }
+
   function attachView(id, ui){
       if(!global.AutoCore || !global.AutoCore.createAutoEngine){ throw new Error('AutoCore missing'); }
       const ns = String(id||'view');
-      const engine = global.AutoCore.createAutoEngine({
-        parseMid: ()=> getMid(),
-        parseExcel: ()=>{ const ex=getExcelRecord(); if(ex && Array.isArray(ex.odds) && ex.odds.length===2){ const n1=parseFloat(ex.odds[0]), n2=parseFloat(ex.odds[1]); if(!isNaN(n1)&&!isNaN(n2)) return [n1,n2]; } return null; },
-        flash: (idx)=>{ try { ui.flash && ui.flash(idx); } catch(_){ } },
-        status: (msg)=>{ try { ui.status && ui.status(msg); } catch(_){ } },
-        onActiveChanged: (active, st, meta)=>{
-          try { ui.onActiveChanged && ui.onActiveChanged(active, st, meta); } catch(_){ }
-          // Handle excel-no-change suspend: send F21 and broadcast OFF
-          if(!active && st && st.lastDisableReason === 'excel-no-change'){
-            try {
-              console.log('[autoHub][excelNoChangeGuard] suspend after', st.excelNoChangeCount, 'failed attempts');
-              sendAutoPressF21({ reason: 'excel-no-change:x'+st.excelNoChangeCount });
-              // Broadcast OFF to all windows
-              if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); }
-              else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } }
-            } catch(_){ }
-          }
-        },
-        storageKeys: { autoResumeKey: ns+':autoResumeEnabled', userWantedKey: ns+':autoUserWanted' },
-      });
-      // Initialize engine config from persisted global settings (tolerance, interval, adaptive, burstLevels)
-      try {
-        Promise.all([
-          invokeSetting('auto-tolerance-get').catch(()=>null),
-          invokeSetting('auto-interval-get').catch(()=>null),
-          invokeSetting('auto-adaptive-get').catch(()=>null),
-          invokeSetting('auto-burst-levels-get').catch(()=>null),
-        ]).then(([tol, interval, adaptive, levels])=>{
-          const cfg = {};
-          const missing = [];
-          if(typeof tol==='number' && !isNaN(tol)) cfg.tolerancePct = tol; else missing.push('Tolerance');
-          // Provide safe defaults for missing params so auto can run once Tolerance is set
-          cfg.stepMs = (typeof interval==='number' && !isNaN(interval)) ? interval : 500;
-          cfg.adaptive = (typeof adaptive==='boolean') ? adaptive : false;
-          cfg.burstLevels = (Array.isArray(levels) && levels.length) ? levels : [
-            { thresholdPct:20, pulses:4 },
-            { thresholdPct:12, pulses:3 },
-            { thresholdPct:6, pulses:2 }
-          ];
-          try { engine.setConfig(cfg); } catch(_){ }
-          try { if(engine && engine.state && engine.state.active){ engine.step(); } } catch(_){ }
-          // If no tolerance configured at all, inform UI and keep auto off
-          if(missing.length){
-            try { ui && ui.status && ui.status('Set in Settings: '+missing.join(', ')); } catch(_){ }
-            try { engine.setActive(false); } catch(_){ }
-          }
-        }).catch(()=>{});
-      } catch(_){ }
-      // If other views already exist, align this engine to their canonical state (first found)
-      const first = views.values().next();
-      if(first && first.value && first.value.engine && first.value.engine.state){
-        const base = first.value.engine.state;
-        try { engine.setAutoResume(!!base.autoResume); } catch(_){ }
-        try { if(base.active){ engine.setActive(true); } } catch(_){ }
-        try { if(ui && typeof ui.onAutoResumeChanged==='function'){ ui.onAutoResumeChanged(!!base.autoResume, engine.state); } } catch(_){ }
-      } else {
+      
+      // Store UI callbacks for this view
+      viewUIs.set(ns, ui);
+      
+      // Create engine only once (first attachView call)
+      if(!sharedEngine){
+        sharedEngine = global.AutoCore.createAutoEngine({
+          parseMid: ()=> getMid(),
+          parseExcel: ()=>{ const ex=getExcelRecord(); if(ex && Array.isArray(ex.odds) && ex.odds.length===2){ const n1=parseFloat(ex.odds[0]), n2=parseFloat(ex.odds[1]); if(!isNaN(n1)&&!isNaN(n2)) return [n1,n2]; } return null; },
+          flash: (idx)=>{ notifyAllUIs('flash', idx); },
+          status: (msg)=>{ notifyAllUIs('status', msg); },
+          onActiveChanged: (active, st, meta)=>{
+            notifyAllUIs('onActiveChanged', active, st, meta);
+            // Handle excel-no-change suspend: send F21 and broadcast OFF
+            if(!active && st && st.lastDisableReason === 'excel-no-change'){
+              try {
+                console.log('[autoHub][excelNoChangeGuard] suspend after', st.excelNoChangeCount, 'failed attempts');
+                sendAutoPressF21({ reason: 'excel-no-change:x'+st.excelNoChangeCount });
+                // Broadcast OFF to all windows
+                if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); }
+                else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } }
+              } catch(_){ }
+            }
+          },
+          storageKeys: { autoResumeKey: 'shared:autoResumeEnabled', userWantedKey: 'shared:autoUserWanted' },
+        });
+        
+        // Initialize engine config from persisted global settings
+        try {
+          Promise.all([
+            invokeSetting('auto-tolerance-get').catch(()=>null),
+            invokeSetting('auto-interval-get').catch(()=>null),
+            invokeSetting('auto-adaptive-get').catch(()=>null),
+            invokeSetting('auto-burst-levels-get').catch(()=>null),
+          ]).then(([tol, interval, adaptive, levels])=>{
+            const cfg = {};
+            const missing = [];
+            if(typeof tol==='number' && !isNaN(tol)) cfg.tolerancePct = tol; else missing.push('Tolerance');
+            cfg.stepMs = (typeof interval==='number' && !isNaN(interval)) ? interval : 500;
+            cfg.adaptive = (typeof adaptive==='boolean') ? adaptive : false;
+            cfg.burstLevels = (Array.isArray(levels) && levels.length) ? levels : [
+              { thresholdPct:25, pulses:4 },
+              { thresholdPct:15, pulses:3 },
+              { thresholdPct:10, pulses:2 }
+            ];
+            try { sharedEngine.setConfig(cfg); } catch(_){ }
+            try { if(sharedEngine && sharedEngine.state && sharedEngine.state.active){ sharedEngine.step(); } } catch(_){ }
+            if(missing.length){
+              notifyAllUIs('status', 'Set in Settings: '+missing.join(', '));
+              try { sharedEngine.setActive(false); } catch(_){ }
+            }
+          }).catch(()=>{});
+        } catch(_){ }
+        
         // Late-loaded window: request last known global state from main
         try {
           if(global.require){
             const { ipcRenderer } = global.require('electron');
             if(ipcRenderer && ipcRenderer.invoke){
-              try { console.log('[autoHub][attachView]['+ns+'] requesting auto-state-get ...'); } catch(_){ }
+              try { console.log('[autoHub][attachView] requesting auto-state-get ...'); } catch(_){ }
               ipcRenderer.invoke('auto-state-get').then(s=>{ try {
-                try { console.log('[autoHub][attachView]['+ns+'] got auto-state', s); } catch(_){ }
+                try { console.log('[autoHub][attachView] got auto-state', s); } catch(_){ }
                 if(s && typeof s==='object'){
-                  if(typeof s.resume==='boolean'){ try { engine.setAutoResume(s.resume); } catch(_){ } try { ui && ui.onAutoResumeChanged && ui.onAutoResumeChanged(!!s.resume, engine.state); } catch(_){ } }
-                  if(typeof s.active==='boolean' && s.active){ try { engine.setActive(true); } catch(_){ } }
+                  if(typeof s.resume==='boolean'){ try { sharedEngine.setAutoResume(s.resume); } catch(_){ } notifyAllUIs('onAutoResumeChanged', !!s.resume, sharedEngine.state); }
+                  if(typeof s.active==='boolean' && s.active){ try { sharedEngine.setActive(true); } catch(_){ } }
                 }
               } catch(_){ } }).catch(()=>{});
             }
           }
         } catch(_){ }
       }
-      views.set(ns, { engine, ui, ns });
+      
+      // For compatibility: also add to views map with shared engine
+      views.set(ns, { engine: sharedEngine, ui, ns });
+      
       return {
-        get state(){ return engine.state; },
-        setConfig: (p)=>{ try { engine.setConfig(p||{}); } catch(_){ } },
+        get state(){ return sharedEngine.state; },
+        setConfig: (p)=>{ try { sharedEngine.setConfig(p||{}); } catch(_){ } },
         setActive: (on)=>{
           const val = !!on;
           if(val && !canEnableAuto()){
             try {
               const info = getAutoEnableInfo();
               if(info && info.reasonCode){
-                try { engine.state.lastDisableReason = info.reasonCode; } catch(_){ }
-                try { ui && ui.status && ui.status('Auto blocked: '+info.reasonCode); } catch(_){ }
+                try { sharedEngine.state.lastDisableReason = info.reasonCode; } catch(_){ }
+                notifyAllUIs('status', 'Auto blocked: '+info.reasonCode);
               } else {
-                try { ui && ui.status && ui.status('Start Excel script'); } catch(_){ }
+                notifyAllUIs('status', 'Start Excel script');
               }
-            } catch(_){ try { ui && ui.status && ui.status('Start Excel script'); } catch(_){ } }
+            } catch(_){ notifyAllUIs('status', 'Start Excel script'); }
             disableAllAutoDueToExcelStop();
             broadcastAutoActiveOff();
             return;
           }
-          // Apply to all views uniformly
-          views.forEach(v=>{ try {
-            const was = !!v.engine.state.active;
-            if(!val){ try { v.engine.state.lastDisableReason = 'manual'; } catch(_){ } }
-            if(was !== val){ v.engine.setActive(val); }
-            if(v.ui && typeof v.ui.onActiveChanged==='function'){ v.ui.onActiveChanged(val, v.engine.state); }
-          } catch(_){ } });
+          // Single engine - just set it once
+          const was = !!sharedEngine.state.active;
+          if(!val){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
+          if(was !== val){ sharedEngine.setActive(val); }
+          // Notify all UI views
+          notifyAllUIs('onActiveChanged', val, sharedEngine.state);
           // Broadcast across windows to sync late/other views
           try {
             if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on: val }); }
@@ -560,13 +601,8 @@
         },
         setAutoResume: (on)=>{
           const val = !!on;
-          engine.setAutoResume(val);
-          // Propagate to all other views
-          views.forEach(v=>{ try {
-            if(v.engine!==engine){ v.engine.setAutoResume(val); if(v.ui && typeof v.ui.onAutoResumeChanged==='function'){ v.ui.onAutoResumeChanged(val, v.engine.state); } }
-          } catch(_){ } });
-          // Notify this view as well
-          try { if(ui && typeof ui.onAutoResumeChanged==='function'){ ui.onAutoResumeChanged(val, engine.state); } } catch(_){ }
+          sharedEngine.setAutoResume(val);
+          notifyAllUIs('onAutoResumeChanged', val, sharedEngine.state);
           // Broadcast across windows unless suppressed (to avoid loops)
           try {
             if(!suppressResumeBroadcast){
@@ -575,8 +611,8 @@
             }
           } catch(_){ }
         },
-        step: ()=> engine.step(),
-        schedule: (d)=> engine.schedule(d),
+        step: ()=> sharedEngine.step(),
+        schedule: (d)=> sharedEngine.schedule(d),
       };
     }
 

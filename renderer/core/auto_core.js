@@ -79,7 +79,18 @@
       state.lastFireTs = now; state.lastFireSide = sideToAdjust; state.lastFireKey = keyLabel;
       // Pulses based on thresholds
       let pulses = 1;
-      try { if(Array.isArray(state.burstLevels)){ for(const lvl of state.burstLevels){ if(diffPct >= lvl.thresholdPct){ pulses = lvl.pulses; break; } } } } catch(_){ }
+      try { 
+        if(Array.isArray(state.burstLevels)){ 
+          for(const lvl of state.burstLevels){ 
+            if(diffPct >= lvl.thresholdPct){ 
+              pulses = lvl.pulses; 
+              break; 
+            } 
+          } 
+        } 
+      } catch(_){ }
+      // Debug: log pulse decision
+      try { console.log('[AutoCore] diffPct='+diffPct.toFixed(2)+'% pulses='+pulses+' levels='+JSON.stringify(state.burstLevels)); } catch(_){}
       // Directional
       for(let i=0;i<pulses;i++){
         const delay = i===0? 0 : cfg.pulseGap*i;

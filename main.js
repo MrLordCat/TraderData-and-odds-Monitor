@@ -523,6 +523,10 @@ app.whenReady().then(()=>{
       // and also when both schedule their 500ms retry. Separate buckets for initial and retry.
       let __lastF21SentAt = 0;
       let __lastF21RetrySentAt = 0;
+      // De-duplication for F23/F24 directional keys (prevent dual-engine double sends)
+      let __lastDirKeySentAt = 0;
+      let __lastDirKeySig = '';
+      const DIR_KEY_DEDUP_MS = 100; // collapse commands within 100ms with same signature
       ipcMain.handle('send-auto-press', (_e, payload)=>{
         let side = 0; // default
         let vk = null; // explicit virtual key if provided (0x86 F23 / 0x87 F24)
@@ -573,6 +577,17 @@ app.whenReady().then(()=>{
             }
             __lastF21SentAt = nowTs;
           }
+        }
+        // De-duplication for F23/F24/F22 directional/confirm keys (prevent dual-engine double sends)
+        if(keyLabel === 'F23' || keyLabel === 'F24' || keyLabel === 'F22'){
+          const nowTs = Date.now();
+          const sig = keyLabel + '|' + side + '|' + direction;
+          if(sig === __lastDirKeySig && (nowTs - __lastDirKeySentAt) < DIR_KEY_DEDUP_MS){
+            try { console.log('[auto-press][ipc][dedupe] suppress duplicate', { key: keyLabel, side, direction, elapsed: nowTs - __lastDirKeySentAt }); } catch(_){ }
+            return true;
+          }
+          __lastDirKeySig = sig;
+          __lastDirKeySentAt = nowTs;
         }
         const ts = Date.now();
         try { console.log('[auto-press][ipc] request', { side, key:keyLabel, vk: '0x'+vk.toString(16), direction, diffPct, ts }); } catch(_){ }
