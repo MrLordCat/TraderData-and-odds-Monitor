@@ -523,10 +523,11 @@ app.whenReady().then(()=>{
       // and also when both schedule their 500ms retry. Separate buckets for initial and retry.
       let __lastF21SentAt = 0;
       let __lastF21RetrySentAt = 0;
-      // De-duplication for F23/F24 directional keys (prevent dual-engine double sends)
+      // De-duplication for F23/F24 directional keys - now with single engine this is just safety net
+      // Use very short window (25ms) to catch only true duplicates but allow intentional burst pulses (~50ms apart)
       let __lastDirKeySentAt = 0;
       let __lastDirKeySig = '';
-      const DIR_KEY_DEDUP_MS = 100; // collapse commands within 100ms with same signature
+      const DIR_KEY_DEDUP_MS = 25; // only collapse near-simultaneous duplicates (<25ms), allow burst pulses
       ipcMain.handle('send-auto-press', (_e, payload)=>{
         let side = 0; // default
         let vk = null; // explicit virtual key if provided (0x86 F23 / 0x87 F24)

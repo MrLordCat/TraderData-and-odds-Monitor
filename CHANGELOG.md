@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.6]
+
+### 🏗️ Architecture
+- **Single shared AutoCore engine**: Consolidated dual engines (board + embedded stats) into one shared instance
+  - Eliminates duplicate key presses at the source
+  - All views now share single engine state
+  - `notifyAllUIs()` broadcasts state changes to all registered UI callbacks
+
+### 🐛 Bug Fixes
+- **Fixed burst pulses being blocked**: Reduced IPC deduplication window from 100ms to 25ms
+  - Burst pulses (~55ms apart) now pass through correctly
+  - Only true duplicates (<25ms) are suppressed
+- **IPC deduplication kept as safety net**: Fallback protection in case of edge cases
+
+---
+
 ## [0.0.5]
 
 ### ⚡ Improvements
