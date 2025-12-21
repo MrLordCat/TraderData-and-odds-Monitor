@@ -278,8 +278,25 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     } catch (_) { }
   }, 1200);
 
+  function readHotkeyStatus() {
+    try {
+      const file = path.join(getExcelExtractorDir(), 'hotkey_status.json');
+      if (!fs.existsSync(file)) return null;
+      const txt = fs.readFileSync(file, 'utf8');
+      const data = JSON.parse(txt);
+      if (!data || typeof data !== 'object') return null;
+      return {
+        currentMap: typeof data.currentMap === 'number' ? data.currentMap : null,
+        maxMaps: typeof data.maxMaps === 'number' ? data.maxMaps : null,
+        connected: !!data.connected,
+        ts: data.ts || null,
+      };
+    } catch (_) { return null; }
+  }
+
   function broadcastExcelStatus() {
     try { readAhkFromCurrentState(); } catch (_) { }
+    const hotkeyStatus = readHotkeyStatus();
     const payload = {
       running: !!state.excelProc,
       starting: !!state.excelProcStarting,
@@ -290,6 +307,9 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
         running: !!state.hotkeyProc,
         error: state.hotkeyProcError,
       },
+      scriptMap: hotkeyStatus ? hotkeyStatus.currentMap : null,
+      scriptMaxMaps: hotkeyStatus ? hotkeyStatus.maxMaps : null,
+      scriptConnected: hotkeyStatus ? hotkeyStatus.connected : false,
     };
 
     broadcast('excel-extractor-status', payload);
@@ -650,12 +670,16 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
   }
 
   function getStatus() {
+    const hotkeyStatus = readHotkeyStatus();
     return {
       running: !!state.excelProc,
       starting: !!state.excelProcStarting,
       error: state.excelProcError,
       installing: !!state.excelDepsInstalling,
       ahk: Object.assign({}, state.ahkStatus),
+      scriptMap: hotkeyStatus ? hotkeyStatus.currentMap : null,
+      scriptMaxMaps: hotkeyStatus ? hotkeyStatus.maxMaps : null,
+      scriptConnected: hotkeyStatus ? hotkeyStatus.connected : false,
     };
   }
 

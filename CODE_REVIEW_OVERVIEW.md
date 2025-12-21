@@ -171,13 +171,13 @@ Recent shock diagnostics: detailed log includes prev/cur odds, per-side jumps, m
 
 - OddsCore hub: aggregates broker odds and computes derived values (mid/arb).
 - AutoCore engine: per-view auto with providers reading from shared state, no DOM parsing.
-- AutoHub orchestrator: creates engines per view, applies guards, syncs ON/OFF and Auto-Resume across windows.
+- AutoHub orchestrator: creates engines per view, applies guards, syncs ON/OFF across windows.
 - Guards:
   - Excel suspend/resume: turns engines off/on; sends F21 (suspend) with one retry after 500ms if still trading.
   - Market guard: suspend on missing mid or `arbProfitPct >= 5%`; resume when market OK.
-  - Shock guard: triggers only on the minimum odds line jump meeting threshold; logs details; sends F21.
+  - Auto Suspend by diff%: suspends when Excel vs Mid diff >= threshold; resumes at half threshold.
 - Main-level F21 de-dup: collapses near-simultaneous initial F21 and their retries coming from multiple windows (board + embedded stats).
-- Settings: live updates via IPC; tolerance/shock/burst precision 0.1; safe defaults allow running with tolerance only.
+- Settings: live updates via IPC; tolerance/burst precision 0.1; safe defaults allow running with tolerance only.
 - UI: engine-effective tolerance badges and auto status text on board and stats; explicit suspend reasons and retry labels in logs/UI.
 
 Keep this file updated whenever core managers, IPC modules, or critical constants change.

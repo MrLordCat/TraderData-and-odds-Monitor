@@ -10,7 +10,7 @@
 	<div id="backdrop"></div>
 	<div class="panel" role="dialog" aria-modal="true" aria-labelledby="title">
 		<div class="head">
-			<h1 id="title">Interface</h1>
+			<h1 id="title">Settings <small style="opacity:0.5;font-weight:normal">(v0.0.7)</small></h1>
 			<button id="close" class="x">✕</button>
 		</div>
 		<div class="content">
@@ -49,10 +49,12 @@
 							<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />
 							<span id="auto-tolerance-val" class="rangeVal"></span>
 						</div>
-						<label for="auto-shock-threshold">Suspend on shock (%)</label>
+						<label for="auto-suspend-threshold">Auto Suspend threshold (%)
+							<small class="labelHint">Pauses auto when diff ≥ this; resumes at half</small>
+						</label>
 						<div class="rangeWrap">
-							<input id="auto-shock-threshold" type="range" min="20" max="80" step="0.1" />
-							<span id="auto-shock-threshold-val" class="rangeVal"></span>
+							<input id="auto-suspend-threshold" type="range" min="15" max="80" step="1" />
+							<span id="auto-suspend-threshold-val" class="rangeVal"></span>
 						</div>
 						<label for="burst1-th">Burst L1 threshold (%)</label>
 						<div class="rangeWrap">
@@ -87,7 +89,7 @@
 							<span id="burst3-pulses-val" class="rangeVal"></span>
 						</div>
 					</div>
-					<div class="hint">Tolerance: diff% below this considered aligned. Shock: when Excel odds jump ≥ this %, auto suspends. Burst levels: when diff% ≥ threshold -> use pulses before confirm (F22). First matching level used.</div>
+					<div class="hint">Tolerance: diff% below this considered aligned. Auto Suspend: when diff% ≥ this, auto suspends; resumes when diff drops below half. Burst levels: when diff% ≥ threshold -> use pulses before confirm (F22). First matching level used.</div>
 					</section>
 
 				<!-- Game Stats Theme section removed (LoL table theme controls deprecated) -->

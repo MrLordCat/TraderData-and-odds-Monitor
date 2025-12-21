@@ -74,6 +74,7 @@ auto_press_confirm_debug.json
 auto_press_signal.json
 Excel Extractor/template_sync.json
 Excel Extractor/current_state.json
+Excel Extractor/hotkey_status.json
 
 # Runtime-generated (do not commit)
 auto_press_debug.json

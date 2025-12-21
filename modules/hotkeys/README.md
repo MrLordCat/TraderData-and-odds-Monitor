@@ -9,7 +9,6 @@ Implemented in [modules/hotkeys/index.js](modules/hotkeys/index.js).
 Window-active hotkeys:
 - `Tab` — toggle between Brokers and Stats
 - `F1` — toggle Auto mode (broadcast `auto-toggle-all`)
-- `F2` — toggle Auto Resume after Suspend (broadcast `auto-resume-set`)
 - `F3` — start Excel/Python extractor script
 
 Notes:

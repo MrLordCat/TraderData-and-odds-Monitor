@@ -52,7 +52,6 @@
       onAutoToggleAll: (cb) => withUnsub('auto-toggle-all', cb),
       onAutoSetAll: (cb) => withUnsub('auto-set-all', cb),
       onAutoDisableAll: (cb) => withUnsub('auto-disable-all', cb),
-      onAutoResumeSet: (cb) => withUnsub('auto-resume-set', cb),
       onAutoActiveSet: (cb) => withUnsub('auto-active-set', cb),
       onAutoToleranceUpdated: (cb) => withUnsub('auto-tolerance-updated', cb),
       onAutoIntervalUpdated: (cb) => withUnsub('auto-interval-updated', cb),

@@ -118,6 +118,33 @@
 .autoBtn.paused { background:#6b5a2a; color:#fff; border-color:#8a7336; }
 .autoBtn.susp { background:#775c1f; color:#fff; border-color:#a9852f; box-shadow:0 0 0 1px rgba(169,133,47,.35) inset; }
 
+/* Script map badge (shows Python hotkey controller current map) */
+.scriptMapBadge {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:16px;
+  height:16px;
+  padding:0 4px;
+  margin-left:3px;
+  font-size:10px;
+  font-weight:600;
+  background:#1f2a3a;
+  border:1px solid #33455d;
+  border-radius:4px;
+  color:#8ba2b8;
+}
+.scriptMapBadge.mismatch {
+  background:#5c3a1a;
+  border-color:#8b5a2a;
+  color:#ffb366;
+}
+.scriptMapBadge.match {
+  background:#1a3a2a;
+  border-color:#2a5a4a;
+  color:#7fc99e;
+}
+
 .excelAutoCell { background:transparent; font-size:11px; }
 .autoIndicators { display:flex; align-items:center; gap:12px; justify-content:center; width:100%; }
 .autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.38; transition:opacity .25s, background .25s; flex:0 0 auto; }

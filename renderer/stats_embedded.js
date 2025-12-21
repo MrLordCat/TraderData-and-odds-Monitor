@@ -288,21 +288,39 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
     const { ipcRenderer } = require('electron');
     const btn = document.getElementById('embeddedExcelScriptBtn');
     const statusCell = document.getElementById('embeddedExcelStatusCell');
+    const scriptMapBadge = document.getElementById('embeddedScriptMapBadge');
 
     // Use shared Excel status module
     let ExcelStatusUI = null;
     try { ExcelStatusUI = require('./ui/excel_status'); } catch(_){ }
     if(!ExcelStatusUI && window.ExcelStatusUI) ExcelStatusUI = window.ExcelStatusUI;
     
+    // Get board map from embedded map selector
+    function getEmbeddedBoardMap(){
+      try {
+        const sel = document.getElementById('embeddedMapSelect');
+        if(sel) return parseInt(sel.value, 10);
+      } catch(_){ }
+      return null;
+    }
+    
     if(ExcelStatusUI && btn){
-      const { applyStatus } = ExcelStatusUI.bindExcelStatusButton({
+      const { applyStatus, refreshBadgeMatch } = ExcelStatusUI.bindExcelStatusButton({
         btn: btn,
         statusEl: statusCell,
+        scriptMapBadge: scriptMapBadge,
+        getBoardMap: getEmbeddedBoardMap,
         toggle: ()=> ipcRenderer.send('excel-extractor-toggle')
       });
       
       ipcRenderer.on('excel-extractor-status', (_e, s)=> applyStatus(s));
       try { ipcRenderer.invoke('excel-extractor-status-get').then(applyStatus).catch(()=>{}); } catch(_){ }
+      
+      // Refresh badge when map changes
+      const mapSel = document.getElementById('embeddedMapSelect');
+      if(mapSel && refreshBadgeMatch){
+        mapSel.addEventListener('change', ()=> refreshBadgeMatch());
+      }
     }
   } catch(_){ }
 }

@@ -53,6 +53,7 @@ except ImportError:
 SHEET_NAME = "InPlay FRONT"
 TEMPLATE_CELL = "C1"  # Template name cell (LoL Bo3, LoL Bo5, etc.)
 SYNC_FILE = Path(__file__).parent / "template_sync.json"
+STATUS_FILE = Path(__file__).parent / "hotkey_status.json"  # Written by this script for Electron to read
 
 # Map Winner rows (1-indexed)
 MAP_WINNER_ROWS = {
@@ -82,6 +83,9 @@ class ExcelOddsHotkeyController:
         self._command_queue = Queue()  # Command queue for main thread execution
         self._running = True
         self._manual_map_override = 0  # If >0, use instead of template_sync.json
+        # Key hold state tracking - prevent repeat until odds change
+        self._key_held = {}  # key_name -> {'snapshot': (home, away), 'pending': bool}
+        self._last_odds_snapshot = None  # (home, away) tuple for current map
         
     def connect(self) -> bool:
         """Connect to Excel (call only from main thread!)."""
@@ -99,6 +103,7 @@ class ExcelOddsHotkeyController:
             
             print(f"[OK] Connected to: {self._wb.Name}")
             self._connected = True
+            self.write_status()  # Write initial status for Electron
             return True
         except Exception as e:
             print(f"ERROR connecting to Excel: {e}")
@@ -146,6 +151,21 @@ class ExcelOddsHotkeyController:
                     return i
         return -1
     
+    def write_status(self):
+        """Write current status to hotkey_status.json for Electron to read."""
+        try:
+            current_map = self.read_current_map()
+            status = {
+                'ts': time.time(),
+                'currentMap': current_map,
+                'maxMaps': self._max_maps,
+                'connected': self._connected,
+                'template': self._get_template_name() if self._connected else '',
+            }
+            STATUS_FILE.write_text(json.dumps(status), encoding='utf-8')
+        except Exception as e:
+            pass  # Silent fail - file is optional
+    
     def read_current_map(self) -> int:
         """Read current map from template_sync.json or use manual override."""
         # If manual override set - use it
@@ -178,6 +198,7 @@ class ExcelOddsHotkeyController:
         self._manual_map_override = new_map
         self._current_map = new_map
         print(f"[MAP] Switched: Map {current} -> Map {new_map} (max: {self._max_maps})")
+        self.write_status()  # Notify Electron of map change
     
     def get_row_for_current_map(self) -> int:
         """Get row for current map."""
@@ -194,6 +215,48 @@ class ExcelOddsHotkeyController:
         except:
             return None, None
     
+    def _update_odds_snapshot(self):
+        """Update odds snapshot for key hold detection."""
+        row = self.get_row_for_current_map()
+        self._last_odds_snapshot = self.get_current_odds(row)
+    
+    def _check_key_hold_allowed(self, key_name: str) -> bool:
+        """Check if key press is allowed (first press or odds changed since last press).
+        
+        For held keys: only allow repeat if odds have changed since the key was first pressed.
+        This prevents sending many signals when holding a key - only one per odds change.
+        """
+        row = self.get_row_for_current_map()
+        current_odds = self.get_current_odds(row)
+        
+        if key_name not in self._key_held:
+            # First press - allow and record snapshot
+            self._key_held[key_name] = {'snapshot': current_odds, 'pending': True}
+            return True
+        
+        held_state = self._key_held[key_name]
+        
+        # Key is being held - check if odds changed since last action
+        if held_state['pending']:
+            # Still waiting for odds to change after previous action
+            if current_odds != held_state['snapshot']:
+                # Odds changed - allow next action and update snapshot
+                held_state['snapshot'] = current_odds
+                return True
+            else:
+                # Odds haven't changed yet - block
+                return False
+        else:
+            # Key was released and pressed again - treat as new press
+            held_state['snapshot'] = current_odds
+            held_state['pending'] = True
+            return True
+    
+    def _key_released(self, key_name: str):
+        """Mark key as released."""
+        if key_name in self._key_held:
+            self._key_held[key_name]['pending'] = False
+
     def is_cell_blocked(self, row: int) -> bool:
         """Check if cell is blocked (WIN/LOSE)."""
         home, away = self.get_current_odds(row)
@@ -398,11 +461,27 @@ class ExcelOddsHotkeyController:
             while True:
                 cmd = self._command_queue.get_nowait()
                 # Handle both tuple and string commands
-                cmd_name = cmd[0] if isinstance(cmd, tuple) else cmd
+                # Format: cmd or (cmd,) or (cmd, key_name) for hold-aware commands
+                if isinstance(cmd, tuple):
+                    cmd_name = cmd[0]
+                    key_name = cmd[1] if len(cmd) > 1 else None
+                else:
+                    cmd_name = cmd
+                    key_name = None
+                
                 if cmd_name == 'prev':
+                    # For manual keys with hold tracking
+                    if key_name and not self._check_key_hold_allowed(key_name):
+                        continue  # Skip - waiting for odds change
                     self.previous_odds_home()
                 elif cmd_name == 'next':
+                    if key_name and not self._check_key_hold_allowed(key_name):
+                        continue
                     self.next_odds_home()
+                elif cmd_name == 'key_up':
+                    # Key released - mark in state
+                    if key_name:
+                        self._key_released(key_name)
                 elif cmd_name == 'status':
                     self.show_status()
                 elif cmd_name == 'cycle_map':
@@ -445,26 +524,46 @@ class ExcelOddsHotkeyController:
         print("Waiting for hotkeys...")
         print()
         
-        # Register hotkeys
-        keyboard.add_hotkey('num minus', self.on_hotkey_prev, suppress=True)
-        keyboard.add_hotkey('num plus', self.on_hotkey_next, suppress=True)
+        # Register hotkeys with key hold tracking for repeat prevention
+        # Numpad- and Numpad+ track press/release to prevent queue flooding
+        def on_numpad_minus_down(e):
+            self._command_queue.put(('prev', 'num_minus'))
+        def on_numpad_minus_up(e):
+            self._command_queue.put(('key_up', 'num_minus'))
+        def on_numpad_plus_down(e):
+            self._command_queue.put(('next', 'num_plus'))
+        def on_numpad_plus_up(e):
+            self._command_queue.put(('key_up', 'num_plus'))
+        
+        keyboard.on_press_key('num minus', on_numpad_minus_down, suppress=True)
+        keyboard.on_release_key('num minus', on_numpad_minus_up)
+        keyboard.on_press_key('num plus', on_numpad_plus_down, suppress=True)
+        keyboard.on_release_key('num plus', on_numpad_plus_up)
+        
         # Numpad* - try multiple methods
         try:
             keyboard.on_press_key(55, lambda _: self.on_hotkey_cycle_map())  # scan_code 55 = Numpad*
         except:
             pass
         # F21-F24 for auto mode - use hook because SendInput sends virtual keys with negative scan codes
+        # F23/F24 also track press/release for hold prevention
         def on_fkey(e):
-            if e.event_type != 'down':
-                return
             if e.name == 'f23':
-                self._command_queue.put(('prev',))
+                if e.event_type == 'down':
+                    self._command_queue.put(('prev', 'f23'))
+                else:
+                    self._command_queue.put(('key_up', 'f23'))
             elif e.name == 'f24':
-                self._command_queue.put(('next',))
+                if e.event_type == 'down':
+                    self._command_queue.put(('next', 'f24'))
+                else:
+                    self._command_queue.put(('key_up', 'f24'))
             elif e.name == 'f21':
-                self._command_queue.put(('suspend',))
+                if e.event_type == 'down':
+                    self._command_queue.put(('suspend',))
             elif e.name == 'f22':
-                self._command_queue.put(('send_update',))
+                if e.event_type == 'down':
+                    self._command_queue.put(('send_update',))
         keyboard.hook(on_fkey)
         keyboard.add_hotkey('num 9', self.on_hotkey_status, suppress=True)
         
@@ -474,10 +573,19 @@ class ExcelOddsHotkeyController:
         
         keyboard.add_hotkey('esc', self.on_hotkey_exit, suppress=False)
         
+        # Write initial status
+        self.write_status()
+        last_status_write = time.time()
+        
         try:
             # Main loop - process commands in main thread
             while self._running:
                 self.process_commands()
+                # Periodic status write (every ~1s)
+                now = time.time()
+                if now - last_status_write >= 1.0:
+                    self.write_status()
+                    last_status_write = now
                 time.sleep(0.05)  # 50ms polling
         except KeyboardInterrupt:
             print("\nExit by Ctrl+C...")

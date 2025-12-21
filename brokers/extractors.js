@@ -445,7 +445,17 @@ function collectOdds(host, desiredMap, game){
   const g = normalizeGame(game);
   let meta={odds:['-','-'],frozen:false};
   for(const row of EXTRACTOR_TABLE){ if(row.test.test(host)){ meta=row.fn(desiredMap, g)||meta; break; } }
-  return { broker:getBrokerId(host), odds:meta.odds, frozen:meta.frozen, ts:Date.now(), map:desiredMap };
+  // Post-process: if one side is '-' but the other has valid odds, replace '-' with '1'
+  // This handles cases where bookmakers show e.g. 14.5 on one side but lock/hide the opposing 1.0 odds
+  let odds = meta.odds;
+  if(Array.isArray(odds) && odds.length===2){
+    const isValid = (v) => v && v!=='-' && /^\d+(?:[.,]\d+)?$/.test(String(v).trim());
+    const o0valid = isValid(odds[0]);
+    const o1valid = isValid(odds[1]);
+    if(o0valid && !o1valid) odds = [odds[0], '1'];
+    else if(!o0valid && o1valid) odds = ['1', odds[1]];
+  }
+  return { broker:getBrokerId(host), odds, frozen:meta.frozen, ts:Date.now(), map:desiredMap };
 }
 
 module.exports = { getBrokerId, collectOdds, deepQuery };

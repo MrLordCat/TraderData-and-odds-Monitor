@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.7]
+
+### 🚀 New Features
+- **Script Map indicator**: Badge near S button shows Python controller's current map; red border warns when script map differs from board map
+- **Auto Suspend by diff%**: New intelligent suspension — pauses Auto when Excel vs Mid diff exceeds threshold; auto-resumes at half threshold
+- **Auto Suspend threshold setting**: Configurable in Settings with description
+
+### ⚡ Improvements
+- **Unified Excel status module**: Shared `excel_status.js` handles both board and embedded stats panels — eliminates code duplication
+- **Locked odds fallback**: When bookmaker shows '-' on one side but valid odds on the other (e.g. 1 vs 14.5), '-' is replaced with '1'
+- **Auto status display fix**: No longer shows "BLOCKED" when Auto is already active
+
+### 🧹 Removed
+- **R button (Auto Resume)**: Removed entirely — Auto Suspend by diff% now handles resume automatically
+- **F2 hotkey**: No longer toggles auto-resume (feature removed)
+- **autoResume logic**: Cleaned from auto_core.js, auto_hub.js, auto_trader.js, preload.js, desktop_api_shim.js
+
+### 📝 Documentation
+- Updated hotkeys README (removed F2)
+- Updated CODE_REVIEW_OVERVIEW.md with new Auto Suspend description
+
+---
+
 ## [0.0.6]
 
 ### 🏗️ Architecture

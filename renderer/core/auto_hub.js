@@ -4,7 +4,7 @@
 //  - Create per-view AutoCore engines with providers that read from shared state (no DOM parsing)
 //  - Apply Excel suspend/resume and market guards centrally (with F21 + 500ms retry once)
 //  - Handle global auto broadcasts (toggle/set/disable) across attached views
-//  - Expose thin API for views: attachView(id,{ onActiveChanged, flash, status, storageNs }) -> { state, setActive, setAutoResume, step, schedule }
+//  - Expose thin API for views: attachView(id,{ onActiveChanged, flash, status, storageNs }) -> { state, setActive, step, schedule }
 (function(global){
   if(global.AutoHub) return;
 
@@ -15,7 +15,6 @@
     const state = { records:{}, derived:{ hasMid:false, arbProfitPct:null, mid:null } };
     const views = new Map(); // id -> { engine, ui, ns }
     let lastF21At = 0;
-  let suppressResumeBroadcast = false;
 
     // Excel extractor (python) процесс: Auto нельзя включать если скрипт не запущен.
     // Также: если скрипт остановился — принудительно выключаем Auto (если был включен).
@@ -33,7 +32,9 @@
           starting: excelProcStarting,
           installing: excelProcInstalling,
           error: excelProcError,
-        }
+        },
+        scriptMap: scriptMap,
+        boardMap: boardMap,
       };
       // Block when status unknown (startup) OR when not running OR when starting/installing.
       if(excelProcRunning !== true){
@@ -42,6 +43,8 @@
       }
       if(excelProcInstalling){ info.reasonCode = 'excel-installing'; return info; }
       if(excelProcStarting){ info.reasonCode = 'excel-starting'; return info; }
+      // Block on map mismatch
+      if(isMapMismatch()){ info.reasonCode = 'map-mismatch'; return info; }
       info.canEnable = true;
       return info;
     }
@@ -81,11 +84,31 @@
       try { viewUIs.forEach((ui)=>{ try { ui && ui.status && ui.status(msg); } catch(_){ } }); } catch(_){ }
     }
 
+    // Script map vs board map tracking for mismatch blocking
+    let scriptMap = null; // from Python hotkey controller
+    let boardMap = null;  // from board map selector
+    
+    function setScriptMap(m){
+      scriptMap = (typeof m === 'number' && m >= 1 && m <= 5) ? m : null;
+    }
+    function setBoardMap(m){
+      boardMap = (typeof m === 'number' && m >= 0 && m <= 5) ? m : null;
+    }
+    function isMapMismatch(){
+      // If either is unknown, don't block
+      if(scriptMap === null || boardMap === null) return false;
+      // Map 0 means "Match" - don't compare
+      if(boardMap === 0) return false;
+      return scriptMap !== boardMap;
+    }
+
     function canEnableAuto(){
       // Block when status unknown (startup) OR when not running OR when starting/installing.
       if(excelProcRunning !== true) return false;
       if(excelProcStarting) return false;
       if(excelProcInstalling) return false;
+      // Block on map mismatch
+      if(isMapMismatch()) return false;
       return true;
     }
 
@@ -96,6 +119,9 @@
         excelProcStarting = !!(s && s.starting);
         excelProcInstalling = !!(s && s.installing);
         excelProcError = (s && s.error) ? String(s.error) : null;
+        
+        // Debug log for status tracking
+        try { console.log('[autoHub] excelProcStatus updated:', { running: excelProcRunning, starting: excelProcStarting, installing: excelProcInstalling, prevRunning }); } catch(_){ }
 
         // If python stopped (or not running) and auto is on — force off.
         if(excelProcRunning !== true){
@@ -159,8 +185,9 @@
     }
 
   function getExcelRecord(){ return state.records['excel'] || null; }
-  let shockThresholdPct = null; // user-configurable
-  let lastExcelForShock = null;
+  // Auto Suspend based on diff% (replaces old shock detection)
+  let autoSuspendThresholdPct = 40; // default, user-configurable (15-80%)
+  let autoSuspendActive = false; // currently suspended due to high diff
     function getMid(){ const d=state.derived; return (d && d.hasMid && Array.isArray(d.mid) && d.mid.length===2)? d.mid : null; }
 
     function computeDerived(){ try { state.derived = (global.OddsCore && global.OddsCore.computeDerivedFrom) ? global.OddsCore.computeDerivedFrom(state.records) : { hasMid:false, arbProfitPct:null, mid:null }; } catch(_){ state.derived={ hasMid:false, arbProfitPct:null, mid:null }; } }
@@ -225,14 +252,12 @@
       }
       // Resume
       else if(!ex.frozen && !st.active && st.userWanted && st.lastDisableReason==='excel-suspended'){
-        if(st.autoResume){
-          eng.setActive(true);
-          anyEnabled=true;
-          st.lastDisableReason='excel-resumed';
-          notifyAllUIs('onActiveChanged', true, st, { excelResumed:true });
-          statusAll('Resumed: excel');
-          try { eng.step(); } catch(_){ }
-        }
+        eng.setActive(true);
+        anyEnabled=true;
+        st.lastDisableReason='excel-resumed';
+        notifyAllUIs('onActiveChanged', true, st, { excelResumed:true });
+        statusAll('Resumed: excel');
+        try { eng.step(); } catch(_){ }
       }
       // Broadcast state change across windows so late-loaded views sync
       try {
@@ -249,7 +274,6 @@
       const st = eng.state;
       const shouldSuspend = (!d.hasMid) || (typeof d.arbProfitPct==='number' && d.arbProfitPct >= ARB_SUSPEND_PCT);
       if(shouldSuspend){
-        if(!st.autoResume) return;
         let anyDisabled=false;
         if(st.active){
           anyDisabled=true;
@@ -269,7 +293,6 @@
         }
       } else {
         // Resume if previously disabled due to market and userWanted=true
-        if(!st.autoResume) return;
         if(!st.active && st.userWanted && (st.lastDisableReason==='no-mid' || st.lastDisableReason==='arb-spike')){
           eng.setActive(true);
           st.lastDisableReason='market-resumed';
@@ -284,69 +307,69 @@
       }
     }
 
-    function maybeShockSuspend(){
+    // Auto Suspend based on diff% between Excel and Mid
+    // Suspend when diff >= autoSuspendThresholdPct
+    // Resume when diff < autoSuspendThresholdPct / 2
+    function maybeAutoSuspendByDiff(){
       try {
-        if(!(typeof shockThresholdPct==='number' && !isNaN(shockThresholdPct))) return;
-        const ex = getExcelRecord(); if(!ex || !Array.isArray(ex.odds) || ex.odds.length!==2) return;
-        const n1=parseFloat(ex.odds[0]); const n2=parseFloat(ex.odds[1]); if(isNaN(n1)||isNaN(n2)) return;
-        const cur=[n1,n2];
-        if(lastExcelForShock && Array.isArray(lastExcelForShock) && lastExcelForShock.length===2){
-          const p1 = lastExcelForShock[0]; const p2 = lastExcelForShock[1];
-          // Per-side jumps (для справки в логах)
-          const j1 = p1>0 ? Math.abs((cur[0]-p1)/p1)*100 : NaN;
-          const j2 = p2>0 ? Math.abs((cur[1]-p2)/p2)*100 : NaN;
-          // Реакция только на минимальный оддс: сравниваем jump у минимума
-          const prevMinIdx = (p1<=p2 ? 0 : 1);
-          const curMinIdx = (cur[0]<=cur[1] ? 0 : 1);
-          const prevMinVal = prevMinIdx===0 ? p1 : p2;
-          const curMinVal = curMinIdx===0 ? cur[0] : cur[1];
-          if(!(prevMinVal>0)) { lastExcelForShock = cur; return; }
-          const jumpMin = Math.abs((curMinVal - prevMinVal) / prevMinVal) * 100;
-          if(jumpMin >= shockThresholdPct){
-            // Suspend active engine
-            if(!sharedEngine || !sharedEngine.state) { lastExcelForShock = cur; return; }
-            const eng = sharedEngine;
-            const st = eng.state;
-            let anyDisabled = false;
-            if(st.active){
-              eng.setActive(false);
-              st.lastDisableReason='shock';
-              anyDisabled=true;
-              notifyAllUIs('onActiveChanged', false, st, { shock:true, jump: jumpMin });
-              statusAll('Suspended: shock '+jumpMin.toFixed(1)+'%');
-            }
-            if(anyDisabled){
-              // Detailed diagnostics с упором на минимальный оддс
-              const details = {
-                prevOdds: [Number(p1), Number(p2)],
-                curOdds: [Number(cur[0]), Number(cur[1])],
-                perSideJumpsPct: { side0: isNaN(j1)? null : Number(j1.toFixed(2)), side1: isNaN(j2)? null : Number(j2.toFixed(2)) },
-                minLine: {
-                  prev: { idx: prevMinIdx, value: Number(prevMinVal) },
-                  curr: { idx: curMinIdx, value: Number(curMinVal) },
-                  switched: prevMinIdx !== curMinIdx,
-                  jumpPct: Number(jumpMin.toFixed(2))
-                },
-                thresholdPct: Number(shockThresholdPct)
-              };
-              try {
-                console.log('[autoHub][shockGuard] suspend', details);
-                // Also forward to main so it appears in main console
-                if(global.require){
-                  const { ipcRenderer } = global.require('electron');
-                  if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('renderer-log-forward', { level:'log', args: ['[autoHub][shockGuard] details', JSON.stringify(details)] }); }
-                }
-              } catch(_){ }
-              sendAutoPressF21({ reason: 'shock:'+jumpMin.toFixed(1)+'%', diffPct: jumpMin });
-              try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } } } catch(_){ }
-            }
+        if(!(typeof autoSuspendThresholdPct==='number' && !isNaN(autoSuspendThresholdPct) && autoSuspendThresholdPct > 0)) return;
+        const ex = getExcelRecord();
+        const mid = getMid();
+        if(!ex || !Array.isArray(ex.odds) || ex.odds.length!==2 || !mid) return;
+        
+        const n1=parseFloat(ex.odds[0]); const n2=parseFloat(ex.odds[1]);
+        if(isNaN(n1)||isNaN(n2)) return;
+        
+        // Calculate diff for min side (same logic as auto_core)
+        const sideToCheck = (mid[0] <= mid[1]) ? 0 : 1;
+        const exVal = sideToCheck === 0 ? n1 : n2;
+        const midVal = mid[sideToCheck];
+        if(!(midVal > 0)) return;
+        
+        const diffPct = Math.abs(exVal - midVal) / midVal * 100;
+        
+        const resumeThreshold = autoSuspendThresholdPct / 2;
+        
+        // Suspend: diff >= threshold and not already suspended
+        if(diffPct >= autoSuspendThresholdPct && !autoSuspendActive){
+          if(!sharedEngine || !sharedEngine.state) return;
+          const eng = sharedEngine;
+          const st = eng.state;
+          if(st.active){
+            autoSuspendActive = true;
+            eng.setActive(false);
+            st.lastDisableReason = 'diff-suspend';
+            notifyAllUIs('onActiveChanged', false, st, { diffSuspend: true, diffPct });
+            statusAll('Suspended: diff '+diffPct.toFixed(1)+'% >= '+autoSuspendThresholdPct+'%');
+            try { console.log('[autoHub][diffGuard] suspend', { diffPct: diffPct.toFixed(2), threshold: autoSuspendThresholdPct }); } catch(_){ }
+            sendAutoPressF21({ reason: 'diff-suspend:'+diffPct.toFixed(1)+'%', diffPct });
+            try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } } } catch(_){ }
           }
         }
-        lastExcelForShock = cur;
+        // Resume: diff < resumeThreshold and was suspended due to diff
+        else if(autoSuspendActive && diffPct < resumeThreshold){
+          if(!sharedEngine || !sharedEngine.state) return;
+          const eng = sharedEngine;
+          const st = eng.state;
+          if(!st.active && st.userWanted && st.lastDisableReason === 'diff-suspend'){
+            autoSuspendActive = false;
+            eng.setActive(true);
+            st.lastDisableReason = 'diff-resumed';
+            notifyAllUIs('onActiveChanged', true, st, { diffResumed: true, diffPct });
+            statusAll('Resumed: diff '+diffPct.toFixed(1)+'% < '+resumeThreshold.toFixed(0)+'%');
+            try { console.log('[autoHub][diffGuard] resume', { diffPct: diffPct.toFixed(2), resumeThreshold }); } catch(_){ }
+            try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:true }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:true }); } } } catch(_){ }
+            try { eng.step(); } catch(_){ }
+          }
+        }
+        // Clear suspend flag if user manually re-enabled
+        else if(autoSuspendActive && sharedEngine && sharedEngine.state && sharedEngine.state.active){
+          autoSuspendActive = false;
+        }
       } catch(_){ }
     }
 
-    function onHubUpdate(st){ try { state.records = Object.assign({}, st.records||{}); computeDerived(); applyExcelGuard(); applyMarketGuard(); maybeShockSuspend(); } catch(_){ } }
+    function onHubUpdate(st){ try { state.records = Object.assign({}, st.records||{}); computeDerived(); applyExcelGuard(); applyMarketGuard(); maybeAutoSuspendByDiff(); } catch(_){ } }
 
     function attachOdds(){ if(!oddsHub) return; oddsHub.subscribe(onHubUpdate); oddsHub.start(); }
 
@@ -436,19 +459,10 @@
             }
           } catch(_){ }
         };
-        const handleResumeSet = (p)=>{ try {
-          const val = !!(p && p.on);
-          suppressResumeBroadcast = true;
-          if(sharedEngine){
-            sharedEngine.setAutoResume(val);
-            notifyAllUIs('onAutoResumeChanged', val, sharedEngine.state);
-          }
-        } finally { suppressResumeBroadcast = false; } };
         if(global.desktopAPI){
           if(global.desktopAPI.onAutoToggleAll) global.desktopAPI.onAutoToggleAll(handleToggle);
           if(global.desktopAPI.onAutoSetAll) global.desktopAPI.onAutoSetAll(handleSet);
           if(global.desktopAPI.onAutoDisableAll) global.desktopAPI.onAutoDisableAll(handleDisable);
-          if(global.desktopAPI.onAutoResumeSet) global.desktopAPI.onAutoResumeSet(handleResumeSet);
           if(global.desktopAPI.onAutoActiveSet) global.desktopAPI.onAutoActiveSet(handleActiveSet);
 
           // Settings live updates via bridge
@@ -464,17 +478,16 @@
             ipcRenderer.on('auto-toggle-all', handleToggle);
             ipcRenderer.on('auto-set-all', (_e,p)=> handleSet(p));
             ipcRenderer.on('auto-disable-all', handleDisable);
-            ipcRenderer.on('auto-resume-set', (_e,p)=> handleResumeSet(p));
             ipcRenderer.on('auto-active-set', (_e,p)=> handleActiveSet(p));
             // Apply settings updates to all engines centrally
             ipcRenderer.on('auto-tolerance-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ tolerancePct:v }); });
             ipcRenderer.on('auto-interval-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ stepMs:v }); });
             ipcRenderer.on('auto-adaptive-updated', (_e, v)=>{ if(typeof v==='boolean') applyConfigAll({ adaptive:v }); });
             ipcRenderer.on('auto-burst-levels-updated', (_e, levels)=>{ if(Array.isArray(levels)) applyConfigAll({ burstLevels:levels }); });
-            // Shock threshold live update
-            ipcRenderer.on('auto-shock-threshold-updated', (_e,v)=>{ if(typeof v==='number' && !isNaN(v)) shockThresholdPct=v; });
+            // Auto Suspend threshold live update
+            ipcRenderer.on('auto-suspend-threshold-updated', (_e,v)=>{ if(typeof v==='number' && !isNaN(v)) autoSuspendThresholdPct=v; });
             // Initial fetch
-            ipcRenderer.invoke('auto-shock-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) shockThresholdPct=v; }).catch(()=>{});
+            ipcRenderer.invoke('auto-suspend-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) autoSuspendThresholdPct=v; }).catch(()=>{});
           }
         }
       } catch(_){ }
@@ -517,7 +530,7 @@
               } catch(_){ }
             }
           },
-          storageKeys: { autoResumeKey: 'shared:autoResumeEnabled', userWantedKey: 'shared:autoUserWanted' },
+          storageKeys: { userWantedKey: 'shared:autoUserWanted' },
         });
         
         // Initialize engine config from persisted global settings
@@ -556,7 +569,6 @@
               ipcRenderer.invoke('auto-state-get').then(s=>{ try {
                 try { console.log('[autoHub][attachView] got auto-state', s); } catch(_){ }
                 if(s && typeof s==='object'){
-                  if(typeof s.resume==='boolean'){ try { sharedEngine.setAutoResume(s.resume); } catch(_){ } notifyAllUIs('onAutoResumeChanged', !!s.resume, sharedEngine.state); }
                   if(typeof s.active==='boolean' && s.active){ try { sharedEngine.setActive(true); } catch(_){ } }
                 }
               } catch(_){ } }).catch(()=>{});
@@ -599,18 +611,6 @@
             else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on: val }); } }
           } catch(_){ }
         },
-        setAutoResume: (on)=>{
-          const val = !!on;
-          sharedEngine.setAutoResume(val);
-          notifyAllUIs('onAutoResumeChanged', val, sharedEngine.state);
-          // Broadcast across windows unless suppressed (to avoid loops)
-          try {
-            if(!suppressResumeBroadcast){
-              if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-resume-set', { on: val }); }
-              else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-resume-set', { on: val }); } }
-            }
-          } catch(_){ }
-        },
         step: ()=> sharedEngine.step(),
         schedule: (d)=> sharedEngine.schedule(d),
       };
@@ -625,6 +625,8 @@
       attachView,
       getState:()=> ({ records:state.records, derived:state.derived }),
       getAutoEnableInfo,
+      setScriptMap,
+      setBoardMap,
     };
   }
 

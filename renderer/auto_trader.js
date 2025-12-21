@@ -21,7 +21,6 @@
   const ids = isBoard ? {
     viewId: 'board',
     autoBtn: 'autoBtn',
-    autoResumeBtn: 'autoResumeBtn',
     indicatorsRow: 'excelAutoRow',
     statusText: 'autoStatusText',
     dot1Sel: '#excelAutoRow .autoDot.side1',
@@ -29,7 +28,6 @@
   } : {
     viewId: 'embedded',
     autoBtn: 'embeddedAutoBtn',
-    autoResumeBtn: 'embeddedAutoResumeBtn',
     indicatorsRow: 'embeddedExcelAutoIndicatorsRow',
     statusText: null,
     dot1Sel: '#embeddedExcelAutoIndicatorsRow .autoDot.side1',
@@ -82,14 +80,18 @@
     const derived = hubState && hubState.derived;
     const ex = hubState && hubState.records ? hubState.records['excel'] : null;
 
-    // Global hard blocks (python extractor)
-    if(info && info.canEnable === false){
+    // If auto is currently active and running, skip canEnable check (it's already running)
+    const autoIsActive = st && st.active;
+
+    // Global hard blocks (python extractor) - only block if auto is NOT already active
+    if(!autoIsActive && info && info.canEnable === false){
       const code = info.reasonCode || 'blocked';
       const err = info.excel && info.excel.error ? String(info.excel.error) : '';
       if(code==='excel-unknown') return { kind:'err', lines:[ 'Auto: BLOCKED', 'Reason: no Excel Extractor status yet', 'Wait 1–2 seconds' ] };
       if(code==='excel-starting') return { kind:'err', lines:[ 'Auto: BLOCKED', 'Reason: Python is starting…', 'Please wait' ] };
       if(code==='excel-installing') return { kind:'err', lines:[ 'Auto: BLOCKED', 'Reason: installing dependencies…', 'Please wait' ] };
       if(code==='excel-off') return { kind:'err', lines:[ 'Auto: BLOCKED', 'Reason: Python Extractor is OFF'+(err?(' ('+err+')'):'') , 'Click S to start' ] };
+      if(code==='map-mismatch') return { kind:'err', lines:[ 'Auto: BLOCKED', 'Reason: Map mismatch!', 'Script: '+(info.scriptMap||'?')+' vs Board: '+(info.boardMap||'?') ] };
       return { kind:'err', lines:[ 'Auto: BLOCKED', 'Reason: '+code, 'Click S to start' ] };
     }
 
@@ -171,15 +173,11 @@
         if(el) el.textContent = msg || '';
       } catch(_){ }
     },
-    onAutoResumeChanged(on){
-      try { const r = byId(ids.autoResumeBtn); if(r) r.classList.toggle('on', !!on); } catch(_){ }
-    },
   });
 
   const engine = {
     get state(){ return view.state; },
     setActive: view.setActive,
-    setAutoResume: view.setAutoResume,
     step: view.step,
     schedule: view.schedule,
   };
@@ -193,15 +191,6 @@
   }
 
   function toggleAuto(){ try { engine.setActive(!engine.state.active); } catch(_){ } }
-  function toggleAutoResume(){
-    try {
-      const want = !(engine && engine.state && engine.state.autoResume);
-      engine.setAutoResume(want);
-      const btn = byId(ids.autoResumeBtn);
-      if(btn) btn.classList.toggle('on', !!want);
-      if(isBoard){ try { window.refreshAutoButtonsVisual && window.refreshAutoButtonsVisual(); } catch(_){ } }
-    } catch(_){ }
-  }
 
   // Click handlers
   document.addEventListener('click', (e)=>{
@@ -222,9 +211,6 @@
             } catch(_){ }
           }, 30);
         }
-      }
-      if(e.target && e.target.id === ids.autoResumeBtn){
-        toggleAutoResume();
       }
     } catch(_){ }
   });
@@ -253,8 +239,6 @@
   // DOM ready sync
   window.addEventListener('DOMContentLoaded', ()=>{
     try {
-      const r = byId(ids.autoResumeBtn);
-      if(r) r.classList.toggle('on', !!(engine && engine.state && engine.state.autoResume));
       if(isBoard){ try { window.refreshAutoButtonsVisual && window.refreshAutoButtonsVisual(); } catch(_){ } }
     } catch(_){ }
   });

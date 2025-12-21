@@ -108,28 +108,28 @@ if(autoTolInput){
 	});
 }
 
-// Shock suspend threshold (%) – auto suspends when Excel odds jump by >= this percent
-const shockInput = document.getElementById('auto-shock-threshold');
-const shockVal = document.getElementById('auto-shock-threshold-val');
-let shockThresholdPct = 40.0; // default UI suggestion
-function clampShock(v){ return Math.max(20, Math.min(80, Math.round(v*10)/10)); }
-function renderShock(){
+// Auto Suspend threshold (%) – auto suspends when diff% >= this; resumes when diff < threshold/2
+const autoSuspendInput = document.getElementById('auto-suspend-threshold');
+const autoSuspendVal = document.getElementById('auto-suspend-threshold-val');
+let autoSuspendThresholdPct = 40.0; // default UI suggestion
+function clampAutoSuspend(v){ return Math.max(15, Math.min(80, Math.round(v))); }
+function renderAutoSuspend(){
 	try {
-		if(shockInput) shockInput.value = String(shockThresholdPct);
-		if(shockVal) shockVal.textContent = shockThresholdPct.toFixed(1) + '%';
+		if(autoSuspendInput) autoSuspendInput.value = String(autoSuspendThresholdPct);
+		if(autoSuspendVal) autoSuspendVal.textContent = autoSuspendThresholdPct.toFixed(0) + '%';
 	} catch(_){ }
 }
-if(shockInput){
-	shockInput.addEventListener('input', ()=>{
-		const raw=parseFloat(shockInput.value);
-		if(!isNaN(raw)) shockThresholdPct=clampShock(raw);
-		renderShock();
+if(autoSuspendInput){
+	autoSuspendInput.addEventListener('input', ()=>{
+		const raw=parseFloat(autoSuspendInput.value);
+		if(!isNaN(raw)) autoSuspendThresholdPct=clampAutoSuspend(raw);
+		renderAutoSuspend();
 	});
-	shockInput.addEventListener('change', ()=>{
-		const raw=parseFloat(shockInput.value);
-		if(!isNaN(raw)) shockThresholdPct=clampShock(raw);
-		renderShock();
-		try { ipcRenderer.send('auto-shock-threshold-set', { pct: shockThresholdPct }); } catch(_){ }
+	autoSuspendInput.addEventListener('change', ()=>{
+		const raw=parseFloat(autoSuspendInput.value);
+		if(!isNaN(raw)) autoSuspendThresholdPct=clampAutoSuspend(raw);
+		renderAutoSuspend();
+		try { ipcRenderer.send('auto-suspend-threshold-set', { pct: autoSuspendThresholdPct }); } catch(_){ }
 	});
 }
 
@@ -348,8 +348,8 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		if(typeof v === 'number' && !isNaN(v)) autoTolerancePct = clampTol(v);
 		renderTol();
 	}).catch(()=>{ renderTol(); }); } catch(_){ renderTol(); }
-	// Initialize shock threshold from store
-	try { ipcRenderer.invoke('auto-shock-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) shockThresholdPct=clampShock(v); renderShock(); }).catch(()=>{ renderShock(); }); } catch(_){ renderShock(); }
+	// Initialize auto suspend threshold from store
+	try { ipcRenderer.invoke('auto-suspend-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) autoSuspendThresholdPct=clampAutoSuspend(v); renderAutoSuspend(); }).catch(()=>{ renderAutoSuspend(); }); } catch(_){ renderAutoSuspend(); }
 	try { ipcRenderer.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)) { burstLevels = v; } applyBurstInputsFromModel(); }).catch(()=> applyBurstInputsFromModel()); } catch(_){ applyBurstInputsFromModel(); }
 	// Pre-apply game selector from payload if present
 	try {

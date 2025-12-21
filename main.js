@@ -320,17 +320,11 @@ function bootstrap() {
   createMainWindow();
   // Remove application menu (hidden UI footprint)
   try { Menu.setApplicationMenu(null); } catch(_){}
-  // Unified broadcast helper for auto resume state
-  function broadcastAutoResumeSet(on){
-    try { __autoLast.resume = !!on; } catch(_){ }
-    broadcastToAll(getBroadcastCtx(), 'auto-resume-set', { on: !!on });
-  }
 
   hotkeys = createHotkeyManager({
     actions: {
       toggleStats: ()=>{ try { toggleStatsEmbedded(); } catch(_){ } },
       toggleAuto: ()=>{ try { broadcastAutoToggleAll(); } catch(_){ } },
-      toggleAutoResume: ()=>{ try { broadcastAutoResumeSet(!__autoLast.resume); } catch(_){ } },
       startScript: ()=>{ try { if(excelExtractorController && excelExtractorController.toggle) excelExtractorController.toggle(); } catch(_){ } },
     },
     state: { __autoLast }
@@ -645,12 +639,7 @@ app.whenReady().then(()=>{
         try { __autoLast.active = !!(p&&p.on); } catch(_){ }
         try { broadcastToAll(getBroadcastCtx(), 'auto-active-set', p); } catch(_){ }
       });
-      ipcMain.on('auto-resume-set', (_e, p)=>{
-        try { __autoLast.resume = !!(p&&p.on); } catch(_){ }
-        try { broadcastToAll(getBroadcastCtx(), 'auto-resume-set', p); } catch(_){ }
-        try { console.log('[auto][resume-broadcast]', p); } catch(_){ }
-      });
-      ipcMain.handle('auto-state-get', ()=> { try { console.log('[auto][state-get] return', { active: __autoLast.active, resume: __autoLast.resume }); } catch(_){ } return ({ active: __autoLast.active, resume: __autoLast.resume }); });
+      ipcMain.handle('auto-state-get', ()=> { try { console.log('[auto][state-get] return', { active: __autoLast.active }); } catch(_){ } return ({ active: __autoLast.active }); });
       // Forwarded renderer console lines (selective)
       ipcMain.on('renderer-log-forward', (_e, payload)=>{
         try {
@@ -721,14 +710,6 @@ app.on('browser-window-created', (_e, win)=>{
           if(now - __lastHotkeyTs.f1 < 300) return;
           __lastHotkeyTs.f1 = now;
           try { broadcastAutoToggleAll(); } catch(_){ }
-          return;
-        }
-        // F2 -> toggle auto resume
-        if(!hasModifier && input.key==='F2'){
-          const now=Date.now();
-          if(now - __lastHotkeyTs.f2 < 300) return;
-          __lastHotkeyTs.f2 = now;
-          try { __autoLast.resume = !__autoLast.resume; broadcastToAll(getBroadcastCtx(), 'auto-resume-set', { on: __autoLast.resume }); } catch(_){ }
           return;
         }
         // F3 -> start/stop excel extractor script

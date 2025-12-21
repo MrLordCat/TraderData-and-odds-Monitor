@@ -323,7 +323,6 @@ if(window.desktopAPI){
     if(window.desktopAPI && window.desktopAPI.onAutoSetAll){ window.desktopAPI.onAutoSetAll(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
     if(window.desktopAPI && window.desktopAPI.onAutoToggleAll){ window.desktopAPI.onAutoToggleAll(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
     if(window.desktopAPI && window.desktopAPI.onAutoActiveSet){ window.desktopAPI.onAutoActiveSet(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
-    if(window.desktopAPI && window.desktopAPI.onAutoResumeSet){ window.desktopAPI.onAutoResumeSet(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
   } catch(_){ }
   window.desktopAPI.onBrokerClosed && window.desktopAPI.onBrokerClosed((id)=>{ if (boardData[id]) { delete boardData[id]; renderBoard(); }});
   window.desktopAPI.onBrokersSync && window.desktopAPI.onBrokersSync((ids)=>{
@@ -351,13 +350,28 @@ if(window.desktopAPI){
     
     const sBtn = document.getElementById('excelScriptBtn');
     const statusEl = document.getElementById('excelStatusCell');
+    const scriptMapBadge = document.getElementById('scriptMapBadge');
+    
+    // Get board map from selector
+    function getBoardMap(){
+      try {
+        const sel = document.getElementById('mapSelect');
+        if(sel) return parseInt(sel.value, 10);
+      } catch(_){ }
+      return null;
+    }
     
     if(ExcelStatusUI && sBtn){
-      const { applyStatus } = ExcelStatusUI.bindExcelStatusButton({
+      const { applyStatus, refreshBadgeMatch } = ExcelStatusUI.bindExcelStatusButton({
         btn: sBtn,
         statusEl: statusEl,
+        scriptMapBadge: scriptMapBadge,
+        getBoardMap: getBoardMap,
         toggle: ()=> window.desktopAPI.excelScriptToggle && window.desktopAPI.excelScriptToggle()
       });
+      
+      // Store refreshBadgeMatch for use in map change handler
+      window._boardExcelStatusRefresh = refreshBadgeMatch;
       
       if(window.desktopAPI.onExcelExtractorStatus){
         window.desktopAPI.onExcelExtractorStatus(applyStatus);
@@ -415,6 +429,10 @@ async function restoreMapAndBroadcast(){
         forceBoardMapSelect(val);
         // Single global broadcast (main will rebroadcast to every target)
         window.desktopAPI.setMap('*', val);
+        // Update AutoHub with initial board map via shared module
+        if(window._boardExcelStatusRefresh){
+          window._boardExcelStatusRefresh();
+        }
       }
     }
   } catch(e) {}
@@ -445,6 +463,10 @@ document.getElementById('mapSelect')?.addEventListener('change', e=>{
   if(!window.desktopAPI) return;
   const map=e.target.value;
   window.desktopAPI.setMap('*', map);
+  // Update script map badge match/mismatch styling using shared module
+  if(window._boardExcelStatusRefresh){
+    window._boardExcelStatusRefresh();
+  }
 });
 
 // Map refresh button: re-broadcast current selection (forces odds collectors to re-run with the same map)
@@ -535,11 +557,10 @@ if(window.desktopAPI && window.desktopAPI.onTeamNames){
   window.desktopAPI.onTeamNames(updateTeamHeaders);
 }
 
-// Visual state helpers for Auto/R buttons (kept for board UI)
+// Visual state helpers for Auto buttons (kept for board UI)
 function refreshAutoButtonsVisual(){
   try {
     const autoBtn = document.getElementById('autoBtn');
-    const rBtn = document.getElementById('autoResumeBtn');
     const sim = window.__autoSim;
     if(autoBtn && sim){
       autoBtn.classList.toggle('on', !!sim.active);
@@ -548,7 +569,6 @@ function refreshAutoButtonsVisual(){
       autoBtn.classList.toggle('susp', !!sim.lastDisableReason && sim.lastDisableReason==='excel-suspended');
       // No native title - miniToast handles tooltip on hover
     }
-    if(rBtn && sim){ rBtn.classList.toggle('on', !!sim.autoResume); }
   } catch(_){ }
 }
 function flashDot(idx){

@@ -50,20 +50,16 @@
       pulseCooldownChangesNeeded: 0,
       pulseCooldownChangesObserved: 0,
       pulseCooldownMinDelayMs: 300,
+      pulseCooldownMaxDelayMs: 1000, // Max wait for Excel to execute pulses (1 sec timeout)
       maxAdaptiveWaitMs: cfg.maxAdaptiveWaitMs,
       userWanted:false,
       lastDisableReason:null,
-      // Requirement: Auto Resume (R) must start OFF on every app launch.
-      // User can toggle it during the session, but it should not persist as ON across restarts.
-      autoResume:false,
       // Excel change fail protection: count consecutive failures when Excel doesn't change after adjustment
       excelNoChangeCount: 0,
       maxExcelNoChangeAttempts: 2, // suspend after this many consecutive failures
     };
 
     // Restore persisted flags if keys provided
-    // - autoResume is intentionally forced OFF on startup (do not restore from storage)
-    try { if(storage.autoResumeKey){ localStorage.setItem(storage.autoResumeKey, '0'); } } catch(_){ }
     try { if(storage.userWantedKey){ const v = localStorage.getItem(storage.userWantedKey); if(v==='1'){ state.userWanted=true; } } } catch(_){ }
 
     function schedule(delay){ if(!state.active) return; clearTimeout(state.timer); state.timer = setTimeout(step, typeof delay==='number'? delay: state.stepMs); }
@@ -112,7 +108,7 @@
       const mid = parseMid && parseMid();
       const ex = parseExcel && parseExcel();
       
-      // Check pulse cooldown — must wait for odds changes or minimum delay after sending pulses
+      // Check pulse cooldown — must wait for odds changes or max timeout after sending pulses
       if(state.pulseCooldownActive){
         const elapsedMs = Date.now() - state.pulseCooldownStartTs;
         const exKey = ex ? (ex[0]+'|'+ex[1]) : null;
@@ -121,20 +117,18 @@
           state.pulseCooldownChangesObserved++;
           state.pulseCooldownExcelSnapshot = exKey;
         }
-        // Exit cooldown if: (1) enough changes observed, OR (2) minimum delay passed
-        const minDelayMet = elapsedMs >= state.pulseCooldownMinDelayMs;
-        const changesMetOrTimeout = state.pulseCooldownChangesObserved >= state.pulseCooldownChangesNeeded;
-        // Also exit cooldown after max wait (2x pulses * 300ms)
-        const maxWaitMs = Math.max(state.pulseCooldownMinDelayMs, state.pulseCooldownPulsesSent * 300);
-        const maxWaitMet = elapsedMs >= maxWaitMs;
+        // Exit cooldown if: (1) all expected changes observed, OR (2) max timeout (1 sec)
+        const allChangesObserved = state.pulseCooldownChangesObserved >= state.pulseCooldownChangesNeeded;
+        const maxTimeoutMet = elapsedMs >= state.pulseCooldownMaxDelayMs;
         
-        if((minDelayMet && changesMetOrTimeout) || maxWaitMet){
+        if(allChangesObserved || maxTimeoutMet){
           // Exit cooldown
           state.pulseCooldownActive = false;
-          status(`Cooldown done (${state.pulseCooldownChangesObserved}/${state.pulseCooldownChangesNeeded} chg, ${elapsedMs}ms)`);
+          const reason = allChangesObserved ? 'changes' : 'timeout';
+          status(`Cooldown done (${reason}: ${state.pulseCooldownChangesObserved}/${state.pulseCooldownChangesNeeded} chg, ${elapsedMs}ms)`);
         } else {
           // Still in cooldown — report status and reschedule
-          status(`Pulse cooldown (${state.pulseCooldownChangesObserved}/${state.pulseCooldownChangesNeeded} chg, ${elapsedMs}ms)`);
+          status(`Waiting Excel (${state.pulseCooldownChangesObserved}/${state.pulseCooldownChangesNeeded} chg, ${elapsedMs}ms)`);
           return schedule(80);
         }
       }
@@ -245,11 +239,6 @@
       if(Array.isArray(p.burstLevels)) state.burstLevels = p.burstLevels;
     }
 
-    function setAutoResume(on){
-      state.autoResume = !!on;
-      try { if(storage.autoResumeKey){ localStorage.setItem(storage.autoResumeKey, state.autoResume? '1':'0'); } } catch(_){ }
-    }
-
     return {
       state,
       toggle,
@@ -257,7 +246,6 @@
       schedule,
       step,
       setConfig,
-      setAutoResume,
     };
   }
 

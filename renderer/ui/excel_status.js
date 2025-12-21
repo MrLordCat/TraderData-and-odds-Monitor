@@ -100,17 +100,44 @@ function clearToast(){
 
 /**
  * Bind Excel status button with hover/click/status logic
- * @param {object} opts - { btn, statusEl, toggle, onStatus }
+ * @param {object} opts - { btn, statusEl, toggle, onStatus, scriptMapBadge, getBoardMap }
  * @returns {object} - { applyStatus }
  */
 function bindExcelStatusButton(opts){
-  const { btn, statusEl, toggle, onStatus } = opts;
+  const { btn, statusEl, toggle, onStatus, scriptMapBadge, getBoardMap } = opts;
   
   let excelTogglePendingTs = 0;
   let lastStatusSig = '';
   let lastAutoToastTs = 0;
   let lastHoverLines = null;
   let lastHoverKind = 'ok';
+  let lastScriptMap = null;
+  
+  function updateScriptMapBadge(status){
+    if(!scriptMapBadge) return;
+    const scriptMap = (status && typeof status.scriptMap === 'number') ? status.scriptMap : null;
+    lastScriptMap = scriptMap;
+    
+    if(scriptMap === null){
+      scriptMapBadge.textContent = '-';
+      scriptMapBadge.className = 'scriptMapBadge';
+      scriptMapBadge.title = 'Script map unknown (Python hotkey controller not running?)';
+    } else {
+      scriptMapBadge.textContent = String(scriptMap);
+      // Compare with board map
+      const boardMap = (typeof getBoardMap === 'function') ? getBoardMap() : null;
+      const matches = (boardMap !== null && !isNaN(boardMap) && boardMap === scriptMap);
+      scriptMapBadge.className = 'scriptMapBadge ' + (matches ? 'match' : 'mismatch');
+      scriptMapBadge.title = matches 
+        ? `Script map: ${scriptMap} (matches board)`
+        : `Script map: ${scriptMap} (MISMATCH! Board: ${boardMap || '?'})`;
+    }
+    
+    // Update AutoHub about script map for auto mode blocking
+    if(typeof window !== 'undefined' && window.AutoHub && typeof window.AutoHub.setScriptMap === 'function'){
+      window.AutoHub.setScriptMap(scriptMap);
+    }
+  }
   
   function applyStatus(s){
     try {
@@ -131,6 +158,9 @@ function bindExcelStatusButton(opts){
           statusEl.textContent = text;
         }
       }
+      
+      // Update script map badge
+      updateScriptMapBadge(s);
       
       // Parse for tooltip
       const parsed = parseStatus(s);
@@ -161,6 +191,21 @@ function bindExcelStatusButton(opts){
     } catch(_){ }
   }
   
+  // Method to refresh badge when board map changes
+  function refreshBadgeMatch(){
+    if(!scriptMapBadge || lastScriptMap === null) return;
+    const boardMap = (typeof getBoardMap === 'function') ? getBoardMap() : null;
+    const matches = (boardMap !== null && !isNaN(boardMap) && boardMap === lastScriptMap);
+    scriptMapBadge.className = 'scriptMapBadge ' + (matches ? 'match' : 'mismatch');
+    scriptMapBadge.title = matches 
+      ? `Script map: ${lastScriptMap} (matches board)`
+      : `Script map: ${lastScriptMap} (MISMATCH! Board: ${boardMap || '?'})`;
+    // Update AutoHub board map
+    if(typeof window !== 'undefined' && window.AutoHub && typeof window.AutoHub.setBoardMap === 'function'){
+      window.AutoHub.setBoardMap(boardMap);
+    }
+  }
+  
   // Bind button events
   if(btn && !btn.dataset.excelStatusBound){
     btn.dataset.excelStatusBound = '1';
@@ -183,7 +228,7 @@ function bindExcelStatusButton(opts){
     });
   }
   
-  return { applyStatus };
+  return { applyStatus, refreshBadgeMatch };
 }
 
 // Export

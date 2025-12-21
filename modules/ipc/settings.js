@@ -156,25 +156,25 @@ function initSettingsIpc(ctx){
     } catch(_){ }
   });
 
-  // === Auto shock suspend threshold (%) ===
-  function clampShock(v){ return Math.max(20, Math.min(80, Math.round(v*10)/10)); }
-  ipcMain.handle('auto-shock-threshold-get', ()=>{
+  // === Auto Suspend threshold (%) - suspend when diff >= threshold, resume when < threshold/2 ===
+  function clampAutoSuspend(v){ return Math.max(15, Math.min(80, Math.round(v))); }
+  ipcMain.handle('auto-suspend-threshold-get', ()=>{
     try {
-      const v = store.get('autoShockThresholdPct');
-      if(typeof v==='number' && !isNaN(v)) return clampShock(v);
+      const v = store.get('autoSuspendThresholdPct');
+      if(typeof v==='number' && !isNaN(v)) return clampAutoSuspend(v);
     } catch(_){ }
-    return null;
+    return 40; // default
   });
-  ipcMain.on('auto-shock-threshold-set', (_e, payload)=>{
+  ipcMain.on('auto-suspend-threshold-set', (_e, payload)=>{
     try {
-      const v = payload && typeof payload.pct==='number' ? clampShock(payload.pct) : null;
+      const v = payload && typeof payload.pct==='number' ? clampAutoSuspend(payload.pct) : null;
       if(v!=null){
-        store.set('autoShockThresholdPct', v);
+        store.set('autoSuspendThresholdPct', v);
         try {
           const { BrowserWindow } = require('electron');
           BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-shock-threshold-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-shock-threshold-updated', v); } catch(_){ } }); } } catch(_){ }
+            try { w.webContents.send('auto-suspend-threshold-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-suspend-threshold-updated', v); } catch(_){ } }); } } catch(_){ }
           });
         } catch(_){ }
       }

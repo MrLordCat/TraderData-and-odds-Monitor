@@ -57,8 +57,6 @@ function createHotkeyManager(ctx){
 						actions.toggleStats && actions.toggleStats();
 					} else if(key === 'F1'){
 						actions.toggleAuto && actions.toggleAuto();
-					} else if(key === 'F2'){
-						actions.toggleAutoResume && actions.toggleAutoResume();
 					} else if(key === 'F3'){
 						actions.startScript && actions.startScript();
 					}

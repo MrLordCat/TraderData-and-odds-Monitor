@@ -92,7 +92,6 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,onAutoSetAll: (cb) => withUnsub('auto-set-all', cb)
   ,onAutoDisableAll: (cb) => withUnsub('auto-disable-all', cb)
   // AutoHub state sync (board view relies on these because it has no window.require)
-  ,onAutoResumeSet: (cb) => withUnsub('auto-resume-set', cb)
   ,onAutoActiveSet: (cb) => withUnsub('auto-active-set', cb)
 
   // Auto settings live updates (for views without direct ipcRenderer)
