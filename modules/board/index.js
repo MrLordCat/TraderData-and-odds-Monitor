@@ -10,9 +10,9 @@ function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, a
   let state = { 
     mode: 'docked', 
     side: store.get('boardSide') || 'right', 
-    width: store.get('boardWidth') || 360  // Default matches STATS_PANEL_WIDTH
+    width: store.get('boardWidth') || 361  // Default + 1px for border
   };
-  const MIN_W = 280; 
+  const MIN_W = 281; 
   const MAX_W = 600;
   
   // Reference to stats panel BrowserView (set by statsManager after creation)

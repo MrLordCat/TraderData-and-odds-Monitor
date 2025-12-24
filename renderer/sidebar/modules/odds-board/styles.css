@@ -62,16 +62,24 @@
   font-weight: var(--md-sys-typescale-label-large-weight);
   color: var(--md-sys-color-on-surface-variant);
   background: var(--md-sys-color-surface-container);
+}
+
+.odds-table thead th.col-broker {
   text-align: left;
+}
+
+.odds-table thead th.col-odds {
+  text-align: center;
 }
 
 .odds-table .col-broker {
   width: 35%;
+  text-align: left;
 }
 
 .odds-table .col-odds {
   width: 32.5%;
-  text-align: right;
+  text-align: center;
   font-family: var(--md-sys-typescale-font-family-code);
   font-variant-numeric: tabular-nums;
 }
@@ -123,6 +131,10 @@
   gap: var(--md-sys-spacing-2);
 }
 
+.excel-controls > * {
+  flex-shrink: 0;
+}
+
 /* Auto & Script Buttons - Chip style */
 .auto-btn,
 .script-btn {
@@ -131,20 +143,28 @@
   align-items: center;
   justify-content: center;
   height: 24px;
+  min-width: 24px;
   padding: 0 var(--md-sys-spacing-2);
   font-family: var(--md-sys-typescale-font-family-plain);
   font-size: var(--md-sys-typescale-label-small-size);
   font-weight: var(--md-sys-typescale-label-small-weight);
+  line-height: 1;
   background: transparent;
   border: 1px solid var(--md-sys-color-outline);
   border-radius: var(--md-sys-shape-extra-small);
   color: var(--md-sys-color-on-surface-variant);
   cursor: pointer;
   overflow: hidden;
+  box-sizing: border-box;
   transition: 
     background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
     border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
     color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+
+.script-btn {
+  padding: 0;
+  width: 24px;
 }
 
 .auto-btn::before,
@@ -191,6 +211,12 @@
 /* Script map badge */
 #script-map-badge {
   font-family: var(--md-sys-typescale-font-family-code);
+  height: 24px;
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 /* Excel odds display */

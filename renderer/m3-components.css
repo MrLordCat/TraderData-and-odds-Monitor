@@ -132,7 +132,9 @@ input[type="range"]::-webkit-slider-thumb:active {
 }
 
 /* ===== M3 Button ===== */
-.m3-btn {
+/* Apply to both .m3-btn class and button tag */
+.m3-btn,
+button {
 	height: 36px;
 	padding: 0 var(--md-sys-spacing-lg);
 	background: linear-gradient(
@@ -152,7 +154,8 @@ input[type="range"]::-webkit-slider-thumb:active {
 	overflow: hidden;
 }
 
-.m3-btn::before {
+.m3-btn::before,
+button::before {
 	content: '';
 	position: absolute;
 	inset: 0;
@@ -161,21 +164,36 @@ input[type="range"]::-webkit-slider-thumb:active {
 	transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
 }
 
-.m3-btn:hover::before { opacity: 0.06; }
-.m3-btn:active::before { opacity: 0.10; }
-.m3-btn:hover { border-color: var(--md-sys-color-outline); }
-.m3-btn:active { transform: scale(0.98); }
+.m3-btn:hover::before, button:hover::before { opacity: 0.06; }
+.m3-btn:active::before, button:active::before { opacity: 0.10; }
+.m3-btn:hover, button:hover { border-color: var(--md-sys-color-outline); }
+.m3-btn:active, button:active { transform: scale(0.98); }
+
+.m3-btn:disabled, button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+	transform: none;
+}
+.m3-btn:disabled::before, button:disabled::before { display: none; }
 
 /* Filled variant */
-.m3-btn--filled {
+.m3-btn--filled,
+button.primary {
 	background: var(--md-sys-color-primary);
 	border-color: var(--md-sys-color-primary);
 	color: var(--md-sys-color-on-primary);
 	box-shadow: var(--md-sys-elevation-1);
 }
 
-.m3-btn--filled::before {
+.m3-btn--filled::before,
+button.primary::before {
 	background: var(--md-sys-color-on-primary);
+}
+
+.m3-btn--filled:hover,
+button.primary:hover {
+	box-shadow: var(--md-sys-elevation-2);
+	border-color: var(--md-sys-color-primary);
 }
 
 .m3-btn--filled:hover {
