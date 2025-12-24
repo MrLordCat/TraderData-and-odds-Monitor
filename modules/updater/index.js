@@ -285,55 +285,27 @@ function createUpdateManager({ store, mainWindow }) {
   function createUpdateScript(sourceDir, targetDir, exePath) {
     const scriptPath = path.join(app.getPath('temp'), `oddsmoni-update-${Date.now()}.bat`);
     
-    // Batch file - works on all Windows without restrictions
+    // Batch file - completely silent, no window
     const script = `@echo off
 chcp 65001 >nul
-title OddsMoni Auto-Updater
 
-echo.
-echo ================================
-echo    OddsMoni Auto-Updater
-echo ================================
-echo.
-echo Source: ${sourceDir}
-echo Target: ${targetDir}
-echo.
-
-echo Waiting for application to close...
-timeout /t 3 /nobreak >nul
+REM Wait for application to close
+ping -n 4 127.0.0.1 >nul
 
 REM Kill process if still running
 taskkill /F /IM OddsMoni.exe >nul 2>&1
-timeout /t 1 /nobreak >nul
+ping -n 2 127.0.0.1 >nul
 
-echo.
-echo Copying updated files...
+REM Copy updated files
 xcopy /E /Y /Q "${sourceDir}\\*" "${targetDir}\\" >nul
-if errorlevel 1 (
-    echo.
-    echo ================================
-    echo    UPDATE FAILED!
-    echo ================================
-    echo Error copying files.
-    echo.
-    pause
-    exit /b 1
-)
 
-echo.
-echo Update complete!
-
-echo Cleaning up temp files...
+REM Cleanup temp files
 rmdir /S /Q "${sourceDir}" >nul 2>&1
 
-echo.
-echo Starting application...
-timeout /t 1 /nobreak >nul
-
-start "" "${exePath}"
-
-echo Done! This window will close in 3 seconds...
-timeout /t 3 /nobreak >nul
+REM Start application (hidden using wscript)
+echo CreateObject("WScript.Shell").Run """${exePath.replace(/\\/g, '\\\\')}""", 1, False > "%TEMP%\\oddsmoni-start.vbs"
+wscript "%TEMP%\\oddsmoni-start.vbs"
+del "%TEMP%\\oddsmoni-start.vbs" >nul 2>&1
 `;
 
     fs.writeFileSync(scriptPath, script, 'utf8');
