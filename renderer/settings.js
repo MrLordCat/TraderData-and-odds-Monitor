@@ -1,4 +1,25 @@
 const { ipcRenderer } = require('electron');
+
+// Load and display current version dynamically
+(function loadVersion(){
+	try {
+		const label = document.getElementById('version-label');
+		if(!label) return;
+		ipcRenderer.invoke('updater-get-version').then(info => {
+			if(info && info.version){
+				// Show version, add 'dev' suffix if dev channel
+				let vText = 'v' + info.version;
+				if(info.buildInfo && info.buildInfo.channel === 'dev'){
+					vText += ' dev';
+				}
+				label.textContent = '(' + vText + ')';
+			} else {
+				label.textContent = '';
+			}
+		}).catch(() => { label.textContent = ''; });
+	} catch(_){ }
+})();
+
 // DevTools button (moved from main toolbar)
 try {
 	const devBtn = document.getElementById('open-devtools');
