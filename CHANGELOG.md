@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2]
+
+### ✨ New Features
+- **Excel team names**: Team names now automatically read from Excel cells K4/N4 via Python watcher
+- **Silent auto-updater**: Update window no longer flashes during background updates
+
+### 🐛 Bug Fixes  
+- **Settings panel order**: Fixed sections randomly reordering on each open (removed JS masonry, pure CSS columns now)
+- **Team names broadcast**: Fixed team names not reaching stats panel BrowserView
+- **Excel watcher logging**: Added verbose mode and rebroadcast on stats panel load
+
+### 🌐 Localization
+- **Python scripts**: Translated all Russian text to English in excel_watcher.py
+
+### 🔧 Build
+- **Release workflow**: Dev build no longer triggers when creating release tags
+
+---
+
 ## [0.0.7]
 
 ### 🚀 New Features

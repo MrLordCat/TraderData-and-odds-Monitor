@@ -54,6 +54,30 @@ jobs:
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
           echo "ZIP_PATH=dist/$zipName" >> $env:GITHUB_ENV
       
+      - name: Extract changelog for this version
+        id: changelog
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $content = Get-Content CHANGELOG.md -Raw
+          
+          # Extract section for this version (between ## [version] and next ## or end)
+          $pattern = "(?ms)## \[$version\].*?(?=## \[|\z)"
+          $match = [regex]::Match($content, $pattern)
+          
+          if ($match.Success) {
+            $changelog = $match.Value.Trim()
+            # Remove the version header line itself
+            $changelog = $changelog -replace "^## \[$version\]\s*", ""
+            # Escape for GitHub Actions
+            $changelog = $changelog -replace "%", "%25"
+            $changelog = $changelog -replace "`n", "%0A"
+            $changelog = $changelog -replace "`r", "%0D"
+            echo "CHANGELOG=$changelog" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "CHANGELOG=See commit history for changes." >> $env:GITHUB_OUTPUT
+          }
+      
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -61,13 +85,14 @@ jobs:
           body: |
             ## OddsMoni v${{ steps.get_version.outputs.VERSION }}
             
+            ${{ steps.changelog.outputs.CHANGELOG }}
+            
+            ---
+            
             ### Installation
             1. Download `${{ env.ZIP_NAME }}`
             2. Extract to any folder
             3. Run `OddsMoni.exe`
-            
-            ### Changelog
-            See commit history for changes.
           files: ${{ env.ZIP_PATH }}
           draft: false
           prerelease: false
