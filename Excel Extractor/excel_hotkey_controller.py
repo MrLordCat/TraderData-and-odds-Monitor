@@ -10,7 +10,6 @@ Hotkeys:
     F22 -> Send Update only (auto mode confirm)
     F23 -> PreviousOddsHome (external trigger)
     F24 -> NextOddsHome (external trigger)
-    Numpad9 -> Show status
     Esc or Ctrl+C -> Exit
 
 Reads current map from template_sync.json.
@@ -422,7 +421,7 @@ class ExcelOddsHotkeyController:
             print(f"{marker} Map {map_num} (row {row}): Home={home}, Away={away}{blocked}")
         print("="*50)
         print("Hotkeys: Numpad- (prev), Numpad+ (next), Numpad* (map), Numpad0 (update), Numpad1 (suspend)")
-        print("         F21 (suspend+update), F22 (update), F23 (prev), F24 (next), Numpad9 (status), Esc (exit)")
+        print("         F21 (suspend+update), F22 (update), F23 (prev), F24 (next), Esc (exit)")
         print()
     
     # Hotkey handlers - only add command to queue!
@@ -433,10 +432,6 @@ class ExcelOddsHotkeyController:
     def on_hotkey_next(self):
         """Handler for Numpad+ / F24."""
         self._command_queue.put('next')
-    
-    def on_hotkey_status(self):
-        """Handler for Numpad9."""
-        self._command_queue.put('status')
     
     def on_hotkey_cycle_map(self):
         """Handler for Numpad* - map cycling."""
@@ -482,8 +477,6 @@ class ExcelOddsHotkeyController:
                     # Key released - mark in state
                     if key_name:
                         self._key_released(key_name)
-                elif cmd_name == 'status':
-                    self.show_status()
                 elif cmd_name == 'cycle_map':
                     self.cycle_map()
                 elif cmd_name == 'suspend':
@@ -516,7 +509,6 @@ class ExcelOddsHotkeyController:
         print("  F22      -> Send Update (auto confirm)")
         print("  F23      -> Decrease (external trigger)")
         print("  F24      -> Increase (external trigger)")
-        print("  Numpad9  -> Show status")
         print("  Esc      -> Exit")
         print()
         print(f"Template: {self._get_template_name()}")
@@ -565,7 +557,6 @@ class ExcelOddsHotkeyController:
                 if e.event_type == 'down':
                     self._command_queue.put(('send_update',))
         keyboard.hook(on_fkey)
-        keyboard.add_hotkey('num 9', self.on_hotkey_status, suppress=True)
         
         # Numpad0 (Send Update) and Numpad1 (Suspend) - use add_hotkey with suppress
         keyboard.add_hotkey(82, self.on_hotkey_send_update, suppress=True)  # Numpad0 scan code
