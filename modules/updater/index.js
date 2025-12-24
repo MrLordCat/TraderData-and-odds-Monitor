@@ -36,11 +36,19 @@ function createUpdateManager({ store, mainWindow }) {
 
   function getCurrentCommit() {
     try {
+      // First try build-info.json
       const buildInfoPath = path.join(app.getAppPath(), 'build-info.json');
       if (fs.existsSync(buildInfoPath)) {
         const info = JSON.parse(fs.readFileSync(buildInfoPath, 'utf8'));
-        return info.commit || null;
+        if (info.commit) return info.commit;
+        if (info.commitShort) return info.commitShort;
       }
+      
+      // Fallback: extract from version string (0.1.1-dev.abc1234)
+      const version = getCurrentVersion();
+      const match = version.match(/-dev\.([a-f0-9]+)$/i);
+      if (match) return match[1];
+      
     } catch (e) {}
     return null;
   }
@@ -98,17 +106,27 @@ function createUpdateManager({ store, mainWindow }) {
       let release;
       if (channel === 'dev') {
         release = await getDevRelease(REPO_OWNER, REPO_NAME);
-        // For dev channel, compare commit SHA
-        if (release && release.commit && release.commit !== currentCommit) {
-          availableUpdate = {
-            version: release.version,
-            commit: release.commit,
-            commitShort: release.commitShort,
-            downloadUrl: release.downloadUrl,
-            releaseUrl: release.releaseUrl,
-            channel: 'dev',
-            publishedAt: release.publishedAt
-          };
+        // For dev channel, compare commit SHA (handle short vs full SHA)
+        if (release && release.commitShort) {
+          const currentShort = currentCommit ? currentCommit.substring(0, 7) : null;
+          const remoteShort = release.commitShort.substring(0, 7);
+          
+          console.log(`[updater] Dev compare: current=${currentShort}, remote=${remoteShort}`);
+          
+          if (currentShort !== remoteShort) {
+            availableUpdate = {
+              version: release.version,
+              commit: release.commit,
+              commitShort: release.commitShort,
+              downloadUrl: release.downloadUrl,
+              releaseUrl: release.releaseUrl,
+              channel: 'dev',
+              publishedAt: release.publishedAt
+            };
+          } else {
+            availableUpdate = null;
+            console.log('[updater] No updates available (same commit)');
+          }
         } else {
           availableUpdate = null;
         }
