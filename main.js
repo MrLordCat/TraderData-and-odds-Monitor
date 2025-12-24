@@ -77,6 +77,26 @@ try {
   process.on('uncaughtException', (err)=>{ try { console.error('[uncaughtException]', err); } catch(_){} });
 } catch(_){}
 
+// --- Handle --apply-update argument (run update script before app starts) ---
+try {
+  const updateArgIdx = process.argv.indexOf('--apply-update');
+  if (updateArgIdx !== -1 && process.argv[updateArgIdx + 1]) {
+    const updateScript = process.argv[updateArgIdx + 1];
+    const { spawn } = require('child_process');
+    console.log('[updater] Applying update via script:', updateScript);
+    // Run PowerShell script detached (will replace files and restart app)
+    spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', updateScript], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: false
+    }).unref();
+    // Exit immediately so script can replace files
+    process.exit(0);
+  }
+} catch (e) {
+  console.warn('[updater] apply-update handler failed:', e.message);
+}
+
 // Placeholder odds broadcaster now uses shared util factory
 const { makePlaceholderOdds } = require('./modules/utils/odds');
 function broadcastPlaceholderOdds(id){

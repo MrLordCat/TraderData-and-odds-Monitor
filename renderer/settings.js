@@ -517,9 +517,14 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		downloadBtn.disabled = true;
 		setStatus('Already up to date');
 	});
-	ipcRenderer.on('updater-downloading', (_e, progress)=>{
-		showProgress(progress.percent || 0);
-		setStatus(`Downloading... ${(progress.percent||0).toFixed(0)}%`);
+	ipcRenderer.on('updater-downloading', (_e, data)=>{
+		const pct = data && typeof data.percent === 'number' ? data.percent : 0;
+		showProgress(pct);
+		setStatus(`Downloading... ${pct.toFixed(0)}%`);
+	});
+	ipcRenderer.on('updater-extracting', ()=>{
+		showProgress(100);
+		setStatus('Extracting...');
 	});
 	ipcRenderer.on('updater-ready', ()=>{
 		setStatus('Update ready, restarting...');

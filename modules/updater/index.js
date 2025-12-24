@@ -187,7 +187,7 @@ function createUpdateManager({ store, mainWindow }) {
     downloadProgress = 0;
 
     try {
-      broadcast('update-downloading', { progress: 0 });
+      broadcast('downloading', { percent: 0 });
 
       // Download zip to temp
       const tempDir = app.getPath('temp');
@@ -197,10 +197,10 @@ function createUpdateManager({ store, mainWindow }) {
 
       await downloadUpdate(update.downloadUrl, zipPath, (progress) => {
         downloadProgress = progress;
-        broadcast('update-downloading', { progress });
+        broadcast('downloading', { percent: progress });
       });
 
-      broadcast('update-extracting', {});
+      broadcast('extracting', { percent: 100 });
 
       // Extract to temp folder
       const extractDir = path.join(tempDir, `oddsmoni-update-${Date.now()}`);
@@ -240,23 +240,23 @@ function createUpdateManager({ store, mainWindow }) {
   // Apply update and restart
   function applyUpdateAndRestart(extractDir) {
     try {
-      const appPath = app.getAppPath();
-      const isAsar = appPath.includes('.asar');
+      // For portable builds, get the directory containing the exe
+      const exePath = process.execPath; // Full path to OddsMoni.exe
+      const appDir = path.dirname(exePath); // Directory containing the app
       
-      // For non-asar (portable) builds
-      if (!isAsar) {
-        // Create update script that runs after app exits
-        const updateScript = createUpdateScript(extractDir, appPath);
-        
-        // Store script path and quit
-        store.set('pendingUpdateScript', updateScript);
-        
-        // Relaunch with update flag
-        app.relaunch({ args: ['--apply-update', updateScript] });
-        app.quit();
-      } else {
-        dialog.showErrorBox('Update Error', 'Cannot update ASAR-packed application. Please download manually.');
-      }
+      console.log('[updater] Applying update...');
+      console.log('[updater] Extract dir:', extractDir);
+      console.log('[updater] App dir:', appDir);
+      console.log('[updater] Exe path:', exePath);
+      
+      // Create update script that runs after app exits
+      const updateScript = createUpdateScript(extractDir, appDir, exePath);
+      
+      console.log('[updater] Update script:', updateScript);
+      
+      // Relaunch with update flag - this will run the PS script and exit
+      app.relaunch({ args: ['--apply-update', updateScript] });
+      app.quit();
     } catch (err) {
       console.error('[updater] Apply update failed:', err.message);
       dialog.showErrorBox('Update Failed', err.message);
@@ -264,38 +264,61 @@ function createUpdateManager({ store, mainWindow }) {
   }
 
   // Create PowerShell script for file replacement
-  function createUpdateScript(sourceDir, targetDir) {
+  function createUpdateScript(sourceDir, targetDir, exePath) {
     const scriptPath = path.join(app.getPath('temp'), `oddsmoni-update-${Date.now()}.ps1`);
-    const exePath = path.join(targetDir, 'OddsMoni.exe');
     
-    const script = `
-# OddsMoni Update Script
-$ErrorActionPreference = "Stop"
-$sourceDir = "${sourceDir.replace(/\\/g, '\\\\')}"
-$targetDir = "${targetDir.replace(/\\/g, '\\\\')}"
-$exePath = "${exePath.replace(/\\/g, '\\\\')}"
+    // Escape paths for PowerShell
+    const srcEsc = sourceDir.replace(/'/g, "''");
+    const tgtEsc = targetDir.replace(/'/g, "''");
+    const exeEsc = exePath.replace(/'/g, "''");
+    
+    const script = `# OddsMoni Update Script
+$ErrorActionPreference = "Continue"
+$sourceDir = '${srcEsc}'
+$targetDir = '${tgtEsc}'
+$exePath = '${exeEsc}'
 
-# Wait for app to close
-Start-Sleep -Seconds 2
+Write-Host "OddsMoni Updater"
+Write-Host "================"
+Write-Host "Source: $sourceDir"
+Write-Host "Target: $targetDir"
+Write-Host ""
 
-# Backup current version (optional)
-$backupDir = "$targetDir\\..\\OddsMoni-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+# Wait for app to fully close
+Write-Host "Waiting for application to close..."
+Start-Sleep -Seconds 3
 
 try {
     # Copy new files over old ones
-    Write-Host "Updating files..."
-    Copy-Item -Path "$sourceDir\\*" -Destination "$targetDir" -Recurse -Force
+    Write-Host "Copying updated files..."
+    
+    # Get all items from source (skip top-level folder if zip extracted with container)
+    $items = Get-ChildItem -Path $sourceDir -Force
+    
+    foreach ($item in $items) {
+        $destPath = Join-Path $targetDir $item.Name
+        Write-Host "  -> $($item.Name)"
+        Copy-Item -Path $item.FullName -Destination $destPath -Recurse -Force
+    }
+    
+    Write-Host ""
+    Write-Host "Update complete!"
     
     # Clean up temp extract folder
-    Remove-Item -Path "$sourceDir" -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Cleaning up..."
+    Remove-Item -Path $sourceDir -Recurse -Force -ErrorAction SilentlyContinue
     
-    Write-Host "Update complete. Starting application..."
+    Write-Host "Starting application..."
+    Start-Sleep -Seconds 1
     
     # Start updated app
     Start-Process -FilePath $exePath
     
 } catch {
-    Write-Host "Update failed: $_"
+    Write-Host ""
+    Write-Host "ERROR: Update failed!"
+    Write-Host $_
+    Write-Host ""
     Write-Host "Press any key to exit..."
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
