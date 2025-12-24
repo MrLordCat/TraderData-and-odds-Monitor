@@ -84,12 +84,13 @@ try {
     const updateScript = process.argv[updateArgIdx + 1];
     const { exec } = require('child_process');
     console.log('[updater] Applying update via script:', updateScript);
-    // Run batch file in new visible window
-    const cmd = `start "OddsMoni Update" cmd.exe /c "${updateScript}"`;
-    exec(cmd, { windowsHide: false });
+    // Run batch file hidden using wscript
+    const vbsPath = updateScript.replace('.bat', '.vbs');
+    const vbs = `CreateObject("WScript.Shell").Run """${updateScript.replace(/\\/g, '\\\\')}""", 0, False`;
+    require('fs').writeFileSync(vbsPath, vbs);
+    exec(`wscript "${vbsPath}"`, { windowsHide: true });
     // Give it time to start
-    setTimeout(() => process.exit(0), 500);
-    // Prevent app from continuing
+    setTimeout(() => process.exit(0), 300);
     return;
   }
 } catch (e) {
