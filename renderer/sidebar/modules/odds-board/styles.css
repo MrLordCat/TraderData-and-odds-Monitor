@@ -1,0 +1,132 @@
+/* Odds Board Module Styles */
+
+.odds-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sidebar-border);
+  background: rgba(255,255,255,0.02);
+}
+
+.map-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--sidebar-text-muted);
+}
+
+.odds-table-wrap {
+  overflow: auto;
+}
+
+.odds-table {
+  width: 100%;
+}
+
+.odds-table .col-broker {
+  width: 35%;
+}
+
+.odds-table .col-odds {
+  width: 32.5%;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.odds-table tbody tr.frozen {
+  opacity: 0.5;
+}
+
+.odds-table tbody tr.frozen td {
+  color: var(--sidebar-warning);
+}
+
+/* Excel row */
+.excel-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auto-btn, .script-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--sidebar-surface);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 4px;
+  color: var(--sidebar-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.auto-btn:hover, .script-btn:hover {
+  border-color: var(--sidebar-accent);
+  color: var(--sidebar-text);
+}
+
+.auto-btn.active {
+  background: var(--sidebar-accent);
+  border-color: var(--sidebar-accent);
+  color: #000;
+}
+
+.script-btn.running {
+  background: var(--sidebar-success);
+  border-color: var(--sidebar-success);
+  color: #000;
+}
+
+/* Auto indicators */
+.auto-indicators {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sidebar-border);
+}
+
+.auto-dot.active {
+  background: var(--sidebar-accent);
+  animation: pulse 0.8s ease-in-out infinite;
+}
+
+.auto-dot.side1.active {
+  background: var(--sidebar-success);
+}
+
+.auto-dot.side2.active {
+  background: var(--sidebar-warning);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.auto-status {
+  font-size: 10px;
+  color: var(--sidebar-text-muted);
+}
+
+/* Tfoot styling */
+.odds-table tfoot th {
+  font-weight: 500;
+  color: var(--sidebar-text-muted);
+}
+
+.odds-table tfoot td {
+  font-family: var(--font-mono);
+}
+
+#mid-row td, #arb-row td {
+  text-align: center;
+}

@@ -750,14 +750,7 @@ app.on('browser-window-created', (_e, win)=>{
           try { toggleStatsEmbedded(); } catch(_){ }
           return;
         }
-        // F1 -> toggle auto mode
-        if(!hasModifier && input.key==='F1'){
-          const now=Date.now();
-          if(now - __lastHotkeyTs.f1 < 300) return;
-          __lastHotkeyTs.f1 = now;
-          try { broadcastAutoToggleAll(); } catch(_){ }
-          return;
-        }
+        // F1 handled by hotkeys manager (modules/hotkeys/index.js) - no duplicate here
         // F3 -> start/stop excel extractor script
         if(!hasModifier && input.key==='F3'){
           const now=Date.now();
@@ -774,15 +767,7 @@ app.on('browser-window-created', (_e, win)=>{
           toggleStatsEmbedded();
           return;
         }
-        // Numpad5 fallback (if global shortcut didn't register on this OS)
-        try {
-          const isNum5 = (String(input.code||'').toLowerCase()==='numpad5') || ((input.key==='5' || input.key==='Num5') && input.location===3);
-          if(isNum5){
-            broadcastAutoToggleAll();
-            try { console.log('[hotkey][window][Num5] broadcast auto-toggle-all'); } catch(_){ }
-            return;
-          }
-        } catch(_){ }
+        // Numpad5 handled by globalShortcut.register - no fallback needed (causes double toggle)
         // Ctrl+F12 -> open Board (odds) BrowserView DevTools
         if(input.key==='F12' && input.control){
           try {

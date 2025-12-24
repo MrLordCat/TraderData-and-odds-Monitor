@@ -1,0 +1,91 @@
+/* Sources Layout Module Styles */
+
+.sources-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preset-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--sidebar-radius);
+  color: var(--sidebar-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.preset-btn:hover {
+  border-color: var(--sidebar-accent);
+  color: var(--sidebar-text);
+}
+
+.preset-btn.active {
+  background: var(--sidebar-accent);
+  border-color: var(--sidebar-accent);
+  color: #000;
+}
+
+/* Active sources */
+.active-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--sidebar-radius);
+}
+
+.source-name {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.source-remove {
+  width: 20px;
+  height: 20px;
+  opacity: 0.5;
+}
+
+.source-remove:hover {
+  opacity: 1;
+  color: var(--sidebar-danger);
+}
+
+.source-remove svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Actions */
+.source-actions {
+  margin-top: 4px;
+}

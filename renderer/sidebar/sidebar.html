@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sidebar</title>
+  
+  <!-- Base styles -->
+  <link rel="stylesheet" href="../common.css" />
+  <link rel="stylesheet" href="core/sidebar-base.css" />
+  
+  <!-- Module styles -->
+  <link rel="stylesheet" href="modules/toolbar/styles.css" />
+  <link rel="stylesheet" href="modules/sources-layout/styles.css" />
+  <link rel="stylesheet" href="modules/odds-board/styles.css" />
+  
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--sidebar-bg, #0d1117);
+    }
+    
+    #sidebar-root {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar-root" class="sidebar-container">
+    <!-- Modules will be loaded here dynamically -->
+  </div>
+  
+  <!-- Core -->
+  <script src="core/sidebar-base.js"></script>
+  <script src="core/sidebar-loader.js"></script>
+  
+  <!-- Modules (each registers itself) -->
+  <script src="modules/toolbar/index.js"></script>
+  <script src="modules/sources-layout/index.js"></script>
+  <script src="modules/odds-board/index.js"></script>
+  
+  <!-- Initialize -->
+  <script src="sidebar-init.js"></script>
+</body>
+</html>
