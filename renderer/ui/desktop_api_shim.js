@@ -119,6 +119,19 @@
       setAutoRefreshEnabled: (v) => { try { ipcRenderer.send('set-auto-refresh-enabled', !!v); } catch(_){} },
       onAutoRefreshUpdated: (cb) => withUnsub('auto-refresh-updated', cb),
 
+      // Updater
+      updaterGetStatus: () => ipcRenderer.invoke('updater-get-status'),
+      updaterCheck: (silent) => ipcRenderer.invoke('updater-check', { silent }),
+      updaterSetChannel: (ch) => { try { ipcRenderer.send('updater-set-channel', ch); } catch(_){} },
+      updaterSetAutoCheck: (v) => { try { ipcRenderer.send('updater-set-auto-check', !!v); } catch(_){} },
+      updaterDownload: () => { try { ipcRenderer.send('updater-download'); } catch(_){} },
+      updaterGetVersion: () => ipcRenderer.invoke('updater-get-version'),
+      onUpdaterAvailable: (cb) => withUnsub('updater-update-available', cb),
+      onUpdaterNotAvailable: (cb) => withUnsub('updater-update-not-available', cb),
+      onUpdaterDownloading: (cb) => withUnsub('updater-update-downloading', cb),
+      onUpdaterReady: (cb) => withUnsub('updater-update-ready', cb),
+      onUpdaterError: (cb) => withUnsub('updater-update-error', cb),
+
       // Dev
       openDevTools: () => { try { ipcRenderer.send('open-devtools'); } catch(_){} },
       onDevCssChanged: (cb) => withUnsub('dev-css-changed', cb),

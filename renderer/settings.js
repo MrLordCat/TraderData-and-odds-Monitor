@@ -378,3 +378,136 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		try { ipcRenderer.send('game-set', { game }); } catch(_){ }
 	});
 })();
+
+// ===== Updates section =====
+(function(){
+	const channelSel = document.getElementById('upd-channel');
+	const autoChk = document.getElementById('upd-auto');
+	const versionSpan = document.getElementById('upd-version');
+	const statusSpan = document.getElementById('upd-status');
+	const checkBtn = document.getElementById('upd-check');
+	const downloadBtn = document.getElementById('upd-download');
+	const progressDiv = document.getElementById('upd-progress');
+	const progressBar = progressDiv ? progressDiv.querySelector('.bar') : null;
+
+	if(!channelSel || !autoChk || !checkBtn || !downloadBtn) return;
+
+	let pendingUpdate = null; // { version, url }
+
+	function setStatus(text){
+		if(statusSpan) statusSpan.textContent = text || '—';
+	}
+
+	function showProgress(pct){
+		if(!progressDiv || !progressBar) return;
+		progressDiv.hidden = false;
+		progressBar.style.width = Math.max(0, Math.min(100, pct)).toFixed(1) + '%';
+	}
+	function hideProgress(){
+		if(progressDiv) progressDiv.hidden = true;
+		if(progressBar) progressBar.style.width = '0%';
+	}
+
+	// Load initial state
+	async function loadUpdaterState(){
+		try {
+			const status = await ipcRenderer.invoke('updater-get-status');
+			if(status){
+				channelSel.value = status.channel || 'stable';
+				autoChk.checked = status.autoCheck !== false;
+				if(versionSpan) versionSpan.textContent = status.currentVersion || '—';
+				setStatus(status.statusText || '—');
+			}
+		} catch(e){ console.warn('[settings][updater] loadState failed', e.message); }
+	}
+	loadUpdaterState();
+
+	// Channel change
+	channelSel.addEventListener('change', async ()=>{
+		try {
+			await ipcRenderer.invoke('updater-set-channel', channelSel.value);
+			pendingUpdate = null;
+			downloadBtn.disabled = true;
+			setStatus('Channel changed');
+		} catch(e){ console.warn('[settings][updater] setChannel failed', e.message); }
+	});
+
+	// Auto check toggle
+	autoChk.addEventListener('change', async ()=>{
+		try {
+			await ipcRenderer.invoke('updater-set-auto-check', autoChk.checked);
+		} catch(e){ console.warn('[settings][updater] setAutoCheck failed', e.message); }
+	});
+
+	// Check for updates button
+	checkBtn.addEventListener('click', async ()=>{
+		checkBtn.disabled = true;
+		setStatus('Checking...');
+		try {
+			const result = await ipcRenderer.invoke('updater-check');
+			if(result && result.available){
+				pendingUpdate = { version: result.version, url: result.url };
+				downloadBtn.disabled = false;
+				setStatus(`Update available: ${result.version}`);
+			} else {
+				pendingUpdate = null;
+				downloadBtn.disabled = true;
+				setStatus('Already up to date');
+			}
+		} catch(e){
+			setStatus('Check failed: ' + (e.message || e));
+		} finally {
+			checkBtn.disabled = false;
+		}
+	});
+
+	// Download & Install button
+	downloadBtn.addEventListener('click', async ()=>{
+		if(!pendingUpdate) return;
+		downloadBtn.disabled = true;
+		checkBtn.disabled = true;
+		setStatus('Downloading...');
+		showProgress(0);
+		try {
+			const result = await ipcRenderer.invoke('updater-download');
+			if(result && result.success){
+				setStatus('Update ready, restarting...');
+				showProgress(100);
+			} else {
+				setStatus('Download failed: ' + (result?.error || 'unknown'));
+				hideProgress();
+			}
+		} catch(e){
+			setStatus('Download failed: ' + (e.message || e));
+			hideProgress();
+		} finally {
+			checkBtn.disabled = false;
+		}
+	});
+
+	// Listen for updater events
+	ipcRenderer.on('updater-available', (_e, info)=>{
+		pendingUpdate = { version: info.version, url: info.url };
+		downloadBtn.disabled = false;
+		setStatus(`Update available: ${info.version}`);
+	});
+	ipcRenderer.on('updater-not-available', ()=>{
+		pendingUpdate = null;
+		downloadBtn.disabled = true;
+		setStatus('Already up to date');
+	});
+	ipcRenderer.on('updater-downloading', (_e, progress)=>{
+		showProgress(progress.percent || 0);
+		setStatus(`Downloading... ${(progress.percent||0).toFixed(0)}%`);
+	});
+	ipcRenderer.on('updater-ready', ()=>{
+		setStatus('Update ready, restarting...');
+		showProgress(100);
+	});
+	ipcRenderer.on('updater-error', (_e, err)=>{
+		setStatus('Error: ' + (err.message || err));
+		hideProgress();
+		checkBtn.disabled = false;
+		downloadBtn.disabled = !pendingUpdate;
+	});
+})();

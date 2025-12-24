@@ -199,6 +199,10 @@ const { initTeamNamesIpc } = require('./modules/ipc/teamNames');
 const { initAutoRefreshIpc } = require('./modules/ipc/autoRefresh');
 const { initSwapIpc } = require('./modules/ipc/swap');
 const { initExcelExtractorIpc } = require('./modules/ipc/excelExtractor');
+// Updater module for auto-updates (stable releases + dev commits)
+const { createUpdateManager } = require('./modules/updater');
+const { initUpdaterIpc } = require('./modules/ipc/updater');
+let updateManager = null; // initialized in bootstrap()
 // External Excel odds JSON watcher (pseudo broker 'excel')
 const { createExcelWatcher } = require('./modules/excelWatcher');
 const { createExcelExtractorController } = require('./modules/excelExtractorController');
@@ -485,6 +489,15 @@ function bootstrap() {
       if(bwc && !bwc.isDestroyed()){ bwc.focus(); console.log('[startup] auto-focused board webContents'); }
     } catch(_){ }
   }, 800);
+  // --- Auto-Update Manager ---
+  try {
+    updateManager = createUpdateManager({ app, store, dialog, mainWindow });
+    initUpdaterIpc({ ipcMain, updateManager });
+    // Auto-check for updates on startup (with short delay to not block UI)
+    setTimeout(() => {
+      try { updateManager.init(); } catch(e){ console.warn('[updater] init failed', e.message); }
+    }, 3000);
+  } catch(e){ console.warn('[updater] createUpdateManager failed', e.message); }
   // Menu intentionally suppressed (user prefers F12 only)
   // Removed broker-id partition probing to avoid creating unused persistent profiles
 }

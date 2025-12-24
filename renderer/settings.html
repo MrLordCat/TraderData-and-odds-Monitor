@@ -134,6 +134,31 @@
 					</div>
 					<div class="hint">Opens DevTools (same as the previous Dev button in the top menu).</div>
 					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Updates</h2>
+					<div class="grid formGrid">
+						<label for="upd-channel">Update channel</label>
+						<select id="upd-channel">
+							<option value="stable">Stable (releases)</option>
+							<option value="dev">Dev (commits)</option>
+						</select>
+						<label for="upd-auto">Check on startup</label>
+						<input id="upd-auto" type="checkbox" />
+						<label>Current version</label>
+						<span id="upd-version" class="staticVal">—</span>
+						<label>Status</label>
+						<span id="upd-status" class="staticVal">—</span>
+					</div>
+					<div class="updateActions">
+						<button id="upd-check" type="button">Check for Updates</button>
+						<button id="upd-download" type="button" disabled>Download &amp; Install</button>
+					</div>
+					<div id="upd-progress" class="progress" hidden>
+						<div class="bar"></div>
+					</div>
+					<div class="hint">Stable channel updates when new release tags (v*) are published. Dev channel updates on every commit to main branch.</div>
+					</section>
 				</div>
 			</div>
 		</div>

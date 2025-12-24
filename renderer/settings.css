@@ -171,3 +171,35 @@ button:active { transform:translateY(1px); }
 	.segCol { max-width: none; }
 	.formGrid { grid-template-columns: 1fr; }
 }
+
+/* Updates section */
+.staticVal {
+	opacity: .75;
+	font-variant-numeric: tabular-nums;
+}
+.updateActions {
+	display: flex;
+	gap: 10px;
+	margin-top: 10px;
+}
+.updateActions button {
+	flex: 1;
+}
+.updateActions button:disabled {
+	opacity: .45;
+	cursor: not-allowed;
+}
+.progress {
+	margin-top: 10px;
+	height: 6px;
+	background: #182230;
+	border-radius: 3px;
+	overflow: hidden;
+}
+.progress .bar {
+	height: 100%;
+	width: 0%;
+	background: linear-gradient(90deg, #2f7cf6, #5ea4ff);
+	border-radius: 3px;
+	transition: width .15s;
+}

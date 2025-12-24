@@ -105,6 +105,19 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,setBrokerSwap: (broker, swapped) => { try { ipcRenderer.send('swapped-broker-set', { broker, swapped: !!swapped }); } catch(_){ } }
   ,toggleBrokerSwap: (broker) => { try { ipcRenderer.send('swapped-broker-toggle', { broker }); } catch(_){ } }
   ,onSwappedBrokersUpdated: (cb) => withUnsub('swapped-brokers-updated', cb)
+
+  // --- Updater API ---
+  ,updaterGetStatus: () => ipcRenderer.invoke('updater-get-status')
+  ,updaterCheck: () => ipcRenderer.invoke('updater-check')
+  ,updaterSetChannel: (ch) => ipcRenderer.invoke('updater-set-channel', ch)
+  ,updaterSetAutoCheck: (enabled) => ipcRenderer.invoke('updater-set-auto-check', enabled)
+  ,updaterDownload: () => ipcRenderer.invoke('updater-download')
+  ,updaterGetVersion: () => ipcRenderer.invoke('updater-get-version')
+  ,onUpdaterAvailable: (cb) => withUnsub('updater-available', cb)
+  ,onUpdaterNotAvailable: (cb) => withUnsub('updater-not-available', cb)
+  ,onUpdaterDownloading: (cb) => withUnsub('updater-downloading', cb)
+  ,onUpdaterReady: (cb) => withUnsub('updater-ready', cb)
+  ,onUpdaterError: (cb) => withUnsub('updater-error', cb)
 });
 
 // ---------- Console forwarding (selective) ----------
