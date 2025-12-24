@@ -7,7 +7,7 @@ const path = require('path');
 let electronApp = null;
 try { ({ app: electronApp } = require('electron')); } catch(_){ }
 
-function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
+function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, verbose=false }) {
   if(!win || win.isDestroyed()) return { dispose(){} };
 
   let lastSig = '';
@@ -131,10 +131,23 @@ function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
         if(team1 !== lastTeamNames.team1 || team2 !== lastTeamNames.team2){
           lastTeamNames.team1 = team1;
           lastTeamNames.team2 = team2;
+          // Broadcast to main window
           if(win && !win.isDestroyed()){
-            // Broadcast to main window which will trigger IPC update flow
-            win.webContents.send('excel-team-names', { team1, team2 });
+            try { win.webContents.send('excel-team-names', { team1, team2 }); } catch(_){ }
           }
+          // Broadcast to stats panel (separate BrowserView)
+          try {
+            if(statsManager && statsManager.views && statsManager.views.panel){
+              statsManager.views.panel.webContents.send('excel-team-names', { team1, team2 });
+            }
+          } catch(_){ }
+          // Broadcast to board
+          try {
+            if(boardManager && boardManager.getWebContents){
+              const bwc = boardManager.getWebContents();
+              if(bwc && !bwc.isDestroyed()) bwc.send('excel-team-names', { team1, team2 });
+            }
+          } catch(_){ }
           log('team names from Excel:', team1, '/', team2);
         }
       } catch(_){ }
