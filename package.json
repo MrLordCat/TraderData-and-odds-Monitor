@@ -55,7 +55,8 @@
     },
     "win": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "sign": false
+      "sign": false,
+      "signAndEditExecutable": false
     },
     "asar": false,
     "directories": {
@@ -67,7 +68,7 @@
   },
   "devDependencies": {
     "electron": "^38.0.0",
-    "electron-builder": "^24.6.0",
+    "electron-builder": "24.6.0",
     "electron-packager": "^17.1.2"
   }
 }
