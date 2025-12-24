@@ -1,28 +1,68 @@
-/* Odds Board Module Styles */
+/**
+ * Odds Board Module Styles - Material 3
+ */
 
+/* ============================================
+   HEADER
+   ============================================ */
 .odds-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--sidebar-border);
-  background: rgba(255,255,255,0.02);
+  flex-wrap: wrap;
+  gap: var(--md-sys-spacing-3);
+  padding: var(--md-sys-spacing-3) var(--md-sys-spacing-4);
+  background: var(--md-sys-color-surface-container-high);
+  border-bottom: var(--md-sys-comp-divider-thickness) solid var(--md-sys-color-outline-variant);
 }
 
 .map-selector {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--sidebar-text-muted);
+  gap: var(--md-sys-spacing-2);
+  font-size: var(--md-sys-typescale-label-medium-size);
+  font-weight: var(--md-sys-typescale-label-medium-weight);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
+#map-select {
+  min-width: 64px;
+  height: var(--md-sys-comp-button-height-small);
+}
+
+/* Tolerance Badge */
+#tol-badge {
+  margin-left: auto;
+  font-family: var(--md-sys-typescale-font-family-code);
+}
+
+/* ============================================
+   TABLE WRAPPER
+   ============================================ */
 .odds-table-wrap {
-  overflow: auto;
+  overflow-x: auto;
 }
 
+/* ============================================
+   ODDS TABLE - M3 Data Table
+   ============================================ */
 .odds-table {
   width: 100%;
+  border-collapse: collapse;
+  font-size: var(--md-sys-typescale-body-medium-size);
+}
+
+.odds-table th,
+.odds-table td {
+  padding: var(--md-sys-spacing-3) var(--md-sys-spacing-4);
+  border-bottom: var(--md-sys-comp-divider-thickness) solid var(--md-sys-color-outline-variant);
+}
+
+.odds-table thead th {
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-container);
+  text-align: left;
 }
 
 .odds-table .col-broker {
@@ -32,101 +72,212 @@
 .odds-table .col-odds {
   width: 32.5%;
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--md-sys-typescale-font-family-code);
   font-variant-numeric: tabular-nums;
 }
 
+/* Body rows */
+.odds-table tbody tr {
+  transition: background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+
+.odds-table tbody tr:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-opacity) * 100%), transparent);
+}
+
+/* Frozen state */
 .odds-table tbody tr.frozen {
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 .odds-table tbody tr.frozen td {
-  color: var(--sidebar-warning);
+  color: var(--md-sys-color-warning);
 }
 
-/* Excel row */
+/* Footer */
+.odds-table tfoot th,
+.odds-table tfoot td {
+  background: var(--md-sys-color-surface-container-low);
+  font-size: var(--md-sys-typescale-body-small-size);
+}
+
+.odds-table tfoot th {
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: left;
+}
+
+#mid-row td,
+#arb-row td {
+  font-family: var(--md-sys-typescale-font-family-code);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ============================================
+   EXCEL CONTROLS
+   ============================================ */
 .excel-controls {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--md-sys-spacing-2);
 }
 
-.auto-btn, .script-btn {
-  padding: 2px 8px;
-  font-size: 10px;
-  font-weight: 600;
-  background: var(--sidebar-surface);
-  border: 1px solid var(--sidebar-border);
-  border-radius: 4px;
-  color: var(--sidebar-text-muted);
+/* Auto & Script Buttons - Chip style */
+.auto-btn,
+.script-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 var(--md-sys-spacing-2);
+  font-family: var(--md-sys-typescale-font-family-plain);
+  font-size: var(--md-sys-typescale-label-small-size);
+  font-weight: var(--md-sys-typescale-label-small-weight);
+  background: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-extra-small);
+  color: var(--md-sys-color-on-surface-variant);
   cursor: pointer;
-  transition: all 0.15s;
+  overflow: hidden;
+  transition: 
+    background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
 
-.auto-btn:hover, .script-btn:hover {
-  border-color: var(--sidebar-accent);
-  color: var(--sidebar-text);
+.auto-btn::before,
+.script-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
 
+.auto-btn:hover::before,
+.script-btn:hover::before {
+  opacity: var(--md-sys-state-hover-opacity);
+}
+
+.auto-btn:active::before,
+.script-btn:active::before {
+  opacity: var(--md-sys-state-pressed-opacity);
+}
+
+/* Active state */
 .auto-btn.active {
-  background: var(--sidebar-accent);
-  border-color: var(--sidebar-accent);
-  color: #000;
+  background: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+.auto-btn.active::before {
+  background: var(--md-sys-color-on-primary);
 }
 
 .script-btn.running {
-  background: var(--sidebar-success);
-  border-color: var(--sidebar-success);
-  color: #000;
+  background: var(--md-sys-color-success);
+  border-color: var(--md-sys-color-success);
+  color: var(--md-sys-color-on-success);
 }
 
-/* Auto indicators */
+.script-btn.running::before {
+  background: var(--md-sys-color-on-success);
+}
+
+/* Script map badge */
+#script-map-badge {
+  font-family: var(--md-sys-typescale-font-family-code);
+}
+
+/* Excel odds display */
+#excel-odds {
+  font-family: var(--md-sys-typescale-font-family-code);
+  font-variant-numeric: tabular-nums;
+}
+
+#excel-status {
+  margin-left: var(--md-sys-spacing-2);
+}
+
+/* ============================================
+   AUTO INDICATORS
+   ============================================ */
+#auto-row {
+  border-top: var(--md-sys-comp-divider-thickness) solid var(--md-sys-color-outline-variant);
+}
+
 .auto-indicators {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--md-sys-spacing-3);
+  padding: var(--md-sys-spacing-1) 0;
 }
 
 .auto-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sidebar-border);
+  width: 10px;
+  height: 10px;
+  border-radius: var(--md-sys-shape-full);
+  background: var(--md-sys-color-outline-variant);
+  transition: 
+    background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    box-shadow var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
 
 .auto-dot.active {
-  background: var(--sidebar-accent);
-  animation: pulse 0.8s ease-in-out infinite;
+  background: var(--md-sys-color-primary);
+  box-shadow: 0 0 8px var(--md-sys-color-primary);
+  animation: auto-pulse 1s var(--md-sys-motion-easing-emphasized) infinite;
 }
 
 .auto-dot.side1.active {
-  background: var(--sidebar-success);
+  background: var(--md-sys-color-success);
+  box-shadow: 0 0 8px var(--md-sys-color-success);
 }
 
 .auto-dot.side2.active {
-  background: var(--sidebar-warning);
+  background: var(--md-sys-color-warning);
+  box-shadow: 0 0 8px var(--md-sys-color-warning);
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+@keyframes auto-pulse {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
 }
 
 .auto-status {
-  font-size: 10px;
-  color: var(--sidebar-text-muted);
+  font-size: var(--md-sys-typescale-label-small-size);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Tfoot styling */
-.odds-table tfoot th {
-  font-weight: 500;
-  color: var(--sidebar-text-muted);
+/* ============================================
+   ARB ROW - Highlight
+   ============================================ */
+#arb-value.positive {
+  color: var(--md-sys-color-success);
+  font-weight: var(--md-sys-typescale-label-large-weight);
 }
 
-.odds-table tfoot td {
-  font-family: var(--font-mono);
+#arb-value.negative {
+  color: var(--md-sys-color-error);
 }
 
-#mid-row td, #arb-row td {
-  text-align: center;
+/* ============================================
+   MODULE CONTENT OVERRIDE
+   ============================================ */
+.sidebar-module:has(.odds-header) .module-content {
+  padding: 0;
+}
+
+.sidebar-module:has(.odds-header) > .module-header {
+  display: none;
 }

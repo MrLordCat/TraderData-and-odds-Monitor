@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <title>Sidebar</title>
   
+  <!-- Material 3 Design Tokens -->
+  <link rel="stylesheet" href="../m3-tokens.css" />
+  
   <!-- Base styles -->
-  <link rel="stylesheet" href="../common.css" />
   <link rel="stylesheet" href="core/sidebar-base.css" />
   
   <!-- Module styles -->
@@ -19,15 +21,16 @@
       padding: 0;
       height: 100%;
       overflow: hidden;
-      background: var(--sidebar-bg, #0d1117);
+      background: var(--md-sys-color-surface);
     }
     
     #sidebar-root {
       display: flex;
       flex-direction: column;
       height: 100%;
-      padding: 8px;
+      padding: var(--md-sys-spacing-2);
       box-sizing: border-box;
+      gap: var(--md-sys-spacing-2);
     }
   </style>
 </head>

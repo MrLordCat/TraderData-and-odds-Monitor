@@ -1,0 +1,357 @@
+/* ==========================================
+   M3 Reusable Components
+   Shared across settings, stats, board panels
+   ========================================== */
+
+/* ===== M3 Card ===== */
+.m3-card {
+	background: linear-gradient(
+		180deg,
+		var(--md-sys-color-surface-container) 0%,
+		var(--md-sys-color-surface-container-low) 100%
+	);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	box-shadow: var(--md-sys-elevation-1);
+	transition: box-shadow var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+	            border-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+
+.m3-card:hover {
+	box-shadow: var(--md-sys-elevation-2);
+	border-color: var(--md-sys-color-outline);
+}
+
+.m3-card--elevated {
+	background: linear-gradient(
+		180deg,
+		var(--md-sys-color-surface-container-high) 0%,
+		var(--md-sys-color-surface-container) 100%
+	);
+	box-shadow: var(--md-sys-elevation-2);
+}
+
+/* ===== M3 Input (text, number, select) ===== */
+.m3-input,
+input[type="text"],
+input[type="number"],
+select {
+	height: 32px;
+	padding: 0 var(--md-sys-spacing-sm);
+	background: linear-gradient(
+		180deg,
+		var(--md-sys-color-surface-container-highest) 0%,
+		var(--md-sys-color-surface-container-high) 100%
+	);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-small);
+	color: var(--md-sys-color-on-surface);
+	font: var(--md-sys-typescale-body-small-size)/1 var(--md-sys-typescale-font-family);
+	transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+	box-shadow: 0 1px 2px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.m3-input:focus,
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus {
+	outline: 2px solid var(--md-sys-color-primary);
+	outline-offset: -1px;
+	border-color: transparent;
+}
+
+/* ===== M3 Checkbox ===== */
+.m3-checkbox,
+input[type="checkbox"] {
+	appearance: none;
+	width: 18px;
+	height: 18px;
+	border: 2px solid var(--md-sys-color-on-surface-variant);
+	border-radius: var(--md-sys-shape-corner-extra-small);
+	background: transparent;
+	cursor: pointer;
+	position: relative;
+	transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+
+.m3-checkbox:checked,
+input[type="checkbox"]:checked {
+	background: var(--md-sys-color-primary);
+	border-color: var(--md-sys-color-primary);
+}
+
+.m3-checkbox:checked::after,
+input[type="checkbox"]:checked::after {
+	content: '';
+	position: absolute;
+	left: 5px;
+	top: 1px;
+	width: 4px;
+	height: 9px;
+	border: solid var(--md-sys-color-on-primary);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+
+.m3-checkbox:hover,
+input[type="checkbox"]:hover {
+	border-color: var(--md-sys-color-on-surface);
+}
+
+/* ===== M3 Range Slider ===== */
+.m3-range {
+	flex: 1;
+	min-width: 0;
+	height: 4px;
+	appearance: none;
+	background: var(--md-sys-color-surface-container-highest);
+	border-radius: var(--md-sys-shape-corner-full);
+	outline: none;
+}
+
+.m3-range::-webkit-slider-thumb,
+input[type="range"]::-webkit-slider-thumb {
+	appearance: none;
+	width: 16px;
+	height: 16px;
+	background: var(--md-sys-color-primary);
+	border-radius: var(--md-sys-shape-corner-full);
+	cursor: pointer;
+	box-shadow: var(--md-sys-elevation-1);
+	transition: transform var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
+}
+
+.m3-range::-webkit-slider-thumb:hover,
+input[type="range"]::-webkit-slider-thumb:hover {
+	transform: scale(1.15);
+}
+
+.m3-range::-webkit-slider-thumb:active,
+input[type="range"]::-webkit-slider-thumb:active {
+	transform: scale(1.25);
+}
+
+/* ===== M3 Button ===== */
+.m3-btn {
+	height: 36px;
+	padding: 0 var(--md-sys-spacing-lg);
+	background: linear-gradient(
+		180deg,
+		var(--md-sys-color-surface-container-highest) 0%,
+		var(--md-sys-color-surface-container-high) 100%
+	);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	color: var(--md-sys-color-on-surface);
+	border-radius: var(--md-sys-shape-corner-full);
+	font: var(--md-sys-typescale-label-large-weight) var(--md-sys-typescale-label-large-size)/1 var(--md-sys-typescale-font-family);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	cursor: pointer;
+	transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+	box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+	position: relative;
+	overflow: hidden;
+}
+
+.m3-btn::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: var(--md-sys-color-on-surface);
+	opacity: 0;
+	transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
+}
+
+.m3-btn:hover::before { opacity: 0.06; }
+.m3-btn:active::before { opacity: 0.10; }
+.m3-btn:hover { border-color: var(--md-sys-color-outline); }
+.m3-btn:active { transform: scale(0.98); }
+
+/* Filled variant */
+.m3-btn--filled {
+	background: var(--md-sys-color-primary);
+	border-color: var(--md-sys-color-primary);
+	color: var(--md-sys-color-on-primary);
+	box-shadow: var(--md-sys-elevation-1);
+}
+
+.m3-btn--filled::before {
+	background: var(--md-sys-color-on-primary);
+}
+
+.m3-btn--filled:hover {
+	box-shadow: var(--md-sys-elevation-2);
+	border-color: var(--md-sys-color-primary);
+}
+
+/* Small variant */
+.m3-btn--sm {
+	height: 32px;
+	padding: 0 var(--md-sys-spacing-md);
+	font-size: var(--md-sys-typescale-label-medium-size);
+}
+
+/* ===== M3 Icon Button ===== */
+.m3-icon-btn {
+	width: 36px;
+	height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--md-sys-color-surface-container-highest);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	color: var(--md-sys-color-on-surface-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	cursor: pointer;
+	font-size: 14px;
+	transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+	box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.m3-icon-btn:hover {
+	border-color: var(--md-sys-color-outline);
+	color: var(--md-sys-color-on-surface);
+}
+
+.m3-icon-btn:active { transform: scale(0.95); }
+
+/* Standard (no background) variant */
+.m3-icon-btn--standard {
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	border-radius: var(--md-sys-shape-corner-full);
+	position: relative;
+}
+
+.m3-icon-btn--standard::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: var(--md-sys-color-on-surface);
+	opacity: 0;
+	transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
+}
+
+.m3-icon-btn--standard:hover::before { opacity: 0.08; }
+.m3-icon-btn--standard:active::before { opacity: 0.12; }
+
+/* ===== M3 Badge ===== */
+.m3-badge {
+	display: inline-block;
+	padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-sm);
+	background: var(--md-sys-color-secondary-container);
+	color: var(--md-sys-color-on-secondary-container);
+	font-size: var(--md-sys-typescale-label-small-size);
+	border-radius: var(--md-sys-shape-corner-full);
+	line-height: 1;
+	text-transform: uppercase;
+	letter-spacing: var(--md-sys-typescale-label-small-tracking);
+}
+
+/* ===== M3 Divider ===== */
+.m3-divider {
+	height: 1px;
+	background: var(--md-sys-color-outline-variant);
+	margin: var(--md-sys-spacing-sm) 0;
+}
+
+/* ===== M3 Scrollbar ===== */
+.m3-scrollbar::-webkit-scrollbar { width: 8px; }
+.m3-scrollbar::-webkit-scrollbar-track {
+	background: var(--md-sys-color-surface-container-low);
+	border-radius: var(--md-sys-shape-corner-full);
+}
+.m3-scrollbar::-webkit-scrollbar-thumb {
+	background: var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-full);
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+.m3-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: var(--md-sys-color-outline);
+	background-clip: padding-box;
+}
+
+/* ===== M3 Progress Bar ===== */
+.m3-progress {
+	height: 4px;
+	background: var(--md-sys-color-surface-container-highest);
+	border-radius: var(--md-sys-shape-corner-full);
+	overflow: hidden;
+}
+
+.m3-progress__bar {
+	height: 100%;
+	width: 0%;
+	background: linear-gradient(90deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary));
+	border-radius: var(--md-sys-shape-corner-full);
+	transition: width var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+
+/* ===== M3 Section Title ===== */
+.m3-section-title {
+	margin: 0 0 var(--md-sys-spacing-sm);
+	font: var(--md-sys-typescale-title-small-weight) var(--md-sys-typescale-title-small-size)/var(--md-sys-typescale-title-small-line-height) var(--md-sys-typescale-font-family);
+	color: var(--md-sys-color-primary);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
+}
+
+/* ===== M3 Hint Text ===== */
+.m3-hint {
+	font-size: var(--md-sys-typescale-label-small-size);
+	color: var(--md-sys-color-on-surface-variant);
+	opacity: 0.7;
+	line-height: 1.4;
+}
+
+/* ===== M3 Keyboard Shortcut Badge ===== */
+.m3-kbd {
+	display: inline-block;
+	min-width: 44px;
+	padding: 2px var(--md-sys-spacing-sm);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	background: var(--md-sys-color-surface-container-highest);
+	border-radius: var(--md-sys-shape-corner-small);
+	font-size: var(--md-sys-typescale-label-medium-size);
+	font-variant-numeric: tabular-nums;
+	color: var(--md-sys-color-on-surface);
+	text-align: center;
+}
+
+/* ===== Range Wrap helper ===== */
+.m3-range-wrap {
+	display: flex;
+	align-items: center;
+	gap: var(--md-sys-spacing-sm);
+	min-width: 0;
+}
+
+.m3-range-wrap input[type="range"] {
+	flex: 1;
+	min-width: 0;
+	height: 4px;
+	appearance: none;
+	background: var(--md-sys-color-surface-container-highest);
+	border-radius: var(--md-sys-shape-corner-full);
+	outline: none;
+}
+
+.m3-range-val {
+	min-width: 48px;
+	text-align: right;
+	font-size: var(--md-sys-typescale-label-medium-size);
+	color: var(--md-sys-color-on-surface-variant);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ===== Color Picker ===== */
+input[type="color"] {
+	width: 40px;
+	height: 28px;
+	padding: 2px;
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-small);
+	background: var(--md-sys-color-surface-container-highest);
+	cursor: pointer;
+}

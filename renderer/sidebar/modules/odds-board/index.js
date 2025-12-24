@@ -20,7 +20,7 @@ class OddsBoardModule extends SidebarModule {
       <div class="odds-header">
         <label class="map-selector">
           Map
-          <select id="map-select" class="sb-select">
+          <select id="map-select" class="md-select">
             <option value="0">Match</option>
             <option value="1" selected>1</option>
             <option value="2">2</option>
@@ -29,18 +29,19 @@ class OddsBoardModule extends SidebarModule {
             <option value="5">5</option>
           </select>
         </label>
-        <button id="map-refresh" class="sb-icon-btn" title="Refresh odds">
-          <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 6h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L14 10h6V4l-2.35 2.35z"/></svg>
+        <button id="map-refresh" class="md-icon-btn md-icon-btn--small" data-tooltip="Refresh odds">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
         </button>
-        <label class="sb-checkbox" title="Use match market for final map">
-          <input type="checkbox" id="is-last-chk" />
-          Last
+        <label class="md-checkbox" title="Use match market for final map">
+          <input type="checkbox" id="is-last-chk" class="md-checkbox__input" />
+          <span class="md-checkbox__box"></span>
+          <span class="md-checkbox__label">Last</span>
         </label>
-        <span id="tol-badge" class="sb-badge" title="Auto tolerance">Tol: —</span>
+        <span id="tol-badge" class="md-badge md-badge--large md-badge--secondary" data-tooltip="Auto tolerance">Tol: —</span>
       </div>
       
       <div class="odds-table-wrap">
-        <table class="sb-table odds-table">
+        <table class="odds-table">
           <thead>
             <tr>
               <th class="col-broker">Broker</th>
@@ -52,7 +53,7 @@ class OddsBoardModule extends SidebarModule {
           <tfoot>
             <tr id="mid-row">
               <th>Mid</th>
-              <td colspan="2" id="mid-value">-</td>
+              <td colspan="2" id="mid-value">—</td>
             </tr>
             <tr id="excel-row">
               <th>
@@ -60,27 +61,27 @@ class OddsBoardModule extends SidebarModule {
                   Excel
                   <button id="auto-btn" class="auto-btn">Auto</button>
                   <button id="script-btn" class="script-btn">S</button>
-                  <span id="script-map-badge" class="sb-badge sb-text-xs">-</span>
+                  <span id="script-map-badge" class="md-badge md-badge--dot md-badge--secondary">—</span>
                 </div>
               </th>
               <td colspan="2">
-                <span id="excel-odds">-</span>
-                <span id="excel-status" class="sb-text-muted sb-text-xs sb-hidden">idle</span>
+                <span id="excel-odds">—</span>
+                <span id="excel-status" class="md-text-muted md-text-xs md-hidden">idle</span>
               </td>
             </tr>
-            <tr id="auto-row" class="sb-hidden">
+            <tr id="auto-row" class="md-hidden">
               <th></th>
               <td colspan="2">
                 <div class="auto-indicators">
-                  <span class="auto-dot side1" title="Adjusting side 1"></span>
-                  <span class="auto-dot side2" title="Adjusting side 2"></span>
+                  <span class="auto-dot side1" data-tooltip="Adjusting side 1"></span>
+                  <span class="auto-dot side2" data-tooltip="Adjusting side 2"></span>
                   <span id="auto-status" class="auto-status"></span>
                 </div>
               </td>
             </tr>
             <tr id="arb-row">
               <th>Arb</th>
-              <td colspan="2" id="arb-value">-</td>
+              <td colspan="2" id="arb-value">—</td>
             </tr>
           </tfoot>
         </table>
@@ -236,7 +237,7 @@ class OddsBoardModule extends SidebarModule {
       const arbEl = this.$('#arb-value');
       if (arbEl) {
         arbEl.textContent = `${arb.toFixed(2)}%`;
-        arbEl.className = arb < 0 ? 'sb-text-success' : 'sb-text-danger';
+        arbEl.className = arb < 0 ? 'md-text-success positive' : 'md-text-error negative';
       }
     }
     

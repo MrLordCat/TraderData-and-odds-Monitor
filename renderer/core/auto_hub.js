@@ -380,30 +380,39 @@
       try {
         // Use shared engine directly instead of iterating views
         const applyConfigAll = (cfg)=>{ if(!cfg || !sharedEngine) return; try { sharedEngine.setConfig(cfg); } catch(_){ } };
-        const handleToggle = ()=>{
-          let after = null;
-          // If toggling ON while python script is OFF — block and keep OFF.
-          if(!canEnableAuto()){
+        
+        // Handle state set from main process (main process owns toggle logic)
+        const handleStateSet = (p)=>{
+          const want = !!(p && p.active);
+          console.log('[autoHub] handleStateSet, want:', want, 'canEnable:', canEnableAuto());
+          
+          if(want && !canEnableAuto()){
             try {
               const info = getAutoEnableInfo();
               if(info && info.reasonCode) markAllDisableReason(info.reasonCode);
               statusAll(info && info.reasonCode ? ('Auto blocked: '+info.reasonCode) : 'Start Excel script');
             } catch(_){ statusAll('Start Excel script'); }
-            disableAllAutoDueToExcelStop();
-            after = false;
-          } else if(sharedEngine) {
-            const next = !sharedEngine.state.active;
-            sharedEngine.setActive(next);
-            after = next;
-            notifyAllUIs('onActiveChanged', next, sharedEngine.state);
+            // Tell main to turn off
+            try {
+              if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on: false }); }
+              else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on: false }); } }
+            } catch(_){ }
+            return;
           }
-          // Inform other windows about resulting state so late loads sync (and main updates __autoLast)
-          try {
-            if(after!==null){
-              if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on: after }); }
-              else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on: after }); } }
+          
+          if(sharedEngine){
+            if(!want){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
+            if(want !== sharedEngine.state.active){ 
+              sharedEngine.setActive(want); 
+              notifyAllUIs('onActiveChanged', want, sharedEngine.state);
             }
-          } catch(_){ }
+          }
+        };
+        
+        // Legacy toggle handler - now just syncs to what main decided
+        const handleToggle = ()=>{
+          // Main process handles toggle now, this is for legacy compatibility
+          console.log('[autoHub] handleToggle (legacy) - ignored, main handles state');
         };
         const handleSet = (p)=>{
           const want=!!(p&&p.on);
@@ -459,7 +468,12 @@
             }
           } catch(_){ }
         };
+        console.log('[autoHub] addBroadcastListeners: global.desktopAPI=', !!global.desktopAPI, 'global.require=', !!global.require);
         if(global.desktopAPI){
+          console.log('[autoHub] subscribing via desktopAPI');
+          // Main process state set (new primary method)
+          if(global.desktopAPI.onAutoStateSet) global.desktopAPI.onAutoStateSet(handleStateSet);
+          // Legacy handlers for backward compatibility
           if(global.desktopAPI.onAutoToggleAll) global.desktopAPI.onAutoToggleAll(handleToggle);
           if(global.desktopAPI.onAutoSetAll) global.desktopAPI.onAutoSetAll(handleSet);
           if(global.desktopAPI.onAutoDisableAll) global.desktopAPI.onAutoDisableAll(handleDisable);
@@ -475,6 +489,9 @@
         } else if(global.require){
           const { ipcRenderer } = global.require('electron');
           if(ipcRenderer){
+            // Main process state set (primary)
+            ipcRenderer.on('auto-state-set', (_e,p)=> handleStateSet(p));
+            // Legacy handlers
             ipcRenderer.on('auto-toggle-all', handleToggle);
             ipcRenderer.on('auto-set-all', (_e,p)=> handleSet(p));
             ipcRenderer.on('auto-disable-all', handleDisable);

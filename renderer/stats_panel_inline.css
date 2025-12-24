@@ -1,76 +1,128 @@
-/* Extracted placeholder (was inline: "contrast removed"). */
-/* Add any panel-specific contrast overrides here if needed. */
+/* Panel-specific overrides using M3 tokens */
 
-/* ================= Compact Top Toolbar (Stats side panel) ================= */
+/* ================= Compact Top Toolbar (Stats side panel) - M3 Top App Bar with depth ================= */
 .spTopbar{
 	display:flex;
 	align-items:center;
 	justify-content:flex-end;
-	gap: 8px;
-	padding: 6px 10px;
-	background: linear-gradient(90deg, #1b2434, #141b29);
-	border-bottom: 1px solid #1f2a3c;
+	gap: var(--md-sys-spacing-sm);
+	padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-sm);
+	background: linear-gradient(
+		180deg,
+		var(--md-sys-color-surface-container-high) 0%,
+		var(--md-sys-color-surface-container) 100%
+	);
+	border-bottom: 1px solid var(--md-sys-color-outline-variant);
+	box-shadow: var(--md-sys-elevation-2);
 }
-.spTopbar .spTbGroup{ display:flex; align-items:center; gap:8px; }
+.spTopbar .spTbGroup{ display:flex; align-items:center; gap: var(--md-sys-spacing-md); }
 
+/* M3 Icon Button - Standard with subtle background */
 .spIconBtn{
-	width: 34px;
-	height: 34px;
+	width: 32px;
+	height: 32px;
 	padding: 0;
 	display:inline-flex;
 	align-items:center;
 	justify-content:center;
-	background: var(--panel-alt, #1f2535);
-	color: var(--text, #e4e7ef);
-	border: 1px solid #2c3649;
-	border-radius: 8px;
+	background: var(--md-sys-color-surface-container-highest);
+	color: var(--md-sys-color-on-surface-variant);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
 	cursor:pointer;
-	transition: background 120ms, border-color 120ms, transform 120ms;
+	position: relative;
+	transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
-.spIconBtn:hover{ background:#2a3344; border-color:#3a4960; }
-.spIconBtn:active{ transform: translateY(1px); }
-.spIconBtn svg{ width: 18px; height: 18px; fill: currentColor; opacity: .92; }
+/* State layer */
+.spIconBtn::before{
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: var(--md-sys-color-on-surface-variant);
+	opacity: 0;
+	transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
+}
+.spIconBtn:hover::before{ opacity: 0.06; }
+.spIconBtn:active::before{ opacity: 0.10; }
+.spIconBtn:hover{ 
+	color: var(--md-sys-color-on-surface);
+	border-color: var(--md-sys-color-outline);
+}
+.spIconBtn svg{ width: 18px; height: 18px; fill: currentColor; position: relative; z-index: 1; }
 
+/* M3 Filled Select with depth */
 .spTbSelect{
-	height: 34px;
-	padding: 0 10px;
-	border-radius: 8px;
-	border: 1px solid #2c3649;
-	background: var(--panel, #161b28);
-	color: var(--text, #e4e7ef);
+	height: 32px;
+	padding: 0 var(--md-sys-spacing-sm);
+	border-radius: var(--md-sys-shape-corner-small);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	background: linear-gradient(
+		180deg,
+		var(--md-sys-color-surface-container-highest) 0%,
+		var(--md-sys-color-surface-container-high) 100%
+	);
+	color: var(--md-sys-color-on-surface);
+	font: var(--md-sys-typescale-body-medium-size)/var(--md-sys-typescale-body-medium-line-height) var(--md-sys-typescale-font-family);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+/* M3 Checkbox - Custom styled */
 .spTbCheck{
-	width: 34px;
-	height: 34px;
+	width: 40px;
+	height: 40px;
 	display:inline-flex;
 	align-items:center;
 	justify-content:center;
-	border: 1px solid #2c3649;
-	border-radius: 8px;
-	background: var(--panel, #161b28);
+	border: none;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: transparent;
 	cursor:pointer;
 	position: relative;
 }
+.spTbCheck::before{
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: var(--md-sys-color-on-surface);
+	opacity: 0;
+	transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
+}
+.spTbCheck:hover::before{ opacity: 0.08; }
 .spTbCheck input{
 	position:absolute;
 	inset:0;
 	opacity:0;
 	margin:0;
 	cursor:pointer;
+	z-index: 2;
 }
 .spTbCheckMark{
-	width: 14px;
-	height: 14px;
-	border-radius: 4px;
-	border: 1px solid #3a4960;
-	background: #121922;
-	box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
+	width: 18px;
+	height: 18px;
+	border-radius: var(--md-sys-shape-corner-extra-small);
+	border: 2px solid var(--md-sys-color-on-surface-variant);
+	background: transparent;
+	position: relative;
+	z-index: 1;
+	transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 }
 .spTbCheck input:checked + .spTbCheckMark{
-	background: var(--accent, #2f7cf6);
-	border-color: var(--accent, #2f7cf6);
-	box-shadow: 0 0 0 1px rgba(47,124,246,.35), 0 0 10px rgba(47,124,246,.35);
+	background: var(--md-sys-color-primary);
+	border-color: var(--md-sys-color-primary);
+}
+.spTbCheck input:checked + .spTbCheckMark::after{
+	content: '';
+	position: absolute;
+	left: 5px;
+	top: 1px;
+	width: 5px;
+	height: 10px;
+	border: solid var(--md-sys-color-on-primary);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
 }
 
 #spPanelSide[data-side="left"] .spArrow{ transform: rotate(180deg); }

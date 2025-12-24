@@ -10,26 +10,38 @@
 function broadcastToAll(ctx, channel, payload){
   const { mainWindow, boardManager, statsManager, boardWindow } = ctx;
   
-  // Board (docked or window)
+  // For auto-toggle-all, only send to board (which owns Auto logic)
+  const isAutoToggle = channel === 'auto-toggle-all';
+  
+  if(isAutoToggle){
+    console.log('[broadcast] auto-toggle-all -> board only');
+  }
+  
+  // Board (docked or window) - always receives
   try {
     const bwc = boardManager?.getWebContents?.() || 
                 (boardWindow && !boardWindow.isDestroyed() ? boardWindow.webContents : null);
     if(bwc && !bwc.isDestroyed()) bwc.send(channel, payload);
-  } catch(_){ }
+  } catch(e){ console.error('[broadcast] board error:', e); }
+  
+  // For auto-toggle-all, skip other views - board will broadcast auto-active-set
+  if(isAutoToggle) return;
   
   // Main window
   try {
     if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
   } catch(_){ }
   
-  // Stats views (panel, A, B)
+  // Stats views (panel, A, B) - skip for auto-toggle
   try {
     if(statsManager?.views){
       const vs = statsManager.views;
       ['panel','A','B'].forEach(k => {
         try {
           const v = vs[k];
-          if(v?.webContents && !v.webContents.isDestroyed()) v.webContents.send(channel, payload);
+          if(v?.webContents && !v.webContents.isDestroyed()){
+            v.webContents.send(channel, payload);
+          }
         } catch(_){ }
       });
     }

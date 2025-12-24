@@ -147,14 +147,32 @@ let hotkeys; // unified hotkey manager (TAB/F1/F2/F3)
 const hotkeysRef = { value: null };
 // Helper to get broadcast context (avoids inline repetition)
 const getBroadcastCtx = () => ({ mainWindow, boardManager, statsManager });
-// Unified broadcast for auto-toggle-all across board/main/stats views
-function broadcastAutoToggleAll(){
-  broadcastToAll(getBroadcastCtx(), 'auto-toggle-all');
-}
 
+// === Auto State Management (centralized in main process) ===
 // Cross-window auto state snapshot (used by hotkeys and late-loaded views)
 // Requirement: Auto Resume (R) must start OFF on every app launch.
 let __autoLast = { active:false, resume:false };
+
+// Toggle auto state and broadcast to all views
+function toggleAutoState(){
+  __autoLast.active = !__autoLast.active;
+  console.log('[main] toggleAutoState -> active:', __autoLast.active);
+  // Broadcast new state to all views
+  broadcastToAll(getBroadcastCtx(), 'auto-state-set', { active: __autoLast.active });
+}
+
+// Set auto state explicitly
+function setAutoState(active){
+  __autoLast.active = !!active;
+  console.log('[main] setAutoState ->', __autoLast.active);
+  broadcastToAll(getBroadcastCtx(), 'auto-state-set', { active: __autoLast.active });
+}
+
+// Unified broadcast for auto-toggle-all (triggers toggle in main, then broadcasts state)
+function broadcastAutoToggleAll(){
+  console.log('[main] broadcastAutoToggleAll called');
+  toggleAutoState();
+}
 // BrowserView registry & state caches (restored after accidental removal in refactor)
 const views = {}; // id -> BrowserView
 let activeBrokerIds = []; // ordered list of currently opened broker ids
@@ -447,7 +465,7 @@ function bootstrap() {
       };
       // Annotate forward with a hint for template sync side-channel
       try { Object.defineProperty(forward, '__acceptsTemplateSync', { value: false, enumerable:false }); } catch(_){ }
-      global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward, statsManager, boardManager, verbose: true });
+      global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward, statsManager, boardManager, verbose: false });
     }
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
   // Initialize map selection IPC (needs boardManager, statsManager, mainWindow references)

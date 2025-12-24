@@ -19,47 +19,48 @@ class ToolbarModule extends SidebarModule {
     return `
       <div class="toolbar">
         <div class="tb-group" data-group="brokers">
-          <button id="tb-add-broker" class="sb-icon-btn" title="Add broker" aria-label="Add broker">
-            <svg viewBox="0 0 24 24"><path d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>
+          <button id="tb-add-broker" class="md-icon-btn" data-tooltip="Add broker" aria-label="Add broker">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           </button>
-          <select id="tb-layout-preset" class="sb-select" title="Layout preset">
+          <select id="tb-layout-preset" class="md-select" title="Layout preset">
             <option value="">Layout</option>
             <optgroup label="Horizontal">
-              <option value="2x2">2x2</option>
-              <option value="2x3">2x3</option>
-              <option value="3x3">3x3</option>
-              <option value="1x2">1x2</option>
-              <option value="1x2x2">1x2x2</option>
+              <option value="2x2">2×2</option>
+              <option value="2x3">2×3</option>
+              <option value="3x3">3×3</option>
+              <option value="1x2">1×2</option>
+              <option value="1x2x2">1×2×2</option>
               <option value="2">2</option>
             </optgroup>
             <optgroup label="Vertical">
-              <option value="1x1">1x1</option>
-              <option value="1x1x1">1x1x1</option>
-              <option value="1x1x2">1x1x2</option>
-              <option value="2x2x2">2x2x2</option>
+              <option value="1x1">1×1</option>
+              <option value="1x1x1">1×1×1</option>
+              <option value="1x1x2">1×1×2</option>
+              <option value="2x2x2">2×2×2</option>
             </optgroup>
           </select>
         </div>
         
         <div class="tb-group" data-group="refresh">
-          <button id="tb-refresh-all" class="sb-icon-btn" title="Refresh all brokers">
-            <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 6h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L14 10h6V4l-2.35 2.35z"/></svg>
+          <button id="tb-refresh-all" class="md-icon-btn" data-tooltip="Refresh all">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
           </button>
-          <label class="sb-checkbox" title="Auto refresh">
-            <input type="checkbox" id="tb-auto-reload" />
+          <label class="md-checkbox tb-check-wrapper" title="Auto refresh">
+            <input type="checkbox" id="tb-auto-reload" class="md-checkbox__input" />
+            <span class="md-checkbox__box"></span>
             <span class="tb-check-label">Auto</span>
           </label>
         </div>
         
         <div class="tb-group" data-group="ui">
-          <button id="tb-board-side" class="sb-icon-btn" title="Move board left/right" data-side="right">
-            <svg class="arrow" viewBox="0 0 24 24"><path d="M10 6l6 6-6 6-1.4-1.4L13.2 12 8.6 7.4 10 6z"/></svg>
+          <button id="tb-board-side" class="md-icon-btn" data-tooltip="Move panel" data-side="right">
+            <svg class="arrow" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
           </button>
-          <button id="tb-stats" class="sb-icon-btn" title="Stats">
-            <svg viewBox="0 0 24 24"><path d="M5 9h3v10H5V9zm5-4h3v14h-3V5zm5 7h3v7h-3v-7z"/></svg>
+          <button id="tb-stats" class="md-icon-btn" data-tooltip="Statistics">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
           </button>
-          <button id="tb-settings" class="sb-icon-btn" title="Settings">
-            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.1 7.1 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 12.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L1.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.39.32.6.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.21.1.47.01.6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58z"/></svg>
+          <button id="tb-settings" class="md-icon-btn" data-tooltip="Settings">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
           </button>
         </div>
       </div>
@@ -169,7 +170,7 @@ class ToolbarModule extends SidebarModule {
     
     if (!this.pickerEl) {
       this.pickerEl = document.createElement('div');
-      this.pickerEl.className = 'broker-picker sb-hidden';
+      this.pickerEl.className = 'broker-picker md-hidden';
       this.pickerEl.innerHTML = `
         <div class="picker-title">Add broker</div>
         <div class="picker-list"></div>
@@ -178,13 +179,13 @@ class ToolbarModule extends SidebarModule {
     }
     
     const list = this.pickerEl.querySelector('.picker-list');
-    list.innerHTML = '<div class="sb-text-muted">Loading...</div>';
+    list.innerHTML = '<div class="picker-empty">Loading...</div>';
     
     // Position
     const rect = anchor.getBoundingClientRect();
     this.pickerEl.style.left = `${rect.left}px`;
-    this.pickerEl.style.top = `${rect.bottom + 4}px`;
-    this.pickerEl.classList.remove('sb-hidden');
+    this.pickerEl.style.top = `${rect.bottom + 8}px`;
+    this.pickerEl.classList.remove('md-hidden');
     this.pickerOpen = true;
     
     // Load brokers
@@ -193,7 +194,7 @@ class ToolbarModule extends SidebarModule {
       const inactive = data.brokers.filter(b => !data.active.includes(b.id));
       
       if (!inactive.length) {
-        list.innerHTML = '<div class="sb-text-muted">No available brokers</div>';
+        list.innerHTML = '<div class="picker-empty">No available brokers</div>';
         return;
       }
       
@@ -209,13 +210,13 @@ class ToolbarModule extends SidebarModule {
         list.appendChild(btn);
       });
     } catch (e) {
-      list.innerHTML = '<div class="sb-text-danger">Error loading</div>';
+      list.innerHTML = '<div class="picker-empty md-text-error">Error loading</div>';
     }
   }
   
   closePicker() {
     this.pickerOpen = false;
-    this.pickerEl?.classList.add('sb-hidden');
+    this.pickerEl?.classList.add('md-hidden');
   }
 }
 

@@ -49,6 +49,7 @@
 
       // Auto trader
       autoSendPress: (side) => { try { return ipcRenderer.invoke('send-auto-press', side); } catch(_){ return Promise.resolve(false); } },
+      onAutoStateSet: (cb) => withUnsub('auto-state-set', cb),
       onAutoToggleAll: (cb) => withUnsub('auto-toggle-all', cb),
       onAutoSetAll: (cb) => withUnsub('auto-set-all', cb),
       onAutoDisableAll: (cb) => withUnsub('auto-disable-all', cb),

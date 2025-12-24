@@ -44,6 +44,8 @@ function createHotkeyManager(ctx){
 			const key = String(input.key || '');
 			if(key !== 'Tab' && key !== 'F1' && key !== 'F2' && key !== 'F3') return;
 
+			console.log('[hotkeys] key detected:', key);
+
 			const now = Date.now();
 			const throttleMs = 250;
 			if(key === 'Tab'){
@@ -53,15 +55,17 @@ function createHotkeyManager(ctx){
 
 			const run = ()=>{
 				try {
+					console.log('[hotkeys] running action for:', key);
 					if(key === 'Tab'){
 						actions.toggleStats && actions.toggleStats();
 					} else if(key === 'F1'){
+						console.log('[hotkeys] toggleAuto exists:', !!actions.toggleAuto);
 						actions.toggleAuto && actions.toggleAuto();
 					} else if(key === 'F3'){
 						actions.startScript && actions.startScript();
 					}
 					try { event && event.preventDefault && event.preventDefault(); } catch(_){ }
-				} catch(_){ }
+				} catch(e){ console.error('[hotkeys] action error:', e); }
 			};
 
 			// Avoid firing while user types in an input inside broker pages.

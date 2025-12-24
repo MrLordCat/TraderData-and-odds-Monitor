@@ -1,24 +1,67 @@
 /* Shared Odds Board styles used by: main board + stats embedded board */
+/* M3 Design System Integration - Enhanced depth & readability */
 
 /* ===== Embedded Odds Board (Stats) wrapper ===== */
-#embeddedOddsSection { border:1px solid #27313d; background:#1b232c; border-radius:0; overflow:hidden; }
+#embeddedOddsSection { 
+	border: 1px solid var(--md-sys-color-outline-variant, #3a3d46);
+	background: linear-gradient(
+		180deg,
+		var(--md-sys-color-surface-container, #22262e) 0%,
+		var(--md-sys-color-surface-container-low, #1c1f26) 100%
+	);
+	border-radius: var(--md-sys-shape-corner-medium, 12px);
+	overflow: hidden;
+	margin: var(--md-sys-spacing-xs, 4px) var(--md-sys-spacing-sm, 8px);
+	box-shadow: var(--md-sys-elevation-1, 0 2px 8px rgba(0,0,0,0.3));
+}
 #embeddedOddsSection.collapsed #embeddedOddsBody { max-height:0; padding:0; }
-#embeddedOddsBody { max-height:340px; overflow-y:auto; overflow-x:hidden; transition:max-height .25s ease; padding:0; }
+#embeddedOddsBody { 
+	max-height:340px;
+	overflow-y:auto;
+	overflow-x:hidden;
+	transition: max-height var(--md-sys-motion-duration-medium1, 250ms) var(--md-sys-motion-easing-standard, cubic-bezier(0.2, 0, 0, 1));
+	padding: 0;
+}
 
-/* ===== Odds Table (shared look) ===== */
+/* ===== Odds Table (M3 Data Table) - Enhanced readability ===== */
 .embeddedOddsTable,
 #table {
 	width:100%;
-	border-collapse:collapse;
-	font-size:11px;
+	border-collapse: separate;
+	border-spacing: 0;
+	font-size: var(--md-sys-typescale-body-small-size, 12px);
 }
 
 .embeddedOddsTable th, .embeddedOddsTable td,
 #table th, #table td {
-	padding:3px 4px;
-	border-bottom:1px solid #24303b;
+	padding: var(--md-sys-spacing-xs, 4px) var(--md-sys-spacing-sm, 8px);
+	border-bottom: 1px solid var(--md-sys-color-outline-variant, #3a3d46);
 	text-align:center;
 	vertical-align:middle;
+}
+
+.embeddedOddsTable thead th,
+#table thead th {
+	background: linear-gradient(
+		180deg,
+		var(--md-sys-color-surface-container-high, #2a2f38) 0%,
+		var(--md-sys-color-surface-container, #22262e) 100%
+	);
+	color: var(--md-sys-color-on-surface-variant, #a8abb5);
+	font-weight: var(--md-sys-typescale-title-small-weight, 500);
+	font-size: var(--md-sys-typescale-label-medium-size, 12px);
+	text-transform: none;
+	letter-spacing: 0.02em;
+}
+
+.embeddedOddsTable tbody tr,
+#table tbody tr {
+	transition: background var(--md-sys-motion-duration-short1, 100ms) var(--md-sys-motion-easing-standard);
+}
+
+.embeddedOddsTable tbody tr:hover,
+#table tbody tr:hover {
+	background: rgba(255, 255, 255, 0.03);
 }
 
 .embeddedOddsTable tbody tr:last-child td,
@@ -45,8 +88,8 @@
 
 .embeddedOddsTable tr.frozen td,
 #table tr.frozen td {
-	opacity:.45;
-	filter: grayscale(.4);
+	opacity:.5;
+	filter: grayscale(.35);
 	position:relative;
 }
 
@@ -55,9 +98,9 @@
 	content:' (susp)';
 	font-weight:400;
 	opacity:.8;
-	font-size:10px;
+	font-size: var(--md-sys-typescale-label-small-size, 11px);
 	margin-left:4px;
-	color:#f8d774;
+	color: var(--md-sys-color-warning, #e5c349);
 }
 
 .embeddedOddsTable tr.frozen td.best,
@@ -67,32 +110,36 @@
 
 .embeddedOddsTable td.best,
 #table td.best {
-	color:#d4b14a;
-	font-weight:600;
+	color: var(--md-sys-color-tertiary, #d4b14a);
+	font-weight: var(--md-sys-typescale-label-large-weight, 500);
 	text-shadow:none;
 }
 
-/* ===== Swap button (shared) ===== */
+/* ===== Swap button (M3 chip style) ===== */
 .eo-swapBtn,
 .swapBtn {
-	background:#253143;
-	border:1px solid #314052;
-	color:#9fb6cc;
-	font-size:11px;
-	padding:2px 6px;
-	border-radius:6px;
+	background: var(--md-sys-color-surface-container-highest, #353d48);
+	border: 1px solid var(--md-sys-color-outline, #8b9198);
+	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
+	font-size: var(--md-sys-typescale-label-medium-size, 12px);
+	padding: var(--md-sys-spacing-xs, 4px) var(--md-sys-spacing-sm, 8px);
+	border-radius: var(--md-sys-shape-corner-small, 8px);
 	cursor:pointer;
 	line-height:1;
+	position: relative;
+	transition: all var(--md-sys-motion-duration-short2, 200ms) var(--md-sys-motion-easing-standard);
 }
 .eo-swapBtn.on,
 .swapBtn.on {
-	background:#335477;
-	color:#d5e8ff;
-	border-color:#314052;
-	box-shadow:none;
+	background: var(--md-sys-color-secondary-container, #3f4759);
+	color: var(--md-sys-color-on-secondary-container, #dde1f0);
+	border-color: transparent;
 }
 .eo-swapBtn:hover,
-.swapBtn:hover { background:#2d3e52; }
+.swapBtn:hover { 
+	background: var(--md-sys-color-surface-container-highest, #353d48);
+	border-color: var(--md-sys-color-on-surface-variant, #c4c6cf);
+}
 
 .eo-swap-header { opacity:.55; }
 
@@ -100,56 +147,104 @@
 #embeddedMidRow th,
 #midRow th {
 	text-align:left;
-	font-weight:500;
+	font-weight: var(--md-sys-typescale-label-large-weight, 500);
+	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
 }
 #embeddedMidCell {
 	text-align:center;
-	font-size:11px;
+	font-size: var(--md-sys-typescale-body-small-size, 12px);
 }
 
-/* ===== Excel / Auto controls (shared) ===== */
-.excelControls { display:inline-flex; align-items:center; gap:4px; flex-wrap:nowrap; white-space:nowrap; }
-.excelControls .autoBtn { margin-left:6px; }
+/* ===== Excel / Auto controls (M3 chips) ===== */
+.excelControls { display:inline-flex; align-items:center; gap: var(--md-sys-spacing-xs, 4px); flex-wrap:nowrap; white-space:nowrap; }
+.excelControls .autoBtn { margin-left: var(--md-sys-spacing-sm, 8px); }
 .excelControls button { flex:0 0 auto; }
 
-.autoBtn, .autoSubBtn { background:#273244; border:1px solid #33455d; color:#9fb6d4; padding:2px 6px; font-size:10.5px; line-height:1; border-radius:5px; cursor:pointer; }
-.autoSubBtn { padding:2px 5px; }
-.autoBtn.on, .autoSubBtn.on { background:#2f5182; color:#fff; border-color:#3d6aa8; }
-.autoBtn.paused { background:#6b5a2a; color:#fff; border-color:#8a7336; }
-.autoBtn.susp { background:#775c1f; color:#fff; border-color:#a9852f; box-shadow:0 0 0 1px rgba(169,133,47,.35) inset; }
+/* Auto/Script buttons - M3 tonal chip style */
+.autoBtn, .autoSubBtn { 
+	background: var(--md-sys-color-surface-container-highest, #353d48);
+	border: 1px solid var(--md-sys-color-outline, #8b9198);
+	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
+	padding: var(--md-sys-spacing-xs, 4px) var(--md-sys-spacing-sm, 8px);
+	font-size: var(--md-sys-typescale-label-small-size, 11px);
+	line-height:1;
+	border-radius: var(--md-sys-shape-corner-small, 8px);
+	cursor:pointer;
+	position: relative;
+	transition: all var(--md-sys-motion-duration-short2, 200ms) var(--md-sys-motion-easing-standard);
+}
+.autoSubBtn { padding: var(--md-sys-spacing-xs, 4px) var(--md-sys-spacing-sm, 6px); }
+.autoBtn.on, .autoSubBtn.on { 
+	background: var(--md-sys-color-primary, #a0c4ff);
+	color: var(--md-sys-color-on-primary, #003060);
+	border-color: transparent;
+}
+.autoBtn.paused { 
+	background: var(--md-sys-color-tertiary-container, #6b5a2a);
+	color: var(--md-sys-color-on-tertiary-container, #fff);
+	border-color: transparent;
+}
+.autoBtn.susp { 
+	background: var(--md-sys-color-warning, #775c1f);
+	color: #fff;
+	border-color: transparent;
+}
 
 /* Script map badge (shows Python hotkey controller current map) */
 .scriptMapBadge {
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  min-width:16px;
-  height:16px;
-  padding:0 4px;
-  margin-left:3px;
-  font-size:10px;
-  font-weight:600;
-  background:#1f2a3a;
-  border:1px solid #33455d;
-  border-radius:4px;
-  color:#8ba2b8;
+  min-width:18px;
+  height:18px;
+  padding:0 var(--md-sys-spacing-xs, 4px);
+  margin-left: var(--md-sys-spacing-xs, 4px);
+  font-size: var(--md-sys-typescale-label-small-size, 11px);
+  font-weight: var(--md-sys-typescale-label-large-weight, 500);
+  background: var(--md-sys-color-surface-container, #1d2530);
+  border: 1px solid var(--md-sys-color-outline-variant, #3c4553);
+  border-radius: var(--md-sys-shape-corner-small, 8px);
+  color: var(--md-sys-color-on-surface-variant, #c4c6cf);
 }
 .scriptMapBadge.mismatch {
-  background:#5c3a1a;
-  border-color:#8b5a2a;
-  color:#ffb366;
+  background: var(--md-sys-color-error-container, #93000a);
+  border-color: transparent;
+  color: var(--md-sys-color-on-error-container, #ffdad6);
 }
 .scriptMapBadge.match {
-  background:#1a3a2a;
-  border-color:#2a5a4a;
-  color:#7fc99e;
+  background: var(--md-sys-color-success, #4ade80);
+  border-color: transparent;
+  color: var(--md-sys-color-on-success, #003912);
 }
 
-.excelAutoCell { background:transparent; font-size:11px; }
-.autoIndicators { display:flex; align-items:center; gap:12px; justify-content:center; width:100%; }
-.autoDot { width:10px; height:10px; border-radius:50%; background:#314258; box-shadow:0 0 0 1px #3a4d66 inset; opacity:.38; transition:opacity .25s, background .25s; flex:0 0 auto; }
-.autoDot.active { opacity:1; background:var(--accent); box-shadow:0 0 6px var(--accent-glow),0 0 12px rgba(58,169,255,.4); }
-.autoStatus { font-size:11px; color:var(--muted); letter-spacing:.5px; min-width:120px; text-align:center; white-space:nowrap; flex:0 1 auto; }
-.excelAutoCell { padding:4px 6px; }
-.excelAutoIndicatorsCell { border-bottom:1px solid #273244; }
-.excelAutoStatusCell { padding-top:2px; }
+.excelAutoCell { background:transparent; font-size: var(--md-sys-typescale-body-small-size, 12px); }
+.autoIndicators { display:flex; align-items:center; gap: var(--md-sys-spacing-lg, 16px); justify-content:center; width:100%; }
+
+/* Auto indicator dots with M3 styling */
+.autoDot { 
+	width:12px;
+	height:12px;
+	border-radius: var(--md-sys-shape-corner-full, 50%);
+	background: var(--md-sys-color-surface-container-highest, #353d48);
+	box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant, #3c4553);
+	opacity:.38;
+	transition: all var(--md-sys-motion-duration-medium1, 250ms) var(--md-sys-motion-easing-standard);
+	flex:0 0 auto;
+}
+.autoDot.active { 
+	opacity:1;
+	background: var(--md-sys-color-primary, #a0c4ff);
+	box-shadow: 0 0 8px var(--md-sys-color-primary, #a0c4ff), 0 0 16px rgba(160,196,255,.4);
+}
+.autoStatus { 
+	font-size: var(--md-sys-typescale-body-small-size, 12px);
+	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
+	letter-spacing: var(--md-sys-typescale-body-small-tracking, 0.4px);
+	min-width:120px;
+	text-align:center;
+	white-space:nowrap;
+	flex:0 1 auto;
+}
+.excelAutoCell { padding: var(--md-sys-spacing-xs, 4px) var(--md-sys-spacing-sm, 8px); }
+.excelAutoIndicatorsCell { border-bottom: 1px solid var(--md-sys-color-outline-variant, #3c4553); }
+.excelAutoStatusCell { padding-top: var(--md-sys-spacing-xs, 2px); }

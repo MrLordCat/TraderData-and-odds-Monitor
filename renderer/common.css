@@ -31,22 +31,22 @@
   font-display:swap;
   font-style:normal;
 }
-/* Theme tokens */
+/* Theme tokens - M3 aliases for backward compatibility */
 :root {
-  --bg: #0d0f17;
-  --panel: #161b28;
-  --panel-alt: #1f2535;
-  --accent: #2f7cf6;
-  --accent-glow: #3aa9ff;
-  --good: #15c25a;
-  --good-glow: #34ff8d;
-  --text: #e4e7ef;
-  --muted: #6b7486;
-  --danger: #ff3d5e;
-  --radius: 8px;
-  --transition: 120ms;
+  --bg: var(--md-sys-color-surface, #0d0f17);
+  --panel: var(--md-sys-color-surface-container, #161b28);
+  --panel-alt: var(--md-sys-color-surface-container-high, #1f2535);
+  --accent: var(--md-sys-color-primary, #2f7cf6);
+  --accent-glow: var(--md-sys-color-primary, #3aa9ff);
+  --good: var(--md-sys-color-success, #15c25a);
+  --good-glow: var(--md-sys-color-success, #34ff8d);
+  --text: var(--md-sys-color-on-surface, #e4e7ef);
+  --muted: var(--md-sys-color-on-surface-variant, #6b7486);
+  --danger: var(--md-sys-color-error, #ff3d5e);
+  --radius: var(--md-sys-shape-corner-medium, 8px);
+  --transition: var(--md-sys-motion-duration-short2, 120ms);
   --ui-contrast: 1;
-  --font-sans: 'Inter var','Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto','Helvetica Neue',Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+  --font-sans: var(--md-sys-typescale-font-family, 'Inter var','Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto','Helvetica Neue',Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji");
   --font-mono: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace;
 }
 

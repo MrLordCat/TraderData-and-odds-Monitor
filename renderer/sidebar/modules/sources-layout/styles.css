@@ -1,91 +1,181 @@
-/* Sources Layout Module Styles */
+/**
+ * Sources Layout Module Styles - Material 3
+ */
 
 .sources-grid {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--md-sys-spacing-4);
 }
 
+/* Preset Section */
 .preset-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--md-sys-spacing-2);
 }
 
+.preset-label {
+  font-size: var(--md-sys-typescale-label-medium-size);
+  font-weight: var(--md-sys-typescale-label-medium-weight);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Preset Buttons - Segmented Button Style */
 .preset-btns {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--md-sys-spacing-2);
 }
 
 .preset-btn {
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  background: var(--sidebar-bg);
-  border: 1px solid var(--sidebar-border);
-  border-radius: var(--sidebar-radius);
-  color: var(--sidebar-text-muted);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--md-sys-comp-chip-height);
+  padding: 0 var(--md-sys-spacing-3);
+  font-family: var(--md-sys-typescale-font-family-plain);
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  background: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-small);
+  color: var(--md-sys-color-on-surface-variant);
   cursor: pointer;
-  transition: all 0.15s;
+  overflow: hidden;
+  transition: 
+    background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
 
-.preset-btn:hover {
-  border-color: var(--sidebar-accent);
-  color: var(--sidebar-text);
+/* State layer */
+.preset-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
 
+.preset-btn:hover:not(.active)::before {
+  opacity: var(--md-sys-state-hover-opacity);
+}
+
+.preset-btn:active:not(.active)::before {
+  opacity: var(--md-sys-state-pressed-opacity);
+}
+
+.preset-btn:focus-visible {
+  outline: var(--md-sys-comp-focus-ring-width) solid var(--md-sys-color-primary);
+  outline-offset: var(--md-sys-comp-focus-ring-offset);
+}
+
+/* Active state - Selected chip style */
 .preset-btn.active {
-  background: var(--sidebar-accent);
-  border-color: var(--sidebar-accent);
-  color: #000;
+  background: var(--md-sys-color-secondary-container);
+  border-color: transparent;
+  color: var(--md-sys-color-on-secondary-container);
 }
 
-/* Active sources */
+.preset-btn.active::before {
+  background: var(--md-sys-color-on-secondary-container);
+}
+
+/* ============================================
+   ACTIVE SOURCES - List Style
+   ============================================ */
 .active-sources {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--md-sys-spacing-2);
+}
+
+.sources-label {
+  font-size: var(--md-sys-typescale-label-medium-size);
+  font-weight: var(--md-sys-typescale-label-medium-weight);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .sources-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--md-sys-spacing-1);
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--md-sys-shape-small);
+  padding: var(--md-sys-spacing-1);
 }
 
+/* Empty state */
+.sources-list .empty-state {
+  padding: var(--md-sys-spacing-4);
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+}
+
+/* Source Item - List item style */
 .source-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  background: var(--sidebar-bg);
-  border: 1px solid var(--sidebar-border);
-  border-radius: var(--sidebar-radius);
+  gap: var(--md-sys-spacing-3);
+  padding: var(--md-sys-spacing-2) var(--md-sys-spacing-3);
+  background: transparent;
+  border-radius: var(--md-sys-shape-small);
+  transition: background var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+
+.source-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+
+.source-item:hover::before {
+  opacity: var(--md-sys-state-hover-opacity);
 }
 
 .source-name {
-  font-size: 12px;
+  position: relative;
+  font-size: var(--md-sys-typescale-body-medium-size);
   font-weight: 500;
+  color: var(--md-sys-color-on-surface);
 }
 
 .source-remove {
-  width: 20px;
-  height: 20px;
-  opacity: 0.5;
+  position: relative;
+  opacity: 0.6;
+  transition: opacity var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
 
 .source-remove:hover {
   opacity: 1;
-  color: var(--sidebar-danger);
+  color: var(--md-sys-color-error);
 }
 
-.source-remove svg {
-  width: 12px;
-  height: 12px;
-}
-
-/* Actions */
+/* ============================================
+   SOURCE ACTIONS
+   ============================================ */
 .source-actions {
-  margin-top: 4px;
+  display: flex;
+  gap: var(--md-sys-spacing-2);
+}
+
+#add-source-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--md-sys-spacing-2);
+}
+
+#add-source-btn svg {
+  width: 18px;
+  height: 18px;
 }

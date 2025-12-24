@@ -1,0 +1,440 @@
+/**
+ * Material 3 Design Tokens
+ * 
+ * Complete token system for both light and dark themes.
+ * Currently active: dark theme
+ * 
+ * Usage: All components should reference --md-sys-* tokens,
+ * never hardcode colors directly.
+ */
+
+/* ============================================
+   COLOR TOKENS - Dark Theme (Active)
+   ============================================ */
+:root,
+[data-theme="dark"] {
+  /* Primary */
+  --md-sys-color-primary: #a8c7fa;
+  --md-sys-color-on-primary: #062e6f;
+  --md-sys-color-primary-container: #1b4587;
+  --md-sys-color-on-primary-container: #d3e3fd;
+  
+  /* Secondary */
+  --md-sys-color-secondary: #bec6dc;
+  --md-sys-color-on-secondary: #283141;
+  --md-sys-color-secondary-container: #3e4758;
+  --md-sys-color-on-secondary-container: #dae2f9;
+  
+  /* Tertiary */
+  --md-sys-color-tertiary: #d9bee0;
+  --md-sys-color-on-tertiary: #3d2845;
+  --md-sys-color-tertiary-container: #553e5c;
+  --md-sys-color-on-tertiary-container: #f6defc;
+  
+  /* Error */
+  --md-sys-color-error: #ffb4ab;
+  --md-sys-color-on-error: #690005;
+  --md-sys-color-error-container: #93000a;
+  --md-sys-color-on-error-container: #ffdad6;
+  
+  /* Success (custom - not in M3 spec) */
+  --md-sys-color-success: #7dd891;
+  --md-sys-color-on-success: #003917;
+  --md-sys-color-success-container: #005225;
+  --md-sys-color-on-success-container: #98f5ab;
+  
+  /* Warning (custom - not in M3 spec) */
+  --md-sys-color-warning: #e5c349;
+  --md-sys-color-on-warning: #3b2f00;
+  --md-sys-color-warning-container: #554500;
+  --md-sys-color-on-warning-container: #ffe070;
+  
+  /* Surface levels - softer, less contrast */
+  --md-sys-color-surface: #15181e;
+  --md-sys-color-surface-dim: #15181e;
+  --md-sys-color-surface-bright: #3a3d44;
+  --md-sys-color-surface-container-lowest: #10131a;
+  --md-sys-color-surface-container-low: #1c1f26;
+  --md-sys-color-surface-container: #22262e;
+  --md-sys-color-surface-container-high: #2a2f38;
+  --md-sys-color-surface-container-highest: #353a44;
+  
+  /* On Surface - softer text colors */
+  --md-sys-color-on-surface: #d8dae0;
+  --md-sys-color-on-surface-variant: #a8abb5;
+  
+  /* Outline - subtler borders */
+  --md-sys-color-outline: #6d7078;
+  --md-sys-color-outline-variant: #3a3d46;
+  
+  /* Inverse */
+  --md-sys-color-inverse-surface: #e2e2e6;
+  --md-sys-color-inverse-on-surface: #2f3033;
+  --md-sys-color-inverse-primary: #415f91;
+  
+  /* Scrim & Shadow */
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
+  
+  /* Surface tint */
+  --md-sys-color-surface-tint: #a8c7fa;
+  
+  /* State layers (opacity values) */
+  --md-sys-state-hover-opacity: 0.08;
+  --md-sys-state-focus-opacity: 0.12;
+  --md-sys-state-pressed-opacity: 0.12;
+  --md-sys-state-dragged-opacity: 0.16;
+}
+
+/* ============================================
+   COLOR TOKENS - Light Theme (Prepared)
+   ============================================ */
+[data-theme="light"] {
+  /* Primary */
+  --md-sys-color-primary: #415f91;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d6e3ff;
+  --md-sys-color-on-primary-container: #001b3e;
+  
+  /* Secondary */
+  --md-sys-color-secondary: #565f71;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #dae2f9;
+  --md-sys-color-on-secondary-container: #131c2b;
+  
+  /* Tertiary */
+  --md-sys-color-tertiary: #705575;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #fad8fd;
+  --md-sys-color-on-tertiary-container: #29132e;
+  
+  /* Error */
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+  
+  /* Success */
+  --md-sys-color-success: #1b6d2f;
+  --md-sys-color-on-success: #ffffff;
+  --md-sys-color-success-container: #a4f5a8;
+  --md-sys-color-on-success-container: #002107;
+  
+  /* Warning */
+  --md-sys-color-warning: #6d5e00;
+  --md-sys-color-on-warning: #ffffff;
+  --md-sys-color-warning-container: #fce355;
+  --md-sys-color-on-warning-container: #211b00;
+  
+  /* Surface levels */
+  --md-sys-color-surface: #f9f9ff;
+  --md-sys-color-surface-dim: #d9d9e0;
+  --md-sys-color-surface-bright: #f9f9ff;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f3f3fa;
+  --md-sys-color-surface-container: #ededf4;
+  --md-sys-color-surface-container-high: #e7e8ee;
+  --md-sys-color-surface-container-highest: #e2e2e9;
+  
+  /* On Surface */
+  --md-sys-color-on-surface: #1a1b20;
+  --md-sys-color-on-surface-variant: #44464f;
+  
+  /* Outline */
+  --md-sys-color-outline: #757780;
+  --md-sys-color-outline-variant: #c5c6d0;
+  
+  /* Inverse */
+  --md-sys-color-inverse-surface: #2f3036;
+  --md-sys-color-inverse-on-surface: #f0f0f7;
+  --md-sys-color-inverse-primary: #a8c7fa;
+  
+  /* Scrim & Shadow */
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
+  
+  /* Surface tint */
+  --md-sys-color-surface-tint: #415f91;
+}
+
+/* ============================================
+   ELEVATION TOKENS (Box Shadow) - Enhanced depth
+   ============================================ */
+:root {
+  /* Level 0 - No elevation */
+  --md-sys-elevation-0: none;
+  
+  /* Level 1 - Cards, Sheets - subtle lift */
+  --md-sys-elevation-1: 
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  
+  /* Level 2 - Buttons, FAB resting */
+  --md-sys-elevation-2: 
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  
+  /* Level 3 - Navigation, FAB hover */
+  --md-sys-elevation-3: 
+    0 3px 6px rgba(0, 0, 0, 0.4),
+    0 6px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  
+  /* Level 4 - Menus */
+  --md-sys-elevation-4: 
+    0 4px 8px rgba(0, 0, 0, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  
+  /* Level 5 - Dialogs, Modals */
+  --md-sys-elevation-5: 
+    0 6px 12px rgba(0, 0, 0, 0.4),
+    0 12px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================
+   SHAPE TOKENS (Border Radius)
+   ============================================ */
+:root {
+  --md-sys-shape-none: 0;
+  --md-sys-shape-extra-small: 4px;
+  --md-sys-shape-small: 8px;
+  --md-sys-shape-medium: 12px;
+  --md-sys-shape-large: 16px;
+  --md-sys-shape-extra-large: 28px;
+  --md-sys-shape-full: 9999px;
+  
+  /* Corner aliases (commonly used in component styles) */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+}
+
+/* ============================================
+   MOTION TOKENS (Duration & Easing)
+   ============================================ */
+:root {
+  /* Duration */
+  --md-sys-motion-duration-short1: 50ms;
+  --md-sys-motion-duration-short2: 100ms;
+  --md-sys-motion-duration-short3: 150ms;
+  --md-sys-motion-duration-short4: 200ms;
+  --md-sys-motion-duration-medium1: 250ms;
+  --md-sys-motion-duration-medium2: 300ms;
+  --md-sys-motion-duration-medium3: 350ms;
+  --md-sys-motion-duration-medium4: 400ms;
+  --md-sys-motion-duration-long1: 450ms;
+  --md-sys-motion-duration-long2: 500ms;
+  --md-sys-motion-duration-long3: 550ms;
+  --md-sys-motion-duration-long4: 600ms;
+  --md-sys-motion-duration-extra-long1: 700ms;
+  --md-sys-motion-duration-extra-long2: 800ms;
+  --md-sys-motion-duration-extra-long3: 900ms;
+  --md-sys-motion-duration-extra-long4: 1000ms;
+  
+  /* Easing - Standard */
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-standard-decelerate: cubic-bezier(0, 0, 0, 1);
+  --md-sys-motion-easing-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  
+  /* Easing - Emphasized */
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  
+  /* Easing - Legacy (for compatibility) */
+  --md-sys-motion-easing-linear: linear;
+}
+
+/* ============================================
+   TYPOGRAPHY TOKENS
+   ============================================ */
+:root {
+  /* Font families */
+  --md-sys-typescale-font-family: 'Inter var', 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+  --md-sys-typescale-font-family-plain: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+  --md-sys-typescale-font-family-brand: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+  --md-sys-typescale-font-family-code: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  
+  /* Display - Large */
+  --md-sys-typescale-display-large-size: 57px;
+  --md-sys-typescale-display-large-line-height: 64px;
+  --md-sys-typescale-display-large-weight: 400;
+  --md-sys-typescale-display-large-tracking: -0.25px;
+  
+  /* Display - Medium */
+  --md-sys-typescale-display-medium-size: 45px;
+  --md-sys-typescale-display-medium-line-height: 52px;
+  --md-sys-typescale-display-medium-weight: 400;
+  --md-sys-typescale-display-medium-tracking: 0;
+  
+  /* Display - Small */
+  --md-sys-typescale-display-small-size: 36px;
+  --md-sys-typescale-display-small-line-height: 44px;
+  --md-sys-typescale-display-small-weight: 400;
+  --md-sys-typescale-display-small-tracking: 0;
+  
+  /* Headline - Large */
+  --md-sys-typescale-headline-large-size: 32px;
+  --md-sys-typescale-headline-large-line-height: 40px;
+  --md-sys-typescale-headline-large-weight: 400;
+  --md-sys-typescale-headline-large-tracking: 0;
+  
+  /* Headline - Medium */
+  --md-sys-typescale-headline-medium-size: 28px;
+  --md-sys-typescale-headline-medium-line-height: 36px;
+  --md-sys-typescale-headline-medium-weight: 400;
+  --md-sys-typescale-headline-medium-tracking: 0;
+  
+  /* Headline - Small */
+  --md-sys-typescale-headline-small-size: 24px;
+  --md-sys-typescale-headline-small-line-height: 32px;
+  --md-sys-typescale-headline-small-weight: 400;
+  --md-sys-typescale-headline-small-tracking: 0;
+  
+  /* Title - Large */
+  --md-sys-typescale-title-large-size: 22px;
+  --md-sys-typescale-title-large-line-height: 28px;
+  --md-sys-typescale-title-large-weight: 400;
+  --md-sys-typescale-title-large-tracking: 0;
+  
+  /* Title - Medium */
+  --md-sys-typescale-title-medium-size: 16px;
+  --md-sys-typescale-title-medium-line-height: 24px;
+  --md-sys-typescale-title-medium-weight: 500;
+  --md-sys-typescale-title-medium-tracking: 0.15px;
+  
+  /* Title - Small */
+  --md-sys-typescale-title-small-size: 14px;
+  --md-sys-typescale-title-small-line-height: 20px;
+  --md-sys-typescale-title-small-weight: 500;
+  --md-sys-typescale-title-small-tracking: 0.1px;
+  
+  /* Body - Large */
+  --md-sys-typescale-body-large-size: 16px;
+  --md-sys-typescale-body-large-line-height: 24px;
+  --md-sys-typescale-body-large-weight: 400;
+  --md-sys-typescale-body-large-tracking: 0.5px;
+  
+  /* Body - Medium */
+  --md-sys-typescale-body-medium-size: 14px;
+  --md-sys-typescale-body-medium-line-height: 20px;
+  --md-sys-typescale-body-medium-weight: 400;
+  --md-sys-typescale-body-medium-tracking: 0.25px;
+  
+  /* Body - Small */
+  --md-sys-typescale-body-small-size: 12px;
+  --md-sys-typescale-body-small-line-height: 16px;
+  --md-sys-typescale-body-small-weight: 400;
+  --md-sys-typescale-body-small-tracking: 0.4px;
+  
+  /* Label - Large */
+  --md-sys-typescale-label-large-size: 14px;
+  --md-sys-typescale-label-large-line-height: 20px;
+  --md-sys-typescale-label-large-weight: 500;
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  
+  /* Label - Medium */
+  --md-sys-typescale-label-medium-size: 12px;
+  --md-sys-typescale-label-medium-line-height: 16px;
+  --md-sys-typescale-label-medium-weight: 500;
+  --md-sys-typescale-label-medium-tracking: 0.5px;
+  
+  /* Label - Small */
+  --md-sys-typescale-label-small-size: 11px;
+  --md-sys-typescale-label-small-line-height: 16px;
+  --md-sys-typescale-label-small-weight: 500;
+  --md-sys-typescale-label-small-tracking: 0.5px;
+}
+
+/* ============================================
+   SPACING TOKENS
+   ============================================ */
+:root {
+  /* Numeric scale (M3 standard) */
+  --md-sys-spacing-0: 0;
+  --md-sys-spacing-1: 4px;
+  --md-sys-spacing-2: 8px;
+  --md-sys-spacing-3: 12px;
+  --md-sys-spacing-4: 16px;
+  --md-sys-spacing-5: 20px;
+  --md-sys-spacing-6: 24px;
+  --md-sys-spacing-7: 28px;
+  --md-sys-spacing-8: 32px;
+  --md-sys-spacing-9: 36px;
+  --md-sys-spacing-10: 40px;
+  --md-sys-spacing-12: 48px;
+  --md-sys-spacing-14: 56px;
+  --md-sys-spacing-16: 64px;
+  
+  /* Semantic aliases (for convenience) */
+  --md-sys-spacing-xs: 4px;
+  --md-sys-spacing-sm: 8px;
+  --md-sys-spacing-md: 12px;
+  --md-sys-spacing-lg: 16px;
+  --md-sys-spacing-xl: 24px;
+  --md-sys-spacing-2xl: 32px;
+}
+
+/* ============================================
+   ICON SIZES
+   ============================================ */
+:root {
+  --md-sys-icon-size-small: 18px;
+  --md-sys-icon-size-medium: 24px;
+  --md-sys-icon-size-large: 36px;
+}
+
+/* ============================================
+   COMPONENT-SPECIFIC TOKENS
+   ============================================ */
+:root {
+  /* Button heights */
+  --md-sys-comp-button-height: 40px;
+  --md-sys-comp-button-height-small: 32px;
+  --md-sys-comp-icon-button-size: 40px;
+  --md-sys-comp-icon-button-size-small: 32px;
+  
+  /* FAB sizes */
+  --md-sys-comp-fab-size: 56px;
+  --md-sys-comp-fab-size-small: 40px;
+  --md-sys-comp-fab-size-large: 96px;
+  
+  /* Input heights */
+  --md-sys-comp-text-field-height: 56px;
+  --md-sys-comp-text-field-height-small: 40px;
+  
+  /* List items */
+  --md-sys-comp-list-item-height-one-line: 56px;
+  --md-sys-comp-list-item-height-two-line: 72px;
+  --md-sys-comp-list-item-height-three-line: 88px;
+  
+  /* Chip */
+  --md-sys-comp-chip-height: 32px;
+  
+  /* Badge */
+  --md-sys-comp-badge-size: 6px;
+  --md-sys-comp-badge-size-large: 16px;
+  
+  /* Divider */
+  --md-sys-comp-divider-thickness: 1px;
+  
+  /* Focus ring */
+  --md-sys-comp-focus-ring-width: 3px;
+  --md-sys-comp-focus-ring-offset: 2px;
+}
+
+/* ============================================
+   CSS-ONLY RIPPLE SETUP
+   ============================================ */
+:root {
+  --md-sys-ripple-hover-color: var(--md-sys-color-on-surface);
+  --md-sys-ripple-pressed-color: var(--md-sys-color-on-surface);
+}
