@@ -137,10 +137,11 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
           }
           // Broadcast to stats panel (separate BrowserView)
           try {
-            if(statsManager && statsManager.views && statsManager.views.panel){
+            if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
               statsManager.views.panel.webContents.send('excel-team-names', { team1, team2 });
+              log('sent excel-team-names to stats panel');
             }
-          } catch(_){ }
+          } catch(e){ log('stats panel send failed:', e.message); }
           // Broadcast to board
           try {
             if(boardManager && boardManager.getWebContents){
@@ -271,6 +272,20 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
 
   if(verbose) log('candidates', lastResolvedPaths);
 
+  // Expose method to re-broadcast team names (useful after stats panel loads)
+  function rebroadcastTeamNames(){
+    if(lastTeamNames.team1 || lastTeamNames.team2){
+      const team1 = lastTeamNames.team1 || 'Team 1';
+      const team2 = lastTeamNames.team2 || 'Team 2';
+      log('rebroadcast team names:', team1, '/', team2);
+      try {
+        if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
+          statsManager.views.panel.webContents.send('excel-team-names', { team1, team2 });
+        }
+      } catch(_){ }
+    }
+  }
+
   return {
     dispose(){
       disposed = true;
@@ -278,7 +293,8 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
       if(pollTimer) clearTimeout(pollTimer);
       if(mapPollTimer) clearTimeout(mapPollTimer);
       log('disposed');
-    }
+    },
+    rebroadcastTeamNames
   };
 }
 

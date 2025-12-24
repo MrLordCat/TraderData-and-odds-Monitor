@@ -447,7 +447,7 @@ function bootstrap() {
       };
       // Annotate forward with a hint for template sync side-channel
       try { Object.defineProperty(forward, '__acceptsTemplateSync', { value: false, enumerable:false }); } catch(_){ }
-      global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward, statsManager, boardManager });
+      global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward, statsManager, boardManager, verbose: true });
     }
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
   // Initialize map selection IPC (needs boardManager, statsManager, mainWindow references)

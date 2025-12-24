@@ -52,18 +52,18 @@ def ts() -> str:
 
 
 def attach_excel_app():
-    """Подключение к запущенному Excel."""
+    """Connect to running Excel."""
     if win32com is None:
-        raise SystemExit("pywin32 не установлен. Установите: pip install pywin32")
+        raise SystemExit("pywin32 not installed. Run: pip install pywin32")
     try:
         app = win32com.client.GetObject(Class="Excel.Application")
         return app
     except Exception:
-        raise SystemExit("Excel не найден. Откройте книгу и повторите запуск.")
+        raise SystemExit("Excel not found. Open the workbook and try again.")
 
 
 def find_workbook(app, path: Path):
-    """Найти открытую книгу."""
+    """Find open workbook."""
     for wb in app.Workbooks:
         try:
             if Path(wb.FullName).resolve().samefile(path):
@@ -71,26 +71,26 @@ def find_workbook(app, path: Path):
         except:
             continue
     
-    # Попробуем открыть если существует
+    # Try to open if exists
     try:
         if path.exists():
             return app.Workbooks.Open(str(path))
     except:
         pass
     
-    raise SystemExit(f"Книга {path} не найдена. Откройте её в Excel.")
+    raise SystemExit(f"Workbook {path} not found. Open it in Excel.")
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Excel watcher: reads odds cells and writes current_state.json")
     p.add_argument("--file", default=os.environ.get("ODDSMONI_EXCEL_FILE", ""),
-                   help="Путь к Excel файлу")
-    p.add_argument("--sheet", default=SHEET_NAME, help="Имя листа")
+                   help="Path to Excel file")
+    p.add_argument("--sheet", default=SHEET_NAME, help="Sheet name")
     return p.parse_args()
 
 
 def read_cells_batch(sheet, cells: List[str]) -> Dict[str, Any]:
-    """Прочитать ячейки."""
+    """Read cells."""
     values = {}
     for c in cells:
         try:
@@ -192,10 +192,10 @@ def main():
     file_path = Path(args.file).expanduser() if args.file else DEFAULT_FILE_PATH
     sheet_name = args.sheet or SHEET_NAME
 
-    print("[INFO] Excel watcher запущен...")
-    print(f"[INFO] Файл: {file_path}")
-    print(f"[INFO] Лист: {sheet_name}")
-    print(f"[INFO] Ячейки: {', '.join(CELLS)}")
+    print("[INFO] Excel watcher started...")
+    print(f"[INFO] File: {file_path}")
+    print(f"[INFO] Sheet: {sheet_name}")
+    print(f"[INFO] Cells: {', '.join(CELLS)}")
     
     app = attach_excel_app()
     wb = find_workbook(app, file_path)
@@ -203,7 +203,7 @@ def main():
     try:
         sheet = wb.Worksheets(sheet_name)
     except:
-        raise SystemExit(f"Лист '{sheet_name}' не найден.")
+        raise SystemExit(f"Sheet '{sheet_name}' not found.")
 
     prev = None
     
@@ -226,7 +226,7 @@ def main():
             time.sleep(INTERVAL)
             
     except KeyboardInterrupt:
-        print("\n[INFO] Остановлено.")
+        print("\n[INFO] Stopped.")
 
 
 if __name__ == "__main__":

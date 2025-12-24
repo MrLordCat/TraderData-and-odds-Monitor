@@ -357,6 +357,12 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
               boardManagerRef.value.replayOdds();
             }
           } catch(_){ }
+          // Replay Excel team names to panel after load
+          try {
+            if(global.__excelWatcher && global.__excelWatcher.rebroadcastTeamNames){
+              global.__excelWatcher.rebroadcastTeamNames();
+            }
+          } catch(_){ }
         } catch(_){ } 
       });
     }
