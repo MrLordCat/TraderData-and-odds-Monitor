@@ -107,10 +107,8 @@ button:active { transform:translateY(1px); }
 }
 
 .segments {
-	display: flex;
-	gap: 12px;
-	align-items: flex-start;
-	justify-content: center;
+	column-count: 2;
+	column-gap: 12px;
 }
 
 .segCol {
@@ -128,6 +126,8 @@ button:active { transform:translateY(1px); }
 	border-radius: 14px;
 	padding: 10px 12px 12px;
 	display: block;
+	break-inside: avoid;
+	margin-bottom: 12px;
 }
 
 .hotkeyList{
