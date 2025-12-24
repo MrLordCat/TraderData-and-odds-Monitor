@@ -104,11 +104,7 @@ function setTeamHeader(idx, rawText){
     th.textContent='';
     th.appendChild(wrap);
   }
-  // Ensure unified rename handler is bound once on wrapper (works in both manual & live modes)
-  if(!wrap.dataset.renameBound){
-    wrap.dataset.renameBound='1';
-    wrap.addEventListener('dblclick', ()=> handleTeamHeaderDblClick(idx));
-  }
+  // Team names are now read-only (sourced from Excel K4/N4) - no dblclick edit
   const text = (rawText||'').trim() || ('Team '+idx);
   if(wrap.textContent === text) return; // no change
   wrap.textContent = text;
@@ -139,87 +135,9 @@ function manualSnapshotCurrent(){
 
 function renderManual(){ renderLol(manualSnapshotCurrent(), true); renderMap(); applyWinLose(); }
 
-function renameTeam(idx){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const v = prompt('Team name', cur)||cur; if(v===cur) return; renameTeamInternal(idx,v); }
+// Team names are now read-only from Excel (K4/N4)
+// Manual mode team renaming functions preserved for internal bucket renaming only
 function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const old=cur; if(idx===1) manualData.team1Name=v; else manualData.team2Name=v; Object.values(manualData.gameStats).forEach(gs=>{ ['killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonTimes','netWorth'].forEach(f=>{ const bucket=gs[f]; if(!bucket) return; if(bucket[old]!=null){ bucket[v]=bucket[old]; delete bucket[old]; } }); if(gs.firstKill===old) gs.firstKill=v; ['race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','atakhan','quadra','penta','winner'].forEach(b=>{ if(gs[b]===old) gs[b]=v; }); }); renderManual(); }
-// Unified header double‑click logic (manual inline edit vs live prompt override)
-function handleTeamHeaderDblClick(idx){
-  try {
-    const manualOn = document.getElementById('lolManualMode').checked;
-    // Inline rename in BOTH modes now
-    startInlineRenameUnified(idx, manualOn);
-  } catch(_){ }
-}
-
-// Unified inline rename for both live & manual modes
-function startInlineRenameUnified(idx, manualOn){
-  const th = document.getElementById(idx===1?'lt-team1':'lt-team2'); if(!th) return;
-  // Determine current value
-  let current;
-  if(manualOn){
-    current = (idx===1? manualData.team1Name : manualData.team2Name) || ('Team '+idx);
-  } else {
-    // live mode display (custom override if set else header span text)
-    current = customTeamNames[idx] || (th.querySelector('.teamNameWrap')?.textContent || ('Team '+idx));
-  }
-  const input=document.createElement('input');
-  input.type='text';
-  input.value=current;
-  input.style.cssText='width:100%;background:rgba(255,255,255,0.06);border:1px solid #345;padding:2px 4px;color:#fff;font:inherit;text-align:center;border-radius:4px;';
-  th.innerHTML='';
-  th.appendChild(input);
-  input.focus();
-  input.select();
-  let finished=false; // guard to prevent duplicate commit
-  const commit=()=>{
-    if(finished) return; finished=true;
-    const rawVal=input.value.trim();
-    if(manualOn){
-      const final = rawVal || current; // don't allow empty manual names
-      renameTeamInternal(idx, final);
-      // Immediate visual replacement (in case renderManual async / delayed)
-      try { setTeamHeader(idx, final, false); } catch(_){ }
-    } else {
-      let finalDisplay;
-      if(!rawVal){
-        customTeamNames[idx]=null; // clear override
-        finalDisplay = (th.querySelector('.teamNameWrap')?.textContent) || ('Team '+idx); // fallback to current live name
-      } else {
-        customTeamNames[idx]=rawVal;
-        finalDisplay = rawVal;
-      }
-      // Immediate header update BEFORE any heavy re-render so input disappears instantly
-  try { setTeamHeader(idx, finalDisplay, false); } catch(_){ }
-      // Now trigger full render to ensure consistency with dataset
-      try {
-        if(liveDataset) renderLol(liveDataset); else setTeamHeader(idx, finalDisplay, false);
-      } catch(_){ }
-    }
-    // Post commit verification (next tick)
-    setTimeout(()=>{
-      try {
-        const still = !!th.querySelector('input');
-        if(still){
-          // Failsafe: force header again
-            const fallback = customTeamNames[idx] || current || ('Team '+idx);
-            setTeamHeader(idx, fallback, false);
-        }
-      } catch(_){ }
-    },0);
-  };
-  const cancel=()=>{
-    if(finished) return; finished=true;
-    if(manualOn){
-      renderManual();
-    } else {
-      if(liveDataset) renderLol(liveDataset); else setTeamHeader(idx, customTeamNames[idx] || current, false);
-    }
-  };
-  input.addEventListener('keydown', e=>{
-    if(e.key==='Enter') commit();
-    else if(e.key==='Escape') cancel();
-  });
-  input.addEventListener('blur', ()=>{ commit(); });
-}
 
 function applyRaceFromKills(gs){ const bucket = gs.killCount||{}; [ ['race5',5], ['race10',10], ['race15',15], ['race20',20] ].forEach(([key,n])=>{ if(!gs[key]){ const t1=bucket[manualData.team1Name]||0; const t2=bucket[manualData.team2Name]||0; if(t1===n || t2===n) gs[key]= t1===n? manualData.team1Name: manualData.team2Name; } }); }
 
@@ -450,6 +368,22 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
   try { __setPanelSideUi(cfg && cfg.side); } catch(_){ }
  } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
+
+// Team names from Excel K4/N4 (read-only, updates headers)
+ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
+  try {
+    const t1 = (team1 || '').trim() || 'Team 1';
+    const t2 = (team2 || '').trim() || 'Team 2';
+    setTeamHeader(1, t1);
+    setTeamHeader(2, t2);
+    // Also update manual mode data for consistency
+    if(manualData.team1Name !== t1 || manualData.team2Name !== t2){
+      renameTeamInternal(1, t1);
+      renameTeamInternal(2, t2);
+    }
+    console.log('[stats_panel] Excel team names:', t1, '/', t2);
+  } catch(_){ }
+});
 
 function applyWinLose(){
   try {
@@ -685,7 +619,7 @@ function updateGameSelect(){
   }
   if(!any){ placeholder.selected=true; gameSelect.appendChild(placeholder); }
 }
-function startInlineRename(idx){ if(!document.getElementById('lolManualMode').checked) return; const th = document.getElementById(idx===1?'lt-team1':'lt-team2'); const cur = idx===1? manualData.team1Name: manualData.team2Name; const input=document.createElement('input'); input.type='text'; input.value=cur; input.style.cssText='width:100%;background:rgba(255,255,255,0.05);border:1px solid #345;padding:2px 4px;color:#fff;font:inherit;text-align:center;'; th.innerHTML=''; th.appendChild(input); input.focus(); input.select(); const commit=()=>{ const v=input.value.trim()||cur; renameTeamInternal(idx,v); }; const cancel=()=>{ renderManual(); }; input.addEventListener('keydown',e=>{ if(e.key==='Enter'){ commit(); } else if(e.key==='Escape'){ cancel(); } }); input.addEventListener('blur', commit); }
+// startInlineRename removed - team names are read-only from Excel K4/N4
 function renderLol(payload, manual=false){
   try {
     ensureRows();
@@ -813,7 +747,7 @@ function renderLol(payload, manual=false){
   document.getElementById('swapTeamsBtn').title='Swap display order of teams';
   // Local Detach button (stats window separation)
   // detach button not present
-  // Live & Manual mode rename handled uniformly by wrapper dblclick (see handleTeamHeaderDblClick)
+  // Team names are read-only (from Excel K4/N4) - no dblclick editing
   // Manual toggle logic extension
   document.getElementById('lolManualMode').addEventListener('change', ()=>{ const on=document.getElementById('lolManualMode').checked; if(on){ if(cachedLive){ manualData.team1Name=cachedLive.team1Name||manualData.team1Name; manualData.team2Name=cachedLive.team2Name||manualData.team2Name; manualData.gameStats = JSON.parse(JSON.stringify(cachedLive.gameStats||manualData.gameStats)); } ensureRows(); attachManualHandlers(); updateGameSelect(); renderManual(); } else { updateGameSelect(); if(liveDataset) renderLol(liveDataset); } try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ } });
   document.getElementById('lolManualMode').addEventListener('change', ()=>{

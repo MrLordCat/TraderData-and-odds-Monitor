@@ -20,6 +20,7 @@ function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
   let lastEmittedMap = null; // last map id we emitted for
   let mapPollTimer = null; // timer id for map change polling
   let lastTemplate = null; // last seen template string from Excel (C1)
+  let lastTeamNames = { team1: null, team2: null }; // last sent team names to avoid spam
 
   function log(){
     if(!verbose) return;
@@ -119,6 +120,25 @@ function createExcelWatcher({ win, store, sendOdds, verbose=false }) {
           broadcastTemplateSync();
         }
       } catch(_){ }
+      
+      // Team names from Excel K4/N4 (if empty - defaults to Team 1/Team 2)
+      try {
+        const t1 = typeof raw.team1Name === 'string' ? raw.team1Name.trim() : '';
+        const t2 = typeof raw.team2Name === 'string' ? raw.team2Name.trim() : '';
+        const team1 = t1 || 'Team 1';
+        const team2 = t2 || 'Team 2';
+        // Only send if changed
+        if(team1 !== lastTeamNames.team1 || team2 !== lastTeamNames.team2){
+          lastTeamNames.team1 = team1;
+          lastTeamNames.team2 = team2;
+          if(win && !win.isDestroyed()){
+            // Broadcast to main window which will trigger IPC update flow
+            win.webContents.send('excel-team-names', { team1, team2 });
+          }
+          log('team names from Excel:', team1, '/', team2);
+        }
+      } catch(_){ }
+      
       // Global status cell (default C6) for frozen detection
       const statusKey = (store.get('excelCurrentStateMapping')||{}).status || 'C6';
       const statusVal = String(cells[statusKey]||'').trim();

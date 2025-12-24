@@ -96,6 +96,7 @@
 
       // Team names
       onTeamNames: (cb) => withUnsub('lol-team-names-update', cb),
+      onExcelTeamNames: (cb) => withUnsub('excel-team-names', cb),
       getTeamNames: () => ipcRenderer.invoke('lol-team-names-get'),
       setTeamNames: (t1,t2) => { try { ipcRenderer.send('lol-team-names-set', { team1:t1, team2:t2 }); } catch(_){} },
 

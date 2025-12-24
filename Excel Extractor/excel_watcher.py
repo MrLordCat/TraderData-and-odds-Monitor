@@ -30,6 +30,8 @@ SHEET_NAME = "InPlay FRONT"
 # Ячейки для чтения
 TEMPLATE_CELL = "C1"  # Имя шаблона (LoL Bo3, LoL Bo5, etc.)
 STATUS_CELL = "C6"    # Статус (Trading/Suspended)
+TEAM1_CELL = "K4"     # Название команды 1
+TEAM2_CELL = "N4"     # Название команды 2
 
 # Map Winner odds: (home, away) для каждой карты
 MAP_CELL_PAIRS: List[tuple] = [
@@ -40,7 +42,7 @@ MAP_CELL_PAIRS: List[tuple] = [
     ("M628", "N628"),  # Map 5
 ]
 
-CELLS: List[str] = [TEMPLATE_CELL, STATUS_CELL] + [c for pair in MAP_CELL_PAIRS for c in pair]
+CELLS: List[str] = [TEMPLATE_CELL, STATUS_CELL, TEAM1_CELL, TEAM2_CELL] + [c for pair in MAP_CELL_PAIRS for c in pair]
 INTERVAL = 0.1  # секунды между чтениями (100ms для быстрого отклика на хоткеи)
 STATE_FILE = Path(__file__).parent / "current_state.json"
 
@@ -139,6 +141,16 @@ def write_state(timestamp: str, full: dict, changed: Optional[dict], first: bool
     template_val = full.get(TEMPLATE_CELL)
     template_str = str(template_val).strip() if template_val else ""
     
+    # Названия команд из K4/N4 (если пусто - Team 1/Team 2)
+    team1_raw = full.get(TEAM1_CELL)
+    team2_raw = full.get(TEAM2_CELL)
+    team1_name = str(team1_raw).strip() if team1_raw else "Team 1"
+    team2_name = str(team2_raw).strip() if team2_raw else "Team 2"
+    if not team1_name:
+        team1_name = "Team 1"
+    if not team2_name:
+        team2_name = "Team 2"
+    
     template_changed = False
     if not first and prev_full:
         template_changed = prev_full.get(TEMPLATE_CELL) != full.get(TEMPLATE_CELL)
@@ -150,6 +162,8 @@ def write_state(timestamp: str, full: dict, changed: Optional[dict], first: bool
         "maps": build_maps(full),
         "template": template_str,
         "maxMaps": get_max_maps_from_template(template_str),
+        "team1Name": team1_name,
+        "team2Name": team2_name,
     }
     
     if not first and prev_full:
