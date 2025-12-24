@@ -263,82 +263,89 @@ function createUpdateManager({ store, mainWindow }) {
     }
   }
 
-  // Create PowerShell script for file replacement
+  // Create batch file for file replacement (no PowerShell required)
   function createUpdateScript(sourceDir, targetDir, exePath) {
-    const scriptPath = path.join(app.getPath('temp'), `oddsmoni-update-${Date.now()}.ps1`);
+    const scriptPath = path.join(app.getPath('temp'), `oddsmoni-update-${Date.now()}.bat`);
     
-    // Escape paths for PowerShell
-    const srcEsc = sourceDir.replace(/'/g, "''");
-    const tgtEsc = targetDir.replace(/'/g, "''");
-    const exeEsc = exePath.replace(/'/g, "''");
-    
-    const script = `# OddsMoni Update Script
-$ErrorActionPreference = "Continue"
-$sourceDir = '${srcEsc}'
-$targetDir = '${tgtEsc}'
-$exePath = '${exeEsc}'
+    // Batch file - works on all Windows without restrictions
+    const script = `@echo off
+chcp 65001 >nul
+title OddsMoni Auto-Updater
 
-Write-Host "OddsMoni Updater"
-Write-Host "================"
-Write-Host "Source: $sourceDir"
-Write-Host "Target: $targetDir"
-Write-Host ""
+echo.
+echo ================================
+echo    OddsMoni Auto-Updater
+echo ================================
+echo.
+echo Source: ${sourceDir}
+echo Target: ${targetDir}
+echo.
 
-# Wait for app to fully close
-Write-Host "Waiting for application to close..."
-Start-Sleep -Seconds 3
+echo Waiting for application to close...
+timeout /t 3 /nobreak >nul
 
-try {
-    # Copy new files over old ones
-    Write-Host "Copying updated files..."
-    
-    # Get all items from source (skip top-level folder if zip extracted with container)
-    $items = Get-ChildItem -Path $sourceDir -Force
-    
-    foreach ($item in $items) {
-        $destPath = Join-Path $targetDir $item.Name
-        Write-Host "  -> $($item.Name)"
-        Copy-Item -Path $item.FullName -Destination $destPath -Recurse -Force
-    }
-    
-    Write-Host ""
-    Write-Host "Update complete!"
-    
-    # Clean up temp extract folder
-    Write-Host "Cleaning up..."
-    Remove-Item -Path $sourceDir -Recurse -Force -ErrorAction SilentlyContinue
-    
-    Write-Host "Starting application..."
-    Start-Sleep -Seconds 1
-    
-    # Start updated app
-    Start-Process -FilePath $exePath
-    
-} catch {
-    Write-Host ""
-    Write-Host "ERROR: Update failed!"
-    Write-Host $_
-    Write-Host ""
-    Write-Host "Press any key to exit..."
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-}
+REM Kill process if still running
+taskkill /F /IM OddsMoni.exe >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+echo.
+echo Copying updated files...
+xcopy /E /Y /Q "${sourceDir}\\*" "${targetDir}\\" >nul
+if errorlevel 1 (
+    echo.
+    echo ================================
+    echo    UPDATE FAILED!
+    echo ================================
+    echo Error copying files.
+    echo.
+    pause
+    exit /b 1
+)
+
+echo.
+echo Update complete!
+
+echo Cleaning up temp files...
+rmdir /S /Q "${sourceDir}" >nul 2>&1
+
+echo.
+echo Starting application...
+timeout /t 1 /nobreak >nul
+
+start "" "${exePath}"
+
+echo Done! This window will close in 3 seconds...
+timeout /t 3 /nobreak >nul
 `;
 
     fs.writeFileSync(scriptPath, script, 'utf8');
     return scriptPath;
   }
 
-  // Broadcast to renderer
+  // Broadcast to renderer (windows and views)
   function broadcast(channel, data) {
+    const eventName = `updater-${channel}`;
     try {
+      // Send to main window
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(`updater-${channel}`, data);
+        mainWindow.webContents.send(eventName, data);
+        // Also send to all BrowserViews attached to main window (settings overlay etc)
+        try {
+          const views = mainWindow.getBrowserViews ? mainWindow.getBrowserViews() : [];
+          views.forEach(view => {
+            try {
+              if (view.webContents && !view.webContents.isDestroyed()) {
+                view.webContents.send(eventName, data);
+              }
+            } catch (_) {}
+          });
+        } catch (_) {}
       }
       // Also send to all BrowserWindows
       BrowserWindow.getAllWindows().forEach(win => {
         try {
           if (!win.isDestroyed()) {
-            win.webContents.send(`updater-${channel}`, data);
+            win.webContents.send(eventName, data);
           }
         } catch (_) {}
       });

@@ -111,7 +111,6 @@ jobs:
             Enable "Dev Channel" in Settings to receive these builds automatically.
           files: dist/${{ env.ZIP_NAME }}
           prerelease: true
-          make_latest: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       

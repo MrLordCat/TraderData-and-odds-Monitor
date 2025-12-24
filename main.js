@@ -82,16 +82,15 @@ try {
   const updateArgIdx = process.argv.indexOf('--apply-update');
   if (updateArgIdx !== -1 && process.argv[updateArgIdx + 1]) {
     const updateScript = process.argv[updateArgIdx + 1];
-    const { spawn } = require('child_process');
+    const { exec } = require('child_process');
     console.log('[updater] Applying update via script:', updateScript);
-    // Run PowerShell script detached (will replace files and restart app)
-    spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', updateScript], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: false
-    }).unref();
-    // Exit immediately so script can replace files
-    process.exit(0);
+    // Run batch file in new visible window
+    const cmd = `start "OddsMoni Update" cmd.exe /c "${updateScript}"`;
+    exec(cmd, { windowsHide: false });
+    // Give it time to start
+    setTimeout(() => process.exit(0), 500);
+    // Prevent app from continuing
+    return;
   }
 } catch (e) {
   console.warn('[updater] apply-update handler failed:', e.message);
