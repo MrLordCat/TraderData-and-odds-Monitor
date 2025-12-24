@@ -121,31 +121,57 @@
     </div>
   </div>
 
-  <!-- Embedded Odds Board Section (collapsed by default) -->
-  <div id="embeddedOddsSection" class="embeddedOddsSection sectionCard collapsible collapsed" data-sec="embeddedOdds" data-collapse-on-header="1">
+  <!-- Embedded Odds Board Section (expanded by default - primary odds display) -->
+  <div id="embeddedOddsSection" class="embeddedOddsSection sectionCard collapsible" data-sec="embeddedOdds" data-collapse-on-header="1">
     <div class="sectionHeader">
       <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
       <span class="accent">Odds Board</span>
-      <span id="embeddedMapTag" class="statusSmall" style="margin-left:8px;display:none;">Map -</span>
-      <label id="embeddedIsLastWrap" class="mapLabel" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;" title="Use match market for final map brokers (bet365)">
-        <input type="checkbox" id="embeddedIsLast" style="margin:0 4px 0 0;vertical-align:middle;" />
-        <span class="font-11 muted" style="opacity:.7;">Last</span>
-      </label>
-      <label class="mapLabel" style="margin-left:4px;display:inline-flex;align-items:center;gap:4px;">
-        <span class="font-11 muted" style="opacity:.7;">Set</span>
-        <select id="embeddedMapSelect" class="font-11" style="padding:2px 4px;">
-          <option value="0">Match</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-        </select>
-      </label>
-      <button id="embeddedMapRefreshBtn" class="btn-sm font-11" title="Re-broadcast current map (refresh odds)" style="margin-left:4px;padding:2px 6px;line-height:1;cursor:pointer;">⟳</button>
-      <span id="embeddedTolBadge" class="statusSmall" title="Auto tolerance (from Settings)" style="margin-left:8px;opacity:.8;">Tol: —</span>
+      <!-- Map controls inline with header -->
+      <div class="oddsHeaderControls">
+        <button id="embeddedIsLast" class="oddsToggleBtn" title="Use match market for final map brokers (bet365)">Last</button>
+        <label class="mapLabel">
+          <span>Set</span>
+          <select id="embeddedMapSelect" class="oddsToolSelect">
+            <option value="0">Match</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </label>
+        <button id="embeddedMapRefreshBtn" class="oddsToolBtn" title="Re-broadcast current map (refresh odds)">⟳</button>
+        <span id="embeddedTolBadge" class="oddsTolBadge" title="Auto tolerance (from Settings)">Tol: —</span>
+      </div>
     </div>
     <div id="embeddedOddsBody" class="embeddedOddsBody sectionBody">
+      <!-- Broker controls toolbar -->
+      <div class="embeddedOddsToolbar">
+        <div class="toolbarGroup">
+          <button id="embeddedAddBroker" class="oddsToolBtn" title="Add broker">+ Broker</button>
+          <select id="embeddedLayoutPreset" class="oddsToolSelect" title="Layout preset">
+            <option value="">Layout</option>
+            <optgroup label="Horizontal">
+              <option value="2x2">2x2</option>
+              <option value="2x3">2x3</option>
+              <option value="3x3">3x3</option>
+              <option value="1x2">1x2</option>
+              <option value="1x2x2">1x2x2</option>
+              <option value="2">2</option>
+            </optgroup>
+            <optgroup label="Vertical">
+              <option value="1x1">1x1</option>
+              <option value="1x1x1">1x1x1</option>
+              <option value="1x1x2">1x1x2</option>
+              <option value="2x2x2">2x2x2</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="toolbarGroup">
+          <button id="embeddedRefreshAll" class="oddsToolBtn" title="Refresh all brokers">⟳ All</button>
+          <button id="embeddedAutoRefresh" class="oddsToggleBtn" title="Auto refresh">Auto</button>
+        </div>
+      </div>
       <table id="embeddedOddsTable" class="embeddedOddsTable tblCompact">
         <thead>
           <tr>
@@ -163,6 +189,7 @@
             <span class="autoDot side1" title="Adjusting side 1"></span>
             <span class="autoDot side2" title="Adjusting side 2"></span>
           </div></td></tr>
+          <tr id="embeddedArbRow"><th>Arb</th><td colspan="3" id="embeddedArbCell">-</td></tr>
         </tfoot>
       </table>
     </div>

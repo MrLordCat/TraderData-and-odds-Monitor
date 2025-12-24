@@ -1,0 +1,75 @@
+# Release workflow - triggers on version tags (v*)
+# Creates GitHub Release with portable zip artifact
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Get version from tag
+        id: get_version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Update package.json version
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $pkg.version = "${{ steps.get_version.outputs.VERSION }}"
+          $pkg | ConvertTo-Json -Depth 100 | Set-Content package.json
+      
+      - name: Build with electron-builder
+        run: npm run dist:dir
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create portable zip
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $zipName = "OddsMoni-$version-win64-portable.zip"
+          Compress-Archive -Force -Path "dist/win-unpacked/*" -DestinationPath "dist/$zipName"
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+          echo "ZIP_PATH=dist/$zipName" >> $env:GITHUB_ENV
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: OddsMoni v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## OddsMoni v${{ steps.get_version.outputs.VERSION }}
+            
+            ### Installation
+            1. Download `${{ env.ZIP_NAME }}`
+            2. Extract to any folder
+            3. Run `OddsMoni.exe`
+            
+            ### Changelog
+            See commit history for changes.
+          files: ${{ env.ZIP_PATH }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

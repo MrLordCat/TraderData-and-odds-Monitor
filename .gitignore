@@ -6,12 +6,14 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 package-lock.json
+
 # Build outputs
 dist/
 dist-pack/
 release/
 *.asar
 *.asar.unpacked/
+build-info.json
 
 # OS junk
 .DS_Store

@@ -1,0 +1,105 @@
+# Dev Build workflow - triggers on push to main
+# Creates dev artifact for auto-update dev channel
+
+name: Dev Build
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.github/copilot-instructions.md'
+      - 'docs/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-dev:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Get short commit SHA
+        id: get_sha
+        shell: bash
+        run: |
+          echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "SHA_FULL=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+      
+      - name: Inject commit info into build
+        shell: pwsh
+        run: |
+          # Create build-info.json with commit details
+          $buildInfo = @{
+            commit = "${{ steps.get_sha.outputs.SHA_FULL }}"
+            commitShort = "${{ steps.get_sha.outputs.SHA_SHORT }}"
+            branch = "main"
+            buildTime = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            channel = "dev"
+          }
+          $buildInfo | ConvertTo-Json | Set-Content "build-info.json"
+          
+          # Also update version in package.json to include commit
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $baseVersion = $pkg.version -replace '-dev\..*$', ''
+          $pkg.version = "$baseVersion-dev.${{ steps.get_sha.outputs.SHA_SHORT }}"
+          $pkg | ConvertTo-Json -Depth 100 | Set-Content package.json
+      
+      - name: Build with electron-builder
+        run: npm run dist:dir
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Copy build-info to dist
+        shell: pwsh
+        run: Copy-Item "build-info.json" "dist/win-unpacked/"
+      
+      - name: Create dev zip
+        shell: pwsh
+        run: |
+          $sha = "${{ steps.get_sha.outputs.SHA_SHORT }}"
+          $zipName = "OddsMoni-dev-$sha-win64.zip"
+          Compress-Archive -Force -Path "dist/win-unpacked/*" -DestinationPath "dist/$zipName"
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+          echo "ZIP_PATH=dist/$zipName" >> $env:GITHUB_ENV
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OddsMoni-dev-${{ steps.get_sha.outputs.SHA_SHORT }}
+          path: dist/${{ env.ZIP_NAME }}
+          retention-days: 30
+      
+      - name: Update dev-latest release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: dev-latest
+          name: Dev Build (Latest)
+          body: |
+            ## Development Build
+            
+            **Commit:** ${{ steps.get_sha.outputs.SHA_FULL }}
+            **Built:** ${{ steps.get_sha.outputs.SHA_SHORT }}
+            
+            ⚠️ This is an unstable development build. Use at your own risk.
+            
+            ### Auto-Update
+            Enable "Dev Channel" in Settings to receive these builds automatically.
+          files: dist/${{ env.ZIP_NAME }}
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

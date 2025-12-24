@@ -25,22 +25,24 @@ function initEmbeddedMapSync(){
   window.desktopAPI.getLastMap().then(v=>{ if(typeof v!=='undefined'){ currentMap=v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } }).catch(()=>{});
     }
     bindEmbeddedMapSelect();
-    // Bind existing 'Last' checkbox placed in Odds Board header
+    // Bind 'Last' toggle button in Odds Board header
     try {
-      const chk = document.getElementById('embeddedIsLast');
-      if(chk && !chk.dataset.bound){
-        chk.dataset.bound='1';
-        chk.addEventListener('change', e=>{
+      const lastBtn = document.getElementById('embeddedIsLast');
+      if(lastBtn && !lastBtn.dataset.bound){
+        lastBtn.dataset.bound='1';
+        let isLast = false;
+        lastBtn.addEventListener('click', ()=>{
           try {
-            const v=!!e.target.checked;
-            if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(v); }
+            isLast = !isLast;
+            lastBtn.classList.toggle('active', isLast);
+            if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(isLast); }
           } catch(_){ }
         });
         if(window.desktopAPI && window.desktopAPI.getIsLast){
-          window.desktopAPI.getIsLast().then(v=>{ try { chk.checked=!!v; } catch(_){ } }).catch(()=>{});
+          window.desktopAPI.getIsLast().then(v=>{ try { isLast = !!v; lastBtn.classList.toggle('active', isLast); } catch(_){ } }).catch(()=>{});
         }
         if(window.desktopAPI && window.desktopAPI.onIsLast){
-          window.desktopAPI.onIsLast(v=>{ try { chk.checked=!!v; } catch(_){ } });
+          window.desktopAPI.onIsLast(v=>{ try { isLast = !!v; lastBtn.classList.toggle('active', isLast); } catch(_){ } });
         }
       }
     } catch(_){ }
@@ -207,6 +209,30 @@ function renderEmbeddedOdds(){
     if(!mid){ midCell.textContent='-'; }
     else { midCell.textContent=`${mid.mid1.toFixed(2)} / ${mid.mid2.toFixed(2)}`; }
   }
+  
+  // Arb calculation: margin = (1/best1 + 1/best2) * 100
+  // Only show if margin < 100% (real arbitrage opportunity)
+  try {
+    const arbCell = document.getElementById('embeddedArbCell');
+    const arbRow = document.getElementById('embeddedArbRow');
+    if(arbCell && arbRow){
+      if(!isNaN(embeddedBest1) && !isNaN(embeddedBest2) && embeddedBest1 > 0 && embeddedBest2 > 0){
+        const margin = (1/embeddedBest1 + 1/embeddedBest2) * 100;
+        const hasArb = margin < 100;
+        if(hasArb){
+          const arbPct = 100 - margin;
+          arbCell.textContent = `+${arbPct.toFixed(2)}% (${embeddedBest1.toFixed(2)} / ${embeddedBest2.toFixed(2)})`;
+          arbCell.classList.add('arb-positive');
+          arbRow.style.display = '';
+        } else {
+          arbRow.style.display = 'none';
+        }
+      } else {
+        arbRow.style.display = 'none';
+      }
+    }
+  } catch(_){ }
+  
   try {
     const h1=document.querySelector('#lt-team1 .teamNameWrap')?.textContent || 'Side 1';
     const h2=document.querySelector('#lt-team2 .teamNameWrap')?.textContent || 'Side 2';
@@ -416,6 +442,106 @@ document.addEventListener('click', e=>{
     }
     renderEmbeddedOdds();
   } catch(_){ }
+});
+
+// ======= Unified panel toolbar bindings =======
+function initEmbeddedToolbar(){
+  try {
+    const addBtn = document.getElementById('embeddedAddBroker');
+    const layoutSel = document.getElementById('embeddedLayoutPreset');
+    const refreshBtn = document.getElementById('embeddedRefreshAll');
+    const autoChk = document.getElementById('embeddedAutoRefresh');
+    
+    // Add broker
+    if(addBtn){
+      let pickerEl = null;
+      let pickerOpen = false;
+      
+      function closePicker(){ pickerOpen = false; try { if(pickerEl) pickerEl.classList.add('hidden'); } catch(_){ } }
+      
+      async function openPicker(){
+        try {
+          if(!pickerEl){
+            pickerEl = document.createElement('div');
+            pickerEl.id = 'embeddedBrokerPicker';
+            pickerEl.className = 'brokerPicker panel-base hidden';
+            pickerEl.innerHTML = '<div class="brokerPickerTitle">Add broker</div><div class="brokerPickerList" role="menu"></div>';
+            document.body.appendChild(pickerEl);
+          }
+          
+          const list = pickerEl.querySelector('.brokerPickerList');
+          if(list) list.innerHTML = '<div class="brokerPickerEmpty muted">Loading…</div>';
+          
+          const r = addBtn.getBoundingClientRect();
+          pickerEl.style.position = 'fixed';
+          pickerEl.style.left = Math.max(6, Math.min(window.innerWidth - 240, r.left)) + 'px';
+          pickerEl.style.top = (r.bottom + 6) + 'px';
+          pickerEl.classList.remove('hidden');
+          pickerOpen = true;
+          
+          const data = await (window.desktopAPI?.getBrokersForPicker ? window.desktopAPI.getBrokersForPicker() : Promise.resolve({ brokers:[], active:[] }));
+          const brokers = Array.isArray(data?.brokers) ? data.brokers : [];
+          const active = Array.isArray(data?.active) ? data.active : [];
+          const inactive = brokers.filter(b => b?.id && !active.includes(b.id));
+          
+          if(!list) return;
+          if(!inactive.length){
+            list.innerHTML = '<div class="brokerPickerEmpty muted">No available brokers</div>';
+            return;
+          }
+          
+          list.innerHTML = '';
+          inactive.forEach(b => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'brokerPickBtn';
+            btn.setAttribute('role', 'menuitem');
+            btn.textContent = b.title || b.name || b.id;
+            btn.title = b.id;
+            btn.addEventListener('click', ()=>{
+              try { window.desktopAPI?.addBroker(b.id); } catch(_){ }
+              closePicker();
+            });
+            list.appendChild(btn);
+          });
+        } catch(_){ }
+      }
+      
+      addBtn.addEventListener('click', ()=>{ if(pickerOpen) closePicker(); else openPicker(); });
+      document.addEventListener('click', e=>{ if(pickerOpen && pickerEl && !pickerEl.contains(e.target) && e.target !== addBtn) closePicker(); });
+      window.addEventListener('keydown', e=>{ if(pickerOpen && e.key === 'Escape') closePicker(); });
+    }
+    
+    // Layout preset
+    if(layoutSel){
+      window.desktopAPI?.getLayoutPreset?.().then(p=>{ try { if(p) layoutSel.value = p; } catch(_){ } }).catch(()=>{});
+      layoutSel.addEventListener('change', ()=>{ try { if(layoutSel.value) window.desktopAPI?.applyLayoutPreset(layoutSel.value); } catch(_){ } });
+    }
+    
+    // Refresh all
+    if(refreshBtn){
+      refreshBtn.addEventListener('click', ()=>{ try { window.desktopAPI?.refreshAll?.(); } catch(_){ } });
+    }
+    
+    // Auto refresh toggle button
+    if(autoChk){
+      let autoEnabled = false;
+      window.desktopAPI?.getAutoRefreshEnabled?.().then(v=>{ try { autoEnabled = !!v; autoChk.classList.toggle('active', autoEnabled); } catch(_){ } }).catch(()=>{});
+      autoChk.addEventListener('click', ()=>{ 
+        try { 
+          autoEnabled = !autoEnabled;
+          autoChk.classList.toggle('active', autoEnabled);
+          window.desktopAPI?.setAutoRefreshEnabled?.(autoEnabled); 
+        } catch(_){ } 
+      });
+      window.desktopAPI?.onAutoRefreshUpdated?.(p=>{ try { autoEnabled = !!(p?.enabled); autoChk.classList.toggle('active', autoEnabled); } catch(_){ } });
+    }
+  } catch(e){ console.warn('[embeddedToolbar] init error', e); }
+}
+
+// Initialize toolbar on DOMContentLoaded
+window.addEventListener('DOMContentLoaded', ()=>{
+  try { initEmbeddedToolbar(); } catch(_){ }
 });
 
 // (Legacy embedded auto code removed – unified Auto Core is used via auto_trader.js)

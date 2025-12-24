@@ -36,22 +36,56 @@ try {
   });
 } catch(_){ }
 
-// Board: always docked. Splitter keeps width adjustments.
+// Unified side panel: splitter for width adjustments
+// Panel is now always docked (stats panel replaces separate board)
 const splitter=document.getElementById('boardSplitter');
-let boardState=null; let resizing=false; let startX=0; let startWidth=0;
-function applyBoardState(st){
-  boardState=st; if(!st) return;
+let panelState=null; let resizing=false; let startX=0; let startWidth=0;
+
+function applyPanelState(st){
+  panelState=st; if(!st) return;
   document.body.classList.toggle('board-docked-left', st.side==='left');
   document.body.classList.toggle('board-docked-right', st.side!=='left');
   splitter.style.display='block';
   computeStage();
 }
-window.desktopAPI.onBoardUpdated(applyBoardState);
-window.desktopAPI.getBoardState().then(applyBoardState);
-splitter.addEventListener('mousedown', e=>{ if(!boardState) return; resizing=true; startX=e.clientX; startWidth=boardState.width; splitter.classList.add('dragging'); document.body.style.userSelect='none'; });
-window.addEventListener('mousemove', e=>{ if(!resizing) return; const dx=e.clientX-startX; let newW=startWidth; if(boardState.side==='left'){ newW = startWidth + dx; } else { newW = startWidth - dx; } newW=Math.max(240, Math.min(800, newW)); window.desktopAPI.boardSetWidth(newW); });
-window.addEventListener('mouseup', ()=>{ if(resizing){ resizing=false; splitter.classList.remove('dragging'); document.body.style.userSelect=''; } });
+
+// Listen for panel state updates (board-updated channel used for backward compatibility)
+window.desktopAPI.onBoardUpdated(applyPanelState);
+window.desktopAPI.getBoardState().then(applyPanelState);
+
+// Splitter drag handling
+splitter.addEventListener('mousedown', e=>{ 
+  if(!panelState) return; 
+  resizing=true; 
+  startX=e.clientX; 
+  startWidth=panelState.width; 
+  splitter.classList.add('dragging'); 
+  document.body.style.userSelect='none'; 
+});
+
+window.addEventListener('mousemove', e=>{ 
+  if(!resizing) return; 
+  const dx=e.clientX-startX; 
+  let newW=startWidth; 
+  if(panelState.side==='left'){ 
+    newW = startWidth + dx; 
+  } else { 
+    newW = startWidth - dx; 
+  } 
+  newW=Math.max(280, Math.min(600, newW)); 
+  window.desktopAPI.boardSetWidth(newW); 
+});
+
+window.addEventListener('mouseup', ()=>{ 
+  if(resizing){ 
+    resizing=false; 
+    splitter.classList.remove('dragging'); 
+    document.body.style.userSelect=''; 
+  } 
+});
+
 window.desktopAPI.onUIBlurOn?.(()=> document.body.classList.add('overlay-blur'));
 window.desktopAPI.onUIBlurOff?.(()=> document.body.classList.remove('overlay-blur'));
 
 // (Excel URL modal logic moved to dedicated BrowserView overlay)
+

@@ -355,7 +355,7 @@ function bootstrap() {
   // (Removed: DataServices prompt IPC)
   // (Legacy Marathon migration logic removed – Marathon now treated like any other broker)
   brokerManager.createAll();
-  // Board manager (docking system)
+  // Board manager (virtual - no longer creates its own BrowserView)
   const { createBoardManager } = require('./modules/board');
   boardManager = createBoardManager({
     mainWindow,
@@ -363,15 +363,32 @@ function bootstrap() {
     layoutManager,
     latestOddsRef,
     activeBrokerIdsRef,
-  stageBoundsRef,
+    stageBoundsRef,
     hotkeys,
     replayOddsFn: (id)=> broadcastPlaceholderOdds(id)
   });
-  boardManager.init();
   boardManagerRef.value = boardManager;
 
   // Hotkeys were created after statsManager; inject so fresh stats views get handlers.
   try { if(statsManager && typeof statsManager.setHotkeys==='function') statsManager.setHotkeys(hotkeys); } catch(_){ }
+  
+  // Link boardManager and statsManager for unified panel
+  try { if(statsManager && typeof statsManager.setBoardManagerRef==='function') statsManager.setBoardManagerRef(boardManagerRef); } catch(_){ }
+  
+  // Create unified side panel (stats panel is now always docked)
+  try {
+    const offsetY = stageBoundsRef && stageBoundsRef.value ? Number(stageBoundsRef.value.y) : 0;
+    statsManager.createPanel(offsetY);
+    // Link panel view to boardManager for odds forwarding
+    const panelView = statsManager.getPanelView && statsManager.getPanelView();
+    if(panelView && boardManager.setStatsPanelRef){
+      boardManager.setStatsPanelRef({ value: panelView });
+    }
+  } catch(e){ console.warn('[bootstrap] createPanel failed', e.message); }
+  
+  // Initialize boardManager after panel is created
+  boardManager.init();
+  
   // Cleanup stray bilibili/generic views (removed from supported sources). Closes any broker ids containing 'bilibili'.
   try {
     const stray = activeBrokerIdsRef.value.filter(id=> /bilibili/i.test(id));
@@ -476,29 +493,25 @@ function bootstrap() {
 
 function toggleStatsEmbedded(){
   if(!mainWindow || mainWindow.isDestroyed()) return;
-  if(statsState.mode==='hidden'){
-    // NOTE: Раньше мы удаляли ВСЕ broker BrowserView (removeBrowserView) и потом добавляли обратно,
-    // что вызывало многократное накопление внутренних служебных 'closed' listeners в Electron.
-    // Теперь мы НЕ снимаем брокерские вью — просто кладём поверх них stats BrowserViews (они добавятся последними).
-    // При необходимости скрытия CPU нагрузки можно позже добавить shrink/restore bounds, но сейчас главное – остановить listener leak.
-  // Removed auto-detach of docked board: it now remains docked under stats views.
+  
+  // With unified panel architecture, stats toggle now shows/hides A/B views
+  // Panel is always visible, only stats views (A/B) are toggled
+  const isStatsActive = statsManager && statsManager.isStatsActive && statsManager.isStatsActive();
+  
+  if(!isStatsActive){
+    // Show stats views (A/B)
     const offsetY = stageBoundsRef && stageBoundsRef.value ? Number(stageBoundsRef.value.y) : 0;
-    try { console.log('[stats][toggle] createEmbedded with offsetY', offsetY); } catch(_){ }
-  statsManager.createEmbedded(offsetY);
-  statsState.mode='embedded'; // (log window no longer auto-opens)
-  try { statsState.panelHidden = !!statsManager.getPanelHidden?.(); } catch(_){ }
-  } else if(statsState.mode==='embedded') {
-    statsManager.destroyEmbedded();
-    // Брокерские вью никогда не удалялись -> не нужно addBrowserView, иначе снова накопим listeners.
-  // No reattach needed (we never detached board for stats embed).
-    statsState.mode='hidden';
-  } else if(statsState.mode==='window') {
-    // If window is open, focus instead of embedding (explicit detach path remains)
-  try { statsManager.open(); } catch(_){ }
-    return;
+    try { console.log('[stats][toggle] createStatsViews with offsetY', offsetY); } catch(_){ }
+    statsManager.createStatsViews(offsetY);
+    statsState.mode = 'embedded';
+  } else {
+    // Hide stats views (A/B), panel remains visible
+    statsManager.hideStatsViews();
+    statsState.mode = 'hidden';
   }
+  
   try {
-    if(statsManager && statsManager.getPanelHidden) statsState.panelHidden = !!statsManager.getPanelHidden();
+    statsState.panelHidden = false; // Panel is always visible now
     mainWindow.webContents.send('stats-state-updated', statsState);
   } catch(_){ }
 }

@@ -85,6 +85,15 @@
       boardSetSide: (side) => { try { ipcRenderer.send('board-set-side', { side }); } catch(_){} },
       boardSetWidth: (width) => { try { ipcRenderer.send('board-set-width', { width }); } catch(_){} },
 
+      // Broker picker
+      getBrokersForPicker: () => ipcRenderer.invoke('picker-list-brokers'),
+      addBroker: (id) => { try { ipcRenderer.send('add-broker-selected', { id }); } catch(_){} },
+
+      // Layout presets
+      getLayoutPreset: () => ipcRenderer.invoke('get-layout-preset'),
+      applyLayoutPreset: (id) => { try { ipcRenderer.send('apply-layout-preset', id); } catch(_){} },
+      refreshAll: () => { try { ipcRenderer.send('refresh-all'); } catch(_){} },
+
       // Team names
       onTeamNames: (cb) => withUnsub('lol-team-names-update', cb),
       getTeamNames: () => ipcRenderer.invoke('lol-team-names-get'),
