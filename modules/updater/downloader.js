@@ -76,44 +76,29 @@ function downloadUpdate(url, destPath, onProgress) {
   });
 }
 
-// Extract zip using built-in zlib + manual zip parsing
-// For simplicity, we'll use PowerShell on Windows
+// Extract zip using adm-zip (pure JavaScript, no PowerShell)
 async function extractUpdate(zipPath, destDir) {
   return new Promise((resolve, reject) => {
-    // Ensure dest dir exists
-    if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true });
-    }
-
-    // Use PowerShell Expand-Archive on Windows
-    const { spawn } = require('child_process');
-    
-    const ps = spawn('powershell', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      `Expand-Archive -Path "${zipPath}" -DestinationPath "${destDir}" -Force`
-    ], {
-      windowsHide: true
-    });
-
-    let stderr = '';
-    ps.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    ps.on('close', (code) => {
-      if (code === 0) {
-        console.log(`[downloader] Extracted to: ${destDir}`);
-        resolve(destDir);
-      } else {
-        reject(new Error(`Extraction failed (code ${code}): ${stderr}`));
+    try {
+      // Ensure dest dir exists
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
       }
-    });
 
-    ps.on('error', (err) => {
-      reject(new Error(`Failed to start PowerShell: ${err.message}`));
-    });
+      console.log(`[downloader] Starting extraction: ${zipPath} -> ${destDir}`);
+      
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(zipPath);
+      
+      // Extract all entries
+      zip.extractAllTo(destDir, true); // true = overwrite
+      
+      console.log(`[downloader] Extracted to: ${destDir}`);
+      resolve(destDir);
+    } catch (err) {
+      console.error(`[downloader] Extraction error: ${err.message}`);
+      reject(new Error(`Extraction failed: ${err.message}`));
+    }
   });
 }
 

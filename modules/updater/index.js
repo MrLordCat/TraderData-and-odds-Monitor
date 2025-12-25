@@ -184,17 +184,23 @@ function createUpdateManager({ store, mainWindow }) {
       const zipPath = path.join(tempDir, `oddsmoni-update-${Date.now()}.zip`);
 
       console.log(`[updater] Downloading update from ${update.downloadUrl}`);
+      console.log(`[updater] Saving to: ${zipPath}`);
 
       await downloadUpdate(update.downloadUrl, zipPath, (progress) => {
         downloadProgress = progress;
         broadcast('downloading', { percent: progress });
       });
 
+      console.log(`[updater] Download complete, starting extraction...`);
       broadcast('extracting', { percent: 100 });
 
       // Extract to temp folder
       const extractDir = path.join(tempDir, `oddsmoni-update-${Date.now()}`);
+      console.log(`[updater] Extracting to: ${extractDir}`);
+      
       await extractUpdate(zipPath, extractDir);
+      
+      console.log(`[updater] Extraction complete!`);
 
       // Clean up zip
       try { fs.unlinkSync(zipPath); } catch (_) {}
@@ -203,9 +209,10 @@ function createUpdateManager({ store, mainWindow }) {
       
       // Save pending update path for restart
       store.set('pendingUpdate', extractDir);
+      console.log(`[updater] Broadcasting update-ready`);
       broadcast('update-ready', { extractDir });
     } catch (err) {
-      console.error('[updater] Download failed:', err.message);
+      console.error('[updater] Download/extract failed:', err.message);
       downloading = false;
       broadcast('update-error', { message: err.message });
     }

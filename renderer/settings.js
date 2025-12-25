@@ -455,10 +455,13 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		setStatus('Checking...');
 		try {
 			const result = await ipcRenderer.invoke('updater-check');
-			if(result && result.available){
-				pendingUpdate = { version: result.version, url: result.url };
+			// result is the update object or null
+			if(result && result.version){
+				pendingUpdate = { version: result.version, url: result.downloadUrl };
 				updateReady = false;
 				setStatus(`Update available: ${result.version}`);
+			} else if(result && result.error){
+				setStatus('Check failed: ' + result.error);
 			} else {
 				pendingUpdate = null;
 				updateReady = false;
