@@ -45,6 +45,22 @@ function bindStatsTopbar(){
   try {
     byId('spSettings')?.addEventListener('click', ()=>{ try { ipcRenderer.send('open-settings'); } catch(_){ } });
   } catch(_){ }
+
+  // Update badge: show when update available
+  try {
+    const updateBadge = byId('spUpdateBadge');
+    const showBadge = () => { if(updateBadge) updateBadge.hidden = false; };
+    const hideBadge = () => { if(updateBadge) updateBadge.hidden = true; };
+    
+    // Check initial state
+    ipcRenderer.invoke('updater-get-status').then(st => {
+      if(st && st.availableUpdate) showBadge();
+    }).catch(()=>{});
+    
+    // Listen for update events
+    ipcRenderer.on('updater-update-available', showBadge);
+    ipcRenderer.on('updater-update-not-available', hideBadge);
+  } catch(_){ }
 }
 
 try {

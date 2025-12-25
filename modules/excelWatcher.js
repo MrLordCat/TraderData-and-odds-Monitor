@@ -227,12 +227,12 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
       ensureWatcher(resolved);
     }
     readAndEmit('poll');
-    pollTimer = setTimeout(poll, 2000);
+    pollTimer = setTimeout(poll, 200); // 200ms for responsive Excel sync
   }
 
   // Initial path resolution & start
   ensureWatcher(resolvePath());
-  setTimeout(()=> readAndEmit('init'), 1200);
+  setTimeout(()=> readAndEmit('init'), 300);
   poll();
 
   // Map change polling: re-emit current cached data if user switches map without Excel file changing.
