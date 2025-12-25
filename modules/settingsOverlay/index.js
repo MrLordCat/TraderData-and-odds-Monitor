@@ -47,6 +47,8 @@ function createSettingsOverlay(ctx){
       const mb = ctx.mainWindow.getBounds();
       settingsView.setBounds({ x:0,y:0,width:mb.width,height:mb.height });
     } catch(_){ }
+    // Bring settings to top (above all other BrowserViews including sidebar and stats)
+    try { ctx.mainWindow.setTopBrowserView(settingsView); } catch(_){ }
     applyBlurToBrokers();
     try { ctx.mainWindow.webContents.send('ui-blur-on'); } catch(_){ }
   }
