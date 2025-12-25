@@ -509,13 +509,13 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	});
 
 	// Listen for updater events
-	ipcRenderer.on('updater-available', (_e, info)=>{
+	ipcRenderer.on('updater-update-available', (_e, info)=>{
 		pendingUpdate = { version: info.version, url: info.url };
 		updateReady = false;
 		setStatus(`Update available: ${info.version}`);
 		updateButtonState();
 	});
-	ipcRenderer.on('updater-not-available', ()=>{
+	ipcRenderer.on('updater-update-not-available', ()=>{
 		pendingUpdate = null;
 		updateReady = false;
 		setStatus('Already up to date');
@@ -530,14 +530,14 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		showProgress(100);
 		setStatus('Extracting...');
 	});
-	ipcRenderer.on('updater-ready', ()=>{
+	ipcRenderer.on('updater-update-ready', ()=>{
 		updateReady = true;
 		setStatus('Update ready - click Restart to apply');
 		showProgress(100);
 		updateButtonState();
 		checkBtn.disabled = false;
 	});
-	ipcRenderer.on('updater-error', (_e, err)=>{
+	ipcRenderer.on('updater-update-error', (_e, err)=>{
 		setStatus('Error: ' + (err.message || err));
 		hideProgress();
 		checkBtn.disabled = false;

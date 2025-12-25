@@ -340,11 +340,8 @@ del "%TEMP%\\oddsmoni-start.vbs" >nul 2>&1
     // Auto-check on startup after delay
     if (getAutoCheck()) {
       setTimeout(async () => {
-        const update = await check(true);
-        // If update found on startup, show overlay notification
-        if (update) {
-          broadcast('startup-available', update);
-        }
+        // check() will broadcast 'update-available' if update found
+        await check(true);
       }, 10000); // 10 sec after startup
       
       // Periodic check
