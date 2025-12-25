@@ -419,8 +419,11 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 					setStatus('Checking...');
 				} else if(status.downloading){
 					setStatus(`Downloading... ${status.downloadProgress || 0}%`);
+				} else if(status.lastCheck){
+					// Check was done, no update found
+					setStatus('Already up to date');
 				} else {
-					setStatus('Ready to check');
+					setStatus('—');
 				}
 				updateButtonState();
 			}

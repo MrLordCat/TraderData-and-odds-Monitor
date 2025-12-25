@@ -154,6 +154,16 @@ class OddsBoardModule extends SidebarModule {
     this.subscribeIpc('onAutoStateUpdated', (state) => {
       this.updateAutoState(state);
     });
+    
+    // Subscribe to Excel extractor status for script map badge
+    this.subscribeIpc('onExcelExtractorStatus', (status) => {
+      this.updateScriptMapBadge(status);
+    });
+    
+    // Load initial Excel status
+    api.getExcelExtractorStatus?.().then(status => {
+      this.updateScriptMapBadge(status);
+    }).catch(() => {});
   }
   
   loadInitialState() {
@@ -298,6 +308,41 @@ class OddsBoardModule extends SidebarModule {
     
     if (status && state?.status) {
       status.textContent = state.status;
+    }
+  }
+  
+  updateScriptMapBadge(status) {
+    const badge = this.$('#script-map-badge');
+    if (!badge) return;
+    
+    const isRunning = status && status.running;
+    const scriptMap = (isRunning && status && typeof status.scriptMap === 'number') ? status.scriptMap : null;
+    
+    if (scriptMap === null) {
+      badge.textContent = '—';
+      badge.classList.remove('md-badge--success', 'md-badge--error');
+      badge.classList.add('md-badge--secondary');
+      badge.title = isRunning 
+        ? 'Script map unknown' 
+        : 'Script not running';
+    } else {
+      badge.textContent = String(scriptMap);
+      // Compare with board map
+      const mapSelect = this.$('#map-select');
+      const boardMap = mapSelect ? parseInt(mapSelect.value, 10) : null;
+      const matches = (boardMap !== null && !isNaN(boardMap) && boardMap === scriptMap);
+      
+      badge.classList.remove('md-badge--secondary', 'md-badge--success', 'md-badge--error');
+      badge.classList.add(matches ? 'md-badge--success' : 'md-badge--error');
+      badge.title = matches 
+        ? `Script map: ${scriptMap} (matches board)`
+        : `Script map: ${scriptMap} (MISMATCH! Board: ${boardMap || '?'})`;
+    }
+    
+    // Also update script button state
+    const scriptBtn = this.$('#script-btn');
+    if (scriptBtn) {
+      scriptBtn.classList.toggle('active', isRunning);
     }
   }
 }

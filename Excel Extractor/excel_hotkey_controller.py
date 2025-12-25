@@ -3,7 +3,6 @@
 Hotkeys:
     NumpadSub (Numpad-) -> PreviousOddsHome (decrease home odds)
     NumpadAdd (Numpad+) -> NextOddsHome (increase home odds)
-    NumpadMul (Numpad*) -> Cycle map (1->2->...->max->1, respects Bo1/Bo3/Bo5)
     Numpad0 -> Send Update (Add-in button)
     Numpad1 -> Suspend current map (CurrentMapSuspend button)
     F21 -> Suspend + Send Update (auto mode trigger)
@@ -11,6 +10,9 @@ Hotkeys:
     F23 -> PreviousOddsHome (external trigger)
     F24 -> NextOddsHome (external trigger)
     Esc or Ctrl+C -> Exit
+
+Map selection is synchronized from Odds Board via template_sync.json.
+Manual map switching via Numpad* is disabled - map follows Board selection.
 
 Reads current map from template_sync.json.
 Detects max maps from template (C1): Bo1=1, Bo3=3, Bo5=5.
@@ -81,7 +83,6 @@ class ExcelOddsHotkeyController:
         self._connected = False
         self._command_queue = Queue()  # Command queue for main thread execution
         self._running = True
-        self._manual_map_override = 0  # If >0, use instead of template_sync.json
         # Key hold state tracking - prevent repeat until odds change
         self._key_held = {}  # key_name -> {'snapshot': (home, away), 'pending': bool}
         self._last_odds_snapshot = None  # (home, away) tuple for current map
@@ -166,11 +167,7 @@ class ExcelOddsHotkeyController:
             pass  # Silent fail - file is optional
     
     def read_current_map(self) -> int:
-        """Read current map from template_sync.json or use manual override."""
-        # If manual override set - use it
-        if self._manual_map_override > 0:
-            return self._manual_map_override
-        
+        """Read current map from template_sync.json (synced from Odds Board)."""
         try:
             if SYNC_FILE.exists():
                 data = json.loads(SYNC_FILE.read_text(encoding='utf-8'))
@@ -180,24 +177,6 @@ class ExcelOddsHotkeyController:
         except:
             pass
         return self._current_map
-    
-    def cycle_map(self):
-        """Cycle map (1->2->...->max->1) respecting Bo1/Bo3/Bo5."""
-        # Update max_maps in case template changed
-        self._update_max_maps()
-        
-        current = self.read_current_map()
-        
-        # Cycle within max_maps
-        if current >= self._max_maps:
-            new_map = 1
-        else:
-            new_map = current + 1
-        
-        self._manual_map_override = new_map
-        self._current_map = new_map
-        print(f"[MAP] Switched: Map {current} -> Map {new_map} (max: {self._max_maps})")
-        self.write_status()  # Notify Electron of map change
     
     def get_row_for_current_map(self) -> int:
         """Get row for current map."""
@@ -420,8 +399,9 @@ class ExcelOddsHotkeyController:
             blocked = " [BLOCKED]" if self.is_cell_blocked(row) else ""
             print(f"{marker} Map {map_num} (row {row}): Home={home}, Away={away}{blocked}")
         print("="*50)
-        print("Hotkeys: Numpad- (prev), Numpad+ (next), Numpad* (map), Numpad0 (update), Numpad1 (suspend)")
+        print("Hotkeys: Numpad- (prev), Numpad+ (next), Numpad0 (update), Numpad1 (suspend)")
         print("         F21 (suspend+update), F22 (update), F23 (prev), F24 (next), Esc (exit)")
+        print("Map selection synced from Odds Board (no manual override)")
         print()
     
     # Hotkey handlers - only add command to queue!
@@ -432,10 +412,6 @@ class ExcelOddsHotkeyController:
     def on_hotkey_next(self):
         """Handler for Numpad+ / F24."""
         self._command_queue.put('next')
-    
-    def on_hotkey_cycle_map(self):
-        """Handler for Numpad* - map cycling."""
-        self._command_queue.put('cycle_map')
     
     def on_hotkey_suspend(self):
         """Handler for Numpad1 - suspend current map."""
@@ -477,8 +453,6 @@ class ExcelOddsHotkeyController:
                     # Key released - mark in state
                     if key_name:
                         self._key_released(key_name)
-                elif cmd_name == 'cycle_map':
-                    self.cycle_map()
                 elif cmd_name == 'suspend':
                     self.click_suspend_button()
                 elif cmd_name == 'send_update':
@@ -502,7 +476,6 @@ class ExcelOddsHotkeyController:
         print("Hotkeys active:")
         print("  Numpad-  -> Decrease Home odds (PreviousOddsHome)")
         print("  Numpad+  -> Increase Home odds (NextOddsHome)")
-        print(f"  Numpad*  -> Cycle map (1->...>{self._max_maps}->1)")
         print("  Numpad0  -> Send Update (Add-in)")
         print("  Numpad1  -> Suspend current map")
         print("  F21      -> Suspend + Update (auto mode)")
@@ -532,11 +505,6 @@ class ExcelOddsHotkeyController:
         keyboard.on_press_key('num plus', on_numpad_plus_down, suppress=True)
         keyboard.on_release_key('num plus', on_numpad_plus_up)
         
-        # Numpad* - try multiple methods
-        try:
-            keyboard.on_press_key(55, lambda _: self.on_hotkey_cycle_map())  # scan_code 55 = Numpad*
-        except:
-            pass
         # F21-F24 for auto mode - use hook because SendInput sends virtual keys with negative scan codes
         # F23/F24 also track press/release for hold prevention
         def on_fkey(e):

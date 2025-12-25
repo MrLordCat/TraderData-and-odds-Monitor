@@ -115,13 +115,18 @@ function bindExcelStatusButton(opts){
   
   function updateScriptMapBadge(status){
     if(!scriptMapBadge) return;
-    const scriptMap = (status && typeof status.scriptMap === 'number') ? status.scriptMap : null;
+    
+    // Show dash if script is not running
+    const isRunning = status && status.running;
+    const scriptMap = (isRunning && status && typeof status.scriptMap === 'number') ? status.scriptMap : null;
     lastScriptMap = scriptMap;
     
     if(scriptMap === null){
       scriptMapBadge.textContent = '-';
       scriptMapBadge.className = 'scriptMapBadge';
-      scriptMapBadge.title = 'Script map unknown (Python hotkey controller not running?)';
+      scriptMapBadge.title = isRunning 
+        ? 'Script map unknown (Python hotkey controller not running?)' 
+        : 'Script not running';
     } else {
       scriptMapBadge.textContent = String(scriptMap);
       // Compare with board map
