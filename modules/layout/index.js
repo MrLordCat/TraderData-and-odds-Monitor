@@ -1,7 +1,7 @@
 // Layout / preset management extracted from main.js
 // Provides grid preset application, basic flow relayout, and helper bounds sanitation.
 
-const { constants } = require('..');
+const constants = require('../utils/constants');
 function createLayoutManager({ store, mainWindowRef, views, BROKERS, stageBoundsRef, activeBrokerIdsRef, hotkeysRef, GAP = constants.VIEW_GAP }) {
   // New semantics: preset id like "1x2x3" means rows with 1,2,3 brokers respectively.
   const LAYOUT_PRESETS = {

@@ -188,9 +188,8 @@ try {
   }
 } catch(_){}
 // --- Broker health tracking (stale odds auto-refresh) ---
-const brokerHealth = {}; // id -> { lastChange, lastOdds, lastRefresh }
-const STALE_MS = constants.STALE_MS; // centralized (5 minutes)
-const HEALTH_CHECK_INTERVAL = constants.HEALTH_CHECK_INTERVAL; // centralized (60s)
+const brokerHealth = {}; // id -> { lastChange, lastOdds, lastRefresh, missingStart }
+const HEALTH_CHECK_INTERVAL = constants.HEALTH_CHECK_INTERVAL; // 10s check interval
 // Persisted auto-refresh feature flag (default ON when undefined)
 let autoRefreshEnabled = (()=>{ const v = store.get('autoRefreshEnabled'); return (v === undefined ? true : !!v); })();
 // Track initial load/network failures to retry before showing fallback error page
@@ -500,7 +499,7 @@ function bootstrap() {
   initExcelExtractorIpc({ ipcMain, controller: excelExtractorController });
   // Expose mutable refs for diagnostic / future module hot-swap
   try { Object.defineProperty(global, '__oddsMoniSync', { value:{ autoRefreshEnabledRef, lolTeamNamesRef }, enumerable:false }); } catch(_){}
-  staleMonitor = createStaleMonitor({ intervalMs: HEALTH_CHECK_INTERVAL, staleMs: STALE_MS, brokerHealth, views, enabledRef:{ value: true }, onReload:(id)=>{ try { views[id].webContents.reloadIgnoringCache(); } catch(e){} } });
+  staleMonitor = createStaleMonitor({ intervalMs: HEALTH_CHECK_INTERVAL, brokerHealth, views, store, onReload:(id)=>{ try { views[id].webContents.reloadIgnoringCache(); } catch(e){} } });
   // Restore previously saved layout preset (after views created)
   try {
     const savedPreset = store.get('layoutPreset');

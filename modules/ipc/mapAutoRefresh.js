@@ -1,7 +1,7 @@
 // Periodic map re-broadcast (odds refresh) shared status
 // initMapAutoRefreshIpc({ ipcMain, store, mainWindow, boardManager, statsManager })
 
-const INTERVAL_MS = 30_000; // 30s user requirement
+const INTERVAL_MS = 10_000; // 10s auto reselect interval
 
 function initMapAutoRefreshIpc({ ipcMain, store, mainWindow, boardManager, statsManager, views }) {
   const stateRef = { value: !!store.get('mapAutoRefreshEnabled') };

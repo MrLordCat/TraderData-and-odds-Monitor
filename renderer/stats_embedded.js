@@ -450,7 +450,6 @@ function initEmbeddedToolbar(){
     const addBtn = document.getElementById('embeddedAddBroker');
     const layoutSel = document.getElementById('embeddedLayoutPreset');
     const refreshBtn = document.getElementById('embeddedRefreshAll');
-    const autoChk = document.getElementById('embeddedAutoRefresh');
     
     // Add broker
     if(addBtn){
@@ -521,20 +520,6 @@ function initEmbeddedToolbar(){
     // Refresh all
     if(refreshBtn){
       refreshBtn.addEventListener('click', ()=>{ try { window.desktopAPI?.refreshAll?.(); } catch(_){ } });
-    }
-    
-    // Auto refresh toggle button
-    if(autoChk){
-      let autoEnabled = false;
-      window.desktopAPI?.getAutoRefreshEnabled?.().then(v=>{ try { autoEnabled = !!v; autoChk.classList.toggle('active', autoEnabled); } catch(_){ } }).catch(()=>{});
-      autoChk.addEventListener('click', ()=>{ 
-        try { 
-          autoEnabled = !autoEnabled;
-          autoChk.classList.toggle('active', autoEnabled);
-          window.desktopAPI?.setAutoRefreshEnabled?.(autoEnabled); 
-        } catch(_){ } 
-      });
-      window.desktopAPI?.onAutoRefreshUpdated?.(p=>{ try { autoEnabled = !!(p?.enabled); autoChk.classList.toggle('active', autoEnabled); } catch(_){ } });
     }
   } catch(e){ console.warn('[embeddedToolbar] init error', e); }
 }
