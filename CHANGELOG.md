@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7]
+
+### ✨ New Features
+- **Update badge notification**: Settings button now shows a red pulsing badge when update is available (replaces popup overlay)
+- **Always-on stale broker refresh**: Brokers without odds updates for 3+ minutes are automatically refreshed
+
+### ⚡ Improvements
+- **Faster Excel sync**: Reduced polling interval from 2s to 200ms for near-instant odds display
+- **Python script optimization**: Removed manual map cycling (Numpad*) — map now follows Odds Board selection only
+- **Settings UI**: Added visual card styling to settings sections for better readability
+- **Cleaner codebase**: Removed 6 redundant wrapper files, updated imports to direct paths
+- **IPC synchronization**: Fixed channel naming between preload.js and desktop_api_shim.js
+
+### 🐛 Bug Fixes
+- **Updater detection**: Fixed manual check not finding available updates
+- **ZIP extraction**: Replaced PowerShell with adm-zip for reliable update extraction
+- **Settings overlay z-index**: Fixed overlay not appearing over sidebar/stats panel
+
+### 🧹 Removed
+- **Auto refresh checkbox**: Removed from toolbar — stale refresh is now always enabled
+- **Update popup overlay**: Replaced with badge notification system
+
+### 🔧 Technical
+- **STALE_MS**: Changed from 5 to 3 minutes
+- **adm-zip**: Added as dependency for pure JavaScript ZIP extraction
+
+---
+
 ## [0.1.2]
 
 ### ✨ New Features
