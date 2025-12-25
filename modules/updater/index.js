@@ -101,17 +101,19 @@ function createUpdateManager({ store, mainWindow }) {
       const currentVersion = getCurrentVersion();
       const currentCommit = getCurrentCommit();
 
-      console.log(`[updater] Checking for updates (channel: ${channel}, current: ${currentVersion})`);
+      console.log(`[updater] Checking for updates (channel: ${channel}, current: v${currentVersion}, commit: ${currentCommit || 'none'})`);
 
       let release;
       if (channel === 'dev') {
         release = await getDevRelease(REPO_OWNER, REPO_NAME);
+        console.log(`[updater] Dev release response:`, release ? { commitShort: release.commitShort, downloadUrl: release.downloadUrl?.substring(0, 50) + '...' } : 'null');
+        
         // For dev channel, compare commit SHA (handle short vs full SHA)
         if (release && release.commitShort) {
           const currentShort = currentCommit ? currentCommit.substring(0, 7) : null;
           const remoteShort = release.commitShort.substring(0, 7);
           
-          console.log(`[updater] Dev compare: current=${currentShort}, remote=${remoteShort}`);
+          console.log(`[updater] Dev compare: current="${currentShort}" vs remote="${remoteShort}" -> ${currentShort !== remoteShort ? 'UPDATE AVAILABLE' : 'SAME'}`);
           
           if (currentShort !== remoteShort) {
             availableUpdate = {
