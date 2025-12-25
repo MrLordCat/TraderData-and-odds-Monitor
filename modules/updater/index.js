@@ -1,7 +1,7 @@
 // Auto-Update Manager for portable Electron app
 // Supports two channels: stable (GitHub Releases) and dev (latest commits)
 
-const { app, dialog, shell, BrowserWindow } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { checkForUpdates, getLatestRelease, getDevRelease } = require('./githubApi');
@@ -152,10 +152,6 @@ function createUpdateManager({ store, mainWindow }) {
       if (availableUpdate) {
         console.log(`[updater] Update available: ${availableUpdate.version}`);
         broadcast('update-available', availableUpdate);
-        
-        if (!silent) {
-          showUpdateDialog(availableUpdate);
-        }
       } else {
         console.log('[updater] No updates available');
         if (!silent) {
@@ -169,32 +165,6 @@ function createUpdateManager({ store, mainWindow }) {
       checking = false;
       broadcast('update-error', { message: err.message });
       return null;
-    }
-  }
-
-  // Show update confirmation dialog
-  async function showUpdateDialog(update) {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-
-    const channelLabel = update.channel === 'dev' ? 'Dev Build' : 'Release';
-    const versionInfo = update.channel === 'dev' 
-      ? `${update.version} (${update.commitShort})`
-      : `v${update.version}`;
-
-    const result = await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update Available',
-      message: `A new ${channelLabel} is available`,
-      detail: `Version: ${versionInfo}\n\nWould you like to download and install it now?`,
-      buttons: ['Update Now', 'View Release', 'Later'],
-      defaultId: 0,
-      cancelId: 2
-    });
-
-    if (result.response === 0) {
-      downloadAndInstall(update);
-    } else if (result.response === 1) {
-      shell.openExternal(update.releaseUrl);
     }
   }
 
@@ -228,30 +198,14 @@ function createUpdateManager({ store, mainWindow }) {
       try { fs.unlinkSync(zipPath); } catch (_) {}
 
       downloading = false;
+      
+      // Save pending update path for restart
+      store.set('pendingUpdate', extractDir);
       broadcast('update-ready', { extractDir });
-
-      // Show restart dialog
-      const result = await dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Update Ready',
-        message: 'Update downloaded successfully',
-        detail: 'The application needs to restart to apply the update. Restart now?',
-        buttons: ['Restart Now', 'Later'],
-        defaultId: 0
-      });
-
-      if (result.response === 0) {
-        applyUpdateAndRestart(extractDir);
-      } else {
-        // Save pending update path for later
-        store.set('pendingUpdate', extractDir);
-      }
     } catch (err) {
       console.error('[updater] Download failed:', err.message);
       downloading = false;
       broadcast('update-error', { message: err.message });
-      
-      dialog.showErrorBox('Update Failed', `Failed to download update: ${err.message}`);
     }
   }
 
@@ -373,7 +327,7 @@ del "%TEMP%\\oddsmoni-start.vbs" >nul 2>&1
 
   // Initialize - check on startup if enabled
   let checkTimer = null;
-  function init() {
+  async function init() {
     // Check for pending update on startup
     const pendingScript = store.get('pendingUpdateScript');
     if (pendingScript && fs.existsSync(pendingScript)) {
@@ -383,7 +337,13 @@ del "%TEMP%\\oddsmoni-start.vbs" >nul 2>&1
 
     // Auto-check on startup after delay
     if (getAutoCheck()) {
-      setTimeout(() => check(true), 10000); // 10 sec after startup
+      setTimeout(async () => {
+        const update = await check(true);
+        // If update found on startup, show overlay notification
+        if (update) {
+          broadcast('startup-available', update);
+        }
+      }, 10000); // 10 sec after startup
       
       // Periodic check
       checkTimer = setInterval(() => {
@@ -399,6 +359,18 @@ del "%TEMP%\\oddsmoni-start.vbs" >nul 2>&1
     }
   }
 
+  // Restart to apply pending update
+  function restart() {
+    const extractDir = store.get('pendingUpdate');
+    if (extractDir && fs.existsSync(extractDir)) {
+      applyUpdateAndRestart(extractDir);
+    } else {
+      // No pending update, just restart
+      app.relaunch();
+      app.exit(0);
+    }
+  }
+
   return {
     init,
     destroy,
@@ -407,6 +379,7 @@ del "%TEMP%\\oddsmoni-start.vbs" >nul 2>&1
     setChannel,
     setAutoCheck,
     downloadAndInstall,
+    restart,
     getCurrentVersion,
     getCurrentCommit,
     getBuildInfo

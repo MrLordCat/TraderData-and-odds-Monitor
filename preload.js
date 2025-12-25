@@ -114,12 +114,15 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,updaterSetChannel: (ch) => ipcRenderer.invoke('updater-set-channel', ch)
   ,updaterSetAutoCheck: (enabled) => ipcRenderer.invoke('updater-set-auto-check', enabled)
   ,updaterDownload: () => ipcRenderer.invoke('updater-download')
+  ,updaterRestart: () => ipcRenderer.invoke('updater-restart')
   ,updaterGetVersion: () => ipcRenderer.invoke('updater-get-version')
   ,onUpdaterAvailable: (cb) => withUnsub('updater-available', cb)
   ,onUpdaterNotAvailable: (cb) => withUnsub('updater-not-available', cb)
   ,onUpdaterDownloading: (cb) => withUnsub('updater-downloading', cb)
+  ,onUpdaterExtracting: (cb) => withUnsub('updater-extracting', cb)
   ,onUpdaterReady: (cb) => withUnsub('updater-ready', cb)
   ,onUpdaterError: (cb) => withUnsub('updater-error', cb)
+  ,onUpdaterStartupAvailable: (cb) => withUnsub('updater-startup-available', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

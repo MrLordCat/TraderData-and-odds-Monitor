@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <title>Odds Desktop</title>
+<link rel="stylesheet" href="m3-tokens.css" />
+<link rel="stylesheet" href="m3-components.css" />
 <link rel="stylesheet" href="common.css" />
 <link rel="stylesheet" href="main.css" />
 <link rel="stylesheet" href="index.css" />
@@ -10,6 +12,29 @@
 <body>
   <div id="stageOutline"></div>
 <div id="boardSplitter"></div>
+
+<!-- Update Overlay (shown on startup when update available) -->
+<div id="updateOverlay" class="updateOverlay" hidden>
+  <div class="updateOverlay__backdrop"></div>
+  <div class="updateOverlay__panel">
+    <div class="updateOverlay__header">
+      <h2>Update Available</h2>
+    </div>
+    <div class="updateOverlay__body">
+      <p class="updateOverlay__version">A new version is available: <strong id="updateOverlay__versionNum">—</strong></p>
+      <p class="updateOverlay__hint">Would you like to download and install it now?</p>
+      <div id="updateOverlay__progress" class="updateOverlay__progress" hidden>
+        <div class="updateOverlay__progressBar"></div>
+      </div>
+      <p id="updateOverlay__status" class="updateOverlay__status"></p>
+    </div>
+    <div class="updateOverlay__footer">
+      <button id="updateOverlay__later" class="btn">Later</button>
+      <button id="updateOverlay__action" class="btn btn--primary">Download & Install</button>
+    </div>
+  </div>
+</div>
+
 <script src="index.js"></script>
 </body>
 </html>

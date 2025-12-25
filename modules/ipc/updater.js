@@ -75,6 +75,16 @@ function initUpdaterIpc({ updateManager }) {
     }
   });
 
+  // Restart to apply update
+  ipcMain.handle('updater-restart', () => {
+    try {
+      updateManager.restart();
+      return { success: true };
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
   console.log('[ipc/updater] Initialized');
 }
 

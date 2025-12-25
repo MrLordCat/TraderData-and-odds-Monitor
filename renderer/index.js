@@ -89,3 +89,156 @@ window.desktopAPI.onUIBlurOff?.(()=> document.body.classList.remove('overlay-blu
 
 // (Excel URL modal logic moved to dedicated BrowserView overlay)
 
+// ===== Update Overlay (startup notification) =====
+(function(){
+  const overlay = document.getElementById('updateOverlay');
+  const versionNum = document.getElementById('updateOverlay__versionNum');
+  const progressDiv = document.getElementById('updateOverlay__progress');
+  const progressBar = progressDiv ? progressDiv.querySelector('.updateOverlay__progressBar') : null;
+  const statusEl = document.getElementById('updateOverlay__status');
+  const laterBtn = document.getElementById('updateOverlay__later');
+  const actionBtn = document.getElementById('updateOverlay__action');
+
+  if(!overlay || !laterBtn || !actionBtn) return;
+
+  let pendingUpdate = null;
+  let updateReady = false;
+  let downloading = false;
+
+  function show(update){
+    pendingUpdate = update;
+    updateReady = false;
+    downloading = false;
+    if(versionNum) versionNum.textContent = update.version || '—';
+    if(statusEl) statusEl.textContent = '';
+    if(progressDiv) progressDiv.hidden = true;
+    actionBtn.textContent = 'Download & Install';
+    actionBtn.disabled = false;
+    laterBtn.disabled = false;
+    overlay.hidden = false;
+  }
+
+  function hide(){
+    overlay.hidden = true;
+  }
+
+  function setStatus(text){
+    if(statusEl) statusEl.textContent = text || '';
+  }
+
+  function showProgress(pct){
+    if(progressDiv) progressDiv.hidden = false;
+    if(progressBar) progressBar.style.width = Math.max(0, Math.min(100, pct)).toFixed(1) + '%';
+  }
+
+  function hideProgress(){
+    if(progressDiv) progressDiv.hidden = true;
+    if(progressBar) progressBar.style.width = '0%';
+  }
+
+  function updateButtonState(){
+    if(updateReady){
+      actionBtn.textContent = 'Restart';
+      actionBtn.disabled = false;
+      laterBtn.disabled = false;
+    } else if(downloading){
+      actionBtn.textContent = 'Downloading...';
+      actionBtn.disabled = true;
+      laterBtn.disabled = true;
+    } else {
+      actionBtn.textContent = 'Download & Install';
+      actionBtn.disabled = false;
+      laterBtn.disabled = false;
+    }
+  }
+
+  // Listen for startup update notification
+  window.desktopAPI.onUpdaterStartupAvailable?.((update) => {
+    show(update);
+  });
+
+  // Listen for updater events while overlay is open
+  window.desktopAPI.onUpdaterDownloading?.((data) => {
+    if(overlay.hidden) return;
+    downloading = true;
+    updateButtonState();
+    const pct = data && typeof data.percent === 'number' ? data.percent : 0;
+    showProgress(pct);
+    setStatus(`Downloading... ${pct.toFixed(0)}%`);
+  });
+
+  window.desktopAPI.onUpdaterExtracting?.(() => {
+    if(overlay.hidden) return;
+    showProgress(100);
+    setStatus('Extracting...');
+  });
+
+  window.desktopAPI.onUpdaterReady?.(() => {
+    if(overlay.hidden) return;
+    downloading = false;
+    updateReady = true;
+    updateButtonState();
+    showProgress(100);
+    setStatus('Update ready - click Restart to apply');
+  });
+
+  window.desktopAPI.onUpdaterError?.((err) => {
+    if(overlay.hidden) return;
+    downloading = false;
+    updateButtonState();
+    hideProgress();
+    setStatus('Error: ' + (err.message || err));
+  });
+
+  // Later button - close overlay
+  laterBtn.addEventListener('click', () => {
+    hide();
+  });
+
+  // Action button - Download or Restart
+  actionBtn.addEventListener('click', async () => {
+    if(updateReady){
+      setStatus('Restarting...');
+      actionBtn.disabled = true;
+      laterBtn.disabled = true;
+      try {
+        await window.desktopAPI.updaterRestart();
+      } catch(e){
+        setStatus('Restart failed: ' + (e.message || e));
+        actionBtn.disabled = false;
+        laterBtn.disabled = false;
+      }
+      return;
+    }
+
+    if(!pendingUpdate) return;
+    downloading = true;
+    updateButtonState();
+    setStatus('Starting download...');
+    showProgress(0);
+
+    try {
+      const result = await window.desktopAPI.updaterDownload();
+      if(!result || !result.success){
+        downloading = false;
+        updateButtonState();
+        hideProgress();
+        setStatus('Download failed: ' + (result?.error || 'unknown'));
+      }
+      // Success will trigger updater-ready event
+    } catch(e){
+      downloading = false;
+      updateButtonState();
+      hideProgress();
+      setStatus('Download failed: ' + (e.message || e));
+    }
+  });
+
+  // ESC to close
+  window.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && !overlay.hidden && !downloading){
+      hide();
+    }
+  });
+})();
+

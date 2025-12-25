@@ -373,6 +373,7 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	if(!channelSel || !autoChk || !checkBtn || !downloadBtn) return;
 
 	let pendingUpdate = null; // { version, url }
+	let updateReady = false;  // true when update is downloaded and ready to install
 
 	function setStatus(text){
 		if(statusSpan) statusSpan.textContent = text || '—';
@@ -388,6 +389,20 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		if(progressBar) progressBar.style.width = '0%';
 	}
 
+	// Update button state based on updateReady flag
+	function updateButtonState(){
+		if(updateReady){
+			downloadBtn.textContent = 'Restart';
+			downloadBtn.disabled = false;
+		} else if(pendingUpdate){
+			downloadBtn.textContent = 'Download & Install';
+			downloadBtn.disabled = false;
+		} else {
+			downloadBtn.textContent = 'Download & Install';
+			downloadBtn.disabled = true;
+		}
+	}
+
 	// Load initial state
 	async function loadUpdaterState(){
 		try {
@@ -396,7 +411,18 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 				channelSel.value = status.channel || 'stable';
 				autoChk.checked = status.autoCheck !== false;
 				if(versionSpan) versionSpan.textContent = status.currentVersion || '—';
-				setStatus(status.statusText || '—');
+				// Check if there's already an available update
+				if(status.availableUpdate){
+					pendingUpdate = { version: status.availableUpdate.version, url: status.availableUpdate.downloadUrl };
+					setStatus(`Update available: ${status.availableUpdate.version}`);
+				} else if(status.checking){
+					setStatus('Checking...');
+				} else if(status.downloading){
+					setStatus(`Downloading... ${status.downloadProgress || 0}%`);
+				} else {
+					setStatus('Ready to check');
+				}
+				updateButtonState();
 			}
 		} catch(e){ console.warn('[settings][updater] loadState failed', e.message); }
 	}
@@ -407,7 +433,8 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		try {
 			await ipcRenderer.invoke('updater-set-channel', channelSel.value);
 			pendingUpdate = null;
-			downloadBtn.disabled = true;
+			updateReady = false;
+			updateButtonState();
 			setStatus('Channel changed');
 		} catch(e){ console.warn('[settings][updater] setChannel failed', e.message); }
 	});
@@ -427,13 +454,14 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 			const result = await ipcRenderer.invoke('updater-check');
 			if(result && result.available){
 				pendingUpdate = { version: result.version, url: result.url };
-				downloadBtn.disabled = false;
+				updateReady = false;
 				setStatus(`Update available: ${result.version}`);
 			} else {
 				pendingUpdate = null;
-				downloadBtn.disabled = true;
+				updateReady = false;
 				setStatus('Already up to date');
 			}
+			updateButtonState();
 		} catch(e){
 			setStatus('Check failed: ' + (e.message || e));
 		} finally {
@@ -441,8 +469,19 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		}
 	});
 
-	// Download & Install button
+	// Download & Install / Restart button
 	downloadBtn.addEventListener('click', async ()=>{
+		if(updateReady){
+			// Restart to apply update
+			setStatus('Restarting...');
+			try {
+				await ipcRenderer.invoke('updater-restart');
+			} catch(e){
+				setStatus('Restart failed: ' + (e.message || e));
+			}
+			return;
+		}
+		
 		if(!pendingUpdate) return;
 		downloadBtn.disabled = true;
 		checkBtn.disabled = true;
@@ -451,15 +490,16 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		try {
 			const result = await ipcRenderer.invoke('updater-download');
 			if(result && result.success){
-				setStatus('Update ready, restarting...');
-				showProgress(100);
+				// Will receive updater-ready event
 			} else {
 				setStatus('Download failed: ' + (result?.error || 'unknown'));
 				hideProgress();
+				updateButtonState();
 			}
 		} catch(e){
 			setStatus('Download failed: ' + (e.message || e));
 			hideProgress();
+			updateButtonState();
 		} finally {
 			checkBtn.disabled = false;
 		}
@@ -468,13 +508,15 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	// Listen for updater events
 	ipcRenderer.on('updater-available', (_e, info)=>{
 		pendingUpdate = { version: info.version, url: info.url };
-		downloadBtn.disabled = false;
+		updateReady = false;
 		setStatus(`Update available: ${info.version}`);
+		updateButtonState();
 	});
 	ipcRenderer.on('updater-not-available', ()=>{
 		pendingUpdate = null;
-		downloadBtn.disabled = true;
+		updateReady = false;
 		setStatus('Already up to date');
+		updateButtonState();
 	});
 	ipcRenderer.on('updater-downloading', (_e, data)=>{
 		const pct = data && typeof data.percent === 'number' ? data.percent : 0;
@@ -486,13 +528,16 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		setStatus('Extracting...');
 	});
 	ipcRenderer.on('updater-ready', ()=>{
-		setStatus('Update ready, restarting...');
+		updateReady = true;
+		setStatus('Update ready - click Restart to apply');
 		showProgress(100);
+		updateButtonState();
+		checkBtn.disabled = false;
 	});
 	ipcRenderer.on('updater-error', (_e, err)=>{
 		setStatus('Error: ' + (err.message || err));
 		hideProgress();
 		checkBtn.disabled = false;
-		downloadBtn.disabled = !pendingUpdate;
+		updateButtonState();
 	});
 })();
