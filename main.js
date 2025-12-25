@@ -196,10 +196,10 @@ let autoRefreshEnabled = (()=>{ const v = store.get('autoRefreshEnabled'); retur
 // Track initial load/network failures to retry before showing fallback error page
 const loadFailures = {}; // id -> count
 // Zoom manager (extracted module)
-const { createZoomManager } = require('./modules/zoom'); // now modules/zoom/index.js
+const { createZoomManager } = require('./modules/zoom/');
 const zoom = createZoomManager({ store, views });
 // Stats manager (initialized after stageBoundsRef defined; recreated once mainWindow exists)
-const { createStatsManager } = require('./modules/stats'); // modules/stats/index.js
+const { createStatsManager } = require('./modules/stats/');
 let statsManager; // temporary undefined until after stageBoundsRef creation
 let statsState = { mode: 'hidden', panelHidden: !!store.get('statsPanelHidden', false) }; // 'hidden' | 'embedded', plus panelHidden
 let lastStatsToggleTs = 0; // throttle for space hotkey
@@ -216,7 +216,7 @@ statsManager = createStatsManager({ store, mainWindow: null, stageBoundsRef, qui
 // (Removed) forwardGsTheme – theme customization for stats table deprecated
 
 // Layout manager (needs refs defined above)
-const { createLayoutManager } = require('./modules/layout');
+const { createLayoutManager } = require('./modules/layout/');
 // Ref wrapper for active broker ids (used by layout & board managers)
 const activeBrokerIdsRef = { value: activeBrokerIds };
 const mainWindowRef = { value: null }; // passed for lazy use inside layout manager
@@ -304,7 +304,7 @@ const { createSettingsOverlay } = require('./modules/settingsOverlay');
 const { createHotkeyManager } = require('./modules/hotkeys');
 
 // Broker manager module
-const { createBrokerManager } = require('./modules/brokerManager');
+const { createBrokerManager } = require('./modules/brokerManager/');
 let brokerManager;
 
 // Broker IPC moved to modules/ipc/brokers.js
@@ -334,7 +334,7 @@ ipcMain.on('set-disabled-brokers', (e, list) => {
 // (add-broker-selected & request-add-broker-data moved to brokers IPC module)
 // Map IPC moved to modules/ipc/map.js
 
-const { createStaleMonitor } = require('./modules/staleMonitor');
+const { createStaleMonitor } = require('./modules/staleMonitor/');
 let staleMonitor;
 // IPC modularized handlers
 const { initMapIpc } = require('./modules/ipc/map');

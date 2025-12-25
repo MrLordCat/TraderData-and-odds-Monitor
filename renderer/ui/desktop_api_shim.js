@@ -130,7 +130,8 @@
       updaterGetVersion: () => ipcRenderer.invoke('updater-get-version'),
       onUpdaterAvailable: (cb) => withUnsub('updater-update-available', cb),
       onUpdaterNotAvailable: (cb) => withUnsub('updater-update-not-available', cb),
-      onUpdaterDownloading: (cb) => withUnsub('updater-update-downloading', cb),
+      onUpdaterDownloading: (cb) => withUnsub('updater-downloading', cb),
+      onUpdaterExtracting: (cb) => withUnsub('updater-extracting', cb),
       onUpdaterReady: (cb) => withUnsub('updater-update-ready', cb),
       onUpdaterError: (cb) => withUnsub('updater-update-error', cb),
 
