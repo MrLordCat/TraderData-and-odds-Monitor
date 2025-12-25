@@ -45,11 +45,6 @@ class ToolbarModule extends SidebarModule {
           <button id="tb-refresh-all" class="md-icon-btn" data-tooltip="Refresh all">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
           </button>
-          <label class="md-checkbox tb-check-wrapper" title="Auto refresh">
-            <input type="checkbox" id="tb-auto-reload" class="md-checkbox__input" />
-            <span class="md-checkbox__box"></span>
-            <span class="tb-check-label">Auto</span>
-          </label>
         </div>
         
         <div class="tb-group" data-group="ui">
@@ -110,22 +105,6 @@ class ToolbarModule extends SidebarModule {
     this.$('#tb-refresh-all')?.addEventListener('click', () => {
       api.refreshAll?.();
     });
-    
-    // Auto refresh
-    const autoReload = this.$('#tb-auto-reload');
-    if (autoReload) {
-      api.getAutoRefreshEnabled?.().then(v => {
-        autoReload.checked = !!v;
-      }).catch(() => {});
-      
-      autoReload.addEventListener('change', () => {
-        api.setAutoRefreshEnabled?.(autoReload.checked);
-      });
-      
-      this.subscribeIpc('onAutoRefreshUpdated', (p) => {
-        autoReload.checked = !!(p && p.enabled);
-      });
-    }
     
     // Board side
     const sideBtn = this.$('#tb-board-side');
