@@ -180,6 +180,106 @@ function initSettingsIpc(ctx){
       }
     } catch(_){ }
   });
+
+  // === Shock Threshold (%) - large odds shift detection (ARB protection) ===
+  function clampShock(v){ return Math.max(5, Math.min(50, Math.round(v))); }
+  ipcMain.handle('auto-shock-threshold-get', ()=>{
+    try {
+      const v = store.get('autoShockThresholdPct');
+      if(typeof v==='number' && !isNaN(v)) return clampShock(v);
+    } catch(_){ }
+    return 20; // default
+  });
+  ipcMain.on('auto-shock-threshold-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.pct==='number' ? clampShock(payload.pct) : null;
+      if(v!=null){
+        store.set('autoShockThresholdPct', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-shock-threshold-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-shock-threshold-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
+
+  // === Fire Cooldown (ms) - minimum delay between keypresses ===
+  function clampCooldown(v){ return Math.max(100, Math.min(5000, Math.floor(v))); }
+  ipcMain.handle('auto-fire-cooldown-get', ()=>{
+    try {
+      const v = store.get('autoFireCooldownMs');
+      if(typeof v==='number' && !isNaN(v)) return clampCooldown(v);
+    } catch(_){ }
+    return 900; // default
+  });
+  ipcMain.on('auto-fire-cooldown-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.ms==='number' ? clampCooldown(payload.ms) : null;
+      if(v!=null){
+        store.set('autoFireCooldownMs', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-fire-cooldown-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-fire-cooldown-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
+
+  // === Max Excel Wait (ms) - max adaptive wait for Excel change ===
+  function clampMaxWait(v){ return Math.max(500, Math.min(5000, Math.floor(v))); }
+  ipcMain.handle('auto-max-excel-wait-get', ()=>{
+    try {
+      const v = store.get('autoMaxExcelWaitMs');
+      if(typeof v==='number' && !isNaN(v)) return clampMaxWait(v);
+    } catch(_){ }
+    return 1600; // default
+  });
+  ipcMain.on('auto-max-excel-wait-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.ms==='number' ? clampMaxWait(payload.ms) : null;
+      if(v!=null){
+        store.set('autoMaxExcelWaitMs', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-max-excel-wait-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-max-excel-wait-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
+
+  // === Pulse Gap (ms) - delay between burst pulses ===
+  function clampPulseGap(v){ return Math.max(20, Math.min(200, Math.floor(v))); }
+  ipcMain.handle('auto-pulse-gap-get', ()=>{
+    try {
+      const v = store.get('autoPulseGapMs');
+      if(typeof v==='number' && !isNaN(v)) return clampPulseGap(v);
+    } catch(_){ }
+    return 55; // default
+  });
+  ipcMain.on('auto-pulse-gap-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.ms==='number' ? clampPulseGap(payload.ms) : null;
+      if(v!=null){
+        store.set('autoPulseGapMs', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-pulse-gap-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-pulse-gap-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
 }
 
 module.exports = { initSettingsIpc };

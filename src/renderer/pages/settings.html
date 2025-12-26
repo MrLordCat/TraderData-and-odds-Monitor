@@ -51,6 +51,18 @@
 							<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />
 							<span id="auto-tolerance-val" class="rangeVal"></span>
 						</div>
+						<label for="auto-interval">Step interval (ms)
+							<small class="labelHint">How often Auto checks alignment</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-interval" type="range" min="120" max="2000" step="10" />
+							<span id="auto-interval-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-adaptive">Adaptive mode
+							<small class="labelHint">Wait for Excel to change before next step</small>
+						</label>
+						<input id="auto-adaptive" type="checkbox" />
+						<div class="subRule" aria-hidden="true"></div>
 						<label for="auto-suspend-threshold">Auto Suspend threshold (%)
 							<small class="labelHint">Pauses auto when diff ≥ this; resumes at half</small>
 						</label>
@@ -58,6 +70,36 @@
 							<input id="auto-suspend-threshold" type="range" min="15" max="80" step="1" />
 							<span id="auto-suspend-threshold-val" class="rangeVal"></span>
 						</div>
+						<label for="auto-shock-threshold">Shock threshold (%)
+							<small class="labelHint">Large odds shift detection (ARB protection)</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-shock-threshold" type="range" min="5" max="50" step="1" />
+							<span id="auto-shock-threshold-val" class="rangeVal"></span>
+						</div>
+						<div class="subRule" aria-hidden="true"></div>
+						<label for="auto-fire-cooldown">Fire cooldown (ms)
+							<small class="labelHint">Min delay between keypresses</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-fire-cooldown" type="range" min="100" max="3000" step="50" />
+							<span id="auto-fire-cooldown-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-max-excel-wait">Max Excel wait (ms)
+							<small class="labelHint">Timeout for Excel change in adaptive mode</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-max-excel-wait" type="range" min="500" max="5000" step="100" />
+							<span id="auto-max-excel-wait-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-pulse-gap">Pulse gap (ms)
+							<small class="labelHint">Delay between burst pulses</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-pulse-gap" type="range" min="20" max="200" step="5" />
+							<span id="auto-pulse-gap-val" class="rangeVal"></span>
+						</div>
+						<div class="subRule" aria-hidden="true"></div>
 						<label for="burst1-th">Burst L1 threshold (%)</label>
 						<div class="rangeWrap">
 								<input id="burst1-th" type="range" min="7" max="15" step="1" />
@@ -91,7 +133,7 @@
 							<span id="burst3-pulses-val" class="rangeVal"></span>
 						</div>
 					</div>
-					<div class="hint">Tolerance: diff% below this considered aligned. Auto Suspend: when diff% ≥ this, auto suspends; resumes when diff drops below half. Burst levels: when diff% ≥ threshold -> use pulses before confirm (F22). First matching level used.</div>
+					<div class="hint">Tolerance: diff% below this considered aligned. Step interval: polling rate. Adaptive: waits for Excel before next step. Suspend: pauses on large diff. Shock: ARB detection. Burst levels: pulses before confirm (F22).</div>
 					</section>
 
 				<!-- Game Stats Theme section removed (LoL table theme controls deprecated) -->
