@@ -88,6 +88,13 @@
     let scriptMap = null; // from Python hotkey controller
     let boardMap = null;  // from board map selector
     
+    // Stop on no MID setting (default true = stop Auto when MID unavailable)
+    let stopOnNoMidEnabled = true;
+    
+    function setStopOnNoMid(enabled){
+      stopOnNoMidEnabled = enabled !== false;
+    }
+    
     function setScriptMap(m){
       scriptMap = (typeof m === 'number' && m >= 1 && m <= 5) ? m : null;
     }
@@ -171,7 +178,7 @@
 
     function sendAutoPressF21(opts){
       try {
-        const elapsed = now()-lastF21At; if(elapsed < 250) return; // debounce
+        const elapsed = now()-lastF21At; if(elapsed < 800) return; // debounce - prevent double sends
         lastF21At = now();
         const base = { key:'F21', noConfirm:true };
         // Map reason into 'direction' to surface in main log
@@ -266,30 +273,37 @@
       } catch(_){ }
     }
 
-    const ARB_SUSPEND_PCT = 5.0;
+    // Shock threshold (ARB protection) - user configurable (40-120%)
+    let shockThresholdPct = 80; // default
+    
+    function setShockThreshold(pct){
+      if(typeof pct === 'number' && !isNaN(pct)) shockThresholdPct = Math.max(40, Math.min(120, pct));
+    }
+    
     function applyMarketGuard(){
       const d=state.derived; if(!d) return;
       if(!sharedEngine || !sharedEngine.state) return;
       const eng = sharedEngine;
       const st = eng.state;
-      const shouldSuspend = (!d.hasMid) || (typeof d.arbProfitPct==='number' && d.arbProfitPct >= ARB_SUSPEND_PCT);
+      // Check if should suspend due to no MID (only if stopOnNoMidEnabled) or ARB spike (shock threshold)
+      const noMidSuspend = stopOnNoMidEnabled && !d.hasMid;
+      const arbSuspend = typeof d.arbProfitPct==='number' && d.arbProfitPct >= shockThresholdPct;
+      const shouldSuspend = noMidSuspend || arbSuspend;
       if(shouldSuspend){
         let anyDisabled=false;
         if(st.active){
           anyDisabled=true;
-          st.lastDisableReason = (!d.hasMid)?'no-mid':'arb-spike';
+          st.lastDisableReason = noMidSuspend ? 'no-mid' : 'arb-spike';
           eng.setActive(false);
           notifyAllUIs('onActiveChanged', false, st, { marketSuspended:true });
         }
         if(anyDisabled){
-          try { console.log('[autoHub][marketGuard] suspend', { noMid: !d.hasMid, arbProfitPct: d.arbProfitPct }); } catch(_){ }
-          const reason = !d.hasMid ? 'market:no-mid' : ('market:arb-'+(typeof d.arbProfitPct==='number'? Number(d.arbProfitPct).toFixed(1): 'n/a'));
-          statusAll(!d.hasMid? 'Suspended: no mid' : ('Suspended: arb spike '+Number(d.arbProfitPct).toFixed(1)+'%'));
+          try { console.log('[autoHub][marketGuard] suspend', { noMid: !d.hasMid, stopOnNoMidEnabled, arbProfitPct: d.arbProfitPct, shockThreshold: shockThresholdPct }); } catch(_){ }
+          const reason = noMidSuspend ? 'market:no-mid' : ('market:arb-'+(typeof d.arbProfitPct==='number'? Number(d.arbProfitPct).toFixed(1): 'n/a'));
+          statusAll(noMidSuspend ? 'Suspended: no mid' : ('Suspended: arb spike '+Number(d.arbProfitPct).toFixed(1)+'%'));
           sendAutoPressF21({ reason });
           // Broadcast OFF so other windows reflect true state
           try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:false }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:false }); } } } catch(_){ }
-          // Retry after 500ms if Excel still trading
-          setTimeout(()=>{ try { const ex=getExcelRecord(); const stillTrading = !ex || !ex.frozen; if(stillTrading){ sendAutoPressF21({ reason: reason+':retry', retry:true }); } } catch(_){ } }, 500);
         }
       } else {
         // Resume if previously disabled due to market and userWanted=true
@@ -301,7 +315,6 @@
           try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:true }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:true }); } } } catch(_){ }
           statusAll('Resumed: market OK');
           sendAutoPressF21({ reason:'market:resume', resume:true });
-          setTimeout(()=>{ try { const d2=state.derived; const ok = d2 && d2.hasMid && (!d2.arbProfitPct || d2.arbProfitPct < ARB_SUSPEND_PCT); if(ok && eng.state.active){ sendAutoPressF21({ reason:'market:resume:retry', resume:true, retry:true }); } } catch(_){ } }, 500);
           try { eng.step(); } catch(_){ }
         }
       }
@@ -501,10 +514,18 @@
             ipcRenderer.on('auto-interval-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ stepMs:v }); });
             ipcRenderer.on('auto-adaptive-updated', (_e, v)=>{ if(typeof v==='boolean') applyConfigAll({ adaptive:v }); });
             ipcRenderer.on('auto-burst-levels-updated', (_e, levels)=>{ if(Array.isArray(levels)) applyConfigAll({ burstLevels:levels }); });
+            ipcRenderer.on('auto-fire-cooldown-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ fireCooldownMs:v }); });
+            ipcRenderer.on('auto-max-excel-wait-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ maxAdaptiveWaitMs:v }); });
+            ipcRenderer.on('auto-pulse-gap-updated', (_e, v)=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ pulseGapMs:v }); });
+            ipcRenderer.on('auto-burst3-enabled-updated', (_e, v)=>{ if(typeof v==='boolean') applyConfigAll({ burst3Enabled:v }); });
             // Auto Suspend threshold live update
             ipcRenderer.on('auto-suspend-threshold-updated', (_e,v)=>{ if(typeof v==='number' && !isNaN(v)) autoSuspendThresholdPct=v; });
-            // Initial fetch
+            // Initial fetch of all settings
             ipcRenderer.invoke('auto-suspend-threshold-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) autoSuspendThresholdPct=v; }).catch(()=>{});
+            ipcRenderer.invoke('auto-fire-cooldown-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ fireCooldownMs:v }); }).catch(()=>{});
+            ipcRenderer.invoke('auto-max-excel-wait-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ maxAdaptiveWaitMs:v }); }).catch(()=>{});
+            ipcRenderer.invoke('auto-pulse-gap-get').then(v=>{ if(typeof v==='number' && !isNaN(v)) applyConfigAll({ pulseGapMs:v }); }).catch(()=>{});
+            ipcRenderer.invoke('auto-burst3-enabled-get').then(v=>{ if(typeof v==='boolean') applyConfigAll({ burst3Enabled:v }); }).catch(()=>{});
           }
         }
       } catch(_){ }
@@ -637,6 +658,29 @@
     attachOdds();
     attachExcelProcStatus();
     addBroadcastListeners();
+    
+    // Listen for settings updates
+    try {
+      const ipc = global.require ? global.require('electron').ipcRenderer : null;
+      if(ipc){
+        // Load initial values
+        ipc.invoke('auto-stop-no-mid-get').then(v=>{
+          if(typeof v === 'boolean') setStopOnNoMid(v);
+        }).catch(()=>{});
+        ipc.invoke('auto-shock-threshold-get').then(v=>{
+          if(typeof v === 'number') setShockThreshold(v);
+        }).catch(()=>{});
+        
+        // Listen for updates
+        ipc.on('auto-stop-no-mid-updated', (_e, v)=>{
+          if(typeof v === 'boolean') setStopOnNoMid(v);
+        });
+        ipc.on('auto-shock-threshold-updated', (_e, v)=>{
+          if(typeof v === 'number') setShockThreshold(v);
+          console.log('[AutoHub] shockThresholdPct updated to', v);
+        });
+      }
+    } catch(_){ }
 
     return {
       attachView,
@@ -644,6 +688,7 @@
       getAutoEnableInfo,
       setScriptMap,
       setBoardMap,
+      setStopOnNoMid,
     };
   }
 

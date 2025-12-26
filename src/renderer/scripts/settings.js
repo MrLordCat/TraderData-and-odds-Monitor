@@ -95,8 +95,8 @@ if(autoAdaptiveInput){
 // Shock threshold (%)
 const autoShockInput = document.getElementById('auto-shock-threshold');
 const autoShockVal = document.getElementById('auto-shock-threshold-val');
-let shockThresholdPct = 20;
-function clampShock(v){ return Math.max(5, Math.min(50, Math.round(v))); }
+let shockThresholdPct = 80;
+function clampShock(v){ return Math.max(40, Math.min(120, Math.round(v))); }
 function renderShock(){
 	try {
 		if(autoShockInput) autoShockInput.value = String(shockThresholdPct);
@@ -114,6 +114,16 @@ if(autoShockInput){
 		if(!isNaN(raw)) shockThresholdPct = clampShock(raw);
 		renderShock();
 		try { ipcRenderer.send('auto-shock-threshold-set', { pct: shockThresholdPct }); } catch(_){ }
+	});
+}
+
+// Stop on no MID
+const autoStopNoMidInput = document.getElementById('auto-stop-no-mid');
+let stopOnNoMidEnabled = true;
+if(autoStopNoMidInput){
+	autoStopNoMidInput.addEventListener('change', ()=>{
+		stopOnNoMidEnabled = !!autoStopNoMidInput.checked;
+		try { ipcRenderer.send('auto-stop-no-mid-set', { enabled: stopOnNoMidEnabled }); } catch(_){ }
 	});
 }
 
@@ -189,6 +199,16 @@ if(autoPulseGapInput){
 		if(!isNaN(raw)) pulseGapMs = clampPulseGap(raw);
 		renderPulseGap();
 		try { ipcRenderer.send('auto-pulse-gap-set', { ms: pulseGapMs }); } catch(_){ }
+	});
+}
+
+// Burst L3 enabled
+const burst3EnabledInput = document.getElementById('burst3-enabled');
+let burst3Enabled = true;
+if(burst3EnabledInput){
+	burst3EnabledInput.addEventListener('change', ()=>{
+		burst3Enabled = !!burst3EnabledInput.checked;
+		try { ipcRenderer.send('auto-burst3-enabled-set', { enabled: burst3Enabled }); } catch(_){ }
 	});
 }
 
@@ -428,9 +448,11 @@ document.getElementById('save').onclick = ()=>{
 	try { ipcRenderer.send('auto-adaptive-set', { enabled: autoAdaptiveEnabled }); } catch(_){ }
 	try { ipcRenderer.send('auto-suspend-threshold-set', { pct: autoSuspendThresholdPct }); } catch(_){ }
 	try { ipcRenderer.send('auto-shock-threshold-set', { pct: shockThresholdPct }); } catch(_){ }
+	try { ipcRenderer.send('auto-stop-no-mid-set', { enabled: stopOnNoMidEnabled }); } catch(_){ }
 	try { ipcRenderer.send('auto-fire-cooldown-set', { ms: fireCooldownMs }); } catch(_){ }
 	try { ipcRenderer.send('auto-max-excel-wait-set', { ms: maxExcelWaitMs }); } catch(_){ }
 	try { ipcRenderer.send('auto-pulse-gap-set', { ms: pulseGapMs }); } catch(_){ }
+	try { ipcRenderer.send('auto-burst3-enabled-set', { enabled: burst3Enabled }); } catch(_){ }
 	// Persist burst levels
 	try { readBurstInputs(); ipcRenderer.send('auto-burst-levels-set', { levels: burstLevels }); } catch(_){ }
 	ipcRenderer.send('close-settings');
@@ -495,6 +517,16 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		if(typeof v==='number' && !isNaN(v)) pulseGapMs=clampPulseGap(v); 
 		renderPulseGap();
 	}).catch(()=>{ renderPulseGap(); }); } catch(_){ renderPulseGap(); }
+	// Initialize burst3 enabled
+	try { ipcRenderer.invoke('auto-burst3-enabled-get').then(v=>{ 
+		if(typeof v==='boolean') burst3Enabled=v; 
+		if(burst3EnabledInput) burst3EnabledInput.checked = burst3Enabled;
+	}).catch(()=>{ if(burst3EnabledInput) burst3EnabledInput.checked = burst3Enabled; }); } catch(_){ }
+	// Initialize stop on no MID
+	try { ipcRenderer.invoke('auto-stop-no-mid-get').then(v=>{ 
+		if(typeof v==='boolean') stopOnNoMidEnabled=v; 
+		if(autoStopNoMidInput) autoStopNoMidInput.checked = stopOnNoMidEnabled;
+	}).catch(()=>{ if(autoStopNoMidInput) autoStopNoMidInput.checked = stopOnNoMidEnabled; }); } catch(_){ }
 	try { ipcRenderer.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)) { burstLevels = v; } applyBurstInputsFromModel(); }).catch(()=> applyBurstInputsFromModel()); } catch(_){ applyBurstInputsFromModel(); }
 	// Pre-apply game selector from payload if present
 	try {

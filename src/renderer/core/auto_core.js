@@ -34,8 +34,10 @@
   tolerancePct: cfg.initial.tolerancePct,
   adaptive: cfg.initial.adaptive,
   burstLevels: Array.isArray(cfg.initial.burstLevels)? cfg.initial.burstLevels.slice(): [],
+  burst3Enabled: true,
       lastMidKey:null,
       fireCooldownMs: cfg.fireCooldownMs,
+      pulseGapMs: cfg.pulseGap,
       lastFireTs:0,
       lastFireSide:null,
       lastFireKey:null,
@@ -73,11 +75,15 @@
         return { fired: false, pulses: 0 }; // Did not fire due to cooldown
       }
       state.lastFireTs = now; state.lastFireSide = sideToAdjust; state.lastFireKey = keyLabel;
-      // Pulses based on thresholds
+      // Pulses based on thresholds (burst3Enabled controls L3 usage)
       let pulses = 1;
+      const pulseGap = state.pulseGapMs || cfg.pulseGap;
       try { 
         if(Array.isArray(state.burstLevels)){ 
-          for(const lvl of state.burstLevels){ 
+          for(let i=0; i<state.burstLevels.length; i++){
+            const lvl = state.burstLevels[i];
+            // Skip L3 (index 0 in sorted array) if burst3Enabled is false
+            if(i === 0 && !state.burst3Enabled) continue;
             if(diffPct >= lvl.thresholdPct){ 
               pulses = lvl.pulses; 
               break; 
@@ -86,14 +92,14 @@
         } 
       } catch(_){ }
       // Debug: log pulse decision
-      try { console.log('[AutoCore] diffPct='+diffPct.toFixed(2)+'% pulses='+pulses+' levels='+JSON.stringify(state.burstLevels)); } catch(_){}
+      try { console.log('[AutoCore] diffPct='+diffPct.toFixed(2)+'% pulses='+pulses+' burst3='+state.burst3Enabled+' levels='+JSON.stringify(state.burstLevels)); } catch(_){}
       // Directional
       for(let i=0;i<pulses;i++){
-        const delay = i===0? 0 : cfg.pulseGap*i;
+        const delay = i===0? 0 : pulseGap*i;
         setTimeout(()=>{ try { press({ side: sideToAdjust, key: keyLabel, direction, diffPct, noConfirm:true }); } catch(_){ } }, delay);
       }
       // Confirm F22
-      const confirmDelay = cfg.pulseGap*(pulses-1) + cfg.confirmBase;
+      const confirmDelay = pulseGap*(pulses-1) + cfg.confirmBase;
       setTimeout(()=>{ try { press({ side: sideToAdjust, key: 'F22', direction, diffPct, noConfirm:true }); } catch(_){ } }, confirmDelay);
       return { fired: true, pulses }; // Successfully fired with pulse count
     }
@@ -237,6 +243,10 @@
       if(typeof p.stepMs==='number' && !isNaN(p.stepMs)) state.stepMs = p.stepMs;
       if(typeof p.adaptive==='boolean') state.adaptive = p.adaptive;
       if(Array.isArray(p.burstLevels)) state.burstLevels = p.burstLevels;
+      if(typeof p.fireCooldownMs==='number' && !isNaN(p.fireCooldownMs)) state.fireCooldownMs = p.fireCooldownMs;
+      if(typeof p.maxAdaptiveWaitMs==='number' && !isNaN(p.maxAdaptiveWaitMs)) state.maxAdaptiveWaitMs = p.maxAdaptiveWaitMs;
+      if(typeof p.pulseGapMs==='number' && !isNaN(p.pulseGapMs)) state.pulseGapMs = p.pulseGapMs;
+      if(typeof p.burst3Enabled==='boolean') state.burst3Enabled = p.burst3Enabled;
     }
 
     return {

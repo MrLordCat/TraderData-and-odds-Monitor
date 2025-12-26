@@ -74,9 +74,13 @@
 							<small class="labelHint">Large odds shift detection (ARB protection)</small>
 						</label>
 						<div class="rangeWrap">
-							<input id="auto-shock-threshold" type="range" min="5" max="50" step="1" />
+							<input id="auto-shock-threshold" type="range" min="40" max="120" step="1" />
 							<span id="auto-shock-threshold-val" class="rangeVal"></span>
 						</div>
+						<label for="auto-stop-no-mid">Stop on no MID
+							<small class="labelHint">Disable Auto when MID data unavailable</small>
+						</label>
+						<input id="auto-stop-no-mid" type="checkbox" checked />
 						<div class="subRule" aria-hidden="true"></div>
 						<label for="auto-fire-cooldown">Fire cooldown (ms)
 							<small class="labelHint">Min delay between keypresses</small>
@@ -122,6 +126,8 @@
 							<span id="burst2-pulses-val" class="rangeVal"></span>
 						</div>
 						<div class="subRule" aria-hidden="true"></div>
+						<label for="burst3-enabled">Burst L3 enabled</label>
+						<input id="burst3-enabled" type="checkbox" checked />
 						<label for="burst3-th">Burst L3 threshold (%)</label>
 						<div class="rangeWrap">
 								<input id="burst3-th" type="range" min="20" max="40" step="1" />

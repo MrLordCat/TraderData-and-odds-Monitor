@@ -182,13 +182,13 @@ function initSettingsIpc(ctx){
   });
 
   // === Shock Threshold (%) - large odds shift detection (ARB protection) ===
-  function clampShock(v){ return Math.max(5, Math.min(50, Math.round(v))); }
+  function clampShock(v){ return Math.max(40, Math.min(120, Math.round(v))); }
   ipcMain.handle('auto-shock-threshold-get', ()=>{
     try {
       const v = store.get('autoShockThresholdPct');
       if(typeof v==='number' && !isNaN(v)) return clampShock(v);
     } catch(_){ }
-    return 20; // default
+    return 80; // default
   });
   ipcMain.on('auto-shock-threshold-set', (_e, payload)=>{
     try {
@@ -275,6 +275,54 @@ function initSettingsIpc(ctx){
           BrowserWindow.getAllWindows().forEach(w=>{
             try { w.webContents.send('auto-pulse-gap-updated', v); } catch(_){ }
             try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-pulse-gap-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
+
+  // === Burst L3 Enabled (bool) - ability to disable highest burst level ===
+  ipcMain.handle('auto-burst3-enabled-get', ()=>{
+    try {
+      const v = store.get('autoBurst3Enabled');
+      if(typeof v==='boolean') return v;
+    } catch(_){ }
+    return true; // default enabled
+  });
+  ipcMain.on('auto-burst3-enabled-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.enabled==='boolean' ? payload.enabled : null;
+      if(v!==null){
+        store.set('autoBurst3Enabled', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-burst3-enabled-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-burst3-enabled-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
+
+  // === Stop on No MID (bool) - disable Auto when MID data unavailable ===
+  ipcMain.handle('auto-stop-no-mid-get', ()=>{
+    try {
+      const v = store.get('autoStopOnNoMid');
+      if(typeof v==='boolean') return v;
+    } catch(_){ }
+    return true; // default enabled
+  });
+  ipcMain.on('auto-stop-no-mid-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.enabled==='boolean' ? payload.enabled : null;
+      if(v!==null){
+        store.set('autoStopOnNoMid', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-stop-no-mid-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-stop-no-mid-updated', v); } catch(_){ } }); } } catch(_){ }
           });
         } catch(_){ }
       }
