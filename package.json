@@ -13,7 +13,7 @@
     "url": "https://github.com/MrLordCat/TraderData-and-odds-Monitor/issues"
   },
   "homepage": "https://github.com/MrLordCat/TraderData-and-odds-Monitor#readme",
-  "main": "main.js",
+  "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",

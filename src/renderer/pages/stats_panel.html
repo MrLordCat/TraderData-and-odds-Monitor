@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Stats Panel</title>
+  <link rel="stylesheet" href="../styles/m3-tokens.css" />
+  <link rel="stylesheet" href="../styles/common.css" />
+  <link rel="stylesheet" href="../styles/stats.css" />
+  <link rel="stylesheet" href="../styles/lolstats.css" />
+  <link rel="stylesheet" href="../styles/stats_activity.css" />
+  <link rel="stylesheet" href="../styles/stats_panel_inline.css" />
+  <link rel="stylesheet" href="../ui/odds_board_shared.css" />
+</head>
+<body>
+  <div id="spTopbar" class="spTopbar">
+    <div class="spTbGroup" data-group="ui">
+      <button id="spPanelSide" class="spIconBtn" title="Move panel left/right" aria-label="Move panel left/right" data-side="right">
+        <svg class="spArrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6l6 6-6 6-1.4-1.4L13.2 12 8.6 7.4 10 6z"/></svg>
+      </button>
+      <button id="spBack" class="spIconBtn" title="Back" aria-label="Back">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h3v10H5V9zm5-4h3v14h-3V5zm5 7h3v7h-3v-7z"/></svg>
+      </button>
+      <button id="spSettings" class="spIconBtn has-update-badge" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.1 7.1 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 12.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L1.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.39.32.6.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.21.1.47.01.6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM11 15.5A3.5 3.5 0 1 1 14.5 12 3.5 3.5 0 0 1 11 15.5z"/></svg>
+        <span id="spUpdateBadge" class="sp-update-badge" hidden>!</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="sourcesSection" class="sectionCard collapsible" data-sec="sourcesLayout" data-collapse-on-header="1">
+    <div class="sectionHeader">
+      <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
+      <span class="accent">Sources & Layout</span>
+    </div>
+    <div class="sectionBody" id="sourcesBody" style="gap:8px;">
+      <div class="sourcesGrid">
+        <label for="srcA">A</label><select id="srcA">
+          <option value="https://portal.grid.gg">portal.grid.gg</option>
+          <option value="https://www.twitch.tv">twitch.tv</option>
+          <option value="https://www.youtube.com">youtube.com</option>
+          <option value="https://www.hltv.org">hltv.org</option>
+
+          <option value="embed:lolstats">LoL Stats (embed)</option>
+        </select>
+        <label for="srcB">B</label><select id="srcB">
+          <option value="https://portal.grid.gg">portal.grid.gg</option>
+          <option value="https://www.twitch.tv">twitch.tv</option>
+          <option value="https://www.youtube.com">youtube.com</option>
+          <option value="https://www.hltv.org">hltv.org</option>
+
+          <option value="embed:lolstats">LoL Stats (embed)</option>
+        </select>
+      </div>
+      <div class="divider"></div>
+      <label class="row" style="gap:8px;align-items:center;cursor:pointer;">
+        <input type="checkbox" id="singleWindowMode" />
+        <span class="muted">Single-window mode (A or B only)</span>
+      </label>
+      <div class="divider"></div>
+      <div class="modeButtons"><button id="modeSplit" title="Horizontal split">Split</button><button id="modeVertical" title="Vertical split">Vert</button><button id="modeA" title="A full height">A</button><button id="modeB" title="B full height">B</button></div>
+      <button id="toggleSide" class="panelSideBtn" title="Toggle panel side">Panel Side</button>
+      <div class="divider"></div>
+      <!-- Removed: FrameGen / upscaler controls -->
+      <div class="note">Layout: <span id="dbgLayout"></span><br/>Side: <span id="dbgSide"></span></div>
+    </div>
+  </div>
+
+  <div id="devtoolsSection" class="sectionCard collapsible" data-sec="devtools" data-collapse-on-header="1">
+    <div class="sectionHeader">
+      <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
+      <span class="accent">Dev Tools</span>
+    </div>
+    <div class="sectionBody" style="gap:6px;">
+      <div class="row" style="gap:6px;flex-wrap:wrap;">
+        <button id="btnOpenPanelDevTools" class="btn-sm font-11" title="Open DevTools for Stats Panel">Panel</button>
+        <button id="btnOpenSlotADevTools" class="btn-sm font-11" title="Open DevTools for Slot A">Slot A</button>
+        <button id="btnOpenSlotBDevTools" class="btn-sm font-11" title="Open DevTools for Slot B">Slot B</button>
+      </div>
+      <div class="note font-10" style="margin-top:2px;opacity:0.7;">For debugging only. Hidden in production builds if needed.</div>
+    </div>
+  </div>
+
+  <div id="stats" class="collapsible sectionCard" data-collapse-on-header="1">
+  <div class="sectionHeader">
+    <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
+    <span class="accent">Game Stats</span>
+    <select id="lolGameSelect" class="font-11" style="padding:2px 6px;min-width:78px;vertical-align:middle;"><option value="" disabled selected>Game -</option></select>
+    <button id="lolAddGameBtn" class="btn-sm font-11 addGameBtn" title="Add manual game" aria-disabled="true">+ Game</button>
+  </div>
+  <div class="statsBody sectionBody"><div class="statsControls">
+  <button id="lolReset" class="btn-sm font-11">Reset LoL Stats</button>
+  <label class="authRow font-11" style="cursor:pointer;">
+        <input id="lolManualMode" type="checkbox" style="margin:0;"> Manual
+      </label>
+  <button id="swapTeamsBtn" class="btn-sm font-11">Swap Teams</button>
+  <span class="lolStatusWrap"><span id="lolStatus" class="statusSmall">Waiting...</span></span>
+      <!-- Metrics toggles removed for full visual reset -->
+    </div>
+  <div class="lolTableWrap">
+  <table id="lolTable" class="tblCompact tblHeadSticky">
+        <thead>
+          <tr>
+            <th class="thLeft">Metric</th>
+            <th id="lt-team1" class="thCell"><span class="teamNameWrap" data-team="1">Team 1</span></th>
+            <th id="lt-team2" class="thCell"><span class="teamNameWrap" data-team="2">Team 2</span></th>
+          </tr>
+        </thead>
+        <tbody id="lt-body"></tbody>
+      </table>
+  </div></div>
+  </div>
+
+  <!-- Embedded Odds Board Section (expanded by default - primary odds display) -->
+  <div id="embeddedOddsSection" class="embeddedOddsSection sectionCard collapsible" data-sec="embeddedOdds" data-collapse-on-header="1">
+    <div class="sectionHeader">
+      <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
+      <span class="accent">Odds Board</span>
+      <!-- Map controls inline with header -->
+      <div class="oddsHeaderControls">
+        <button id="embeddedIsLast" class="oddsToggleBtn" title="Use match market for final map brokers (bet365)">Last</button>
+        <label class="mapLabel">
+          <span>Set</span>
+          <select id="embeddedMapSelect" class="oddsToolSelect">
+            <option value="0">Match</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </label>
+        <button id="embeddedMapRefreshBtn" class="oddsToolBtn" title="Re-broadcast current map (refresh odds)">⟳</button>
+        <span id="embeddedTolBadge" class="oddsTolBadge" title="Auto tolerance (from Settings)">Tol: —</span>
+      </div>
+    </div>
+    <div id="embeddedOddsBody" class="embeddedOddsBody sectionBody">
+      <!-- Broker controls toolbar -->
+      <div class="embeddedOddsToolbar">
+        <div class="toolbarGroup">
+          <button id="embeddedAddBroker" class="oddsToolBtn" title="Add broker">+ Broker</button>
+          <select id="embeddedLayoutPreset" class="oddsToolSelect" title="Layout preset">
+            <option value="">Layout</option>
+            <optgroup label="Horizontal">
+              <option value="2x2">2x2</option>
+              <option value="2x3">2x3</option>
+              <option value="3x3">3x3</option>
+              <option value="1x2">1x2</option>
+              <option value="1x2x2">1x2x2</option>
+              <option value="2">2</option>
+            </optgroup>
+            <optgroup label="Vertical">
+              <option value="1x1">1x1</option>
+              <option value="1x1x1">1x1x1</option>
+              <option value="1x1x2">1x1x2</option>
+              <option value="2x2x2">2x2x2</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="toolbarGroup">
+          <button id="embeddedRefreshAll" class="oddsToolBtn" title="Refresh all brokers">⟳ All</button>
+        </div>
+      </div>
+      <table id="embeddedOddsTable" class="embeddedOddsTable tblCompact">
+        <thead>
+          <tr>
+            <th class="eo-broker">Broker</th>
+            <th class="eo-side1" id="eo-side1">Side 1</th>
+            <th class="eo-swap eo-swap-header" title="Swap sides column"></th>
+            <th class="eo-side2" id="eo-side2">Side 2</th>
+          </tr>
+        </thead>
+        <tbody id="embeddedOddsRows"></tbody>
+        <tfoot>
+          <tr id="embeddedMidRow"><th>Mid</th><td colspan="3" id="embeddedMidCell">-</td></tr>
+          <tr id="embeddedExcelRow"><th><div class="excelControls">Excel <button id="embeddedAutoBtn" class="autoBtn">Auto</button><button id="embeddedExcelScriptBtn" class="autoSubBtn">S</button><span id="embeddedScriptMapBadge" class="scriptMapBadge" title="Script map (from Python hotkey controller)">-</span><span id="embeddedAutoReason" class="autoReasonBadge" title="Last auto stop reason"></span></div></th><td colspan="3" id="embeddedExcelCell">- <span id="embeddedExcelStatusCell" class="font-10 muted" style="margin-left:6px;">idle</span></td></tr>
+          <tr id="embeddedExcelAutoIndicatorsRow" style="display:none"><th></th><td colspan="3" class="excelAutoCell excelAutoIndicatorsCell"><div class="autoIndicators">
+            <span class="autoDot side1" title="Adjusting side 1"></span>
+            <span class="autoDot side2" title="Adjusting side 2"></span>
+          </div></td></tr>
+          <tr id="embeddedArbRow"><th>Arb</th><td colspan="3" id="embeddedArbCell">-</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  <script src="../ui/desktop_api_shim.js"></script>
+  <script src="../scripts/devcss-reload.js"></script>
+  <script src="../scripts/stats_config.js"></script>
+  <script src="../scripts/stats_theme.js"></script>
+  <script src="../scripts/stats_collapse.js"></script>
+  <script src="../core/odds_core.js"></script>
+  <script src="../core/auto_hub.js"></script>
+  <script src="../core/auto_core.js"></script>
+  <script src="../scripts/auto_trader.js"></script>
+  <script src="../ui/toast.js"></script>
+  <script src="../ui/excel_status.js"></script>
+  <script src="../scripts/stats_embedded.js"></script>
+  <script src="../scripts/stats_panel.js"></script>
+  <script src="../scripts/stats_boot.js"></script>
+  <script>
+    (function(){
+      function bind(id, payload){ const el=document.getElementById(id); if(!el) return; el.addEventListener('click', ()=>{ try { if(window.require){ const { ipcRenderer } = require('electron'); ipcRenderer.send('stats-open-devtools', payload); } } catch(e){ console.warn('[devtools] send failed', e); } }); }
+      bind('btnOpenPanelDevTools', { target:'panel' });
+      bind('btnOpenSlotADevTools', { slot:'A' });
+      bind('btnOpenSlotBDevTools', { slot:'B' });
+    })();
+  </script>
+</body>
+</html>
