@@ -28,30 +28,13 @@
     "appId": "com.oddsmoni.desktop",
     "productName": "OddsMoni",
     "files": [
-      "main.js",
-      "preload.js",
-      "brokerPreload.js",
-      "addBrokerPreload.js",
-      "slotPreload.js",
-      "statsContentPreload.js",
-      "stealthPreload.js",
-      "blankPreload.js",
-      "brokers/**/*",
+      "src/**/*",
       "Excel Extractor/**/*",
-      "modules/**/*",
-      "renderer/**/*",
-      "!renderer/ds_url.html",
-      "!renderer/ds_url.js",
-      "!modules/upscaler/**",
-      "!modules/ipc/upscaler.js",
-      "!modules/dataservices/**",
-      "lolstats/**/*",
-      "sendKeyInject.ps1",
       "package.json",
       "build-info.json"
     ],
     "extraMetadata": {
-      "main": "main.js"
+      "main": "src/main/main.js"
     },
     "win": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
