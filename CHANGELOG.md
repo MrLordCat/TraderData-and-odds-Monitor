@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0]
+
+### 🏗️ Project Restructure
+- **React-like folder structure**: Reorganized entire codebase into `src/` directory
+  - `src/main/` — Main process (main.js, modules, preloads)
+  - `src/renderer/` — Renderer (pages, scripts, styles, core, ui, sidebar)
+  - `src/brokers/` — Broker extractors and map navigation
+  - `src/assets/` — Static assets (icons)
+- **Cleaner imports**: All paths updated to new structure
+- **Better separation**: Clear distinction between main/renderer code
+
+### ✨ New Auto Settings
+- **Shock threshold**: Configurable ARB protection (40-120%, default 80%)
+  - Replaces hardcoded 5% constant — now user-adjustable
+- **Stop on no MID**: Toggle to disable Auto when MID data unavailable
+- **Burst L3 toggle**: Enable/disable highest burst level independently
+- **Fire cooldown**: Configurable minimum delay between keypresses (100-3000ms)
+- **Max Excel wait**: Timeout for Excel change in adaptive mode (500-5000ms)
+- **Pulse gap**: Delay between burst pulses (20-200ms)
+- **All settings connected**: Settings now properly sync to Auto engine in real-time
+
+### 🐛 Bug Fixes
+- **Double F21 fix**: Increased debounce from 250ms to 800ms, removed retry logic
+- **ARB suspend threshold**: Now uses user setting instead of hardcoded 5%
+- **Stop on no MID**: Now respects the toggle setting (was always stopping before)
+- **Settings sync**: All Auto settings now properly initialize and update the engine
+
+### ⚡ Improvements
+- **Python exit hotkey**: Changed from ESC to Ctrl+Esc (blocks Windows Start menu)
+- **Workflow changelog**: Release notes now automatically extracted from CHANGELOG.md
+
+### 🔧 Technical
+- **auto_core.js**: Added burst3Enabled, pulseGapMs to engine state
+- **auto_hub.js**: Added setShockThreshold(), setStopOnNoMid() functions
+- **IPC handlers**: New channels for all Auto settings (shock-threshold, burst3-enabled, stop-no-mid, fire-cooldown, max-excel-wait, pulse-gap)
+
+---
+
 ## [0.1.7]
 
 ### ✨ New Features

@@ -61,22 +61,25 @@ jobs:
           $version = "${{ steps.get_version.outputs.VERSION }}"
           $content = Get-Content CHANGELOG.md -Raw
           
-          # Extract section for this version (between ## [version] and next ## or end)
-          $pattern = "(?ms)## \[$version\].*?(?=## \[|\z)"
+          # Extract section for this version (between ## [version] and next ## or ---)
+          $pattern = "(?ms)## \[$version\].*?(?=## \[|---|\z)"
           $match = [regex]::Match($content, $pattern)
           
           if ($match.Success) {
             $changelog = $match.Value.Trim()
             # Remove the version header line itself
-            $changelog = $changelog -replace "^## \[$version\]\s*", ""
-            # Escape for GitHub Actions
-            $changelog = $changelog -replace "%", "%25"
-            $changelog = $changelog -replace "`n", "%0A"
-            $changelog = $changelog -replace "`r", "%0D"
-            echo "CHANGELOG=$changelog" >> $env:GITHUB_OUTPUT
+            $changelog = $changelog -replace "^## \[$version\]\s*\r?\n?", ""
+            # Remove trailing --- if captured
+            $changelog = $changelog -replace "\r?\n?---\s*$", ""
+            $changelog = $changelog.Trim()
           } else {
-            echo "CHANGELOG=See commit history for changes." >> $env:GITHUB_OUTPUT
+            $changelog = "See commit history for changes."
           }
+          
+          # Write multiline output using heredoc syntax
+          "CHANGELOG<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $changelog | Out-File -FilePath $env:GITHUB_OUTPUT -Append -NoNewline
+          "`nEOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
