@@ -9,7 +9,7 @@ Hotkeys:
     F22 -> Send Update only (auto mode confirm)
     F23 -> PreviousOddsHome (external trigger)
     F24 -> NextOddsHome (external trigger)
-    Esc or Ctrl+C -> Exit
+    Ctrl+Esc or Ctrl+C -> Exit
 
 Map selection is synchronized from Odds Board via template_sync.json.
 Manual map switching via Numpad* is disabled - map follows Board selection.
@@ -400,7 +400,7 @@ class ExcelOddsHotkeyController:
             print(f"{marker} Map {map_num} (row {row}): Home={home}, Away={away}{blocked}")
         print("="*50)
         print("Hotkeys: Numpad- (prev), Numpad+ (next), Numpad0 (update), Numpad1 (suspend)")
-        print("         F21 (suspend+update), F22 (update), F23 (prev), F24 (next), Esc (exit)")
+        print("         F21 (suspend+update), F22 (update), F23 (prev), F24 (next), Ctrl+Esc (exit)")
         print("Map selection synced from Odds Board (no manual override)")
         print()
     
@@ -422,7 +422,7 @@ class ExcelOddsHotkeyController:
         self._command_queue.put('send_update')
     
     def on_hotkey_exit(self):
-        """Handler for Esc."""
+        """Handler for Ctrl+Esc."""
         self._running = False
         self._command_queue.put('exit')
     
@@ -482,7 +482,7 @@ class ExcelOddsHotkeyController:
         print("  F22      -> Send Update (auto confirm)")
         print("  F23      -> Decrease (external trigger)")
         print("  F24      -> Increase (external trigger)")
-        print("  Esc      -> Exit")
+        print("  Ctrl+Esc -> Exit (blocks Windows Start menu)")
         print()
         print(f"Template: {self._get_template_name()}")
         print(f"Current map: {self.read_current_map()} (max: {self._max_maps})")
@@ -530,7 +530,7 @@ class ExcelOddsHotkeyController:
         keyboard.add_hotkey(82, self.on_hotkey_send_update, suppress=True)  # Numpad0 scan code
         keyboard.add_hotkey(79, self.on_hotkey_suspend, suppress=True)  # Numpad1 scan code
         
-        keyboard.add_hotkey('esc', self.on_hotkey_exit, suppress=False)
+        keyboard.add_hotkey('ctrl+esc', self.on_hotkey_exit, suppress=True)
         
         # Write initial status
         self.write_status()
