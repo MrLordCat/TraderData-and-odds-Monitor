@@ -24,8 +24,12 @@ jobs:
       - name: Extract addon info
         id: addon-info
         run: |
-          # Try to read manifest.json from addon directory
-          if [ -f "addon/manifest.json" ]; then
+          # Try to read manifest.json from addon directory (check multiple locations)
+          if [ -f "test-addon/manifest.json" ]; then
+            ADDON_ID=$(jq -r '.id' test-addon/manifest.json)
+            ADDON_VERSION=$(jq -r '.version' test-addon/manifest.json)
+            ADDON_NAME=$(jq -r '.name' test-addon/manifest.json)
+          elif [ -f "addon/manifest.json" ]; then
             ADDON_ID=$(jq -r '.id' addon/manifest.json)
             ADDON_VERSION=$(jq -r '.version' addon/manifest.json)
             ADDON_NAME=$(jq -r '.name' addon/manifest.json)
@@ -51,7 +55,9 @@ jobs:
           mkdir -p dist
           
           # Determine addon source directory
-          if [ -d "addon" ]; then
+          if [ -d "test-addon" ]; then
+            ADDON_SRC="test-addon"
+          elif [ -d "addon" ]; then
             ADDON_SRC="addon"
           elif [ -d "src/renderer/sidebar/modules/power-towers" ]; then
             ADDON_SRC="src/renderer/sidebar/modules/power-towers"
