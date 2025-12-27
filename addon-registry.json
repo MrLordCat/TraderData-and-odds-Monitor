@@ -1,15 +1,14 @@
 {
   "addons": [
     {
-      "id": "power-towers-test",
-      "name": "Power Towers TD (Test)",
-      "version": "0.0.1",
+      "id": "power-towers",
+      "name": "Power Towers TD",
+      "version": "0.0.2",
       "description": "Roguelike Tower Defense game inspired by Warcraft 3 Power Towers",
       "author": "MrLordCat",
       "icon": "🗼",
-      "downloadUrl": "https://github.com/MrLordCat/TraderData-and-odds-Monitor/releases/download/addon-power-towers-v0.1.0/power-towers-test-v0.0.1.zip",
+      "downloadUrl": "https://github.com/MrLordCat/TraderData-and-odds-Monitor/releases/download/addon-power-towers-v0.0.2/power-towers-v0.0.2.zip",
       "repository": "https://github.com/MrLordCat/TraderData-and-odds-Monitor",
-      "branch": "game",
       "requires": {
         "app": ">=0.2.0"
       }
