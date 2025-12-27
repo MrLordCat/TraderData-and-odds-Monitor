@@ -5,6 +5,23 @@ const https = require('https');
 
 const USER_AGENT = 'OddsMoni-Updater/1.0';
 
+// Simple in-memory cache to avoid rate limits (60 req/hour unauthenticated)
+const cache = {
+  data: {},
+  ttl: 5 * 60 * 1000, // 5 minutes cache TTL
+  get(key) {
+    const entry = this.data[key];
+    if (entry && Date.now() - entry.time < this.ttl) {
+      console.log(`[githubApi] Cache hit for ${key}`);
+      return entry.value;
+    }
+    return null;
+  },
+  set(key, value) {
+    this.data[key] = { value, time: Date.now() };
+  }
+};
+
 // Generic HTTPS GET request
 function httpsGet(url, options = {}) {
   return new Promise((resolve, reject) => {
@@ -25,6 +42,13 @@ function httpsGet(url, options = {}) {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         httpsGet(res.headers.location, options).then(resolve).catch(reject);
         return;
+      }
+
+      // Log rate limit info
+      const remaining = res.headers['x-ratelimit-remaining'];
+      const reset = res.headers['x-ratelimit-reset'];
+      if (remaining) {
+        console.log(`[githubApi] Rate limit remaining: ${remaining}, resets at: ${reset ? new Date(reset * 1000).toLocaleTimeString() : 'unknown'}`);
       }
 
       if (res.statusCode !== 200) {
@@ -54,6 +78,10 @@ function httpsGet(url, options = {}) {
 
 // Get latest stable release (non-prerelease)
 async function getLatestRelease(owner, repo) {
+  const cacheKey = `latest-${owner}-${repo}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
   try {
     const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
     const release = await httpsGet(url);
@@ -72,7 +100,7 @@ async function getLatestRelease(owner, repo) {
       return null;
     }
 
-    return {
+    const result = {
       version: release.tag_name.replace(/^v/, ''),
       tagName: release.tag_name,
       downloadUrl: asset.browser_download_url,
@@ -80,6 +108,9 @@ async function getLatestRelease(owner, repo) {
       publishedAt: release.published_at,
       body: release.body || ''
     };
+    
+    cache.set(cacheKey, result);
+    return result;
   } catch (err) {
     console.error('[githubApi] getLatestRelease error:', err.message);
     throw err;
@@ -88,6 +119,10 @@ async function getLatestRelease(owner, repo) {
 
 // Get dev-latest release (prerelease with dev builds)
 async function getDevRelease(owner, repo) {
+  const cacheKey = `dev-${owner}-${repo}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
   try {
     // Fetch release by tag "dev-latest"
     const url = `https://api.github.com/repos/${owner}/${repo}/releases/tags/dev-latest`;
@@ -115,7 +150,7 @@ async function getDevRelease(owner, repo) {
     const fullCommitMatch = release.body?.match(/Commit:\s*([a-f0-9]{40})/i);
     const commit = fullCommitMatch ? fullCommitMatch[1] : commitShort;
 
-    return {
+    const result = {
       version: release.tag_name,
       commit: commit,
       commitShort: commitShort,
@@ -124,6 +159,9 @@ async function getDevRelease(owner, repo) {
       publishedAt: release.published_at,
       body: release.body || ''
     };
+    
+    cache.set(cacheKey, result);
+    return result;
   } catch (err) {
     // dev-latest might not exist yet
     if (err.message.includes('404')) {

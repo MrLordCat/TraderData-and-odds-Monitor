@@ -669,7 +669,16 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 				updateReady = false;
 				setStatus(`Update available: ${result.version}`);
 			} else if(result && result.error){
-				setStatus('Check failed: ' + result.error);
+				// Show user-friendly error messages
+				let errorMsg = result.error;
+				if(result.error.includes('403') || result.error.includes('rate limit')){
+					errorMsg = 'Rate limit exceeded. Try again in ~1 hour.';
+				} else if(result.error.includes('timeout')){
+					errorMsg = 'Request timeout. Check internet connection.';
+				} else if(result.error.includes('network') || result.error.includes('ENOTFOUND')){
+					errorMsg = 'Network error. Check internet connection.';
+				}
+				setStatus('⚠️ ' + errorMsg);
 			} else {
 				pendingUpdate = null;
 				updateReady = false;
@@ -677,7 +686,11 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 			}
 			updateButtonState();
 		} catch(e){
-			setStatus('Check failed: ' + (e.message || e));
+			let errorMsg = e.message || String(e);
+			if(errorMsg.includes('403') || errorMsg.includes('rate limit')){
+				errorMsg = 'Rate limit exceeded. Try again in ~1 hour.';
+			}
+			setStatus('⚠️ ' + errorMsg);
 		} finally {
 			checkBtn.disabled = false;
 		}
