@@ -1,36 +1,8 @@
 /* Global shared styles consolidated */
-/* Inter font faces (variable + minimal fallbacks). Font files are expected in ./fonts/Inter-4.1/web/ but that folder is git-ignored.
-   If fonts are missing (e.g. fresh clone) the stack gracefully falls back to system fonts. */
-@font-face {
-  font-family:'Inter var';
-  src: url('./fonts/Inter-4.1/web/InterVariable.woff2') format('woff2');
-  font-weight:100 900;
-  font-display:swap;
-  font-style:normal;
-  font-named-instance:"Regular";
-}
-@font-face {
-  font-family:'Inter var';
-  src: url('./fonts/Inter-4.1/web/InterVariable-Italic.woff2') format('woff2');
-  font-weight:100 900;
-  font-display:swap;
-  font-style:italic;
-  font-named-instance:"Italic";
-}
-@font-face {
-  font-family:'Inter';
-  src: url('./fonts/Inter-4.1/web/Inter-Regular.woff2') format('woff2');
-  font-weight:400;
-  font-display:swap;
-  font-style:normal;
-}
-@font-face {
-  font-family:'Inter';
-  src: url('./fonts/Inter-4.1/web/Inter-SemiBold.woff2') format('woff2');
-  font-weight:600;
-  font-display:swap;
-  font-style:normal;
-}
+/* Inter font - loaded from Google Fonts CDN for reliability.
+   Falls back to system fonts if CDN unavailable. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+
 /* Theme tokens - M3 aliases for backward compatibility */
 :root {
   --bg: var(--md-sys-color-surface, #0d0f17);
@@ -46,7 +18,7 @@
   --radius: var(--md-sys-shape-corner-medium, 8px);
   --transition: var(--md-sys-motion-duration-short2, 120ms);
   --ui-contrast: 1;
-  --font-sans: var(--md-sys-typescale-font-family, 'Inter var','Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto','Helvetica Neue',Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji");
+  --font-sans: var(--md-sys-typescale-font-family, 'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto','Helvetica Neue',Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji");
   --font-mono: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace;
 }
 

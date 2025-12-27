@@ -4,7 +4,7 @@
 	 ========================================== */
 
 @import url("./m3-components.css");
-@import url("./ui/odds_board_shared.css");
+@import url("../ui/odds_board_shared.css");
 
 /* Theme Tokens - now inherit from m3-tokens.css */
 :root {

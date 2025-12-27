@@ -1,6 +1,6 @@
 /* Extracted from inline <style> in board.html */
 
-@import url("./ui/odds_board_shared.css");
+@import url("../ui/odds_board_shared.css");
 /* ================= Theme Tokens (mirrors common) ================ */
 :root {
   --bg: #0d0f17;
