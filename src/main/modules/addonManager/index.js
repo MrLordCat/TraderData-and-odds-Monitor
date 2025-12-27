@@ -20,8 +20,8 @@ const AdmZip = require('adm-zip');
 const REPO_OWNER = 'MrLordCat';
 const REPO_NAME = 'TraderData-and-odds-Monitor';
 
-// Registry of available addons (fetched from GitHub)
-const ADDON_REGISTRY_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/addon-registry/registry.json`;
+// Registry of available addons (fetched from GitHub main branch)
+const ADDON_REGISTRY_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/addon-registry.json`;
 
 function createAddonManager({ store, mainWindow }) {
   // Paths
