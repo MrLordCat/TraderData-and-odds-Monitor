@@ -41,6 +41,8 @@ function createAddonManager({ store, mainWindow }) {
   let installedAddons = [];  // Locally installed
   let enabledAddons = store.get('enabledAddons', []);
   let addonChannel = store.get('addonChannel', 'dev');  // 'dev' or 'release'
+  let lastFetchTime = 0;  // Cache timestamp
+  const CACHE_TTL = 60000;  // 1 minute cache
   
   /**
    * Get/set addon channel
@@ -53,6 +55,9 @@ function createAddonManager({ store, mainWindow }) {
     if (channel === 'dev' || channel === 'release') {
       addonChannel = channel;
       store.set('addonChannel', channel);
+      // Reset cache on channel change
+      availableAddons = [];
+      lastFetchTime = 0;
       return true;
     }
     return false;
@@ -153,7 +158,13 @@ function createAddonManager({ store, mainWindow }) {
   /**
    * Fetch available addons from GitHub releases based on channel
    */
-  async function fetchAvailableAddons() {
+  async function fetchAvailableAddons(forceRefresh = false) {
+    // Return cached if fresh
+    if (!forceRefresh && availableAddons.length > 0 && Date.now() - lastFetchTime < CACHE_TTL) {
+      console.log('[AddonManager] Returning cached addons');
+      return availableAddons;
+    }
+    
     try {
       const channel = addonChannel;
       console.log(`[AddonManager] Fetching addons for channel: ${channel}`);
@@ -215,6 +226,7 @@ function createAddonManager({ store, mainWindow }) {
       }
       
       availableAddons = Array.from(addonMap.values());
+      lastFetchTime = Date.now();
       console.log(`[AddonManager] Found ${availableAddons.length} addons for ${channel} channel`);
       
       return availableAddons;
