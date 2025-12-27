@@ -13,6 +13,9 @@ on:
     tags:
       - 'addon-*'
 
+permissions:
+  contents: write
+
 jobs:
   build-addon:
     runs-on: ubuntu-latest
