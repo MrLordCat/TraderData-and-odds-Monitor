@@ -291,6 +291,75 @@ function createAddonManager({ store, mainWindow }) {
   }
   
   /**
+   * Compare semver versions (basic)
+   * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+   */
+  function compareVersions(v1, v2) {
+    if (!v1 || !v2) return 0;
+    
+    const parse = (v) => {
+      const parts = v.replace(/^v/, '').split('.').map(p => parseInt(p, 10) || 0);
+      while (parts.length < 3) parts.push(0);
+      return parts;
+    };
+    
+    const p1 = parse(v1);
+    const p2 = parse(v2);
+    
+    for (let i = 0; i < 3; i++) {
+      if (p1[i] > p2[i]) return 1;
+      if (p1[i] < p2[i]) return -1;
+    }
+    return 0;
+  }
+  
+  /**
+   * Check for addon updates
+   * Returns list of addons with available updates
+   */
+  async function checkForUpdates() {
+    await fetchAvailableAddons();
+    scanInstalledAddons();
+    
+    const updates = [];
+    
+    for (const installed of installedAddons) {
+      const available = availableAddons.find(a => a.id === installed.id);
+      if (available && compareVersions(available.version, installed.version) > 0) {
+        updates.push({
+          id: installed.id,
+          name: installed.name,
+          currentVersion: installed.version,
+          newVersion: available.version,
+          downloadUrl: available.downloadUrl
+        });
+      }
+    }
+    
+    console.log('[AddonManager] Updates available:', updates);
+    return updates;
+  }
+  
+  /**
+   * Update addon to latest version
+   */
+  async function updateAddon(addonId) {
+    const available = availableAddons.find(a => a.id === addonId);
+    if (!available) {
+      return { success: false, error: 'Addon not found in registry' };
+    }
+    
+    // Use installAddon which handles removal of old version
+    const result = await installAddon(addonId, available.downloadUrl);
+    
+    if (result.success) {
+      broadcast('addon-updated', { addonId, version: available.version });
+    }
+    
+    return result;
+  }
+  
+  /**
    * Get list of enabled addon sidebar module paths for sidebar loading
    */
   function getEnabledAddonPaths() {
@@ -359,7 +428,10 @@ function createAddonManager({ store, mainWindow }) {
     uninstallAddon,
     setAddonEnabled,
     getEnabledAddonPaths,
-    getAddonsInfo
+    getAddonsInfo,
+    checkForUpdates,
+    updateAddon,
+    compareVersions
   };
 }
 

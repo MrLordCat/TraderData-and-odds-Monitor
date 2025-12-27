@@ -40,6 +40,16 @@ function registerAddonIpc({ addonManager }) {
     return addonManager.getAddonsDir();
   });
   
+  // Check for addon updates
+  ipcMain.handle('addons-check-updates', async () => {
+    return addonManager.checkForUpdates();
+  });
+  
+  // Update addon to latest version
+  ipcMain.handle('addons-update', async (event, { addonId }) => {
+    return addonManager.updateAddon(addonId);
+  });
+  
   // Open path in file explorer
   ipcMain.on('shell-open-path', (event, dirPath) => {
     try {

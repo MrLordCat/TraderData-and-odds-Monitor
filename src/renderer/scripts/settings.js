@@ -780,7 +780,13 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	
 	let installedAddons = [];
 	let availableAddons = [];
+	let addonUpdates = []; // Available updates
 	let needsRestart = false;
+	
+	// Check if update is available for addon
+	function getUpdateForAddon(addonId) {
+		return addonUpdates.find(u => u.id === addonId);
+	}
 	
 	// Render installed addons
 	function renderInstalled(){
@@ -789,24 +795,35 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 			return;
 		}
 		
-		listEl.innerHTML = installedAddons.map(addon => `
+		listEl.innerHTML = installedAddons.map(addon => {
+			const update = getUpdateForAddon(addon.id);
+			const updateBtn = update 
+				? `<button class="addon-btn update" data-action="update" data-id="${addon.id}" title="Update to v${update.newVersion}">⬆️ Update</button>`
+				: '';
+			const versionClass = update ? 'addon-version outdated' : 'addon-version';
+			const versionText = update 
+				? `v${addon.version} → v${update.newVersion}`
+				: `v${addon.version}`;
+			
+			return `
 			<div class="addon-card ${addon.enabled ? '' : 'disabled'}" data-id="${addon.id}">
 				<div class="addon-icon">${addon.icon || '📦'}</div>
 				<div class="addon-info">
 					<div>
 						<span class="addon-name">${addon.name}</span>
-						<span class="addon-version">v${addon.version}</span>
+						<span class="${versionClass}">${versionText}</span>
 					</div>
 					<div class="addon-desc">${addon.description || ''}</div>
 				</div>
 				<div class="addon-actions">
+					${updateBtn}
 					<button class="addon-toggle ${addon.enabled ? 'on' : 'off'}" 
 						data-action="toggle" data-id="${addon.id}" 
 						title="${addon.enabled ? 'Disable' : 'Enable'}"></button>
 					<button class="addon-btn danger" data-action="uninstall" data-id="${addon.id}">Uninstall</button>
 				</div>
 			</div>
-		`).join('');
+		`}).join('');
 		
 		// Show restart notice if needed
 		if(needsRestart){
@@ -867,8 +884,9 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 			renderInstalled();
 			renderAvailable();
 			
-			// Fetch remote addons in background
+			// Fetch remote addons and check for updates in background
 			fetchAvailable();
+			checkAddonUpdates();
 		} catch(e){
 			listEl.innerHTML = '<div class="addons-empty">Failed to load addons</div>';
 			console.error('[settings][addons] loadAddons failed:', e);
@@ -883,6 +901,20 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 			renderAvailable();
 		} catch(e){
 			console.warn('[settings][addons] fetchAvailable failed:', e);
+		}
+	}
+	
+	// Check for addon updates
+	async function checkAddonUpdates(){
+		try {
+			const updates = await ipcRenderer.invoke('addons-check-updates');
+			addonUpdates = updates || [];
+			if(addonUpdates.length > 0){
+				console.log('[settings][addons] Updates available:', addonUpdates);
+				renderInstalled(); // Re-render to show update buttons
+			}
+		} catch(e){
+			console.warn('[settings][addons] checkAddonUpdates failed:', e);
 		}
 	}
 	
@@ -924,6 +956,35 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 			} catch(e){
 				console.error('[settings][addons] uninstall failed:', e);
 				btn.textContent = 'Uninstall';
+			}
+			btn.disabled = false;
+		}
+		
+		if(action === 'update'){
+			const update = getUpdateForAddon(addonId);
+			if(!update) return;
+			
+			btn.disabled = true;
+			btn.textContent = 'Updating...';
+			
+			try {
+				const result = await ipcRenderer.invoke('addons-update', { addonId });
+				if(result.success){
+					// Update local version
+					const addon = installedAddons.find(a => a.id === addonId);
+					if(addon) addon.version = update.newVersion;
+					// Remove from updates list
+					addonUpdates = addonUpdates.filter(u => u.id !== addonId);
+					needsRestart = true;
+					renderInstalled();
+				} else {
+					alert(`Update failed: ${result.error || 'Unknown error'}`);
+					btn.textContent = '⬆️ Update';
+				}
+			} catch(e){
+				console.error('[settings][addons] update failed:', e);
+				alert(`Update failed: ${e.message || e}`);
+				btn.textContent = '⬆️ Update';
 			}
 			btn.disabled = false;
 		}

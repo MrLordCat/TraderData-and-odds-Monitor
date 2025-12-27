@@ -245,6 +245,8 @@ h1 {
 .addon-btn.primary:hover { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
 .addon-btn.danger { color: var(--md-sys-color-error); border-color: var(--md-sys-color-error); }
 .addon-btn.danger:hover { background: var(--md-sys-color-error-container); }
+.addon-btn.update { background: var(--md-sys-color-tertiary); color: var(--md-sys-color-on-tertiary); border-color: var(--md-sys-color-tertiary); }
+.addon-btn.update:hover { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
 .addon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .addon-toggle { width: 44px; height: 24px; border-radius: 12px; border: none; cursor: pointer; position: relative; transition: background var(--md-sys-motion-duration-short2); }

@@ -131,10 +131,13 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,addonsSetEnabled: (addonId, enabled) => ipcRenderer.invoke('addons-set-enabled', { addonId, enabled })
   ,addonsGetEnabledPaths: () => ipcRenderer.invoke('addons-get-enabled-paths')
   ,addonsGetDir: () => ipcRenderer.invoke('addons-get-dir')
+  ,addonsCheckUpdates: () => ipcRenderer.invoke('addons-check-updates')
+  ,addonsUpdate: (addonId) => ipcRenderer.invoke('addons-update', { addonId })
   ,onAddonInstallStatus: (cb) => withUnsub('addon-install-status', cb)
   ,onAddonDownloadProgress: (cb) => withUnsub('addon-download-progress', cb)
   ,onAddonUninstalled: (cb) => withUnsub('addon-uninstalled', cb)
   ,onAddonEnabledChanged: (cb) => withUnsub('addon-enabled-changed', cb)
+  ,onAddonUpdated: (cb) => withUnsub('addon-updated', cb)
 });
 
 // ---------- Console forwarding (selective) ----------
