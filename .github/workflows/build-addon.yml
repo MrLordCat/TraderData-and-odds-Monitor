@@ -102,21 +102,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Update registry when addon is released
-  update-registry:
-    needs: build-addon
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/addon-')
-    
-    steps:
-      - name: Checkout addon-registry branch
-        uses: actions/checkout@v4
-        with:
-          ref: addon-registry
-          
-      - name: Update registry.json
-        run: |
-          # This step would normally update the registry
-          # For now, just echo info
-          echo "Would update registry for: ${{ needs.build-addon.outputs.addon_id }}"
-          # Manual registry update required for now
+  # Update registry when addon is released (disabled - no addon-registry branch yet)
+  # update-registry:
+  #   needs: build-addon
+  #   runs-on: ubuntu-latest
+  #   if: startsWith(github.ref, 'refs/tags/addon-')
+  #   
+  #   steps:
+  #     - name: Checkout addon-registry branch
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: addon-registry
+  #         
+  #     - name: Update registry.json
+  #       run: |
+  #         # This step would normally update the registry
+  #         # For now, just echo info
+  #         echo "Would update registry for addon"
+  #         # Manual registry update required for now
