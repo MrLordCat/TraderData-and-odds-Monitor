@@ -182,6 +182,10 @@
       </table>
     </div>
   </div>
+
+  <!-- Addon Modules Container -->
+  <div id="addonModulesContainer"></div>
+
   <script src="../ui/desktop_api_shim.js"></script>
   <script src="../scripts/devcss-reload.js"></script>
   <script src="../scripts/stats_config.js"></script>
@@ -196,6 +200,7 @@
   <script src="../scripts/stats_embedded.js"></script>
   <script src="../scripts/stats_panel.js"></script>
   <script src="../scripts/stats_boot.js"></script>
+  <script src="../scripts/addon_loader.js"></script>
   <script>
     (function(){
       function bind(id, payload){ const el=document.getElementById(id); if(!el) return; el.addEventListener('click', ()=>{ try { if(window.require){ const { ipcRenderer } = require('electron'); ipcRenderer.send('stats-open-devtools', payload); } } catch(e){ console.warn('[devtools] send failed', e); } }); }

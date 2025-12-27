@@ -158,3 +158,10 @@
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.15); }
 }
+/* Addon Sections */
+.addon-section {
+  margin-top: var(--md-sys-spacing-sm);
+}
+.addon-section .addon-body {
+  padding: var(--md-sys-spacing-sm);
+}
