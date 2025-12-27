@@ -1,8 +1,8 @@
 {
   "id": "power-towers",
   "name": "Power Towers TD",
-  "version": "0.0.2",
-  "description": "Roguelike Tower Defense game inspired by Warcraft 3 Power Towers",
+  "version": "0.1.0",
+  "description": "Roguelike Tower Defense game with energy system, inspired by Warcraft 3 Power Towers",
   "author": "MrLordCat",
   "main": "index.js",
   "sidebarModules": [
