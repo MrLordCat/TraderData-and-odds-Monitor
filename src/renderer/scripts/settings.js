@@ -26,6 +26,18 @@ try {
 	if(devBtn){ devBtn.addEventListener('click', ()=>{ try { ipcRenderer.send('open-devtools'); } catch(_){ } }); }
 } catch(_){ }
 
+// Main Window DevTools button
+try {
+	const mainDevBtn = document.getElementById('open-main-devtools');
+	if(mainDevBtn){ mainDevBtn.addEventListener('click', ()=>{ try { ipcRenderer.send('open-main-devtools'); } catch(_){ } }); }
+} catch(_){ }
+
+// Open User Data folder button
+try {
+	const userDataBtn = document.getElementById('open-userdata');
+	if(userDataBtn){ userDataBtn.addEventListener('click', ()=>{ try { ipcRenderer.send('open-userdata-folder'); } catch(_){ } }); }
+} catch(_){ }
+
 // ===== CSS-only column layout (stable order, no JS shuffling) =====
 // Previously used JS masonry which caused random order on each open.
 // Now using pure CSS column-count - segments stay in DOM order.

@@ -35,6 +35,23 @@ ipcMain.on('open-devtools', () => {
   } catch(e){ console.warn('openDevTools failed', e); }
 });
 
+// Open main window DevTools (renderer console)
+ipcMain.on('open-main-devtools', () => {
+  try {
+    if(mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
+  } catch(e){ console.warn('openMainDevTools failed', e); }
+});
+
+// Open user data folder (contains logs, settings, addons)
+ipcMain.on('open-userdata-folder', () => {
+  try {
+    const { shell } = require('electron');
+    shell.openPath(app.getPath('userData'));
+  } catch(e){ console.warn('openUserDataFolder failed', e); }
+});
+
 // Reapply stored map & team names after broker navigation (multi-delay strategy as documented in project instructions)
 function scheduleMapReapply(view){
   try {
