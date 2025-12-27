@@ -743,3 +743,241 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		updateButtonState();
 	});
 })();
+
+// ===== Addons section =====
+(function(){
+	const listEl = document.getElementById('addons-list');
+	const availableEl = document.getElementById('addons-available-list');
+	const refreshBtn = document.getElementById('addons-refresh');
+	const openFolderBtn = document.getElementById('addons-open-folder');
+	
+	if(!listEl) return;
+	
+	let installedAddons = [];
+	let availableAddons = [];
+	let needsRestart = false;
+	
+	// Render installed addons
+	function renderInstalled(){
+		if(installedAddons.length === 0){
+			listEl.innerHTML = '<div class="addons-empty">No addons installed</div>';
+			return;
+		}
+		
+		listEl.innerHTML = installedAddons.map(addon => `
+			<div class="addon-card ${addon.enabled ? '' : 'disabled'}" data-id="${addon.id}">
+				<div class="addon-icon">${addon.icon || '📦'}</div>
+				<div class="addon-info">
+					<div>
+						<span class="addon-name">${addon.name}</span>
+						<span class="addon-version">v${addon.version}</span>
+					</div>
+					<div class="addon-desc">${addon.description || ''}</div>
+				</div>
+				<div class="addon-actions">
+					<button class="addon-toggle ${addon.enabled ? 'on' : 'off'}" 
+						data-action="toggle" data-id="${addon.id}" 
+						title="${addon.enabled ? 'Disable' : 'Enable'}"></button>
+					<button class="addon-btn danger" data-action="uninstall" data-id="${addon.id}">Uninstall</button>
+				</div>
+			</div>
+		`).join('');
+		
+		// Show restart notice if needed
+		if(needsRestart){
+			const notice = document.createElement('div');
+			notice.className = 'restart-notice';
+			notice.innerHTML = `
+				<span>⚠️ Restart required to apply changes</span>
+				<button id="addon-restart-btn">Restart Now</button>
+			`;
+			listEl.appendChild(notice);
+			
+			const restartBtn = document.getElementById('addon-restart-btn');
+			if(restartBtn){
+				restartBtn.addEventListener('click', () => {
+					try { ipcRenderer.invoke('updater-restart'); } catch(_){}
+				});
+			}
+		}
+	}
+	
+	// Render available addons
+	function renderAvailable(){
+		// Filter out already installed
+		const installedIds = new Set(installedAddons.map(a => a.id));
+		const toShow = availableAddons.filter(a => !installedIds.has(a.id));
+		
+		if(toShow.length === 0){
+			availableEl.innerHTML = '<div class="addons-empty">No new addons available</div>';
+			return;
+		}
+		
+		availableEl.innerHTML = toShow.map(addon => `
+			<div class="addon-card" data-id="${addon.id}">
+				<div class="addon-icon">${addon.icon || '📦'}</div>
+				<div class="addon-info">
+					<div>
+						<span class="addon-name">${addon.name}</span>
+						<span class="addon-version">v${addon.version}</span>
+					</div>
+					<div class="addon-desc">${addon.description || ''}</div>
+				</div>
+				<div class="addon-actions">
+					<button class="addon-btn primary" data-action="install" data-id="${addon.id}" data-url="${addon.downloadUrl}">Install</button>
+				</div>
+			</div>
+		`).join('');
+	}
+	
+	// Load addons info
+	async function loadAddons(){
+		listEl.innerHTML = '<div class="addons-loading">Loading addons...</div>';
+		
+		try {
+			const info = await ipcRenderer.invoke('addons-get-info');
+			installedAddons = info.installed || [];
+			availableAddons = info.available || [];
+			
+			renderInstalled();
+			renderAvailable();
+			
+			// Fetch remote addons in background
+			fetchAvailable();
+		} catch(e){
+			listEl.innerHTML = '<div class="addons-empty">Failed to load addons</div>';
+			console.error('[settings][addons] loadAddons failed:', e);
+		}
+	}
+	
+	// Fetch available addons from registry
+	async function fetchAvailable(){
+		try {
+			const available = await ipcRenderer.invoke('addons-fetch-available');
+			availableAddons = available || [];
+			renderAvailable();
+		} catch(e){
+			console.warn('[settings][addons] fetchAvailable failed:', e);
+		}
+	}
+	
+	// Handle addon actions (click delegation)
+	listEl.addEventListener('click', async (e) => {
+		const btn = e.target.closest('[data-action]');
+		if(!btn) return;
+		
+		const action = btn.dataset.action;
+		const addonId = btn.dataset.id;
+		
+		if(action === 'toggle'){
+			const addon = installedAddons.find(a => a.id === addonId);
+			if(!addon) return;
+			
+			btn.disabled = true;
+			try {
+				await ipcRenderer.invoke('addons-set-enabled', { addonId, enabled: !addon.enabled });
+				addon.enabled = !addon.enabled;
+				needsRestart = true;
+				renderInstalled();
+			} catch(e){
+				console.error('[settings][addons] toggle failed:', e);
+			}
+			btn.disabled = false;
+		}
+		
+		if(action === 'uninstall'){
+			if(!confirm(`Uninstall addon "${addonId}"?`)) return;
+			
+			btn.disabled = true;
+			btn.textContent = 'Removing...';
+			try {
+				await ipcRenderer.invoke('addons-uninstall', { addonId });
+				installedAddons = installedAddons.filter(a => a.id !== addonId);
+				needsRestart = true;
+				renderInstalled();
+				renderAvailable();
+			} catch(e){
+				console.error('[settings][addons] uninstall failed:', e);
+				btn.textContent = 'Uninstall';
+			}
+			btn.disabled = false;
+		}
+	});
+	
+	// Handle available addons install
+	if(availableEl){
+		availableEl.addEventListener('click', async (e) => {
+			const btn = e.target.closest('[data-action="install"]');
+			if(!btn) return;
+			
+			const addonId = btn.dataset.id;
+			const downloadUrl = btn.dataset.url;
+			
+			btn.disabled = true;
+			btn.textContent = 'Installing...';
+			
+			// Add progress bar
+			const card = btn.closest('.addon-card');
+			let progressEl = card.querySelector('.addon-progress');
+			if(!progressEl){
+				progressEl = document.createElement('div');
+				progressEl.className = 'addon-progress';
+				progressEl.innerHTML = '<div class="addon-progress-bar" style="width: 0%"></div>';
+				card.appendChild(progressEl);
+			}
+			
+			try {
+				const result = await ipcRenderer.invoke('addons-install', { addonId, downloadUrl });
+				
+				if(result.success){
+					needsRestart = true;
+					// Reload list
+					await loadAddons();
+				} else {
+					btn.textContent = 'Failed';
+					setTimeout(() => { btn.textContent = 'Install'; btn.disabled = false; }, 2000);
+				}
+			} catch(e){
+				console.error('[settings][addons] install failed:', e);
+				btn.textContent = 'Install';
+				btn.disabled = false;
+			}
+			
+			if(progressEl) progressEl.remove();
+		});
+	}
+	
+	// Refresh button
+	if(refreshBtn){
+		refreshBtn.addEventListener('click', () => {
+			loadAddons();
+		});
+	}
+	
+	// Open folder button
+	if(openFolderBtn){
+		openFolderBtn.addEventListener('click', async () => {
+			try {
+				const dir = await ipcRenderer.invoke('addons-get-dir');
+				if(dir){
+					// Use shell.openPath via IPC
+					ipcRenderer.send('shell-open-path', dir);
+				}
+			} catch(e){
+				console.error('[settings][addons] openFolder failed:', e);
+			}
+		});
+	}
+	
+	// Listen for install progress
+	ipcRenderer.on('addon-download-progress', (_e, data) => {
+		const progressBars = document.querySelectorAll('.addon-progress-bar');
+		progressBars.forEach(bar => {
+			bar.style.width = (data.progress || 0) + '%';
+		});
+	});
+	
+	// Initial load
+	loadAddons();
+})();
+

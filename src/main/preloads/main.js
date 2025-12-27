@@ -122,6 +122,19 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,onUpdaterExtracting: (cb) => withUnsub('updater-extracting', cb)
   ,onUpdaterReady: (cb) => withUnsub('updater-update-ready', cb)
   ,onUpdaterError: (cb) => withUnsub('updater-update-error', cb)
+
+  // --- Addons API ---
+  ,addonsGetInfo: () => ipcRenderer.invoke('addons-get-info')
+  ,addonsFetchAvailable: () => ipcRenderer.invoke('addons-fetch-available')
+  ,addonsInstall: (addonId, downloadUrl) => ipcRenderer.invoke('addons-install', { addonId, downloadUrl })
+  ,addonsUninstall: (addonId) => ipcRenderer.invoke('addons-uninstall', { addonId })
+  ,addonsSetEnabled: (addonId, enabled) => ipcRenderer.invoke('addons-set-enabled', { addonId, enabled })
+  ,addonsGetEnabledPaths: () => ipcRenderer.invoke('addons-get-enabled-paths')
+  ,addonsGetDir: () => ipcRenderer.invoke('addons-get-dir')
+  ,onAddonInstallStatus: (cb) => withUnsub('addon-install-status', cb)
+  ,onAddonDownloadProgress: (cb) => withUnsub('addon-download-progress', cb)
+  ,onAddonUninstalled: (cb) => withUnsub('addon-uninstalled', cb)
+  ,onAddonEnabledChanged: (cb) => withUnsub('addon-enabled-changed', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

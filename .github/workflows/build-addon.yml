@@ -1,0 +1,113 @@
+# Build Addon Package
+# 
+# Triggered when pushing to addon branches (addon/*)
+# Packages the addon as a zip and uploads to releases
+
+name: Build Addon
+
+on:
+  push:
+    branches:
+      - 'addon/*'
+      - 'game'  # Power Towers game addon
+    tags:
+      - 'addon-*'
+
+jobs:
+  build-addon:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Extract addon info
+        id: addon-info
+        run: |
+          # Try to read manifest.json from addon directory
+          if [ -f "addon/manifest.json" ]; then
+            ADDON_ID=$(jq -r '.id' addon/manifest.json)
+            ADDON_VERSION=$(jq -r '.version' addon/manifest.json)
+            ADDON_NAME=$(jq -r '.name' addon/manifest.json)
+          elif [ -f "src/renderer/sidebar/modules/power-towers/manifest.json" ]; then
+            ADDON_ID=$(jq -r '.id' src/renderer/sidebar/modules/power-towers/manifest.json)
+            ADDON_VERSION=$(jq -r '.version' src/renderer/sidebar/modules/power-towers/manifest.json)
+            ADDON_NAME=$(jq -r '.name' src/renderer/sidebar/modules/power-towers/manifest.json)
+          else
+            # Fallback to branch name
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+            ADDON_ID=${BRANCH_NAME//\//-}
+            ADDON_VERSION="0.0.1"
+            ADDON_NAME=$ADDON_ID
+          fi
+          
+          echo "addon_id=$ADDON_ID" >> $GITHUB_OUTPUT
+          echo "addon_version=$ADDON_VERSION" >> $GITHUB_OUTPUT
+          echo "addon_name=$ADDON_NAME" >> $GITHUB_OUTPUT
+          echo "zip_name=${ADDON_ID}-v${ADDON_VERSION}.zip" >> $GITHUB_OUTPUT
+          
+      - name: Package addon
+        run: |
+          mkdir -p dist
+          
+          # Determine addon source directory
+          if [ -d "addon" ]; then
+            ADDON_SRC="addon"
+          elif [ -d "src/renderer/sidebar/modules/power-towers" ]; then
+            ADDON_SRC="src/renderer/sidebar/modules/power-towers"
+          else
+            echo "No addon directory found!"
+            exit 1
+          fi
+          
+          # Create zip with addon contents
+          cd "$ADDON_SRC"
+          zip -r "../dist/${{ steps.addon-info.outputs.zip_name }}" . \
+            -x "*.git*" \
+            -x "node_modules/*" \
+            -x "*.md" \
+            -x ".DS_Store"
+          
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.addon-info.outputs.addon_id }}-addon
+          path: dist/${{ steps.addon-info.outputs.zip_name }}
+          
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/addon-')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "${{ steps.addon-info.outputs.addon_name }} v${{ steps.addon-info.outputs.addon_version }}"
+          body: |
+            ## ${{ steps.addon-info.outputs.addon_name }}
+            
+            Version: ${{ steps.addon-info.outputs.addon_version }}
+            
+            ### Installation
+            1. Open app Settings → Addons
+            2. Click "Refresh" to see available addons
+            3. Click "Install" next to this addon
+            4. Restart the app
+          files: dist/${{ steps.addon-info.outputs.zip_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Update registry when addon is released
+  update-registry:
+    needs: build-addon
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/addon-')
+    
+    steps:
+      - name: Checkout addon-registry branch
+        uses: actions/checkout@v4
+        with:
+          ref: addon-registry
+          
+      - name: Update registry.json
+        run: |
+          # This step would normally update the registry
+          # For now, just echo info
+          echo "Would update registry for: ${{ needs.build-addon.outputs.addon_id }}"
+          # Manual registry update required for now

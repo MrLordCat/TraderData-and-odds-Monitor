@@ -2,6 +2,7 @@
  * Sidebar Initialization
  * 
  * Entry point that loads all registered modules into the sidebar container.
+ * Also loads external addons from userData/addons/ directory.
  */
 
 (async function initSidebar() {
@@ -30,7 +31,16 @@
       // Pass any global options here
     });
     
+    // Load built-in modules first
     await loader.loadAll();
+    
+    // Load external addons (from userData/addons/)
+    try {
+      await loader.loadExternalAddons();
+      console.log('[sidebar] External addons loaded');
+    } catch (e) {
+      console.warn('[sidebar] Failed to load external addons:', e);
+    }
     
     // Expose for debugging
     window.__sidebarLoader = loader;

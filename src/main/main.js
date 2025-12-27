@@ -239,6 +239,10 @@ const { initExcelExtractorIpc } = require('./modules/ipc/excelExtractor');
 // Updater module for auto-updates (stable releases + dev commits)
 const { createUpdateManager } = require('./modules/updater');
 const { initUpdaterIpc } = require('./modules/ipc/updater');
+// Addon Manager for loading external modules
+const { createAddonManager } = require('./modules/addonManager');
+const { registerAddonIpc } = require('./modules/ipc/addons');
+let addonManager = null; // initialized in bootstrap()
 let updateManager = null; // initialized in bootstrap()
 // External Excel odds JSON watcher (pseudo broker 'excel')
 const { createExcelWatcher } = require('./modules/excelWatcher');
@@ -535,6 +539,12 @@ function bootstrap() {
       try { updateManager.init(); } catch(e){ console.warn('[updater] init failed', e.message); }
     }, 3000);
   } catch(e){ console.warn('[updater] createUpdateManager failed', e.message); }
+  // --- Addon Manager ---
+  try {
+    addonManager = createAddonManager({ store, mainWindow });
+    registerAddonIpc({ addonManager });
+    console.log('[addons] AddonManager initialized');
+  } catch(e){ console.warn('[addons] createAddonManager failed', e.message); }
   // Menu intentionally suppressed (user prefers F12 only)
   // Removed broker-id partition probing to avoid creating unused persistent profiles
 }

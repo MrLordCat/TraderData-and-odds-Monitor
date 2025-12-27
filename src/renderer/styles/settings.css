@@ -218,3 +218,48 @@ h1 {
 }
 
 .sepLine { margin: var(--md-sys-spacing-lg) 0; border: none; border-top: 1px solid var(--md-sys-color-outline-variant); }
+
+/* Addons Section */
+.addons-container { display: flex; flex-direction: column; gap: var(--md-sys-spacing-md); }
+.addons-actions { display: flex; gap: var(--md-sys-spacing-sm); }
+.addons-actions button { display: flex; align-items: center; gap: var(--md-sys-spacing-xs); }
+.btn-secondary { background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); border: 1px solid var(--md-sys-color-outline-variant); padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-md); border-radius: var(--md-sys-shape-corner-small); cursor: pointer; font-size: var(--md-sys-typescale-label-medium-size); }
+.btn-secondary:hover { background: var(--md-sys-color-surface-container-high); }
+.btn-icon { font-size: 1em; }
+
+.addons-list { display: flex; flex-direction: column; gap: var(--md-sys-spacing-sm); }
+.addons-loading { font-size: var(--md-sys-typescale-body-small-size); color: var(--md-sys-color-on-surface-variant); padding: var(--md-sys-spacing-md); text-align: center; }
+.addons-empty { font-size: var(--md-sys-typescale-body-small-size); color: var(--md-sys-color-on-surface-variant); padding: var(--md-sys-spacing-md); text-align: center; font-style: italic; }
+
+.addon-card { display: flex; align-items: center; gap: var(--md-sys-spacing-md); padding: var(--md-sys-spacing-md); background: var(--md-sys-color-surface-container-highest); border-radius: var(--md-sys-shape-corner-medium); border: 1px solid var(--md-sys-color-outline-variant); }
+.addon-card.disabled { opacity: 0.6; }
+.addon-icon { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-small); background: var(--md-sys-color-primary-container); display: flex; align-items: center; justify-content: center; font-size: 1.5em; flex-shrink: 0; }
+.addon-info { flex: 1; min-width: 0; }
+.addon-name { font-weight: 500; font-size: var(--md-sys-typescale-body-medium-size); color: var(--md-sys-color-on-surface); }
+.addon-version { font-size: var(--md-sys-typescale-label-small-size); color: var(--md-sys-color-on-surface-variant); margin-left: var(--md-sys-spacing-xs); }
+.addon-desc { font-size: var(--md-sys-typescale-body-small-size); color: var(--md-sys-color-on-surface-variant); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.addon-actions { display: flex; gap: var(--md-sys-spacing-xs); flex-shrink: 0; }
+.addon-btn { padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-sm); border-radius: var(--md-sys-shape-corner-small); border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); cursor: pointer; font-size: var(--md-sys-typescale-label-small-size); }
+.addon-btn:hover { background: var(--md-sys-color-surface-container-high); }
+.addon-btn.primary { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border-color: var(--md-sys-color-primary); }
+.addon-btn.primary:hover { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.addon-btn.danger { color: var(--md-sys-color-error); border-color: var(--md-sys-color-error); }
+.addon-btn.danger:hover { background: var(--md-sys-color-error-container); }
+.addon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.addon-toggle { width: 44px; height: 24px; border-radius: 12px; border: none; cursor: pointer; position: relative; transition: background var(--md-sys-motion-duration-short2); }
+.addon-toggle.off { background: var(--md-sys-color-surface-container-highest); }
+.addon-toggle.on { background: var(--md-sys-color-primary); }
+.addon-toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: white; top: 3px; transition: left var(--md-sys-motion-duration-short2); }
+.addon-toggle.off::after { left: 3px; }
+.addon-toggle.on::after { left: 23px; }
+
+.addons-available { margin-top: var(--md-sys-spacing-md); }
+.addons-subtitle { font-size: var(--md-sys-typescale-label-large-size); color: var(--md-sys-color-on-surface-variant); margin-bottom: var(--md-sys-spacing-sm); }
+
+.addon-progress { width: 100%; height: 4px; background: var(--md-sys-color-surface-container); border-radius: 2px; overflow: hidden; margin-top: var(--md-sys-spacing-xs); }
+.addon-progress-bar { height: 100%; background: var(--md-sys-color-primary); transition: width 0.2s; }
+
+.restart-notice { display: flex; align-items: center; gap: var(--md-sys-spacing-sm); padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-md); background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); border-radius: var(--md-sys-shape-corner-small); font-size: var(--md-sys-typescale-label-medium-size); margin-top: var(--md-sys-spacing-md); }
+.restart-notice button { padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-sm); }
+

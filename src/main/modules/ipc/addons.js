@@ -1,0 +1,53 @@
+/**
+ * IPC handlers for Addon Manager
+ */
+
+const { ipcMain, shell } = require('electron');
+
+function registerAddonIpc({ addonManager }) {
+  // Get all addons info (installed + available)
+  ipcMain.handle('addons-get-info', async () => {
+    return addonManager.getAddonsInfo();
+  });
+  
+  // Fetch available addons from registry
+  ipcMain.handle('addons-fetch-available', async () => {
+    return addonManager.fetchAvailableAddons();
+  });
+  
+  // Install addon
+  ipcMain.handle('addons-install', async (event, { addonId, downloadUrl }) => {
+    return addonManager.installAddon(addonId, downloadUrl);
+  });
+  
+  // Uninstall addon
+  ipcMain.handle('addons-uninstall', async (event, { addonId }) => {
+    return addonManager.uninstallAddon(addonId);
+  });
+  
+  // Enable/disable addon
+  ipcMain.handle('addons-set-enabled', async (event, { addonId, enabled }) => {
+    return addonManager.setAddonEnabled(addonId, enabled);
+  });
+  
+  // Get enabled addon paths (for sidebar loading)
+  ipcMain.handle('addons-get-enabled-paths', async () => {
+    return addonManager.getEnabledAddonPaths();
+  });
+  
+  // Get addons directory path
+  ipcMain.handle('addons-get-dir', async () => {
+    return addonManager.getAddonsDir();
+  });
+  
+  // Open path in file explorer
+  ipcMain.on('shell-open-path', (event, dirPath) => {
+    try {
+      shell.openPath(dirPath);
+    } catch (e) {
+      console.error('[addons] shell.openPath failed:', e);
+    }
+  });
+}
+
+module.exports = { registerAddonIpc };

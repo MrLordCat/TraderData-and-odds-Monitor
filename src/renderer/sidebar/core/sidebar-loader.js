@@ -5,9 +5,12 @@
  * - Loading module files
  * - Rendering modules to container
  * - Managing IPC routing to modules
+ * - Loading external addons from userData/addons/
  */
 
-const { getModules, createModuleInstance, eventBus } = require('./sidebar-base');
+const { getModules, createModuleInstance, eventBus, registerModule } = require('./sidebar-base');
+const path = require('path');
+const fs = require('fs');
 
 class SidebarLoader {
   constructor(containerEl, options = {}) {
@@ -28,6 +31,65 @@ class SidebarLoader {
     }
     
     this.setupIpcRouter();
+  }
+  
+  /**
+   * Load external addons from paths provided by main process
+   */
+  async loadExternalAddons() {
+    if (!window.desktopAPI || !window.desktopAPI.addonsGetEnabledPaths) {
+      console.log('[sidebar] No addon API available');
+      return;
+    }
+    
+    try {
+      const addonPaths = await window.desktopAPI.addonsGetEnabledPaths();
+      console.log('[sidebar] Loading external addons:', addonPaths);
+      
+      for (const addon of addonPaths) {
+        try {
+          await this.loadExternalModule(addon.path);
+        } catch (e) {
+          console.error(`[sidebar] Failed to load addon ${addon.id}:`, e);
+        }
+      }
+    } catch (e) {
+      console.error('[sidebar] Failed to get addon paths:', e);
+    }
+  }
+  
+  /**
+   * Load an external module from file path
+   */
+  async loadExternalModule(modulePath) {
+    try {
+      // Check if file exists
+      if (!fs.existsSync(modulePath)) {
+        console.warn(`[sidebar] Module file not found: ${modulePath}`);
+        return null;
+      }
+      
+      // Clear require cache to allow hot-reload
+      delete require.cache[require.resolve(modulePath)];
+      
+      // Load the module
+      const ModuleClass = require(modulePath);
+      
+      if (!ModuleClass || !ModuleClass.id) {
+        console.warn(`[sidebar] Invalid module at ${modulePath}: no id`);
+        return null;
+      }
+      
+      // Register if not already registered
+      registerModule(ModuleClass);
+      
+      // Load into sidebar
+      return await this.loadModule(ModuleClass.id);
+      
+    } catch (e) {
+      console.error(`[sidebar] Error loading external module ${modulePath}:`, e);
+      return null;
+    }
   }
   
   /**
