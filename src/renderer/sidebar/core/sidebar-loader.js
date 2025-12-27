@@ -73,7 +73,20 @@ class SidebarLoader {
       delete require.cache[require.resolve(modulePath)];
       
       // Load the module
-      const ModuleClass = require(modulePath);
+      const exported = require(modulePath);
+      
+      let ModuleClass;
+      
+      // Check if it's a factory function (for external addons)
+      if (typeof exported === 'function' && !exported.id) {
+        // Call factory with SidebarModule base class and registerModule
+        const { SidebarModule, registerModule: regFn } = require('./sidebar-base');
+        ModuleClass = exported({ SidebarModule, registerModule: regFn });
+        console.log(`[sidebar] Loaded module via factory: ${ModuleClass?.id || 'unknown'}`);
+      } else {
+        // Direct class export
+        ModuleClass = exported;
+      }
       
       if (!ModuleClass || !ModuleClass.id) {
         console.warn(`[sidebar] Invalid module at ${modulePath}: no id`);

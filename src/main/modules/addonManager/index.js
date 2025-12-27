@@ -291,17 +291,39 @@ function createAddonManager({ store, mainWindow }) {
   }
   
   /**
-   * Get list of enabled addon paths for sidebar loading
+   * Get list of enabled addon sidebar module paths for sidebar loading
    */
   function getEnabledAddonPaths() {
     scanInstalledAddons();
     
-    return installedAddons
-      .filter(a => a.enabled)
-      .map(a => ({
-        id: a.id,
-        path: path.join(a.path, a.main || 'index.js')
-      }));
+    const result = [];
+    
+    for (const addon of installedAddons.filter(a => a.enabled)) {
+      // Load manifest to get sidebarModules
+      const manifest = loadManifest(addon.path);
+      if (!manifest) continue;
+      
+      // If addon has sidebarModules, return those paths
+      if (manifest.sidebarModules && Array.isArray(manifest.sidebarModules)) {
+        for (const mod of manifest.sidebarModules) {
+          result.push({
+            id: `${addon.id}:${mod.id || mod.path}`,
+            addonId: addon.id,
+            path: path.join(addon.path, mod.path)
+          });
+        }
+      } else {
+        // Fallback to main entry point
+        result.push({
+          id: addon.id,
+          addonId: addon.id,
+          path: path.join(addon.path, addon.main || 'index.js')
+        });
+      }
+    }
+    
+    console.log('[AddonManager] getEnabledAddonPaths:', result);
+    return result;
   }
   
   /**
