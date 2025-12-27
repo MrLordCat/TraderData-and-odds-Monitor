@@ -243,6 +243,8 @@ const { initUpdaterIpc } = require('./modules/ipc/updater');
 const { createAddonManager } = require('./modules/addonManager');
 const { registerAddonIpc } = require('./modules/ipc/addons');
 let addonManager = null; // initialized in bootstrap()
+// Game module detach support
+const { initGameIpc } = require('./modules/ipc/game');
 let updateManager = null; // initialized in bootstrap()
 // External Excel odds JSON watcher (pseudo broker 'excel')
 const { createExcelWatcher } = require('./modules/excelWatcher');
@@ -539,6 +541,10 @@ function bootstrap() {
       try { updateManager.init(); } catch(e){ console.warn('[updater] init failed', e.message); }
     }, 3000);
   } catch(e){ console.warn('[updater] createUpdateManager failed', e.message); }
+  // --- Game Module IPC ---
+  try {
+    initGameIpc({ mainWindow });
+  } catch(e){ console.warn('[game] initGameIpc failed', e.message); }
   // --- Addon Manager ---
   try {
     addonManager = createAddonManager({ store, mainWindow });

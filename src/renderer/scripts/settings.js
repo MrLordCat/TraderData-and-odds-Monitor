@@ -750,6 +750,7 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	const availableEl = document.getElementById('addons-available-list');
 	const refreshBtn = document.getElementById('addons-refresh');
 	const openFolderBtn = document.getElementById('addons-open-folder');
+	const devInstallBtn = document.getElementById('addons-dev-install');
 	
 	if(!listEl) return;
 	
@@ -965,6 +966,43 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 				}
 			} catch(e){
 				console.error('[settings][addons] openFolder failed:', e);
+			}
+		});
+	}
+	
+	// Dev Install button (installs from project test-addon folder)
+	if(devInstallBtn){
+		devInstallBtn.addEventListener('click', async () => {
+			// Get app path and construct test-addon path
+			try {
+				const { app } = require('@electron/remote') || {};
+				// Fallback: use __dirname if remote not available
+				const path = require('path');
+				const appPath = process.cwd();
+				const testAddonPath = path.join(appPath, 'test-addon');
+				
+				devInstallBtn.disabled = true;
+				devInstallBtn.innerHTML = '<span class="btn-icon">⏳</span> Installing...';
+				
+				const result = await ipcRenderer.invoke('addons-install-local', { sourcePath: testAddonPath });
+				
+				if(result.success){
+					needsRestart = true;
+					devInstallBtn.innerHTML = '<span class="btn-icon">✅</span> Installed!';
+					await loadAddons();
+				} else {
+					devInstallBtn.innerHTML = '<span class="btn-icon">❌</span> Failed';
+					console.error('[settings][addons] devInstall failed:', result.error);
+				}
+				
+				setTimeout(() => {
+					devInstallBtn.innerHTML = '<span class="btn-icon">🛠️</span> Dev Install';
+					devInstallBtn.disabled = false;
+				}, 2000);
+			} catch(e){
+				console.error('[settings][addons] devInstall error:', e);
+				devInstallBtn.innerHTML = '<span class="btn-icon">🛠️</span> Dev Install';
+				devInstallBtn.disabled = false;
 			}
 		});
 	}

@@ -127,6 +127,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,addonsGetInfo: () => ipcRenderer.invoke('addons-get-info')
   ,addonsFetchAvailable: () => ipcRenderer.invoke('addons-fetch-available')
   ,addonsInstall: (addonId, downloadUrl) => ipcRenderer.invoke('addons-install', { addonId, downloadUrl })
+  ,addonsInstallLocal: (sourcePath) => ipcRenderer.invoke('addons-install-local', { sourcePath })
   ,addonsUninstall: (addonId) => ipcRenderer.invoke('addons-uninstall', { addonId })
   ,addonsSetEnabled: (addonId, enabled) => ipcRenderer.invoke('addons-set-enabled', { addonId, enabled })
   ,addonsGetEnabledPaths: () => ipcRenderer.invoke('addons-get-enabled-paths')

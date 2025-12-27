@@ -273,6 +273,78 @@ function createAddonManager({ store, mainWindow }) {
   }
   
   /**
+   * Install addon from local folder (dev mode)
+   * Copies folder contents to addons directory
+   */
+  function installFromLocal(sourcePath) {
+    try {
+      if (!fs.existsSync(sourcePath)) {
+        return { success: false, error: 'Source path not found' };
+      }
+      
+      // Load manifest from source
+      const manifestPath = path.join(sourcePath, 'manifest.json');
+      if (!fs.existsSync(manifestPath)) {
+        return { success: false, error: 'manifest.json not found in source' };
+      }
+      
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const addonId = manifest.id;
+      
+      if (!addonId) {
+        return { success: false, error: 'Invalid manifest: id required' };
+      }
+      
+      const addonDir = path.join(addonsDir, addonId);
+      
+      // Remove old version if exists
+      if (fs.existsSync(addonDir)) {
+        fs.rmSync(addonDir, { recursive: true, force: true });
+      }
+      
+      // Copy recursively
+      copyDirRecursive(sourcePath, addonDir);
+      
+      // Auto-enable
+      if (!enabledAddons.includes(addonId)) {
+        enabledAddons.push(addonId);
+        store.set('enabledAddons', enabledAddons);
+      }
+      
+      // Rescan
+      scanInstalledAddons();
+      
+      console.log(`[AddonManager] Installed ${addonId} from local: ${sourcePath}`);
+      broadcast('addon-install-status', { addonId, status: 'installed', requiresRestart: true });
+      
+      return { success: true, addonId, requiresRestart: true };
+      
+    } catch (e) {
+      console.error(`[AddonManager] Local install failed:`, e);
+      return { success: false, error: e.message };
+    }
+  }
+  
+  /**
+   * Helper: recursive copy directory
+   */
+  function copyDirRecursive(src, dest) {
+    fs.mkdirSync(dest, { recursive: true });
+    
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+    for (const entry of entries) {
+      const srcPath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+      
+      if (entry.isDirectory()) {
+        copyDirRecursive(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+  
+  /**
    * Enable/disable addon
    */
   function setAddonEnabled(addonId, enabled) {
@@ -292,16 +364,42 @@ function createAddonManager({ store, mainWindow }) {
   
   /**
    * Get list of enabled addon paths for sidebar loading
+   * Returns paths to sidebar modules defined in manifest
    */
   function getEnabledAddonPaths() {
     scanInstalledAddons();
     
-    return installedAddons
-      .filter(a => a.enabled)
-      .map(a => ({
-        id: a.id,
-        path: path.join(a.path, a.main || 'index.js')
-      }));
+    const result = [];
+    
+    for (const addon of installedAddons) {
+      if (!addon.enabled) continue;
+      
+      const manifest = loadManifest(addon.path);
+      if (!manifest) continue;
+      
+      // Load sidebar modules from manifest
+      if (manifest.sidebarModules && Array.isArray(manifest.sidebarModules)) {
+        for (const mod of manifest.sidebarModules) {
+          result.push({
+            id: `${addon.id}/${mod.id}`,
+            addonId: addon.id,
+            moduleId: mod.id,
+            path: path.join(addon.path, mod.path)
+          });
+        }
+      }
+      
+      // Legacy: if no sidebarModules, try main entry
+      if (!manifest.sidebarModules && manifest.main) {
+        result.push({
+          id: addon.id,
+          addonId: addon.id,
+          path: path.join(addon.path, manifest.main)
+        });
+      }
+    }
+    
+    return result;
   }
   
   /**
@@ -334,6 +432,7 @@ function createAddonManager({ store, mainWindow }) {
     scanInstalledAddons,
     fetchAvailableAddons,
     installAddon,
+    installFromLocal,
     uninstallAddon,
     setAddonEnabled,
     getEnabledAddonPaths,

@@ -1,0 +1,15 @@
+{
+  "id": "power-towers-test",
+  "name": "Power Towers TD (Test)",
+  "version": "0.0.1",
+  "description": "Test addon for Power Towers TD game - sidebar panel with canvas",
+  "author": "MrLordCat",
+  "main": "index.js",
+  "sidebarModules": [
+    {
+      "path": "modules/game-panel/index.js",
+      "id": "game-panel",
+      "name": "Game Panel"
+    }
+  ]
+}

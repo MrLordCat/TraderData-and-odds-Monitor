@@ -20,6 +20,11 @@ function registerAddonIpc({ addonManager }) {
     return addonManager.installAddon(addonId, downloadUrl);
   });
   
+  // Install addon from local folder (dev mode)
+  ipcMain.handle('addons-install-local', async (event, { sourcePath }) => {
+    return addonManager.installFromLocal(sourcePath);
+  });
+  
   // Uninstall addon
   ipcMain.handle('addons-uninstall', async (event, { addonId }) => {
     return addonManager.uninstallAddon(addonId);

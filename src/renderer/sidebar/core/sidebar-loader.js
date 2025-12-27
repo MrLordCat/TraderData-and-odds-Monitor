@@ -60,6 +60,7 @@ class SidebarLoader {
   
   /**
    * Load an external module from file path
+   * External modules export a factory function that receives { SidebarModule, registerModule }
    */
   async loadExternalModule(modulePath) {
     try {
@@ -73,18 +74,30 @@ class SidebarLoader {
       delete require.cache[require.resolve(modulePath)];
       
       // Load the module
-      const ModuleClass = require(modulePath);
+      const moduleExport = require(modulePath);
       
-      if (!ModuleClass || !ModuleClass.id) {
-        console.warn(`[sidebar] Invalid module at ${modulePath}: no id`);
-        return null;
+      // If module exports a factory function, call it with SidebarModule base
+      if (typeof moduleExport === 'function') {
+        const { SidebarModule: BaseClass } = require('./sidebar-base');
+        const ModuleClass = moduleExport({ SidebarModule: BaseClass, registerModule });
+        
+        if (!ModuleClass || !ModuleClass.id) {
+          console.warn(`[sidebar] Factory at ${modulePath} returned invalid module`);
+          return null;
+        }
+        
+        registerModule(ModuleClass);
+        return await this.loadModule(ModuleClass.id);
       }
       
-      // Register if not already registered
-      registerModule(ModuleClass);
+      // Legacy: module exports class directly with id
+      if (moduleExport && moduleExport.id) {
+        registerModule(moduleExport);
+        return await this.loadModule(moduleExport.id);
+      }
       
-      // Load into sidebar
-      return await this.loadModule(ModuleClass.id);
+      console.warn(`[sidebar] Invalid module at ${modulePath}: must export factory function or class with id`);
+      return null;
       
     } catch (e) {
       console.error(`[sidebar] Error loading external module ${modulePath}:`, e);
