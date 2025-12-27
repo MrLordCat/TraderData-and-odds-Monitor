@@ -3,7 +3,7 @@
  * Handles all Canvas rendering
  */
 
-const CONFIG = require('../config');
+const CONFIG = require('../core/config');
 
 class GameRenderer {
   constructor(canvas) {
