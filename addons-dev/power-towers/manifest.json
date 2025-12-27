@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Roguelike Tower Defense game with energy system, inspired by Warcraft 3 Power Towers",
   "author": "MrLordCat",
+  "icon": "🗼",
   "main": "index.js",
   "sidebarModules": [
     {
