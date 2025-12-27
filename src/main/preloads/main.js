@@ -122,6 +122,12 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,onUpdaterExtracting: (cb) => withUnsub('updater-extracting', cb)
   ,onUpdaterReady: (cb) => withUnsub('updater-update-ready', cb)
   ,onUpdaterError: (cb) => withUnsub('updater-update-error', cb)
+
+  // --- Game Module Detach API ---
+  ,onGameWindowReady: (cb) => withUnsub('game-window-ready', cb)
+  ,onGameWindowClosed: (cb) => withUnsub('game-window-closed', cb)
+  ,onGameDetachedInput: (cb) => withUnsub('game-detached-input', cb)
+  ,onGameDetachedCommand: (cb) => withUnsub('game-detached-command', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

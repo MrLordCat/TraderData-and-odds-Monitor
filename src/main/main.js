@@ -239,6 +239,8 @@ const { initExcelExtractorIpc } = require('./modules/ipc/excelExtractor');
 // Updater module for auto-updates (stable releases + dev commits)
 const { createUpdateManager } = require('./modules/updater');
 const { initUpdaterIpc } = require('./modules/ipc/updater');
+// Game module detach support
+const { initGameIpc } = require('./modules/ipc/game');
 let updateManager = null; // initialized in bootstrap()
 // External Excel odds JSON watcher (pseudo broker 'excel')
 const { createExcelWatcher } = require('./modules/excelWatcher');
@@ -535,6 +537,10 @@ function bootstrap() {
       try { updateManager.init(); } catch(e){ console.warn('[updater] init failed', e.message); }
     }, 3000);
   } catch(e){ console.warn('[updater] createUpdateManager failed', e.message); }
+  // --- Game Module IPC ---
+  try {
+    initGameIpc({ mainWindow });
+  } catch(e){ console.warn('[game] initGameIpc failed', e.message); }
   // Menu intentionally suppressed (user prefers F12 only)
   // Removed broker-id partition probing to avoid creating unused persistent profiles
 }

@@ -18,6 +18,7 @@
   padding: var(--md-sys-spacing-2, 8px) var(--md-sys-spacing-3, 12px);
   background: var(--md-sys-color-surface-container-high, #2a2a3e);
   border-radius: var(--md-sys-shape-small, 8px);
+  gap: var(--md-sys-spacing-2, 8px);
 }
 
 .game-score,
@@ -25,6 +26,10 @@
   display: flex;
   align-items: baseline;
   gap: var(--md-sys-spacing-1, 4px);
+}
+
+.game-high-score {
+  margin-right: auto;
 }
 
 .score-label {
@@ -157,6 +162,22 @@
   background: var(--md-sys-color-primary-container, #9370ff);
 }
 
+/* Icon-only button */
+.game-btn-icon {
+  padding: var(--md-sys-spacing-2, 8px);
+  min-width: 36px;
+}
+
+.game-btn-icon span {
+  display: none;
+}
+
+/* Detach button states */
+#game-detach.detached {
+  background: var(--md-sys-color-tertiary-container, #3d3d1e);
+  color: var(--md-sys-color-on-tertiary-container, #ffd700);
+}
+
 /* Instructions */
 .game-instructions {
   padding: var(--md-sys-spacing-2, 8px) var(--md-sys-spacing-3, 12px);
@@ -170,6 +191,22 @@
   font-size: var(--md-sys-typescale-body-small-size, 12px);
   color: var(--md-sys-color-on-surface-variant, #a0a0b0);
   line-height: 1.5;
+}
+
+/* ============================================
+   DETACHED MODE
+   ============================================ */
+
+.game-canvas-wrapper.detached-mode {
+  background: var(--md-sys-color-surface-container, #252538);
+}
+
+.game-canvas-wrapper.detached-mode canvas {
+  opacity: 0.3;
+}
+
+.game-canvas-wrapper.detached-mode .game-overlay {
+  background: rgba(37, 37, 56, 0.95);
 }
 
 /* ============================================

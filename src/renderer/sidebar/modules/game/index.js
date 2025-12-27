@@ -1,11 +1,17 @@
 /**
  * Game Module - Mini-game for the sidebar
  * 
- * This is a placeholder game module that can be customized
- * to implement any mini-game (Snake, Tetris, Tic-Tac-Toe, etc.)
+ * Architecture:
+ * - GameCore (core.js): Central game logic, runs here in sidebar
+ * - GameRenderer (renderer.js): Display-only canvas renderer
+ * - Detached window: Just displays, no logic duplication
+ * 
+ * The core broadcasts state to all connected renderers (embedded + detached).
  */
 
 const { SidebarModule, registerModule, eventBus } = require('../../core/sidebar-base');
+const { GameCore } = require('./core');
+const { GameRenderer } = require('./renderer');
 
 class GameModule extends SidebarModule {
   static id = 'game';
@@ -26,6 +32,12 @@ class GameModule extends SidebarModule {
     this.canvas = null;
     this.ctx = null;
     this.animationId = null;
+    
+    // Detach state
+    this.isDetached = false;
+    this.detachedWindowId = null;
+    this.renderer = null;
+    this.coreUnsubscribe = null;
   }
 
   getTemplate() {
@@ -40,9 +52,14 @@ class GameModule extends SidebarModule {
             <span class="score-label">Best:</span>
             <span class="score-value" id="game-high-score">0</span>
           </div>
+          <button id="game-detach" class="game-btn game-btn-icon" title="Detach to separate window">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+            </svg>
+          </button>
         </div>
         
-        <div class="game-canvas-wrapper">
+        <div class="game-canvas-wrapper" id="game-canvas-wrapper">
           <canvas id="game-canvas" width="280" height="280"></canvas>
           <div class="game-overlay" id="game-overlay">
             <div class="overlay-content">
@@ -85,6 +102,10 @@ class GameModule extends SidebarModule {
     this.canvas = this.$('#game-canvas');
     this.ctx = this.canvas?.getContext('2d');
     
+    // Initialize renderer and connect to GameCore
+    this.renderer = new GameRenderer(this.canvas);
+    this.setupCoreConnection();
+    
     this.loadHighScore();
     this.bindEvents();
     this.drawInitialState();
@@ -92,25 +113,124 @@ class GameModule extends SidebarModule {
 
   onUnmount() {
     this.stopGame();
+    this.disconnectCore();
+    if (this.detachedWindowId) {
+      this.attachWindow();
+    }
     super.onUnmount();
+  }
+
+  /**
+   * Connect to GameCore for state updates
+   */
+  setupCoreConnection() {
+    // Subscribe to GameCore events
+    this.coreUnsubscribe = GameCore.subscribe((message) => {
+      this.handleCoreMessage(message);
+    });
+    
+    // Setup IPC listeners for detached window communication
+    this.setupDetachIpc();
+  }
+
+  /**
+   * Disconnect from GameCore
+   */
+  disconnectCore() {
+    if (this.coreUnsubscribe) {
+      this.coreUnsubscribe();
+      this.coreUnsubscribe = null;
+    }
+  }
+
+  /**
+   * Handle messages from GameCore
+   */
+  handleCoreMessage(message) {
+    const { type, payload } = message;
+    
+    // Update local state
+    switch (type) {
+      case 'sync':
+      case 'init':
+        this.gameState = { ...this.gameState, ...payload };
+        this.updateScoreDisplay();
+        break;
+      case 'start':
+        this.gameState.running = true;
+        this.gameState.paused = false;
+        this.hideOverlay();
+        this.updateButtonStates();
+        break;
+      case 'pause':
+        this.gameState.paused = true;
+        this.showOverlay('⏸️ Paused', 'Press Pause or Esc to continue');
+        this.updateButtonStates();
+        break;
+      case 'resume':
+        this.gameState.paused = false;
+        this.hideOverlay();
+        this.updateButtonStates();
+        break;
+      case 'stop':
+      case 'reset':
+        this.gameState.running = false;
+        this.gameState.paused = false;
+        this.showOverlay('🎮 Ready?', 'Press Start to play');
+        this.updateScoreDisplay();
+        this.updateButtonStates();
+        break;
+      case 'gameover':
+        this.gameState.running = false;
+        this.gameState.score = payload.score;
+        this.gameState.highScore = payload.highScore;
+        if (payload.isNewHigh) {
+          this.showOverlay('🏆 New High Score!', `Score: ${payload.score}`);
+        } else {
+          this.showOverlay('💀 Game Over', `Score: ${payload.score}`);
+        }
+        this.updateScoreDisplay();
+        this.updateButtonStates();
+        break;
+      case 'tick':
+      case 'score':
+        this.gameState.score = payload.score ?? this.gameState.score;
+        this.updateScoreDisplay();
+        break;
+    }
+    
+    // Forward to detached window if connected
+    if (this.isDetached && this.detachedWindowId) {
+      this.broadcastToDetached(message);
+    }
+    
+    // Renderer handles its own rendering via subscription
+    if (this.renderer && !this.isDetached) {
+      this.renderer.handleMessage(message);
+    }
   }
 
   bindEvents() {
     // Start button
     this.$('#game-start')?.addEventListener('click', () => {
       if (!this.gameState.running) {
-        this.startGame();
+        GameCore.start();
       }
     });
 
     // Pause button
     this.$('#game-pause')?.addEventListener('click', () => {
-      this.togglePause();
+      GameCore.togglePause();
     });
 
     // Reset button
     this.$('#game-reset')?.addEventListener('click', () => {
-      this.resetGame();
+      GameCore.reset();
+    });
+
+    // Detach button
+    this.$('#game-detach')?.addEventListener('click', () => {
+      this.toggleDetach();
     });
 
     // Keyboard controls
@@ -119,176 +239,328 @@ class GameModule extends SidebarModule {
   }
 
   handleKeydown(e) {
+    // Escape always works for pause
+    if (e.key === 'Escape' && this.gameState.running) {
+      GameCore.togglePause();
+      return;
+    }
+    
     if (!this.gameState.running || this.gameState.paused) return;
     
-    // Override in game implementation
-    // Example: Arrow keys, WASD, Space, etc.
+    // Forward input to GameCore
     switch (e.key) {
       case 'ArrowUp':
       case 'w':
       case 'W':
-        this.onInput('up');
+        GameCore.input('up');
         break;
       case 'ArrowDown':
       case 's':
       case 'S':
-        this.onInput('down');
+        GameCore.input('down');
         break;
       case 'ArrowLeft':
       case 'a':
       case 'A':
-        this.onInput('left');
+        GameCore.input('left');
         break;
       case 'ArrowRight':
       case 'd':
       case 'D':
-        this.onInput('right');
+        GameCore.input('right');
         break;
       case ' ':
-        this.onInput('action');
-        break;
-      case 'Escape':
-        this.togglePause();
+        GameCore.input('action');
         break;
     }
   }
 
   // ============================================
-  // GAME LIFECYCLE - Override these in subclass
+  // DETACH FUNCTIONALITY
   // ============================================
 
   /**
-   * Initialize game state
-   * Override in game implementation
+   * Setup IPC listeners for detach communication
+   */
+  setupDetachIpc() {
+    const api = window.desktopAPI;
+    if (!api) return;
+
+    // Listen for detached window ready
+    if (api.onGameWindowReady) {
+      this._ipcCleanup.push(
+        api.onGameWindowReady(({ windowId }) => {
+          if (windowId === this.detachedWindowId) {
+            // Send current state to newly connected window
+            this.broadcastToDetached({ type: 'sync', payload: GameCore.getSnapshot() });
+          }
+        })
+      );
+    }
+
+    // Listen for detached window closed
+    if (api.onGameWindowClosed) {
+      this._ipcCleanup.push(
+        api.onGameWindowClosed(({ windowId }) => {
+          if (windowId === this.detachedWindowId) {
+            this.onDetachedWindowClosed();
+          }
+        })
+      );
+    }
+
+    // Listen for input from detached window
+    if (api.onGameDetachedInput) {
+      this._ipcCleanup.push(
+        api.onGameDetachedInput(({ action }) => {
+          GameCore.input(action);
+        })
+      );
+    }
+
+    // Listen for commands from detached window
+    if (api.onGameDetachedCommand) {
+      this._ipcCleanup.push(
+        api.onGameDetachedCommand(({ cmd }) => {
+          this.handleDetachedCommand(cmd);
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle commands from detached window
+   */
+  handleDetachedCommand(cmd) {
+    switch (cmd) {
+      case 'start':
+        GameCore.start();
+        break;
+      case 'stop':
+        GameCore.stop();
+        break;
+      case 'reset':
+        GameCore.reset();
+        break;
+      case 'togglePause':
+        GameCore.togglePause();
+        break;
+      case 'attach':
+        this.attachWindow();
+        break;
+    }
+  }
+
+  /**
+   * Toggle between embedded and detached mode
+   */
+  async toggleDetach() {
+    if (this.isDetached) {
+      await this.attachWindow();
+    } else {
+      await this.detachWindow();
+    }
+  }
+
+  /**
+   * Open detached window
+   */
+  async detachWindow() {
+    const api = window.desktopAPI;
+    if (!api?.invoke) {
+      console.warn('[Game] desktopAPI.invoke not available');
+      return;
+    }
+
+    try {
+      const result = await api.invoke('game-detach', {
+        width: 340,
+        height: 460
+      });
+
+      if (result?.success && result.windowId) {
+        this.detachedWindowId = result.windowId;
+        this.isDetached = true;
+        this.updateDetachButton();
+        this.hideEmbeddedCanvas();
+        
+        console.log('[Game] Detached to window:', result.windowId);
+      } else {
+        console.error('[Game] Failed to detach:', result?.error);
+      }
+    } catch (err) {
+      console.error('[Game] Detach error:', err);
+    }
+  }
+
+  /**
+   * Close detached window and return to embedded
+   */
+  async attachWindow() {
+    const api = window.desktopAPI;
+    
+    if (this.detachedWindowId && api?.invoke) {
+      try {
+        await api.invoke('game-attach', { windowId: this.detachedWindowId });
+      } catch (e) { /* ignore */ }
+    }
+
+    this.detachedWindowId = null;
+    this.isDetached = false;
+    this.updateDetachButton();
+    this.showEmbeddedCanvas();
+    
+    // Re-sync renderer
+    if (this.renderer) {
+      this.renderer.handleMessage({ type: 'sync', payload: GameCore.getSnapshot() });
+    }
+    
+    console.log('[Game] Attached back to sidebar');
+  }
+
+  /**
+   * Handle detached window closed externally
+   */
+  onDetachedWindowClosed() {
+    this.detachedWindowId = null;
+    this.isDetached = false;
+    this.updateDetachButton();
+    this.showEmbeddedCanvas();
+    
+    // Re-sync renderer
+    if (this.renderer) {
+      this.renderer.handleMessage({ type: 'sync', payload: GameCore.getSnapshot() });
+    }
+  }
+
+  /**
+   * Send message to detached window via IPC
+   */
+  broadcastToDetached(message) {
+    const api = window.desktopAPI;
+    if (!api?.send || !this.detachedWindowId) return;
+
+    try {
+      api.send('game-broadcast', {
+        windowId: this.detachedWindowId,
+        message
+      });
+    } catch (e) {
+      console.warn('[Game] Broadcast error:', e);
+    }
+  }
+
+  /**
+   * Update detach button appearance
+   */
+  updateDetachButton() {
+    const btn = this.$('#game-detach');
+    if (!btn) return;
+
+    if (this.isDetached) {
+      btn.title = 'Attach back to sidebar';
+      btn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+          <path d="M19 11H7.83l4.88-4.88c.39-.39.39-1.03 0-1.42-.39-.39-1.02-.39-1.41 0l-6.59 6.59c-.39.39-.39 1.02 0 1.41l6.59 6.59c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L7.83 13H19c.55 0 1-.45 1-1s-.45-1-1-1z"/>
+        </svg>
+      `;
+      btn.classList.add('detached');
+    } else {
+      btn.title = 'Detach to separate window';
+      btn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+          <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+        </svg>
+      `;
+      btn.classList.remove('detached');
+    }
+  }
+
+  /**
+   * Hide embedded canvas when detached
+   */
+  hideEmbeddedCanvas() {
+    const wrapper = this.$('#game-canvas-wrapper');
+    if (wrapper) {
+      wrapper.classList.add('detached-mode');
+    }
+    // Show "detached" message
+    this.showOverlay('📺 Detached', 'Game is running in separate window');
+  }
+
+  /**
+   * Show embedded canvas when attached
+   */
+  showEmbeddedCanvas() {
+    const wrapper = this.$('#game-canvas-wrapper');
+    if (wrapper) {
+      wrapper.classList.remove('detached-mode');
+    }
+  }
+
+  // ============================================
+  // GAME LIFECYCLE - Now delegated to GameCore
+  // These methods are kept for backwards compatibility
+  // ============================================
+
+  /**
+   * @deprecated Use GameCore.start() instead
    */
   initGame() {
-    this.gameState.score = 0;
-    this.updateScoreDisplay();
+    // GameCore handles initialization
   }
 
   /**
-   * Main game loop tick
-   * Override in game implementation
-   */
-  gameTick() {
-    // Game logic here
-    this.render();
-  }
-
-  /**
-   * Handle player input
-   * @param {string} direction - 'up', 'down', 'left', 'right', 'action'
+   * @deprecated Use GameCore.input() instead
    */
   onInput(direction) {
-    // Handle input in game implementation
-    console.log('[Game] Input:', direction);
+    GameCore.input(direction);
   }
 
   /**
-   * Render game state to canvas
-   * Override in game implementation
+   * @deprecated Rendering handled by GameRenderer
    */
   render() {
-    if (!this.ctx) return;
-    
-    const { width, height } = this.canvas;
-    
-    // Clear canvas
-    this.ctx.fillStyle = 'var(--md-sys-color-surface-container-lowest, #1a1a1a)';
-    this.ctx.fillRect(0, 0, width, height);
-    
-    // Draw placeholder
-    this.ctx.fillStyle = 'var(--md-sys-color-on-surface, #fff)';
-    this.ctx.font = '16px sans-serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText('Game Running...', width / 2, height / 2);
+    // Renderer handles this
   }
 
   /**
-   * Check for game over condition
-   * @returns {boolean}
+   * @deprecated Use GameCore checkGameOver
    */
   checkGameOver() {
     return false;
   }
 
   // ============================================
-  // GAME CONTROL METHODS
+  // GAME CONTROL METHODS - Delegate to GameCore
   // ============================================
 
   startGame() {
-    this.initGame();
-    this.gameState.running = true;
-    this.gameState.paused = false;
-    
-    this.hideOverlay();
-    this.updateButtonStates();
-    
-    this.gameLoop();
+    GameCore.start();
   }
 
   stopGame() {
-    this.gameState.running = false;
-    this.gameState.paused = false;
-    
-    if (this.animationId) {
-      cancelAnimationFrame(this.animationId);
-      this.animationId = null;
-    }
+    GameCore.stop();
   }
 
   togglePause() {
-    if (!this.gameState.running) return;
-    
-    this.gameState.paused = !this.gameState.paused;
-    
-    if (this.gameState.paused) {
-      this.showOverlay('⏸️ Paused', 'Press Pause or Esc to continue');
-    } else {
-      this.hideOverlay();
-      this.gameLoop();
-    }
-    
-    this.updateButtonStates();
+    GameCore.togglePause();
   }
 
   resetGame() {
-    this.stopGame();
-    this.gameState.score = 0;
-    this.updateScoreDisplay();
-    this.drawInitialState();
-    this.showOverlay('🎮 Ready?', 'Press Start to play');
-    this.updateButtonStates();
+    GameCore.reset();
   }
 
   gameOver() {
-    this.stopGame();
-    
-    if (this.gameState.score > this.gameState.highScore) {
-      this.gameState.highScore = this.gameState.score;
-      this.saveHighScore();
-      this.showOverlay('🏆 New High Score!', `Score: ${this.gameState.score}`);
-    } else {
-      this.showOverlay('💀 Game Over', `Score: ${this.gameState.score}`);
-    }
-    
-    this.updateButtonStates();
+    // Handled by GameCore
   }
 
   gameLoop() {
-    if (!this.gameState.running || this.gameState.paused) return;
-    
-    this.gameTick();
-    
-    if (this.checkGameOver()) {
-      this.gameOver();
-      return;
-    }
-    
-    // ~60 FPS, можно настроить скорость
-    this.animationId = requestAnimationFrame(() => {
-      setTimeout(() => this.gameLoop(), 100); // Adjust speed here
-    });
+    // Handled by GameCore
+  }
+
+  gameTick() {
+    // Handled by GameCore
   }
 
   // ============================================
