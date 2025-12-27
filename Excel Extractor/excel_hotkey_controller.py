@@ -526,9 +526,15 @@ class ExcelOddsHotkeyController:
                     self._command_queue.put(('send_update',))
         keyboard.hook(on_fkey)
         
-        # Numpad0 (Send Update) and Numpad1 (Suspend) - use add_hotkey with suppress
-        keyboard.add_hotkey(82, self.on_hotkey_send_update, suppress=True)  # Numpad0 scan code
-        keyboard.add_hotkey(79, self.on_hotkey_suspend, suppress=True)  # Numpad1 scan code
+        # Numpad0 (Send Update) and Numpad1 (Suspend) - use on_press_key with suppress
+        # to properly block the keypress from propagating to other applications
+        def on_numpad0_down(e):
+            self._command_queue.put('send_update')
+        def on_numpad1_down(e):
+            self._command_queue.put('suspend')
+        
+        keyboard.on_press_key('num 0', on_numpad0_down, suppress=True)
+        keyboard.on_press_key('num 1', on_numpad1_down, suppress=True)
         
         keyboard.add_hotkey('ctrl+esc', self.on_hotkey_exit, suppress=True)
         
