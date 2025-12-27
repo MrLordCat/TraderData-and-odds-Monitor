@@ -894,9 +894,9 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	}
 	
 	// Fetch available addons from registry
-	async function fetchAvailable(){
+	async function fetchAvailable(forceRefresh = false){
 		try {
-			const available = await ipcRenderer.invoke('addons-fetch-available');
+			const available = await ipcRenderer.invoke('addons-fetch-available', { forceRefresh });
 			availableAddons = available || [];
 			renderAvailable();
 		} catch(e){
@@ -905,9 +905,9 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	}
 	
 	// Check for addon updates
-	async function checkAddonUpdates(){
+	async function checkAddonUpdates(forceRefresh = false){
 		try {
-			const updates = await ipcRenderer.invoke('addons-check-updates');
+			const updates = await ipcRenderer.invoke('addons-check-updates', { forceRefresh });
 			addonUpdates = updates || [];
 			if(addonUpdates.length > 0){
 				console.log('[settings][addons] Updates available:', addonUpdates);
@@ -970,23 +970,25 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 			try {
 				const result = await ipcRenderer.invoke('addons-update', { addonId });
 				if(result.success){
-					// Update local version
-					const addon = installedAddons.find(a => a.id === addonId);
-					if(addon) addon.version = update.newVersion;
 					// Remove from updates list
 					addonUpdates = addonUpdates.filter(u => u.id !== addonId);
 					needsRestart = true;
+					// Reload addons to get updated version info
+					const info = await ipcRenderer.invoke('addons-get-info');
+					installedAddons = info.installed || [];
 					renderInstalled();
+					console.log('[settings][addons] Update complete, restart required');
 				} else {
 					alert(`Update failed: ${result.error || 'Unknown error'}`);
 					btn.textContent = '⬆️ Update';
+					btn.disabled = false;
 				}
 			} catch(e){
 				console.error('[settings][addons] update failed:', e);
 				alert(`Update failed: ${e.message || e}`);
 				btn.textContent = '⬆️ Update';
+				btn.disabled = false;
 			}
-			btn.disabled = false;
 		}
 	});
 	
@@ -1033,10 +1035,19 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 		});
 	}
 	
-	// Refresh button
+	// Refresh button (force refresh clears cache)
 	if(refreshBtn){
-		refreshBtn.addEventListener('click', () => {
-			loadAddons();
+		refreshBtn.addEventListener('click', async () => {
+			refreshBtn.disabled = true;
+			refreshBtn.textContent = '⏳ Refreshing...';
+			try {
+				await fetchAvailable(true);
+				await checkAddonUpdates(true);
+				await loadAddons();
+			} finally {
+				refreshBtn.disabled = false;
+				refreshBtn.textContent = '🔄 Refresh';
+			}
 		});
 	}
 	

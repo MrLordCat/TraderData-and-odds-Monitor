@@ -3,6 +3,7 @@
  */
 
 const { ipcMain, shell } = require('electron');
+const { clearCache } = require('../updater/githubApi');
 
 function registerAddonIpc({ addonManager }) {
   // Get all addons info (installed + available)
@@ -10,8 +11,11 @@ function registerAddonIpc({ addonManager }) {
     return addonManager.getAddonsInfo();
   });
   
-  // Fetch available addons from registry
-  ipcMain.handle('addons-fetch-available', async () => {
+  // Fetch available addons from registry (with optional force refresh)
+  ipcMain.handle('addons-fetch-available', async (event, { forceRefresh } = {}) => {
+    if (forceRefresh) {
+      clearCache();
+    }
     return addonManager.fetchAvailableAddons();
   });
   
@@ -40,8 +44,11 @@ function registerAddonIpc({ addonManager }) {
     return addonManager.getAddonsDir();
   });
   
-  // Check for addon updates
-  ipcMain.handle('addons-check-updates', async () => {
+  // Check for addon updates (with optional force refresh)
+  ipcMain.handle('addons-check-updates', async (event, { forceRefresh } = {}) => {
+    if (forceRefresh) {
+      clearCache();
+    }
     return addonManager.checkForUpdates();
   });
   

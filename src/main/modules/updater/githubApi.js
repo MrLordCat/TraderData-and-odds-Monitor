@@ -19,6 +19,13 @@ const cache = {
   },
   set(key, value) {
     this.data[key] = { value, time: Date.now() };
+  },
+  clear() {
+    this.data = {};
+    console.log('[githubApi] Cache cleared');
+  },
+  clearKey(key) {
+    delete this.data[key];
   }
 };
 
@@ -208,10 +215,16 @@ async function getAllReleases(owner, repo, limit = 10) {
   }
 }
 
+// Clear API cache (for force refresh)
+function clearCache() {
+  cache.clear();
+}
+
 module.exports = {
   getLatestRelease,
   getDevRelease,
   getLatestCommit,
   getAllReleases,
-  httpsGet
+  httpsGet,
+  clearCache
 };
