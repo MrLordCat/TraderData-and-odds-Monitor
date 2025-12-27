@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1]
+
+### 🐛 Bug Fixes
+- **Numpad hotkeys**: Fixed scan code detection to distinguish numpad from regular keys
+  - Numpad0/1/-/+ no longer interfere with other applications (YouTube, etc.)
+  - Regular number keys and -/= now work correctly everywhere
+- **CSS paths**: Fixed broken import paths for shared styles
+  - `odds_board_shared.css` now loads correctly in board and stats panel
+  - `m3-tokens.css` path fixed in sidebar
+  - `common.css` path fixed in lolstats
+- **Fonts**: Replaced missing local Inter font files with Google Fonts CDN
+
+---
+
 ## [0.2.0]
 
 ### 🏗️ Project Restructure
