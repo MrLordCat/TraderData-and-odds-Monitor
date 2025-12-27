@@ -9,7 +9,7 @@ module.exports = function({ SidebarModule, registerModule }) {
   
   class GamePanelModule extends SidebarModule {
     static id = 'game-panel';
-    static title = 'ЁЯОо Power Towers TD';
+    static title = 'Power Towers TD';
     static icon = null;
     static order = 100;
 
@@ -32,14 +32,14 @@ module.exports = function({ SidebarModule, registerModule }) {
       return `
         <div class="game-panel-container">
           <div class="game-header">
-            <span class="game-stat">ЁЯТ░ <span id="game-gold">100</span></span>
-            <span class="game-stat">тЭдя╕П <span id="game-lives">10</span></span>
-            <span class="game-stat">ЁЯМК <span id="game-wave">0</span></span>
+            <span class="game-stat">Gold: <span id="game-gold">100</span></span>
+            <span class="game-stat">HP: <span id="game-lives">10</span></span>
+            <span class="game-stat">Wave: <span id="game-wave">0</span></span>
           </div>
           <canvas id="game-canvas" width="300" height="300"></canvas>
           <div class="game-controls">
-            <button id="game-start-btn" class="game-btn">тЦ╢я╕П Start</button>
-            <button id="game-tower-btn" class="game-btn" disabled>ЁЯЧ╝ Tower (50g)</button>
+            <button id="game-start-btn" class="game-btn">Start</button>
+            <button id="game-tower-btn" class="game-btn" disabled>Tower (50g)</button>
           </div>
           <div class="game-info">
             <p>Click canvas to place towers</p>
@@ -124,7 +124,7 @@ module.exports = function({ SidebarModule, registerModule }) {
 
     toggleGame() {
       this.gameRunning = !this.gameRunning;
-      this.startBtn.textContent = this.gameRunning ? 'тП╕я╕П Pause' : 'тЦ╢я╕П Start';
+      this.startBtn.textContent = this.gameRunning ? 'Pause' : 'Start';
       this.towerBtn.disabled = !this.gameRunning;
       
       if (this.gameRunning) {
@@ -312,7 +312,7 @@ module.exports = function({ SidebarModule, registerModule }) {
 
     gameOver() {
       this.gameRunning = false;
-      this.startBtn.textContent = 'ЁЯФД Restart';
+      this.startBtn.textContent = 'Restart';
       this.startBtn.onclick = () => this.restart();
       
       const ctx = this.ctx;
@@ -335,7 +335,7 @@ module.exports = function({ SidebarModule, registerModule }) {
       this.lives = 10;
       this.wave = 0;
       this.gameRunning = false;
-      this.startBtn.textContent = 'тЦ╢я╕П Start';
+      this.startBtn.textContent = 'Start';
       this.startBtn.onclick = () => this.toggleGame();
       this.towerBtn.disabled = true;
       this.updateUI();
