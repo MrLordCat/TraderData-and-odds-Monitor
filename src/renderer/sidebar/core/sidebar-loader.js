@@ -37,24 +37,40 @@ class SidebarLoader {
    * Load external addons from paths provided by main process
    */
   async loadExternalAddons() {
-    if (!window.desktopAPI || !window.desktopAPI.addonsGetEnabledPaths) {
-      console.log('[sidebar] No addon API available');
+    let addonPaths = null;
+    
+    // Try desktopAPI first (main window preload)
+    if (window.desktopAPI && window.desktopAPI.addonsGetEnabledPaths) {
+      try {
+        addonPaths = await window.desktopAPI.addonsGetEnabledPaths();
+      } catch (e) {
+        console.warn('[sidebar] desktopAPI.addonsGetEnabledPaths failed:', e);
+      }
+    }
+    
+    // Fallback: use ipcRenderer directly (stats panel has nodeIntegration)
+    if (!addonPaths) {
+      try {
+        const { ipcRenderer } = require('electron');
+        addonPaths = await ipcRenderer.invoke('addons-get-enabled-paths');
+      } catch (e) {
+        console.warn('[sidebar] ipcRenderer fallback failed:', e);
+      }
+    }
+    
+    if (!addonPaths || addonPaths.length === 0) {
+      console.log('[sidebar] No addon paths available');
       return;
     }
     
-    try {
-      const addonPaths = await window.desktopAPI.addonsGetEnabledPaths();
-      console.log('[sidebar] Loading external addons:', addonPaths);
-      
-      for (const addon of addonPaths) {
-        try {
-          await this.loadExternalModule(addon.path);
-        } catch (e) {
-          console.error(`[sidebar] Failed to load addon ${addon.id}:`, e);
-        }
+    console.log('[sidebar] Loading external addons:', addonPaths);
+    
+    for (const addon of addonPaths) {
+      try {
+        await this.loadExternalModule(addon.path);
+      } catch (e) {
+        console.error(`[sidebar] Failed to load addon ${addon.id}:`, e);
       }
-    } catch (e) {
-      console.error('[sidebar] Failed to get addon paths:', e);
     }
   }
   

@@ -14,16 +14,8 @@
     return;
   }
   
-  // Wait for desktopAPI to be available
-  let retries = 0;
-  while (!window.desktopAPI && retries < 50) {
-    await new Promise(r => setTimeout(r, 100));
-    retries++;
-  }
-  
-  if (!window.desktopAPI) {
-    console.warn('[sidebar] desktopAPI not available, some features may not work');
-  }
+  // Small delay to ensure scripts are loaded
+  await new Promise(r => setTimeout(r, 50));
   
   // Create loader and load all modules
   try {
