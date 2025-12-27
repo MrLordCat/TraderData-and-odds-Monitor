@@ -13,6 +13,8 @@ on:
       - '**.md'
       - '.github/copilot-instructions.md'
       - 'docs/**'
+      - 'addons-dev/**'
+      - 'addon-registry.json'
     tags-ignore:
       - 'v*'
 
