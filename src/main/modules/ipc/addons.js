@@ -57,6 +57,16 @@ function registerAddonIpc({ addonManager }) {
     return addonManager.updateAddon(addonId);
   });
   
+  // Get addon update channel (dev/release)
+  ipcMain.handle('addons-get-channel', async () => {
+    return addonManager.getAddonChannel();
+  });
+  
+  // Set addon update channel (dev/release)
+  ipcMain.handle('addons-set-channel', async (event, { channel }) => {
+    return addonManager.setAddonChannel(channel);
+  });
+  
   // Open path in file explorer
   ipcMain.on('shell-open-path', (event, dirPath) => {
     try {

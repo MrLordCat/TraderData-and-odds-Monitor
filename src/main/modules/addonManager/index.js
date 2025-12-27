@@ -4,9 +4,11 @@
  * Addons are downloaded from GitHub releases and installed to userData/addons/
  * Each addon has a manifest.json describing its metadata and entry point.
  * 
+ * Supports dev/release channels like the main updater.
+ * 
  * Flow:
  * 1. User opens Settings → Addons tab
- * 2. Available addons fetched from GitHub (addon-registry branch or releases)
+ * 2. Available addons fetched from GitHub releases based on channel
  * 3. User clicks Install → downloads zip → extracts to addons/<id>/
  * 4. On next app start (or hot-reload), addon's sidebar module is loaded
  */
@@ -20,7 +22,9 @@ const AdmZip = require('adm-zip');
 const REPO_OWNER = 'MrLordCat';
 const REPO_NAME = 'TraderData-and-odds-Monitor';
 
-// Registry of available addons (fetched from GitHub main branch)
+// GitHub API for releases
+const GITHUB_API_BASE = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
+// Fallback registry (for release channel, updated by workflow)
 const ADDON_REGISTRY_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/addon-registry.json`;
 
 function createAddonManager({ store, mainWindow }) {
@@ -33,9 +37,26 @@ function createAddonManager({ store, mainWindow }) {
   }
   
   // State
-  let availableAddons = [];  // From registry
+  let availableAddons = [];  // From registry/releases
   let installedAddons = [];  // Locally installed
   let enabledAddons = store.get('enabledAddons', []);
+  let addonChannel = store.get('addonChannel', 'dev');  // 'dev' or 'release'
+  
+  /**
+   * Get/set addon channel
+   */
+  function getAddonChannel() {
+    return addonChannel;
+  }
+  
+  function setAddonChannel(channel) {
+    if (channel === 'dev' || channel === 'release') {
+      addonChannel = channel;
+      store.set('addonChannel', channel);
+      return true;
+    }
+    return false;
+  }
   
   /**
    * Get path to addons directory
@@ -94,9 +115,127 @@ function createAddonManager({ store, mainWindow }) {
   }
   
   /**
-   * Fetch available addons from registry
+   * Fetch JSON from URL
+   */
+  function fetchJSON(url) {
+    return new Promise((resolve, reject) => {
+      const options = {
+        headers: {
+          'User-Agent': 'OddsMoni-AddonManager',
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      };
+      
+      https.get(url, options, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          fetchJSON(res.headers.location).then(resolve).catch(reject);
+          return;
+        }
+        
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+        
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }).on('error', reject);
+    });
+  }
+  
+  /**
+   * Fetch available addons from GitHub releases based on channel
    */
   async function fetchAvailableAddons() {
+    try {
+      const channel = addonChannel;
+      console.log(`[AddonManager] Fetching addons for channel: ${channel}`);
+      
+      // Fetch releases from GitHub API
+      const releases = await fetchJSON(`${GITHUB_API_BASE}/releases`);
+      
+      // Filter addon releases (tag starts with 'addon-')
+      const addonReleases = releases.filter(r => r.tag_name.startsWith('addon-'));
+      
+      // Group by addon ID and find latest for each
+      const addonMap = new Map();
+      
+      for (const release of addonReleases) {
+        const tag = release.tag_name;
+        const isDev = tag.endsWith('-dev') || release.prerelease;
+        
+        // Skip if wrong channel
+        if (channel === 'dev' && !isDev) continue;
+        if (channel === 'release' && isDev) continue;
+        
+        // Extract addon ID: addon-power-towers-dev or addon-power-towers-v1.0.0
+        let addonId;
+        if (isDev) {
+          addonId = tag.replace(/^addon-/, '').replace(/-dev$/, '');
+        } else {
+          addonId = tag.replace(/^addon-/, '').replace(/-v[\d.]+$/, '');
+        }
+        
+        // Find zip asset
+        const zipAsset = release.assets.find(a => a.name.endsWith('.zip'));
+        if (!zipAsset) continue;
+        
+        // Extract version from asset name or tag
+        let version;
+        if (isDev) {
+          // power-towers-dev-abc1234.zip → extract from release body or use tag
+          const match = zipAsset.name.match(/-dev-([a-f0-9]+)\.zip$/);
+          version = match ? `dev.${match[1]}` : 'dev';
+        } else {
+          // power-towers-v1.0.0.zip
+          const match = tag.match(/-v([\d.]+)$/);
+          version = match ? match[1] : '0.0.0';
+        }
+        
+        // Only keep latest for each addon
+        if (!addonMap.has(addonId) || new Date(release.published_at) > new Date(addonMap.get(addonId).publishedAt)) {
+          addonMap.set(addonId, {
+            id: addonId,
+            name: release.name.replace(/ v[\d.]+.*$/, '').replace(/ dev.*$/i, ''),
+            version,
+            description: release.body ? release.body.split('\n').find(l => l && !l.startsWith('#') && !l.startsWith('*')) || '' : '',
+            downloadUrl: zipAsset.browser_download_url,
+            publishedAt: release.published_at,
+            channel: isDev ? 'dev' : 'release',
+            prerelease: release.prerelease
+          });
+        }
+      }
+      
+      availableAddons = Array.from(addonMap.values());
+      console.log(`[AddonManager] Found ${availableAddons.length} addons for ${channel} channel`);
+      
+      return availableAddons;
+      
+    } catch (e) {
+      console.error('[AddonManager] Failed to fetch from GitHub API:', e.message);
+      
+      // Fallback to registry for release channel
+      if (addonChannel === 'release') {
+        console.log('[AddonManager] Falling back to registry...');
+        return fetchFromRegistry();
+      }
+      
+      return [];
+    }
+  }
+  
+  /**
+   * Fallback: fetch from static registry file
+   */
+  async function fetchFromRegistry() {
     return new Promise((resolve) => {
       https.get(ADDON_REGISTRY_URL, (res) => {
         if (res.statusCode !== 200) {
@@ -422,6 +561,8 @@ function createAddonManager({ store, mainWindow }) {
   
   return {
     getAddonsDir,
+    getAddonChannel,
+    setAddonChannel,
     scanInstalledAddons,
     fetchAvailableAddons,
     installAddon,

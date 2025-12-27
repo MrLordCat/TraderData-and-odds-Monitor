@@ -775,6 +775,7 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	const availableEl = document.getElementById('addons-available-list');
 	const refreshBtn = document.getElementById('addons-refresh');
 	const openFolderBtn = document.getElementById('addons-open-folder');
+	const channelSelect = document.getElementById('addon-channel');
 	
 	if(!listEl) return;
 	
@@ -782,6 +783,35 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	let availableAddons = [];
 	let addonUpdates = []; // Available updates
 	let needsRestart = false;
+	let currentChannel = 'dev';
+	
+	// Initialize channel selector
+	async function initChannel(){
+		try {
+			currentChannel = await ipcRenderer.invoke('addons-get-channel');
+			if(channelSelect) channelSelect.value = currentChannel;
+		} catch(e){
+			console.warn('[settings][addons] Failed to get channel:', e);
+		}
+	}
+	initChannel();
+	
+	// Handle channel change
+	if(channelSelect){
+		channelSelect.addEventListener('change', async () => {
+			const newChannel = channelSelect.value;
+			try {
+				await ipcRenderer.invoke('addons-set-channel', { channel: newChannel });
+				currentChannel = newChannel;
+				// Refresh available addons with new channel
+				await fetchAvailable(true);
+				await checkAddonUpdates(true);
+			} catch(e){
+				console.error('[settings][addons] Failed to set channel:', e);
+				channelSelect.value = currentChannel; // Revert
+			}
+		});
+	}
 	
 	// Check if update is available for addon
 	function getUpdateForAddon(addonId) {

@@ -1,6 +1,9 @@
 # Build Addon Package
 # 
-# Triggered when pushing changes to addons-dev/ folder
+# Triggered:
+# - On push to main (addons-dev/**) → creates DEV release
+# - On tag addon-<id>-v* (via workflow_dispatch or manual tag creation)
+# 
 # Packages each addon as a zip and uploads to releases
 
 name: Build Addon
@@ -11,14 +14,20 @@ on:
       - main
     paths:
       - 'addons-dev/**'
-    tags:
-      - 'addon-*'
   workflow_dispatch:
     inputs:
       addon_id:
         description: 'Addon ID to build (folder name in addons-dev/)'
         required: true
         default: 'power-towers'
+      channel:
+        description: 'Release channel'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - release
 
 jobs:
   build-addon:
@@ -30,86 +39,192 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-      - name: Find addons to build
-        id: find-addons
+      - name: Determine channel and addons
+        id: config
         run: |
-          # If manual trigger, use input
-          if [ -n "${{ github.event.inputs.addon_id }}" ]; then
-            echo "addons=${{ github.event.inputs.addon_id }}" >> $GITHUB_OUTPUT
-          else
-            # Find all addon directories with manifest.json
-            ADDONS=""
-            for dir in addons-dev/*/; do
-              if [ -f "${dir}manifest.json" ]; then
-                ADDON_NAME=$(basename "$dir")
-                ADDONS="${ADDONS}${ADDON_NAME} "
-              fi
-            done
-            echo "addons=$ADDONS" >> $GITHUB_OUTPUT
+          # Default channel
+          CHANNEL="dev"
+          ADDON_ID=""
+          
+          # If tag push (addon-<id>-v*)
+          if [[ "${{ github.ref }}" == refs/tags/addon-* ]]; then
+            CHANNEL="release"
+            # Extract addon ID from tag: addon-power-towers-v1.0.0 → power-towers
+            TAG="${{ github.ref_name }}"
+            ADDON_ID=$(echo "$TAG" | sed 's/^addon-//' | sed 's/-v[0-9].*$//')
           fi
           
-      - name: Build addons
+          # If manual trigger
+          if [ -n "${{ github.event.inputs.addon_id }}" ]; then
+            ADDON_ID="${{ github.event.inputs.addon_id }}"
+            CHANNEL="${{ github.event.inputs.channel }}"
+          fi
+          
+          # If push to main (find changed addons)
+          if [ -z "$ADDON_ID" ] && [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            CHANNEL="dev"
+            for dir in addons-dev/*/; do
+              if [ -f "${dir}manifest.json" ]; then
+                ADDON_ID=$(basename "$dir")
+                break
+              fi
+            done
+          fi
+          
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          echo "addon_id=$ADDON_ID" >> $GITHUB_OUTPUT
+          echo "Channel: $CHANNEL, Addon: $ADDON_ID"
+          
+      - name: Build addon
         id: build
         run: |
+          ADDON_ID="${{ steps.config.outputs.addon_id }}"
+          CHANNEL="${{ steps.config.outputs.channel }}"
+          ADDON_DIR="addons-dev/${ADDON_ID}"
+          
+          if [ ! -f "${ADDON_DIR}/manifest.json" ]; then
+            echo "Error: ${ADDON_DIR}/manifest.json not found"
+            exit 1
+          fi
+          
           mkdir -p dist
           
-          for ADDON_ID in ${{ steps.find-addons.outputs.addons }}; do
-            ADDON_DIR="addons-dev/${ADDON_ID}"
-            
-            if [ ! -f "${ADDON_DIR}/manifest.json" ]; then
-              echo "Skipping ${ADDON_ID}: no manifest.json"
-              continue
-            fi
-            
-            # Read manifest
-            ADDON_VERSION=$(jq -r '.version' "${ADDON_DIR}/manifest.json")
-            ADDON_NAME=$(jq -r '.name' "${ADDON_DIR}/manifest.json")
-            ZIP_NAME="${ADDON_ID}-v${ADDON_VERSION}.zip"
-            
-            echo "Building ${ADDON_NAME} v${ADDON_VERSION}..."
-            
-            # Create zip
-            cd "${ADDON_DIR}"
-            zip -r "../../dist/${ZIP_NAME}" . \
-              -x "*.git*" \
-              -x "node_modules/*" \
-              -x "*.md" \
-              -x ".DS_Store"
-            cd ../..
-            
-            echo "Created dist/${ZIP_NAME}"
-            
-            # Save info for release
-            echo "addon_id=${ADDON_ID}" >> $GITHUB_OUTPUT
-            echo "addon_version=${ADDON_VERSION}" >> $GITHUB_OUTPUT
-            echo "addon_name=${ADDON_NAME}" >> $GITHUB_OUTPUT
-            echo "zip_name=${ZIP_NAME}" >> $GITHUB_OUTPUT
-          done
+          # Read manifest
+          ADDON_VERSION=$(jq -r '.version' "${ADDON_DIR}/manifest.json")
+          ADDON_NAME=$(jq -r '.name' "${ADDON_DIR}/manifest.json")
+          ADDON_DESC=$(jq -r '.description // ""' "${ADDON_DIR}/manifest.json")
           
-      - name: Upload artifacts
+          # Create version suffix for dev builds
+          if [ "$CHANNEL" == "dev" ]; then
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            FULL_VERSION="${ADDON_VERSION}-dev.${SHORT_SHA}"
+            ZIP_NAME="${ADDON_ID}-dev-${SHORT_SHA}.zip"
+            TAG_NAME="addon-${ADDON_ID}-dev"
+          else
+            FULL_VERSION="${ADDON_VERSION}"
+            ZIP_NAME="${ADDON_ID}-v${ADDON_VERSION}.zip"
+            TAG_NAME="addon-${ADDON_ID}-v${ADDON_VERSION}"
+          fi
+          
+          echo "Building ${ADDON_NAME} v${FULL_VERSION} (${CHANNEL})..."
+          
+          # Update manifest version for dev
+          if [ "$CHANNEL" == "dev" ]; then
+            jq --arg v "$FULL_VERSION" '.version = $v' "${ADDON_DIR}/manifest.json" > "${ADDON_DIR}/manifest.tmp"
+            mv "${ADDON_DIR}/manifest.tmp" "${ADDON_DIR}/manifest.json"
+          fi
+          
+          # Create zip
+          cd "${ADDON_DIR}"
+          zip -r "../../dist/${ZIP_NAME}" . \
+            -x "*.git*" \
+            -x "node_modules/*" \
+            -x ".DS_Store" \
+            -x "*.tmp"
+          cd ../..
+          
+          echo "Created dist/${ZIP_NAME}"
+          
+          # Outputs
+          echo "addon_id=${ADDON_ID}" >> $GITHUB_OUTPUT
+          echo "addon_version=${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "addon_base_version=${ADDON_VERSION}" >> $GITHUB_OUTPUT
+          echo "addon_name=${ADDON_NAME}" >> $GITHUB_OUTPUT
+          echo "addon_desc=${ADDON_DESC}" >> $GITHUB_OUTPUT
+          echo "zip_name=${ZIP_NAME}" >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "channel=${CHANNEL}" >> $GITHUB_OUTPUT
+          
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: addons
+          name: addon-${{ steps.build.outputs.addon_id }}-${{ steps.build.outputs.channel }}
           path: dist/*.zip
           
+      - name: Delete old dev release assets
+        if: steps.build.outputs.channel == 'dev'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tagName = '${{ steps.build.outputs.tag_name }}';
+            try {
+              const release = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tagName
+              });
+              
+              // Delete old assets
+              for (const asset of release.data.assets) {
+                console.log(`Deleting old asset: ${asset.name}`);
+                await github.rest.repos.deleteReleaseAsset({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  asset_id: asset.id
+                });
+              }
+            } catch (e) {
+              console.log('No existing dev release, will create new');
+            }
+          
       - name: Create/Update Release
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/addon-')
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: addon-${{ steps.build.outputs.addon_id }}-v${{ steps.build.outputs.addon_version }}
-          name: "${{ steps.build.outputs.addon_name }} v${{ steps.build.outputs.addon_version }}"
+          tag_name: ${{ steps.build.outputs.tag_name }}
+          name: "${{ steps.build.outputs.addon_name }} ${{ steps.build.outputs.addon_version }}"
           body: |
             ## ${{ steps.build.outputs.addon_name }}
             
-            Version: ${{ steps.build.outputs.addon_version }}
+            **Version:** ${{ steps.build.outputs.addon_version }}
+            **Channel:** ${{ steps.build.outputs.channel }}
+            
+            ${{ steps.build.outputs.addon_desc }}
             
             ### Installation
             1. Open app Settings → Addons
-            2. Click "Refresh" to see available addons
-            3. Click "Install" next to this addon
-            4. Restart the app
+            2. Select "${{ steps.build.outputs.channel }}" channel
+            3. Click "Refresh" to see available addons
+            4. Click "Install" next to this addon
+            5. Restart the app
           files: dist/${{ steps.build.outputs.zip_name }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.build.outputs.channel == 'dev' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Update addon-registry.json
+        if: steps.build.outputs.channel == 'release'
+        run: |
+          ADDON_ID="${{ steps.build.outputs.addon_id }}"
+          VERSION="${{ steps.build.outputs.addon_base_version }}"
+          NAME="${{ steps.build.outputs.addon_name }}"
+          DESC="${{ steps.build.outputs.addon_desc }}"
+          ZIP_NAME="${{ steps.build.outputs.zip_name }}"
+          TAG_NAME="${{ steps.build.outputs.tag_name }}"
+          
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/${ZIP_NAME}"
+          
+          # Update registry
+          jq --arg id "$ADDON_ID" \
+             --arg v "$VERSION" \
+             --arg name "$NAME" \
+             --arg desc "$DESC" \
+             --arg url "$DOWNLOAD_URL" \
+             '(.addons[] | select(.id == $id)) |= . + {version: $v, name: $name, description: $desc, downloadUrl: $url}' \
+             addon-registry.json > addon-registry.tmp
+          mv addon-registry.tmp addon-registry.json
+          
+          # Update timestamp
+          jq --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastUpdated = $ts' addon-registry.json > addon-registry.tmp
+          mv addon-registry.tmp addon-registry.json
+          
+          # Commit if changed
+          if git diff --quiet addon-registry.json; then
+            echo "No registry changes"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add addon-registry.json
+            git commit -m "chore: update addon-registry for ${ADDON_ID} v${VERSION}"
+            git push
+          fi

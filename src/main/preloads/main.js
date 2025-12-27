@@ -133,6 +133,8 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,addonsGetDir: () => ipcRenderer.invoke('addons-get-dir')
   ,addonsCheckUpdates: () => ipcRenderer.invoke('addons-check-updates')
   ,addonsUpdate: (addonId) => ipcRenderer.invoke('addons-update', { addonId })
+  ,addonsGetChannel: () => ipcRenderer.invoke('addons-get-channel')
+  ,addonsSetChannel: (channel) => ipcRenderer.invoke('addons-set-channel', { channel })
   ,onAddonInstallStatus: (cb) => withUnsub('addon-install-status', cb)
   ,onAddonDownloadProgress: (cb) => withUnsub('addon-download-progress', cb)
   ,onAddonUninstalled: (cb) => withUnsub('addon-uninstalled', cb)
