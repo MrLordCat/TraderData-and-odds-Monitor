@@ -489,25 +489,45 @@ class ExcelOddsHotkeyController:
         print("Waiting for hotkeys...")
         print()
         
-        # Register hotkeys with key hold tracking for repeat prevention
-        # Numpad- and Numpad+ track press/release to prevent queue flooding
-        def on_numpad_minus_down(e):
-            self._command_queue.put(('prev', 'num_minus'))
-        def on_numpad_minus_up(e):
-            self._command_queue.put(('key_up', 'num_minus'))
-        def on_numpad_plus_down(e):
-            self._command_queue.put(('next', 'num_plus'))
-        def on_numpad_plus_up(e):
-            self._command_queue.put(('key_up', 'num_plus'))
+        # ============================================
+        # COMBINED HOTKEY HOOK - handles numpad (by scan code) and F-keys (by name)
+        # Scan codes: Numpad0=82, Numpad1=79, Numpad-=74, Numpad+=78
+        # Regular keys have different scan codes (0=11, 1=2, -=12, +=13)
+        # ============================================
+        NUMPAD_SCAN_CODES = {
+            82: 'numpad0',   # Numpad0
+            79: 'numpad1',   # Numpad1
+            74: 'numpad_minus',  # Numpad-
+            78: 'numpad_plus',   # Numpad+
+        }
         
-        keyboard.on_press_key('num minus', on_numpad_minus_down, suppress=True)
-        keyboard.on_release_key('num minus', on_numpad_minus_up)
-        keyboard.on_press_key('num plus', on_numpad_plus_down, suppress=True)
-        keyboard.on_release_key('num plus', on_numpad_plus_up)
-        
-        # F21-F24 for auto mode - use hook because SendInput sends virtual keys with negative scan codes
-        # F23/F24 also track press/release for hold prevention
-        def on_fkey(e):
+        def on_hotkey_hook(e):
+            """Combined hook for numpad keys (by scan code) and F-keys (by name)."""
+            
+            # Handle NUMPAD keys by scan code (to distinguish from regular keys)
+            if e.scan_code in NUMPAD_SCAN_CODES:
+                key_name = NUMPAD_SCAN_CODES[e.scan_code]
+                
+                if e.event_type == 'down':
+                    if key_name == 'numpad0':
+                        self._command_queue.put('send_update')
+                    elif key_name == 'numpad1':
+                        self._command_queue.put('suspend')
+                    elif key_name == 'numpad_minus':
+                        self._command_queue.put(('prev', 'num_minus'))
+                    elif key_name == 'numpad_plus':
+                        self._command_queue.put(('next', 'num_plus'))
+                elif e.event_type == 'up':
+                    if key_name == 'numpad_minus':
+                        self._command_queue.put(('key_up', 'num_minus'))
+                    elif key_name == 'numpad_plus':
+                        self._command_queue.put(('key_up', 'num_plus'))
+                
+                # Suppress numpad keys (return False to block propagation)
+                return False
+            
+            # Handle F21-F24 keys by name
+            # F23/F24 track press/release for hold prevention
             if e.name == 'f23':
                 if e.event_type == 'down':
                     self._command_queue.put(('prev', 'f23'))
@@ -524,17 +544,11 @@ class ExcelOddsHotkeyController:
             elif e.name == 'f22':
                 if e.event_type == 'down':
                     self._command_queue.put(('send_update',))
-        keyboard.hook(on_fkey)
+            
+            # Allow all other keys to pass through
+            return True
         
-        # Numpad0 (Send Update) and Numpad1 (Suspend) - use on_press_key with suppress
-        # to properly block the keypress from propagating to other applications
-        def on_numpad0_down(e):
-            self._command_queue.put('send_update')
-        def on_numpad1_down(e):
-            self._command_queue.put('suspend')
-        
-        keyboard.on_press_key('num 0', on_numpad0_down, suppress=True)
-        keyboard.on_press_key('num 1', on_numpad1_down, suppress=True)
+        keyboard.hook(on_hotkey_hook, suppress=True)
         
         keyboard.add_hotkey('ctrl+esc', self.on_hotkey_exit, suppress=True)
         
