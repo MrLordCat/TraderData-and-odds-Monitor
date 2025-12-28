@@ -162,23 +162,16 @@ class NoiseGenerator {
  * Map Generator Configuration
  */
 const GENERATOR_CONFIG = {
-  // Path generation - advanced waypoint system
+  // Path generation
   PATH_WIDTH: 3,                  // Path width in cells (3 = enemy walks in center)
-  PATH_MARGIN: 6,                 // Minimum distance from map edges
+  PATH_MARGIN: 8,                 // Minimum distance from map edges
+  PATH_CLEARANCE: 2,              // Minimum cells between path segments (for tower placement)
   
-  // Path complexity
-  PATH_SEGMENTS_MIN: 6,           // Minimum path segments (more = longer path)
-  PATH_SEGMENTS_MAX: 12,          // Maximum path segments
-  PATH_SEGMENT_LENGTH_MIN: 8,     // Minimum segment length in cells
-  PATH_SEGMENT_LENGTH_MAX: 25,    // Maximum segment length in cells
-  
-  // Path patterns weights (higher = more likely)
-  PATTERN_WEIGHTS: {
-    spiral: 25,                   // Спиральный путь к центру
-    zigzag: 30,                   // Зигзаг к центру
-    snake: 25,                    // S-образный
-    corner: 20                    // Угловой путь
-  },
+  // Path complexity  
+  PATH_SEGMENTS_MIN: 5,           // Minimum path segments
+  PATH_SEGMENTS_MAX: 9,           // Maximum path segments
+  PATH_SEGMENT_LENGTH_MIN: 12,    // Minimum segment length in cells
+  PATH_SEGMENT_LENGTH_MAX: 35,    // Maximum segment length in cells
   
   // Spawn edge weights (which edge to spawn from)
   SPAWN_EDGE_WEIGHTS: {
@@ -386,7 +379,7 @@ class MapGenerator {
   /**
    * Generate path from spawn edge to base in center
    * Only uses 90-degree angles (horizontal and vertical segments)
-   * Multiple pattern strategies for variety
+   * Ensures no self-intersection with PATH_CLEARANCE gap
    */
   _generatePath() {
     this.waypoints = [];
@@ -399,28 +392,383 @@ class MapGenerator {
     const baseX = this.basePoint.gridX;
     const baseY = this.basePoint.gridY;
     
-    // Pick a path pattern
-    const pattern = this._pickWeighted(GENERATOR_CONFIG.PATTERN_WEIGHTS);
-    console.log(`[MapGenerator] Using path pattern: ${pattern}`);
+    // Occupied zones map - tracks cells that path cannot cross
+    // Each path cell blocks itself + clearance radius
+    this.occupiedZones = new Set();
     
-    // Generate control waypoints based on pattern
-    let controlPoints;
-    switch (pattern) {
-      case 'spiral':
-        controlPoints = this._generateSpiralPath(entry, baseX, baseY);
-        break;
-      case 'zigzag':
-        controlPoints = this._generateZigzagPath(entry, baseX, baseY);
-        break;
-      case 'snake':
-        controlPoints = this._generateSnakePath(entry, baseX, baseY);
-        break;
-      case 'corner':
-        controlPoints = this._generateCornerPath(entry, baseX, baseY);
-        break;
-      default:
-        controlPoints = this._generateZigzagPath(entry, baseX, baseY);
+    // Generate path with collision avoidance
+    const path = this._generateSafePath(entry.x, entry.y, baseX, baseY);
+    
+    if (path.length === 0) {
+      console.warn('[MapGenerator] Failed to generate path, using fallback');
+      // Fallback: direct L-shaped path
+      const fallbackPath = this._generateFallbackPath(entry.x, entry.y, baseX, baseY);
+      this.pathCells = fallbackPath;
+    } else {
+      this.pathCells = path;
     }
+    
+    // Build waypoints from path cells (direction changes)
+    this._buildWaypointsFromPath();
+    
+    console.log(`[MapGenerator] Path generated: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
+  }
+  
+  /**
+   * Generate safe path that doesn't intersect itself
+   * Uses iterative segment-by-segment approach
+   */
+  _generateSafePath(startX, startY, endX, endY) {
+    const path = [];
+    const margin = GENERATOR_CONFIG.PATH_MARGIN;
+    const clearance = GENERATOR_CONFIG.PATH_CLEARANCE;
+    const segMin = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MIN;
+    const segMax = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MAX;
+    
+    let x = startX;
+    let y = startY;
+    
+    // Add starting cells
+    this._addPathSegment(path, x, y, x, y);
+    
+    // Determine initial direction (away from edge towards center)
+    let isHorizontal = (this.spawnPoint.edge === 'left' || this.spawnPoint.edge === 'right');
+    let primaryDir = this._getPrimaryDirection(x, y, endX, endY, isHorizontal);
+    
+    const maxSegments = GENERATOR_CONFIG.PATH_SEGMENTS_MAX;
+    let segmentCount = 0;
+    let stuckCount = 0;
+    const maxStuck = 5;
+    
+    while ((Math.abs(x - endX) > 3 || Math.abs(y - endY) > 3) && segmentCount < maxSegments) {
+      segmentCount++;
+      
+      // Try to create a segment
+      let segmentCreated = false;
+      
+      // Calculate desired segment length
+      const distToEnd = Math.abs(x - endX) + Math.abs(y - endY);
+      const maxLen = Math.min(segMax, distToEnd);
+      const segLen = this.rng.int(Math.min(segMin, maxLen), maxLen);
+      
+      // Try primary direction first
+      let nextX = x, nextY = y;
+      
+      if (isHorizontal) {
+        // Try horizontal movement
+        const dir = this._getBestHorizontalDir(x, endX);
+        nextX = this._findSafeEndpoint(x, y, dir, segLen, true, margin);
+        
+        if (nextX !== x && this._canDrawSegment(x, y, nextX, y, clearance)) {
+          this._addPathSegment(path, x, y, nextX, y);
+          x = nextX;
+          segmentCreated = true;
+          stuckCount = 0;
+        }
+      } else {
+        // Try vertical movement
+        const dir = this._getBestVerticalDir(y, endY);
+        nextY = this._findSafeEndpoint(x, y, dir, segLen, false, margin);
+        
+        if (nextY !== y && this._canDrawSegment(x, y, x, nextY, clearance)) {
+          this._addPathSegment(path, x, y, x, nextY);
+          y = nextY;
+          segmentCreated = true;
+          stuckCount = 0;
+        }
+      }
+      
+      // If primary failed, try perpendicular
+      if (!segmentCreated) {
+        if (isHorizontal) {
+          // Try vertical instead
+          const dir = this._getBestVerticalDir(y, endY);
+          nextY = this._findSafeEndpoint(x, y, dir, segLen, false, margin);
+          
+          if (nextY !== y && this._canDrawSegment(x, y, x, nextY, clearance)) {
+            this._addPathSegment(path, x, y, x, nextY);
+            y = nextY;
+            segmentCreated = true;
+            stuckCount = 0;
+          }
+        } else {
+          // Try horizontal instead
+          const dir = this._getBestHorizontalDir(x, endX);
+          nextX = this._findSafeEndpoint(x, y, dir, segLen, true, margin);
+          
+          if (nextX !== x && this._canDrawSegment(x, y, nextX, y, clearance)) {
+            this._addPathSegment(path, x, y, nextX, y);
+            x = nextX;
+            segmentCreated = true;
+            stuckCount = 0;
+          }
+        }
+      }
+      
+      // If still stuck, try any valid direction with shorter segment
+      if (!segmentCreated) {
+        stuckCount++;
+        
+        if (stuckCount < maxStuck) {
+          const shortLen = Math.max(5, Math.floor(segLen / 2));
+          const escaped = this._tryEscapeStuck(path, x, y, endX, endY, shortLen, margin, clearance);
+          if (escaped) {
+            x = escaped.x;
+            y = escaped.y;
+            segmentCreated = true;
+          }
+        }
+      }
+      
+      // If completely stuck, break and connect directly
+      if (!segmentCreated && stuckCount >= maxStuck) {
+        console.log('[MapGenerator] Path stuck, connecting directly to base');
+        break;
+      }
+      
+      // Alternate direction for zigzag pattern
+      isHorizontal = !isHorizontal;
+    }
+    
+    // Final connection to base (L-shaped)
+    this._connectToBase(path, x, y, endX, endY);
+    
+    return path;
+  }
+  
+  /**
+   * Get primary direction towards target
+   */
+  _getPrimaryDirection(x, y, endX, endY, isHorizontal) {
+    if (isHorizontal) {
+      return endX > x ? 1 : -1;
+    }
+    return endY > y ? 1 : -1;
+  }
+  
+  /**
+   * Get best horizontal direction
+   */
+  _getBestHorizontalDir(x, endX) {
+    return endX > x ? 1 : -1;
+  }
+  
+  /**
+   * Get best vertical direction
+   */
+  _getBestVerticalDir(y, endY) {
+    return endY > y ? 1 : -1;
+  }
+  
+  /**
+   * Find safe endpoint for segment that doesn't cross occupied zones
+   */
+  _findSafeEndpoint(x, y, dir, maxLen, isHorizontal, margin) {
+    const clearance = GENERATOR_CONFIG.PATH_CLEARANCE;
+    let bestEnd = isHorizontal ? x : y;
+    
+    for (let len = 1; len <= maxLen; len++) {
+      let testX = isHorizontal ? x + dir * len : x;
+      let testY = isHorizontal ? y : y + dir * len;
+      
+      // Check bounds
+      if (testX < margin || testX >= this.width - margin ||
+          testY < margin || testY >= this.height - margin) {
+        break;
+      }
+      
+      // Check if this cell and its clearance zone is free
+      if (this._isCellBlocked(testX, testY, clearance)) {
+        break;
+      }
+      
+      bestEnd = isHorizontal ? testX : testY;
+    }
+    
+    return bestEnd;
+  }
+  
+  /**
+   * Check if cell is blocked by existing path
+   */
+  _isCellBlocked(x, y, clearance) {
+    for (let dy = -clearance; dy <= clearance; dy++) {
+      for (let dx = -clearance; dx <= clearance; dx++) {
+        if (this.occupiedZones.has(`${x + dx},${y + dy}`)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
+  /**
+   * Check if we can draw segment without crossing occupied zones
+   */
+  _canDrawSegment(x1, y1, x2, y2, clearance) {
+    const cells = this._getLineCells(x1, y1, x2, y2);
+    
+    for (const cell of cells) {
+      // Check clearance zone around each cell
+      for (let dy = -clearance; dy <= clearance; dy++) {
+        for (let dx = -clearance; dx <= clearance; dx++) {
+          const key = `${cell.x + dx},${cell.y + dy}`;
+          if (this.occupiedZones.has(key)) {
+            // Check if it's our own recently added cells (allow continuation)
+            const isOwnCell = (cell.x + dx === x1 && cell.y + dy === y1);
+            if (!isOwnCell) {
+              return false;
+            }
+          }
+        }
+      }
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Add path segment and mark occupied zones
+   */
+  _addPathSegment(path, x1, y1, x2, y2) {
+    const cells = this._getLineCells(x1, y1, x2, y2);
+    const clearance = GENERATOR_CONFIG.PATH_CLEARANCE;
+    
+    for (const cell of cells) {
+      path.push(cell);
+      
+      // Mark occupied zone (cell + clearance)
+      for (let dy = -clearance; dy <= clearance; dy++) {
+        for (let dx = -clearance; dx <= clearance; dx++) {
+          this.occupiedZones.add(`${cell.x + dx},${cell.y + dy}`);
+        }
+      }
+    }
+  }
+  
+  /**
+   * Get cells along a horizontal or vertical line
+   */
+  _getLineCells(x1, y1, x2, y2) {
+    const cells = [];
+    
+    if (x1 === x2) {
+      // Vertical line
+      const step = y2 > y1 ? 1 : -1;
+      for (let y = y1; y !== y2 + step; y += step) {
+        cells.push({ x: x1, y });
+      }
+    } else {
+      // Horizontal line
+      const step = x2 > x1 ? 1 : -1;
+      for (let x = x1; x !== x2 + step; x += step) {
+        cells.push({ x, y: y1 });
+      }
+    }
+    
+    return cells;
+  }
+  
+  /**
+   * Try to escape stuck situation
+   */
+  _tryEscapeStuck(path, x, y, endX, endY, segLen, margin, clearance) {
+    // Try all 4 directions with shorter segments
+    const directions = [
+      { dx: 1, dy: 0 },   // right
+      { dx: -1, dy: 0 },  // left
+      { dx: 0, dy: 1 },   // down
+      { dx: 0, dy: -1 }   // up
+    ];
+    
+    // Shuffle for variety
+    this.rng.shuffle(directions);
+    
+    for (const dir of directions) {
+      const isHorizontal = dir.dx !== 0;
+      
+      for (let len = segLen; len >= 4; len -= 2) {
+        const nextX = x + dir.dx * len;
+        const nextY = y + dir.dy * len;
+        
+        // Check bounds
+        if (nextX < margin || nextX >= this.width - margin ||
+            nextY < margin || nextY >= this.height - margin) {
+          continue;
+        }
+        
+        // Check if segment is valid
+        if (isHorizontal) {
+          if (this._canDrawSegment(x, y, nextX, y, clearance)) {
+            this._addPathSegment(path, x, y, nextX, y);
+            return { x: nextX, y };
+          }
+        } else {
+          if (this._canDrawSegment(x, y, x, nextY, clearance)) {
+            this._addPathSegment(path, x, y, x, nextY);
+            return { x, y: nextY };
+          }
+        }
+      }
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Connect current position to base with L-shaped path
+   */
+  _connectToBase(path, x, y, endX, endY) {
+    // Clear occupied zones near base for final connection
+    const clearance = GENERATOR_CONFIG.PATH_CLEARANCE;
+    
+    // First move horizontally to align X
+    if (x !== endX) {
+      const cells = this._getLineCells(x, y, endX, y);
+      for (const cell of cells) {
+        path.push(cell);
+      }
+      x = endX;
+    }
+    
+    // Then move vertically to base
+    if (y !== endY) {
+      const cells = this._getLineCells(x, y, x, endY);
+      for (const cell of cells) {
+        path.push(cell);
+      }
+    }
+  }
+  
+  /**
+   * Generate simple fallback L-shaped path
+   */
+  _generateFallbackPath(startX, startY, endX, endY) {
+    const path = [];
+    
+    // Horizontal first
+    const hCells = this._getLineCells(startX, startY, endX, startY);
+    for (const cell of hCells) {
+      path.push(cell);
+    }
+    
+    // Then vertical
+    if (startY !== endY) {
+      const vCells = this._getLineCells(endX, startY, endX, endY);
+      // Skip first cell (already added)
+      for (let i = 1; i < vCells.length; i++) {
+        path.push(vCells[i]);
+      }
+    }
+    
+    return path;
+  }
+  
+  /**
+   * Build waypoints from path cells (extract direction changes)
+   */
+  _buildWaypointsFromPath() {
+    if (this.pathCells.length === 0) return;
     
     // Add spawn waypoint
     this.waypoints.push({
@@ -428,16 +776,33 @@ class MapGenerator {
       y: this.spawnPoint.y
     });
     
-    // Connect all points with only horizontal/vertical lines
-    const allPoints = [entry, ...controlPoints, { x: baseX, y: baseY }];
-    const path = this._connectPointsOrthogonal(allPoints);
+    // Add first path cell
+    const first = this.pathCells[0];
+    this.waypoints.push({
+      x: (first.x + 0.5) * this.gridSize,
+      y: (first.y + 0.5) * this.gridSize
+    });
     
-    // Add waypoints for rendering
-    for (const cp of controlPoints) {
-      this.waypoints.push({
-        x: (cp.x + 0.5) * this.gridSize,
-        y: (cp.y + 0.5) * this.gridSize
-      });
+    // Find direction changes
+    if (this.pathCells.length > 2) {
+      let lastDx = this.pathCells[1].x - this.pathCells[0].x;
+      let lastDy = this.pathCells[1].y - this.pathCells[0].y;
+      
+      for (let i = 2; i < this.pathCells.length; i++) {
+        const dx = this.pathCells[i].x - this.pathCells[i-1].x;
+        const dy = this.pathCells[i].y - this.pathCells[i-1].y;
+        
+        if (dx !== lastDx || dy !== lastDy) {
+          // Direction changed - add waypoint at turn
+          const turn = this.pathCells[i-1];
+          this.waypoints.push({
+            x: (turn.x + 0.5) * this.gridSize,
+            y: (turn.y + 0.5) * this.gridSize
+          });
+          lastDx = dx;
+          lastDy = dy;
+        }
+      }
     }
     
     // Add base waypoint
@@ -445,8 +810,6 @@ class MapGenerator {
       x: this.basePoint.x,
       y: this.basePoint.y
     });
-    
-    this.pathCells = path;
   }
   
   /**
@@ -467,331 +830,6 @@ class MapGenerator {
         return { x: Math.max(margin, Math.min(this.width - margin - 1, this.spawnPoint.gridX)), y: this.height - 1 };
     }
     return { x: 0, y: Math.floor(this.height / 2) };
-  }
-  
-  /**
-   * Generate spiral path towards center
-   */
-  _generateSpiralPath(entry, targetX, targetY) {
-    const points = [];
-    const margin = GENERATOR_CONFIG.PATH_MARGIN;
-    const segMin = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MIN;
-    const segMax = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MAX;
-    
-    let x = entry.x;
-    let y = entry.y;
-    
-    // Determine initial direction based on entry edge
-    const edge = this.spawnPoint.edge;
-    let directions;
-    
-    if (edge === 'left') {
-      directions = ['right', 'down', 'left', 'up']; // Clockwise from left
-    } else if (edge === 'right') {
-      directions = ['left', 'up', 'right', 'down']; // Counter-clockwise from right
-    } else if (edge === 'top') {
-      directions = ['down', 'left', 'up', 'right'];
-    } else {
-      directions = ['up', 'right', 'down', 'left'];
-    }
-    
-    // Shrinking bounds for spiral
-    let bounds = {
-      minX: margin,
-      maxX: this.width - margin - 1,
-      minY: margin,
-      maxY: this.height - margin - 1
-    };
-    
-    const numSegments = this.rng.int(GENERATOR_CONFIG.PATH_SEGMENTS_MIN, GENERATOR_CONFIG.PATH_SEGMENTS_MAX);
-    let dirIndex = 0;
-    
-    for (let i = 0; i < numSegments; i++) {
-      const dir = directions[dirIndex % 4];
-      let length = this.rng.int(segMin, segMax);
-      
-      // Calculate next point
-      let nextX = x, nextY = y;
-      
-      switch (dir) {
-        case 'right':
-          nextX = Math.min(bounds.maxX, x + length);
-          bounds.maxX = nextX - margin; // Shrink
-          break;
-        case 'left':
-          nextX = Math.max(bounds.minX, x - length);
-          bounds.minX = nextX + margin;
-          break;
-        case 'down':
-          nextY = Math.min(bounds.maxY, y + length);
-          bounds.maxY = nextY - margin;
-          break;
-        case 'up':
-          nextY = Math.max(bounds.minY, y - length);
-          bounds.minY = nextY + margin;
-          break;
-      }
-      
-      // Only add if we actually moved
-      if (nextX !== x || nextY !== y) {
-        points.push({ x: nextX, y: nextY });
-        x = nextX;
-        y = nextY;
-      }
-      
-      dirIndex++;
-      
-      // Check if close enough to target
-      if (Math.abs(x - targetX) < segMin && Math.abs(y - targetY) < segMin) {
-        break;
-      }
-    }
-    
-    return points;
-  }
-  
-  /**
-   * Generate zigzag path towards center
-   */
-  _generateZigzagPath(entry, targetX, targetY) {
-    const points = [];
-    const margin = GENERATOR_CONFIG.PATH_MARGIN;
-    const segMin = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MIN;
-    const segMax = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MAX;
-    
-    let x = entry.x;
-    let y = entry.y;
-    
-    const edge = this.spawnPoint.edge;
-    const isHorizontalEntry = (edge === 'left' || edge === 'right');
-    
-    const numSegments = this.rng.int(GENERATOR_CONFIG.PATH_SEGMENTS_MIN, GENERATOR_CONFIG.PATH_SEGMENTS_MAX);
-    let goingUp = this.rng.next() > 0.5;
-    
-    for (let i = 0; i < numSegments; i++) {
-      let nextX = x, nextY = y;
-      
-      if (i % 2 === 0) {
-        // Move towards target on primary axis
-        if (isHorizontalEntry) {
-          const dir = targetX > x ? 1 : -1;
-          const maxMove = Math.abs(targetX - x);
-          const move = Math.min(maxMove, this.rng.int(segMin, segMax));
-          nextX = x + dir * move;
-        } else {
-          const dir = targetY > y ? 1 : -1;
-          const maxMove = Math.abs(targetY - y);
-          const move = Math.min(maxMove, this.rng.int(segMin, segMax));
-          nextY = y + dir * move;
-        }
-      } else {
-        // Zigzag perpendicular
-        if (isHorizontalEntry) {
-          const move = this.rng.int(segMin, segMax);
-          if (goingUp) {
-            nextY = Math.max(margin, y - move);
-          } else {
-            nextY = Math.min(this.height - margin - 1, y + move);
-          }
-          goingUp = !goingUp;
-        } else {
-          const move = this.rng.int(segMin, segMax);
-          if (goingUp) {
-            nextX = Math.max(margin, x - move);
-          } else {
-            nextX = Math.min(this.width - margin - 1, x + move);
-          }
-          goingUp = !goingUp;
-        }
-      }
-      
-      // Clamp to bounds
-      nextX = Math.max(margin, Math.min(this.width - margin - 1, nextX));
-      nextY = Math.max(margin, Math.min(this.height - margin - 1, nextY));
-      
-      if (nextX !== x || nextY !== y) {
-        points.push({ x: nextX, y: nextY });
-        x = nextX;
-        y = nextY;
-      }
-      
-      // Close enough to target
-      if (Math.abs(x - targetX) < segMin && Math.abs(y - targetY) < segMin) {
-        break;
-      }
-    }
-    
-    return points;
-  }
-  
-  /**
-   * Generate S-shaped snake path
-   */
-  _generateSnakePath(entry, targetX, targetY) {
-    const points = [];
-    const margin = GENERATOR_CONFIG.PATH_MARGIN;
-    const segMin = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MIN;
-    const segMax = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MAX;
-    
-    let x = entry.x;
-    let y = entry.y;
-    
-    const edge = this.spawnPoint.edge;
-    const isHorizontalEntry = (edge === 'left' || edge === 'right');
-    
-    // Snake goes to edges then curves back
-    const numCurves = this.rng.int(2, 4);
-    let goingToEdge = true;
-    
-    for (let curve = 0; curve < numCurves; curve++) {
-      // First go perpendicular to edge
-      let nextX = x, nextY = y;
-      
-      if (isHorizontalEntry) {
-        // Go up or down to edge
-        if (goingToEdge) {
-          if (y < this.height / 2) {
-            nextY = this.rng.int(margin, margin + segMax);
-          } else {
-            nextY = this.rng.int(this.height - margin - segMax - 1, this.height - margin - 1);
-          }
-        } else {
-          // Go towards center Y
-          nextY = Math.floor(this.height / 2) + this.rng.int(-segMin, segMin);
-        }
-        goingToEdge = !goingToEdge;
-        
-        nextY = Math.max(margin, Math.min(this.height - margin - 1, nextY));
-        if (nextY !== y) {
-          points.push({ x, y: nextY });
-          y = nextY;
-        }
-        
-        // Then move towards target X
-        const dir = targetX > x ? 1 : -1;
-        const move = this.rng.int(segMin, segMax);
-        nextX = Math.max(margin, Math.min(this.width - margin - 1, x + dir * move));
-        if (nextX !== x) {
-          points.push({ x: nextX, y });
-          x = nextX;
-        }
-      } else {
-        // Vertical entry - similar but swap axes
-        if (goingToEdge) {
-          if (x < this.width / 2) {
-            nextX = this.rng.int(margin, margin + segMax);
-          } else {
-            nextX = this.rng.int(this.width - margin - segMax - 1, this.width - margin - 1);
-          }
-        } else {
-          nextX = Math.floor(this.width / 2) + this.rng.int(-segMin, segMin);
-        }
-        goingToEdge = !goingToEdge;
-        
-        nextX = Math.max(margin, Math.min(this.width - margin - 1, nextX));
-        if (nextX !== x) {
-          points.push({ x: nextX, y });
-          x = nextX;
-        }
-        
-        const dir = targetY > y ? 1 : -1;
-        const move = this.rng.int(segMin, segMax);
-        nextY = Math.max(margin, Math.min(this.height - margin - 1, y + dir * move));
-        if (nextY !== y) {
-          points.push({ x, y: nextY });
-          y = nextY;
-        }
-      }
-      
-      // Close enough
-      if (Math.abs(x - targetX) < segMin && Math.abs(y - targetY) < segMin) {
-        break;
-      }
-    }
-    
-    return points;
-  }
-  
-  /**
-   * Generate corner/L-shaped path with multiple turns
-   */
-  _generateCornerPath(entry, targetX, targetY) {
-    const points = [];
-    const margin = GENERATOR_CONFIG.PATH_MARGIN;
-    const segMin = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MIN;
-    const segMax = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MAX;
-    
-    let x = entry.x;
-    let y = entry.y;
-    
-    const numTurns = this.rng.int(GENERATOR_CONFIG.PATH_SEGMENTS_MIN, GENERATOR_CONFIG.PATH_SEGMENTS_MAX);
-    let isHorizontal = (this.spawnPoint.edge === 'left' || this.spawnPoint.edge === 'right');
-    
-    for (let i = 0; i < numTurns; i++) {
-      let nextX = x, nextY = y;
-      
-      if (isHorizontal) {
-        // Move horizontally
-        const dir = targetX > x ? 1 : -1;
-        const maxMove = Math.abs(targetX - x);
-        const move = Math.min(maxMove, this.rng.int(segMin, segMax));
-        nextX = x + dir * move;
-      } else {
-        // Move vertically
-        const dir = targetY > y ? 1 : -1;
-        const maxMove = Math.abs(targetY - y);
-        const move = Math.min(maxMove, this.rng.int(segMin, segMax));
-        nextY = y + dir * move;
-      }
-      
-      nextX = Math.max(margin, Math.min(this.width - margin - 1, nextX));
-      nextY = Math.max(margin, Math.min(this.height - margin - 1, nextY));
-      
-      if (nextX !== x || nextY !== y) {
-        points.push({ x: nextX, y: nextY });
-        x = nextX;
-        y = nextY;
-      }
-      
-      isHorizontal = !isHorizontal;
-      
-      if (Math.abs(x - targetX) < 3 && Math.abs(y - targetY) < 3) {
-        break;
-      }
-    }
-    
-    return points;
-  }
-  
-  /**
-   * Connect points with only horizontal and vertical lines (90-degree turns)
-   */
-  _connectPointsOrthogonal(points) {
-    const path = [];
-    const visited = new Set();
-    
-    for (let i = 0; i < points.length - 1; i++) {
-      const start = points[i];
-      const end = points[i + 1];
-      
-      // Draw orthogonal path (first horizontal, then vertical OR vice versa)
-      // Alternate to create variety
-      const horizontalFirst = i % 2 === 0;
-      
-      const lineCells = horizontalFirst
-        ? this._drawOrthogonalLine(start.x, start.y, end.x, end.y, true)
-        : this._drawOrthogonalLine(start.x, start.y, end.x, end.y, false);
-      
-      for (const cell of lineCells) {
-        const key = `${cell.x},${cell.y}`;
-        if (!visited.has(key)) {
-          path.push(cell);
-          visited.add(key);
-        }
-      }
-    }
-    
-    return path;
   }
   
   /**
