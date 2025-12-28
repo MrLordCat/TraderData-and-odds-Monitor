@@ -537,11 +537,18 @@ class GameRenderer {
 
   /**
    * Convert screen coords to world coords
+   * screenX, screenY are clientX/clientY from mouse event
    */
   screenToWorld(screenX, screenY) {
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
+    
+    // Use actual canvas dimensions (from attributes, not cached)
+    const canvasWidth = this.canvas.width;
+    const canvasHeight = this.canvas.height;
+    
+    // Convert client coords to canvas coords (account for CSS scaling)
+    const scaleX = canvasWidth / rect.width;
+    const scaleY = canvasHeight / rect.height;
     
     const canvasX = (screenX - rect.left) * scaleX;
     const canvasY = (screenY - rect.top) * scaleY;

@@ -359,12 +359,24 @@ module.exports = function({ SidebarModule, registerModule }) {
         .stat-value.danger { color: #fc8181; }
         .stat-value.warning { color: #f6ad55; }
         
-        .canvas-container { position: relative; border-radius: 8px; overflow: hidden; flex: 1; min-height: 0; display: flex; }
+        .canvas-container { 
+          position: relative; 
+          border-radius: 8px; 
+          overflow: hidden; 
+          flex: 1; 
+          min-height: 0; 
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #0a0a12;
+        }
         #game-canvas {
-          display: block; width: 100%; height: 100%;
+          display: block;
+          max-width: 100%;
+          max-height: 100%;
+          aspect-ratio: 1 / 1;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
           cursor: crosshair;
-          object-fit: contain;
         }
         
         .game-overlay {
