@@ -422,118 +422,225 @@ class MapGenerator {
     const path = [];
     const margin = GENERATOR_CONFIG.PATH_MARGIN;
     const clearance = GENERATOR_CONFIG.PATH_CLEARANCE;
+    
+    // Generate mandatory waypoints that go AROUND the base before reaching it
+    const waypoints = this._generateMandatoryWaypoints(startX, startY, endX, endY, margin);
+    
+    console.log(`[MapGenerator] Generated ${waypoints.length} mandatory waypoints`);
+    
+    let x = startX;
+    let y = startY;
+    
+    // Add starting cell
+    this._addPathSegment(path, x, y, x, y);
+    
+    // Navigate through each waypoint
+    for (const wp of waypoints) {
+      const result = this._navigateToPoint(path, x, y, wp.x, wp.y, margin, clearance);
+      x = result.x;
+      y = result.y;
+    }
+    
+    // Final approach to base
+    this._connectToBase(path, x, y, endX, endY);
+    
+    return path;
+  }
+  
+  /**
+   * Generate mandatory waypoints that force path to go around the base
+   * Creates a winding path from spawn edge, around the base, then to base
+   */
+  _generateMandatoryWaypoints(startX, startY, baseX, baseY, margin) {
+    const waypoints = [];
+    const edge = this.spawnPoint.edge;
+    
+    // Determine which quadrant we're coming from
+    const fromLeft = (edge === 'left');
+    const fromRight = (edge === 'right');
+    const fromTop = (edge === 'top');
+    const fromBottom = (edge === 'bottom');
+    
+    // Calculate orbit radius around base (how far to go around)
+    const orbitRadius = this.rng.int(15, 25);
+    
+    // First waypoint: move into the map from spawn edge
+    const entryDepth = this.rng.int(15, 30);
+    let wp1x, wp1y;
+    
+    if (fromLeft) {
+      wp1x = margin + entryDepth;
+      wp1y = startY + this.rng.int(-10, 10);
+    } else if (fromRight) {
+      wp1x = this.width - margin - entryDepth;
+      wp1y = startY + this.rng.int(-10, 10);
+    } else if (fromTop) {
+      wp1x = startX + this.rng.int(-10, 10);
+      wp1y = margin + entryDepth;
+    } else {
+      wp1x = startX + this.rng.int(-10, 10);
+      wp1y = this.height - margin - entryDepth;
+    }
+    wp1x = this._clamp(wp1x, margin, this.width - margin - 1);
+    wp1y = this._clamp(wp1y, margin, this.height - margin - 1);
+    waypoints.push({ x: wp1x, y: wp1y });
+    
+    // Second waypoint: go to opposite side of base (start circling)
+    // Pick a corner/side to go to first
+    const circleDir = this.rng.next() > 0.5 ? 1 : -1; // clockwise or counter-clockwise
+    
+    let wp2x, wp2y;
+    if (fromLeft || fromRight) {
+      // Coming from sides - go up or down first
+      wp2y = baseY + circleDir * orbitRadius;
+      wp2x = fromLeft ? baseX - orbitRadius : baseX + orbitRadius;
+    } else {
+      // Coming from top/bottom - go left or right first  
+      wp2x = baseX + circleDir * orbitRadius;
+      wp2y = fromTop ? baseY - orbitRadius : baseY + orbitRadius;
+    }
+    wp2x = this._clamp(wp2x, margin, this.width - margin - 1);
+    wp2y = this._clamp(wp2y, margin, this.height - margin - 1);
+    waypoints.push({ x: wp2x, y: wp2y });
+    
+    // Third waypoint: continue around the base (90 degrees further)
+    let wp3x, wp3y;
+    if (fromLeft || fromRight) {
+      wp3x = baseX + (fromLeft ? orbitRadius : -orbitRadius);
+      wp3y = wp2y;
+    } else {
+      wp3x = wp2x;
+      wp3y = baseY + (fromTop ? orbitRadius : -orbitRadius);
+    }
+    wp3x = this._clamp(wp3x, margin, this.width - margin - 1);
+    wp3y = this._clamp(wp3y, margin, this.height - margin - 1);
+    waypoints.push({ x: wp3x, y: wp3y });
+    
+    // Fourth waypoint: complete more of the circle (opposite side)
+    let wp4x, wp4y;
+    if (fromLeft || fromRight) {
+      wp4x = wp3x;
+      wp4y = baseY - circleDir * (orbitRadius - 5);
+    } else {
+      wp4x = baseX - circleDir * (orbitRadius - 5);
+      wp4y = wp3y;
+    }
+    wp4x = this._clamp(wp4x, margin, this.width - margin - 1);
+    wp4y = this._clamp(wp4y, margin, this.height - margin - 1);
+    waypoints.push({ x: wp4x, y: wp4y });
+    
+    // Fifth waypoint: approach towards base area
+    let wp5x, wp5y;
+    wp5x = baseX + this.rng.int(-8, 8);
+    wp5y = baseY + this.rng.int(-8, 8);
+    // Make sure it's not too close to base
+    if (Math.abs(wp5x - baseX) < 5) wp5x = baseX + (this.rng.next() > 0.5 ? 6 : -6);
+    if (Math.abs(wp5y - baseY) < 5) wp5y = baseY + (this.rng.next() > 0.5 ? 6 : -6);
+    wp5x = this._clamp(wp5x, margin, this.width - margin - 1);
+    wp5y = this._clamp(wp5y, margin, this.height - margin - 1);
+    waypoints.push({ x: wp5x, y: wp5y });
+    
+    return waypoints;
+  }
+  
+  /**
+   * Navigate from current position to target waypoint using orthogonal moves
+   */
+  _navigateToPoint(path, startX, startY, targetX, targetY, margin, clearance) {
     const segMin = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MIN;
     const segMax = GENERATOR_CONFIG.PATH_SEGMENT_LENGTH_MAX;
     
     let x = startX;
     let y = startY;
+    let isHorizontal = this.rng.next() > 0.5;
+    let iterations = 0;
+    const maxIterations = 20;
     
-    // Add starting cells
-    this._addPathSegment(path, x, y, x, y);
-    
-    // Determine initial direction (away from edge towards center)
-    let isHorizontal = (this.spawnPoint.edge === 'left' || this.spawnPoint.edge === 'right');
-    let primaryDir = this._getPrimaryDirection(x, y, endX, endY, isHorizontal);
-    
-    const maxSegments = GENERATOR_CONFIG.PATH_SEGMENTS_MAX;
-    let segmentCount = 0;
-    let stuckCount = 0;
-    const maxStuck = 5;
-    
-    while ((Math.abs(x - endX) > 3 || Math.abs(y - endY) > 3) && segmentCount < maxSegments) {
-      segmentCount++;
+    while ((Math.abs(x - targetX) > 2 || Math.abs(y - targetY) > 2) && iterations < maxIterations) {
+      iterations++;
       
-      // Try to create a segment
-      let segmentCreated = false;
+      const distX = Math.abs(x - targetX);
+      const distY = Math.abs(y - targetY);
       
-      // Calculate desired segment length
-      const distToEnd = Math.abs(x - endX) + Math.abs(y - endY);
-      const maxLen = Math.min(segMax, distToEnd);
-      const segLen = this.rng.int(Math.min(segMin, maxLen), maxLen);
+      // Prefer direction that has more distance to cover
+      if (distX > distY + 5) {
+        isHorizontal = true;
+      } else if (distY > distX + 5) {
+        isHorizontal = false;
+      }
       
-      // Try primary direction first
-      let nextX = x, nextY = y;
+      const segLen = this.rng.int(segMin, Math.min(segMax, Math.max(distX, distY)));
+      let moved = false;
       
-      if (isHorizontal) {
-        // Try horizontal movement
-        const dir = this._getBestHorizontalDir(x, endX);
-        nextX = this._findSafeEndpoint(x, y, dir, segLen, true, margin);
+      if (isHorizontal && distX > 0) {
+        const dir = targetX > x ? 1 : -1;
+        const nextX = this._findSafeEndpoint(x, y, dir, Math.min(segLen, distX), true, margin);
         
         if (nextX !== x && this._canDrawSegment(x, y, nextX, y, clearance)) {
           this._addPathSegment(path, x, y, nextX, y);
           x = nextX;
-          segmentCreated = true;
-          stuckCount = 0;
+          moved = true;
         }
-      } else {
-        // Try vertical movement
-        const dir = this._getBestVerticalDir(y, endY);
-        nextY = this._findSafeEndpoint(x, y, dir, segLen, false, margin);
+      }
+      
+      if (!moved && distY > 0) {
+        const dir = targetY > y ? 1 : -1;
+        const nextY = this._findSafeEndpoint(x, y, dir, Math.min(segLen, distY), false, margin);
         
         if (nextY !== y && this._canDrawSegment(x, y, x, nextY, clearance)) {
           this._addPathSegment(path, x, y, x, nextY);
           y = nextY;
-          segmentCreated = true;
-          stuckCount = 0;
+          moved = true;
         }
       }
       
-      // If primary failed, try perpendicular
-      if (!segmentCreated) {
-        if (isHorizontal) {
-          // Try vertical instead
-          const dir = this._getBestVerticalDir(y, endY);
-          nextY = this._findSafeEndpoint(x, y, dir, segLen, false, margin);
-          
-          if (nextY !== y && this._canDrawSegment(x, y, x, nextY, clearance)) {
-            this._addPathSegment(path, x, y, x, nextY);
-            y = nextY;
-            segmentCreated = true;
-            stuckCount = 0;
-          }
-        } else {
-          // Try horizontal instead
-          const dir = this._getBestHorizontalDir(x, endX);
-          nextX = this._findSafeEndpoint(x, y, dir, segLen, true, margin);
+      // If couldn't move in preferred direction, try the other
+      if (!moved) {
+        if (!isHorizontal && distX > 0) {
+          const dir = targetX > x ? 1 : -1;
+          const nextX = this._findSafeEndpoint(x, y, dir, Math.min(segLen, distX), true, margin);
           
           if (nextX !== x && this._canDrawSegment(x, y, nextX, y, clearance)) {
             this._addPathSegment(path, x, y, nextX, y);
             x = nextX;
-            segmentCreated = true;
-            stuckCount = 0;
+            moved = true;
           }
         }
-      }
-      
-      // If still stuck, try any valid direction with shorter segment
-      if (!segmentCreated) {
-        stuckCount++;
         
-        if (stuckCount < maxStuck) {
-          const shortLen = Math.max(5, Math.floor(segLen / 2));
-          const escaped = this._tryEscapeStuck(path, x, y, endX, endY, shortLen, margin, clearance);
-          if (escaped) {
-            x = escaped.x;
-            y = escaped.y;
-            segmentCreated = true;
+        if (!moved && isHorizontal && distY > 0) {
+          const dir = targetY > y ? 1 : -1;
+          const nextY = this._findSafeEndpoint(x, y, dir, Math.min(segLen, distY), false, margin);
+          
+          if (nextY !== y && this._canDrawSegment(x, y, x, nextY, clearance)) {
+            this._addPathSegment(path, x, y, x, nextY);
+            y = nextY;
+            moved = true;
           }
         }
       }
       
-      // If completely stuck, break and connect directly
-      if (!segmentCreated && stuckCount >= maxStuck) {
-        console.log('[MapGenerator] Path stuck, connecting directly to base');
-        break;
+      // If still stuck, try escape
+      if (!moved) {
+        const escaped = this._tryEscapeStuck(path, x, y, targetX, targetY, 8, margin, clearance);
+        if (escaped) {
+          x = escaped.x;
+          y = escaped.y;
+        } else {
+          break; // Give up on this waypoint
+        }
       }
       
-      // Alternate direction for zigzag pattern
       isHorizontal = !isHorizontal;
     }
     
-    // Final connection to base (L-shaped)
-    this._connectToBase(path, x, y, endX, endY);
-    
-    return path;
+    return { x, y };
+  }
+  
+  /**
+   * Clamp value between min and max
+   */
+  _clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
   }
   
   /**
