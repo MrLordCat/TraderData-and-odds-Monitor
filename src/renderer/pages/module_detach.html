@@ -110,8 +110,16 @@
       document.title = title;
       document.getElementById('moduleTitle').textContent = title;
       
-      // Attach button
-      document.getElementById('attachBtn').addEventListener('click', () => {
+      // Attach button - needs to save state before closing
+      document.getElementById('attachBtn').addEventListener('click', async () => {
+        // Try to save state if module supports it
+        if (window._currentModuleInstance && typeof window._currentModuleInstance.getSerializedState === 'function') {
+          const state = window._currentModuleInstance.getSerializedState();
+          if (state) {
+            await ipcRenderer.invoke('module-store-state', { moduleId, state });
+            console.log('[detach] State saved before attach');
+          }
+        }
         ipcRenderer.invoke('module-attach', { moduleId });
       });
       
@@ -125,6 +133,16 @@
         }
         
         try {
+          // Get stored state from main process
+          const stateResult = await ipcRenderer.invoke('module-get-state', { moduleId });
+          const savedState = stateResult.success ? stateResult.state : null;
+          console.log('[detach] Retrieved saved state:', !!savedState);
+          
+          // Clear the stored state after retrieval (consumed)
+          if (savedState) {
+            await ipcRenderer.invoke('module-clear-state', { moduleId });
+          }
+          
           // Simple SidebarModule base for detached mode
           class SidebarModule {
             static id = 'base';
@@ -135,6 +153,7 @@
               this.options = options;
               this.container = null;
               this.isDetached = true;
+              this._savedState = options.savedState || null;
             }
             
             getTemplate() { return '<div>Module content</div>'; }
@@ -146,6 +165,11 @@
             
             onUnmount() {
               this.container = null;
+            }
+            
+            // Override in subclass to provide serialized state
+            getSerializedState() {
+              return null;
             }
           }
           
@@ -165,8 +189,14 @@
             return;
           }
           
-          // Create instance with detached flag
-          const instance = new ModuleClass({ isDetached: true });
+          // Create instance with detached flag AND saved state
+          const instance = new ModuleClass({ 
+            isDetached: true,
+            savedState: savedState
+          });
+          
+          // Store reference for state saving
+          window._currentModuleInstance = instance;
           
           // Render
           body.innerHTML = instance.getTemplate();
@@ -182,7 +212,7 @@
           // Mount
           instance.onMount(body);
           
-          console.log(`[detach] Module loaded: ${ModuleClass.id}`);
+          console.log(`[detach] Module loaded: ${ModuleClass.id}, withState: ${!!savedState}`);
           
         } catch (e) {
           console.error('[detach] Failed to load module:', e);

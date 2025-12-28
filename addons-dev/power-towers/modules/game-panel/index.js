@@ -59,14 +59,9 @@ module.exports = function({ SidebarModule, registerModule }) {
       // Menu state
       this.currentScreen = 'menu';  // 'menu', 'game', 'upgrades', 'tips', 'settings'
       
-      // Shared game state (survives detach/attach)
-      this.sharedGameState = GamePanelModule._sharedState || null;
+      // Saved state from detach/attach (passed via options)
+      this._savedState = options.savedState || null;
     }
-    
-    // Static shared state - survives between instances
-    static _sharedState = null;
-    static _sharedGame = null;
-    static _sharedCamera = null;
 
     getTemplate() {
       return `
@@ -478,32 +473,50 @@ module.exports = function({ SidebarModule, registerModule }) {
       // Setup screen navigation
       this.setupScreenNavigation(container);
       
-      // Check for saved state (detach/attach or window reload)
-      const savedScreen = GamePanelModule._sharedState?.currentScreen;
-      const hasGame = GamePanelModule._sharedGame !== null;
-      
-      if (savedScreen && hasGame) {
-        // Restore to saved screen
-        console.log('[game-panel] Restoring saved screen:', savedScreen);
-        this.showScreen(savedScreen);
-        
-        // If returning to game screen, reinitialize game renderer
-        if (savedScreen === 'game') {
-          this.initializeGame();
-          
-          // Update button states based on game state
-          if (this.game.running && !this.game.paused) {
-            this.elements.btnStart.textContent = '⏸ Pause';
-          } else if (this.game.paused) {
-            this.elements.btnStart.textContent = '▶ Resume';
-          }
-        }
+      // Check for saved state from detach/attach (passed via IPC)
+      if (this._savedState) {
+        console.log('[game-panel] Restoring from saved state (detach/attach)');
+        this.restoreFromSavedState(this._savedState);
       } else {
         // Show menu initially
         this.showScreen('menu');
       }
       
-      console.log('[game-panel] Mounted, hasSharedGame:', hasGame);
+      console.log('[game-panel] Mounted, hasSavedState:', !!this._savedState);
+    }
+    
+    /**
+     * Restore game from saved state (from detach/attach)
+     */
+    restoreFromSavedState(state) {
+      if (!state) return;
+      
+      // Restore screen
+      const savedScreen = state.currentScreen || 'menu';
+      this.showScreen(savedScreen);
+      
+      // If game was active, restore game state
+      if (savedScreen === 'game' && state.gameState) {
+        console.log('[game-panel] Restoring game state');
+        this.initializeGameWithState(state.gameState);
+      }
+    }
+    
+    /**
+     * Get serialized state for saving (called before detach/attach)
+     */
+    getSerializedState() {
+      const state = {
+        currentScreen: this.currentScreen
+      };
+      
+      // If game is active, serialize game state
+      if (this.game) {
+        state.gameState = this.game.serialize();
+      }
+      
+      console.log('[game-panel] Serialized state, screen:', state.currentScreen, 'hasGame:', !!state.gameState);
+      return state;
     }
     
     setupScreenNavigation(container) {
@@ -540,10 +553,6 @@ module.exports = function({ SidebarModule, registerModule }) {
     showScreen(screenId) {
       this.currentScreen = screenId;
       
-      // Save current screen to shared state
-      GamePanelModule._sharedState = GamePanelModule._sharedState || {};
-      GamePanelModule._sharedState.currentScreen = screenId;
-      
       console.log('[game-panel] showScreen:', screenId);
       
       Object.entries(this.screens).forEach(([id, el]) => {
@@ -562,23 +571,12 @@ module.exports = function({ SidebarModule, registerModule }) {
         return;
       }
       
-      // Check if we have shared game state (from previous detach)
-      if (GamePanelModule._sharedGame) {
-        console.log('[game-panel] Restoring shared game instance');
-        this.game = GamePanelModule._sharedGame;
-        this.camera = GamePanelModule._sharedCamera;
-      } else {
-        // Create new instances
-        this.camera = new Camera();
-        this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-        this.camera.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2, true);
-        
-        this.game = new GameCore();
-        
-        // Store in shared state
-        GamePanelModule._sharedGame = this.game;
-        GamePanelModule._sharedCamera = this.camera;
-      }
+      // Create new instances
+      this.camera = new Camera();
+      this.camera.setViewportSize(this.canvas.width, this.canvas.height);
+      this.camera.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2, true);
+      
+      this.game = new GameCore();
       
       // Set canvas size from config
       this.canvas.width = CONFIG.CANVAS_WIDTH;
@@ -597,6 +595,64 @@ module.exports = function({ SidebarModule, registerModule }) {
       this.updateUI(this.game.getState());
       
       console.log('[game-panel] Game initialized, running:', this.game.running);
+    }
+    
+    /**
+     * Initialize game with saved state (from detach/attach)
+     */
+    initializeGameWithState(gameState) {
+      // Check modules loaded
+      if (!GameCore || !GameRenderer || !Camera) {
+        this.showError('Failed to load game engine');
+        return;
+      }
+      
+      // Create new instances
+      this.camera = new Camera();
+      this.camera.setViewportSize(this.canvas.width, this.canvas.height);
+      this.camera.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2, true);
+      
+      this.game = new GameCore();
+      
+      // Restore state from serialized data
+      const restored = this.game.restoreFromSerialized(gameState);
+      
+      if (!restored) {
+        console.warn('[game-panel] Failed to restore game state, starting fresh');
+      }
+      
+      // Set canvas size from config
+      this.canvas.width = CONFIG.CANVAS_WIDTH;
+      this.canvas.height = CONFIG.CANVAS_HEIGHT;
+      
+      // Update camera viewport size
+      this.camera.setViewportSize(this.canvas.width, this.canvas.height);
+      
+      // Create new renderer (canvas specific)
+      this.renderer = new GameRenderer(this.canvas, this.camera);
+      
+      this.setupEventListeners();
+      this.setupGameEvents();
+      
+      this.renderGame();
+      this.updateUI(this.game.getState());
+      
+      // Update button states based on restored game state
+      if (this.game.gameOver) {
+        this.elements.btnStart.textContent = '▶ Start';
+        this.elements.btnTower.disabled = true;
+      } else if (this.game.running && !this.game.paused) {
+        this.elements.btnStart.textContent = '⏸ Pause';
+        this.elements.btnTower.disabled = this.game.economy.gold < 50;
+      } else if (this.game.paused) {
+        this.elements.btnStart.textContent = '▶ Resume';
+        this.elements.btnTower.disabled = true;
+      } else {
+        this.elements.btnStart.textContent = '▶ Start Wave';
+        this.elements.btnTower.disabled = true;
+      }
+      
+      console.log('[game-panel] Game restored from state, running:', this.game.running, 'paused:', this.game.paused);
     }
 
     setupEventListeners() {
@@ -919,9 +975,12 @@ module.exports = function({ SidebarModule, registerModule }) {
         this.resizeObserver = null;
       }
       
-      // DON'T destroy shared game - just detach from this instance
-      // Game state stays in static _sharedGame
-      this.game = null;
+      // Pause game if running (to preserve state)
+      if (this.game && this.game.running && !this.game.paused) {
+        this.game.pause();
+      }
+      
+      // Clean up renderer but keep game state available for serialization
       this.renderer = null;
       this.camera = null;
       

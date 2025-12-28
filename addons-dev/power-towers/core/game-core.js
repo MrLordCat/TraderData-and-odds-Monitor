@@ -583,6 +583,186 @@ class GameCore {
   }
 
   /**
+   * Serialize game state for transfer between windows
+   */
+  serialize() {
+    return {
+      // Game state
+      lives: this.lives,
+      running: this.running,
+      paused: this.paused,
+      gameOver: this.gameOver,
+      stats: { ...this.stats },
+      
+      // Economy
+      economy: {
+        gold: this.economy.gold,
+        totalEarned: this.economy.totalEarned,
+        totalSpent: this.economy.totalSpent
+      },
+      
+      // Energy
+      energy: {
+        current: this.energySystem.current,
+        max: this.energySystem.max,
+        regenRate: this.energySystem.regenRate
+      },
+      
+      // Wave system
+      wave: {
+        currentWave: this.waveSystem.currentWave,
+        enemiesRemaining: this.waveSystem.enemiesRemaining,
+        enemiesSpawned: this.waveSystem.enemiesSpawned,
+        totalEnemiesInWave: this.waveSystem.totalEnemiesInWave,
+        isSpawning: this.waveSystem.isSpawning,
+        spawnTimer: this.waveSystem.spawnTimer,
+        waveDelayTimer: this.waveSystem.waveDelayTimer,
+        waitingForNextWave: this.waveSystem.waitingForNextWave,
+        spawnQueue: [...this.waveSystem.spawnQueue]
+      },
+      
+      // Towers (full data for restoration)
+      towers: this.towers.map(t => ({
+        id: t.id,
+        type: t.type,
+        path: t.path,
+        tier: t.tier,
+        gridX: t.gridX,
+        gridY: t.gridY,
+        x: t.x,
+        y: t.y,
+        damage: t.damage,
+        range: t.range,
+        fireRate: t.fireRate,
+        energyCost: t.energyCost,
+        damageType: t.damageType,
+        splashRadius: t.splashRadius,
+        chainCount: t.chainCount,
+        slowPercent: t.slowPercent,
+        slowDuration: t.slowDuration,
+        burnDamage: t.burnDamage,
+        burnDuration: t.burnDuration,
+        size: t.size,
+        color: t.color,
+        cooldown: t.cooldown,
+        rotation: t.rotation,
+        totalDamageDealt: t.totalDamageDealt,
+        totalKills: t.totalKills
+      })),
+      
+      // Enemies (full data for restoration)
+      enemies: this.enemies.map(e => ({
+        id: e.id,
+        type: e.type,
+        x: e.x,
+        y: e.y,
+        waypointIndex: e.waypointIndex,
+        speed: e.speed,
+        hp: e.hp,
+        maxHp: e.maxHp,
+        armor: e.armor,
+        armorType: e.armorType,
+        reward: e.reward,
+        size: e.size,
+        color: e.color,
+        alive: e.alive,
+        slowEffect: e.slowEffect,
+        slowDuration: e.slowDuration,
+        burnDamage: e.burnDamage,
+        burnDuration: e.burnDuration
+      })),
+      
+      // Projectiles (can be lost during transfer - acceptable)
+      projectiles: []
+    };
+  }
+
+  /**
+   * Restore game state from serialized data
+   */
+  restoreFromSerialized(data) {
+    if (!data) return false;
+    
+    try {
+      // Stop any running loop
+      if (this.animationId) {
+        cancelAnimationFrame(this.animationId);
+        this.animationId = null;
+      }
+      
+      // Restore game state
+      this.lives = data.lives;
+      this.running = false; // Will be resumed after restore
+      this.paused = data.paused;
+      this.gameOver = data.gameOver;
+      this.stats = { ...data.stats };
+      
+      // Restore economy
+      this.economy.gold = data.economy.gold;
+      this.economy.totalEarned = data.economy.totalEarned;
+      this.economy.totalSpent = data.economy.totalSpent;
+      
+      // Restore energy
+      this.energySystem.current = data.energy.current;
+      this.energySystem.max = data.energy.max;
+      this.energySystem.regenRate = data.energy.regenRate;
+      
+      // Restore wave system
+      this.waveSystem.currentWave = data.wave.currentWave;
+      this.waveSystem.enemiesRemaining = data.wave.enemiesRemaining;
+      this.waveSystem.enemiesSpawned = data.wave.enemiesSpawned;
+      this.waveSystem.totalEnemiesInWave = data.wave.totalEnemiesInWave;
+      this.waveSystem.isSpawning = data.wave.isSpawning;
+      this.waveSystem.spawnTimer = data.wave.spawnTimer;
+      this.waveSystem.waveDelayTimer = data.wave.waveDelayTimer;
+      this.waveSystem.waitingForNextWave = data.wave.waitingForNextWave;
+      this.waveSystem.spawnQueue = [...data.wave.spawnQueue];
+      
+      // Restore towers
+      this.towers = data.towers.map(tData => {
+        const tower = new Tower(tData);
+        tower.id = tData.id;
+        tower.cooldown = tData.cooldown;
+        tower.rotation = tData.rotation;
+        tower.totalDamageDealt = tData.totalDamageDealt;
+        tower.totalKills = tData.totalKills;
+        return tower;
+      });
+      
+      // Restore enemies
+      this.enemies = data.enemies.map(eData => {
+        const enemy = new Enemy(eData);
+        enemy.id = eData.id;
+        enemy.waypointIndex = eData.waypointIndex;
+        enemy.slowEffect = eData.slowEffect;
+        enemy.slowDuration = eData.slowDuration;
+        enemy.burnDamage = eData.burnDamage;
+        enemy.burnDuration = eData.burnDuration;
+        return enemy;
+      });
+      
+      // Clear projectiles (acceptable loss)
+      this.projectiles = [];
+      
+      // Resume if was running
+      if (data.running && !data.gameOver) {
+        this.running = true;
+        if (!data.paused) {
+          this.lastTick = performance.now();
+          this.gameLoop();
+        }
+      }
+      
+      console.log('[GameCore] State restored successfully');
+      return true;
+      
+    } catch (e) {
+      console.error('[GameCore] Failed to restore state:', e);
+      return false;
+    }
+  }
+
+  /**
    * Cleanup
    */
   destroy() {

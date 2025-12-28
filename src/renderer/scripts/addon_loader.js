@@ -189,6 +189,15 @@
       console.log(`[addon-loader] Detaching: ${moduleId}`);
       
       try {
+        // Save module state before detach (if module supports it)
+        if (moduleData.instance && typeof moduleData.instance.getSerializedState === 'function') {
+          const state = moduleData.instance.getSerializedState();
+          if (state) {
+            await ipcRenderer.invoke('module-store-state', { moduleId, state });
+            console.log(`[addon-loader] Saved state for module: ${moduleId}`);
+          }
+        }
+        
         const result = await ipcRenderer.invoke('module-detach', {
           moduleId,
           modulePath,
@@ -208,9 +217,37 @@
     });
     
     // Handle reattach notification
-    ipcRenderer.on('module-reattached', (event, { moduleId }) => {
+    ipcRenderer.on('module-reattached', async (event, { moduleId }) => {
       const moduleData = loadedModules.get(moduleId);
       if (moduleData) {
+        // Try to get saved state and restore it
+        try {
+          const stateResult = await ipcRenderer.invoke('module-get-state', { moduleId });
+          if (stateResult.success && stateResult.state && moduleData.instance) {
+            // Unmount current instance
+            if (typeof moduleData.instance.onUnmount === 'function') {
+              moduleData.instance.onUnmount();
+            }
+            
+            // Create new instance with saved state
+            const NewInstance = new moduleData.ModuleClass({ savedState: stateResult.state });
+            
+            // Find body and re-render
+            const body = moduleData.section.querySelector('.sectionBody');
+            if (body) {
+              body.innerHTML = NewInstance.getTemplate();
+              NewInstance.onMount(body);
+              moduleData.instance = NewInstance;
+              console.log(`[addon-loader] Restored state for reattached module: ${moduleId}`);
+            }
+            
+            // Clear stored state
+            await ipcRenderer.invoke('module-clear-state', { moduleId });
+          }
+        } catch (e) {
+          console.warn(`[addon-loader] Failed to restore state for ${moduleId}:`, e);
+        }
+        
         moduleData.section.classList.remove('detached');
         moduleData.section.style.display = '';
         console.log(`[addon-loader] Reattached: ${moduleId}`);

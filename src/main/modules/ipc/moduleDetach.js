@@ -10,6 +10,9 @@ const path = require('path');
 // Track detached windows by module id
 const detachedWindows = new Map();
 
+// Store module states for transfer between windows
+const moduleStates = new Map();
+
 /**
  * Close all detached windows (called on app quit)
  */
@@ -25,9 +28,46 @@ function closeAllDetachedWindows() {
     }
   }
   detachedWindows.clear();
+  moduleStates.clear();
 }
 
 function registerModuleDetachIpc({ mainWindow, store, getStatsWebContentsList }) {
+  
+  /**
+   * Store module state before detach
+   */
+  ipcMain.handle('module-store-state', async (event, { moduleId, state }) => {
+    try {
+      moduleStates.set(moduleId, state);
+      console.log(`[moduleDetach] Stored state for module: ${moduleId}`);
+      return { success: true };
+    } catch (e) {
+      console.error(`[moduleDetach] Failed to store state:`, e);
+      return { success: false, error: e.message };
+    }
+  });
+  
+  /**
+   * Get stored module state
+   */
+  ipcMain.handle('module-get-state', async (event, { moduleId }) => {
+    try {
+      const state = moduleStates.get(moduleId);
+      console.log(`[moduleDetach] Retrieved state for module: ${moduleId}, hasState: ${!!state}`);
+      return { success: true, state };
+    } catch (e) {
+      console.error(`[moduleDetach] Failed to get state:`, e);
+      return { success: false, error: e.message };
+    }
+  });
+  
+  /**
+   * Clear module state (when no longer needed)
+   */
+  ipcMain.handle('module-clear-state', async (event, { moduleId }) => {
+    moduleStates.delete(moduleId);
+    return { success: true };
+  });
   
   /**
    * Create detached window for a module
