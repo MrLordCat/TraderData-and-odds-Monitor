@@ -165,9 +165,14 @@ const GENERATOR_CONFIG = {
   // Path generation
   PATH_MIN_LENGTH_FACTOR: 1.8,    // Min path length relative to direct distance
   PATH_MAX_LENGTH_FACTOR: 3.0,    // Max path length relative to direct distance
-  PATH_SEGMENT_MIN: 5,            // Min cells per straight segment
-  PATH_SEGMENT_MAX: 15,           // Max cells per straight segment
-  PATH_WIDTH: 1,                  // Path width in cells (1 = single cell path)
+  PATH_SEGMENT_MIN: 3,            // Min cells per straight segment (shorter = more turns)
+  PATH_SEGMENT_MAX: 8,            // Max cells per straight segment (shorter = more turns)
+  PATH_WIDTH: 3,                  // Path width in cells (3 = enemy walks in center)
+  
+  // Path meandering
+  TURN_CHANCE: 0.4,               // Chance to change direction
+  FORWARD_BIAS: 0.5,              // How much to favor forward movement (lower = more meander)
+  VERTICAL_WANDER: 0.35,          // Chance for random vertical movement
   
   // Terrain distribution thresholds (based on noise value 0-1)
   TERRAIN_THRESHOLDS: {
@@ -414,37 +419,47 @@ class MapGenerator {
         }
         
         // Calculate weight based on:
-        // 1. Progress towards goal (heavily favor moving right)
-        // 2. Keeping some randomness for meandering
-        // 3. Continuing in same direction for straight segments
+        // 1. Progress towards goal
+        // 2. Randomness for meandering
+        // 3. Continuing in same direction for segments
         
         let weight = 1;
         
-        // Progress weight (strongly favor right direction)
+        // Progress weight - favor moves that get closer, but not too strongly
         const distToEnd = Math.abs(endX - nx) + Math.abs(endY - ny);
         const currentDist = Math.abs(endX - x) + Math.abs(endY - y);
         
         if (distToEnd < currentDist) {
-          weight *= 3; // Favor moves that get closer
+          weight *= 1.5; // Reduced from 3 - less aggressive forward progress
         }
         
-        // Right direction bonus (main progression)
+        // Right direction bonus (main progression) - reduced for more meandering
         if (dir.name === 'right') {
-          weight *= 4;
+          weight *= GENERATOR_CONFIG.FORWARD_BIAS * 5; // 0.5 * 5 = 2.5
         }
         
         // Same direction bonus (for straight segments)
         if (dir.name === lastDir && straightCount < maxStraight) {
+          weight *= 1.5;
+        }
+        
+        // Random turn chance - add weight to perpendicular directions
+        if ((dir.name === 'up' || dir.name === 'down') && this.rng.next() < GENERATOR_CONFIG.TURN_CHANCE) {
+          weight *= 3; // Encourage turns
+        }
+        
+        // Random vertical wandering even when not needed
+        if ((dir.name === 'up' || dir.name === 'down') && this.rng.next() < GENERATOR_CONFIG.VERTICAL_WANDER) {
           weight *= 2;
         }
         
-        // Vertical movement when we need to align with end Y
-        if (dir.name === 'up' && y > endY) weight *= 2;
-        if (dir.name === 'down' && y < endY) weight *= 2;
+        // Vertical movement when we need to align with end Y (but don't force it)
+        if (dir.name === 'up' && y > endY) weight *= 1.3;
+        if (dir.name === 'down' && y < endY) weight *= 1.3;
         
         // Avoid going back left too much
         if (dir.name === 'left') {
-          weight *= 0.3;
+          weight *= 0.15; // Reduced from 0.3 - even less backtracking
         }
         
         // Terrain preference (avoid water for path)
@@ -551,11 +566,44 @@ class MapGenerator {
   
   /**
    * Carve path into terrain (mark path cells)
+   * Expands path to PATH_WIDTH cells wide
+   * Center line is the actual enemy walk path
    */
   _carvePath() {
+    const pathWidth = GENERATOR_CONFIG.PATH_WIDTH;
+    const halfWidth = Math.floor(pathWidth / 2);
+    
+    // Store original center path for waypoints (enemies walk here)
+    this.centerPath = [...this.pathCells];
+    
+    // Expand path cells to include adjacent cells for width
+    const expandedCells = new Set();
+    
     for (const cell of this.pathCells) {
-      if (cell.x >= 0 && cell.x < this.width && cell.y >= 0 && cell.y < this.height) {
-        this.terrain[cell.y][cell.x] = 'path';
+      // Add center cell
+      expandedCells.add(`${cell.x},${cell.y}`);
+      
+      // Add adjacent cells based on path width
+      for (let dy = -halfWidth; dy <= halfWidth; dy++) {
+        for (let dx = -halfWidth; dx <= halfWidth; dx++) {
+          const nx = cell.x + dx;
+          const ny = cell.y + dy;
+          
+          // Check bounds
+          if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+            expandedCells.add(`${nx},${ny}`);
+          }
+        }
+      }
+    }
+    
+    // Convert expanded cells to path terrain
+    this.pathCells = [];
+    for (const key of expandedCells) {
+      const [x, y] = key.split(',').map(Number);
+      this.pathCells.push({ x, y });
+      if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+        this.terrain[y][x] = 'path';
       }
     }
   }

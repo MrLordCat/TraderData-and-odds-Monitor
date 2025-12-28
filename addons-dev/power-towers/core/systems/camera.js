@@ -157,11 +157,19 @@ class Camera {
   }
 
   /**
-   * Set zoom level
+   * Set zoom level with bounds checking
+   * Prevents zooming out beyond map boundaries
    */
   setZoom(newZoom, centerX = null, centerY = null) {
     const oldZoom = this.zoom;
-    this.zoom = Math.max(0.1, Math.min(2.0, newZoom));
+    
+    // Calculate minimum zoom to fit map in viewport
+    // Ensures you can't zoom out beyond the map boundaries
+    const minZoomX = this.viewportWidth / this.mapWidth;
+    const minZoomY = this.viewportHeight / this.mapHeight;
+    const minZoom = Math.max(minZoomX, minZoomY, 0.15); // At least show whole map
+    
+    this.zoom = Math.max(minZoom, Math.min(2.0, newZoom));
     
     // If center point provided, keep that point stationary
     if (centerX !== null && centerY !== null) {
@@ -187,20 +195,37 @@ class Camera {
 
   /**
    * Clamp camera position to map bounds
+   * Ensures camera never shows area outside the map
    */
   clampPosition() {
     const worldWidth = this.viewportWidth / this.zoom;
     const worldHeight = this.viewportHeight / this.zoom;
     
-    // Allow camera to see edge of map but not beyond
-    const maxX = Math.max(0, this.mapWidth - worldWidth);
-    const maxY = Math.max(0, this.mapHeight - worldHeight);
+    // Calculate bounds - camera position is top-left corner
+    // Ensure we never see past map edges
+    let maxX, maxY, minX, minY;
     
-    this.targetX = Math.max(0, Math.min(maxX, this.targetX));
-    this.targetY = Math.max(0, Math.min(maxY, this.targetY));
+    if (worldWidth >= this.mapWidth) {
+      // Viewport wider than map - center horizontally
+      minX = maxX = (this.mapWidth - worldWidth) / 2;
+    } else {
+      minX = 0;
+      maxX = this.mapWidth - worldWidth;
+    }
     
-    this.x = Math.max(0, Math.min(maxX, this.x));
-    this.y = Math.max(0, Math.min(maxY, this.y));
+    if (worldHeight >= this.mapHeight) {
+      // Viewport taller than map - center vertically
+      minY = maxY = (this.mapHeight - worldHeight) / 2;
+    } else {
+      minY = 0;
+      maxY = this.mapHeight - worldHeight;
+    }
+    
+    this.targetX = Math.max(minX, Math.min(maxX, this.targetX));
+    this.targetY = Math.max(minY, Math.min(maxY, this.targetY));
+    
+    this.x = Math.max(minX, Math.min(maxX, this.x));
+    this.y = Math.max(minY, Math.min(maxY, this.y));
   }
 
   /**
