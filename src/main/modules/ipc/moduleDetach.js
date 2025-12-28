@@ -34,6 +34,20 @@ function closeAllDetachedWindows() {
 function registerModuleDetachIpc({ mainWindow, store, getStatsWebContentsList }) {
   
   /**
+   * Open DevTools for current detached window
+   */
+  ipcMain.on('open-devtools-current', (event) => {
+    try {
+      const webContents = event.sender;
+      if (webContents && !webContents.isDestroyed()) {
+        webContents.openDevTools();
+      }
+    } catch (e) {
+      console.warn('[moduleDetach] Failed to open DevTools:', e.message);
+    }
+  });
+  
+  /**
    * Store module state before detach
    */
   ipcMain.handle('module-store-state', async (event, { moduleId, state }) => {

@@ -40,7 +40,7 @@
       flex: 1;
     }
     
-    #attachBtn {
+    #attachBtn, #devToolsBtn {
       -webkit-app-region: no-drag;
       padding: 4px 12px;
       border: 1px solid var(--md-sys-color-outline-variant);
@@ -51,7 +51,7 @@
       font-size: 12px;
     }
     
-    #attachBtn:hover {
+    #attachBtn:hover, #devToolsBtn:hover {
       background: var(--md-sys-color-surface-container-highest);
     }
     
@@ -83,6 +83,7 @@
   <div id="moduleContainer">
     <div id="moduleHeader">
       <span id="moduleTitle">Module</span>
+      <button id="devToolsBtn" title="Open DevTools">🛠 DevTools</button>
       <button id="attachBtn" title="Reattach to sidebar">⬅ Attach</button>
     </div>
     <div id="moduleBody">
@@ -109,6 +110,12 @@
       // Update title
       document.title = title;
       document.getElementById('moduleTitle').textContent = title;
+      
+      // DevTools button
+      document.getElementById('devToolsBtn').addEventListener('click', () => {
+        require('electron').remote?.getCurrentWindow()?.webContents?.openDevTools() ||
+        ipcRenderer.send('open-devtools-current');
+      });
       
       // Attach button - needs to save state before closing
       document.getElementById('attachBtn').addEventListener('click', async () => {

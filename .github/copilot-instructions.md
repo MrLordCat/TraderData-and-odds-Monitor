@@ -295,3 +295,6 @@ power-towers/
 - Cache errors on restart are normal (previous process releasing files).
 
 ## 18. Code Style
+- **File Size Limit:** If a file exceeds ~500 lines, split it into smaller modules.
+- Extract templates, styles, and handlers into separate files for maintainability.
+- Use folder structure: `module-name/index.js` + `templates.js` + `styles.js` + `handlers.js`
