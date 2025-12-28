@@ -58,7 +58,15 @@ module.exports = function({ SidebarModule, registerModule }) {
       
       // Menu state
       this.currentScreen = 'menu';  // 'menu', 'game', 'upgrades', 'tips', 'settings'
+      
+      // Shared game state (survives detach/attach)
+      this.sharedGameState = GamePanelModule._sharedState || null;
     }
+    
+    // Static shared state - survives between instances
+    static _sharedState = null;
+    static _sharedGame = null;
+    static _sharedCamera = null;
 
     getTemplate() {
       return `
@@ -267,12 +275,16 @@ module.exports = function({ SidebarModule, registerModule }) {
           flex-direction: column;
           gap: 8px;
           font-family: 'Segoe UI', sans-serif;
-          min-height: 400px;
+          height: 100%;
+          min-height: 0;
+          box-sizing: border-box;
+          overflow: hidden;
         }
         
         /* Screens */
-        .game-screen { display: flex; flex-direction: column; gap: 12px; }
-        .game-screen.menu-screen { align-items: center; justify-content: center; padding: 20px 10px; }
+        .game-screen { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; overflow: hidden; }
+        .game-screen.menu-screen { align-items: center; justify-content: center; padding: 20px 10px; overflow: auto; }
+        .gameplay-screen { flex: 1; min-height: 0; }
         
         /* Menu Title */
         .menu-title { text-align: center; margin-bottom: 20px; }
@@ -347,11 +359,12 @@ module.exports = function({ SidebarModule, registerModule }) {
         .stat-value.danger { color: #fc8181; }
         .stat-value.warning { color: #f6ad55; }
         
-        .canvas-container { position: relative; border-radius: 8px; overflow: hidden; }
+        .canvas-container { position: relative; border-radius: 8px; overflow: hidden; flex: 1; min-height: 0; display: flex; }
         #game-canvas {
-          display: block; width: 100%; aspect-ratio: 1;
+          display: block; width: 100%; height: 100%;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
           cursor: crosshair;
+          object-fit: contain;
         }
         
         .game-overlay {
@@ -367,6 +380,7 @@ module.exports = function({ SidebarModule, registerModule }) {
           display: flex; gap: 4px; justify-content: center;
           padding: 6px; background: rgba(0,0,0,0.3); border-radius: 6px;
           opacity: 0.5; pointer-events: none; transition: opacity 0.2s;
+          flex-shrink: 0;
         }
         .tower-select.active { opacity: 1; pointer-events: auto; }
         .tower-btn {
@@ -378,7 +392,7 @@ module.exports = function({ SidebarModule, registerModule }) {
         .tower-btn:hover { border-color: #718096; background: #3d4758; }
         .tower-btn.selected { border-color: #48bb78; background: rgba(72, 187, 120, 0.2); }
         
-        .game-controls { display: flex; gap: 8px; }
+        .game-controls { display: flex; gap: 8px; flex-shrink: 0; }
         .game-btn {
           flex: 1; padding: 10px; border: none; border-radius: 6px;
           background: #4a5568; color: white; cursor: pointer;
@@ -395,13 +409,16 @@ module.exports = function({ SidebarModule, registerModule }) {
         .tower-info {
           padding: 8px; background: rgba(0,0,0,0.4);
           border-radius: 6px; font-size: 11px;
+          flex-shrink: 0;
         }
         .tower-info-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: bold; }
         .tower-info-stats { display: flex; gap: 12px; margin-bottom: 8px; color: #a0aec0; }
         .tower-info-actions { display: flex; gap: 6px; }
         
-        .game-footer { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+        .game-footer { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-shrink: 0; }
         .game-footer .hint { font-size: 10px; color: #718096; margin: 0; }
+        
+        .game-stats-bar { flex-shrink: 0; }
       `;
     }
 
@@ -449,12 +466,32 @@ module.exports = function({ SidebarModule, registerModule }) {
       // Setup screen navigation
       this.setupScreenNavigation(container);
       
-      // Show menu initially
-      this.showScreen('menu');
+      // Check for saved state (detach/attach or window reload)
+      const savedScreen = GamePanelModule._sharedState?.currentScreen;
+      const hasGame = GamePanelModule._sharedGame !== null;
       
-      // Debug: log which screens were found
-      console.log('[game-panel] Screens found:', Object.entries(this.screens).map(([k, v]) => `${k}:${!!v}`).join(', '));
-      console.log('[game-panel] Mounted - showing menu');
+      if (savedScreen && hasGame) {
+        // Restore to saved screen
+        console.log('[game-panel] Restoring saved screen:', savedScreen);
+        this.showScreen(savedScreen);
+        
+        // If returning to game screen, reinitialize game renderer
+        if (savedScreen === 'game') {
+          this.initializeGame();
+          
+          // Update button states based on game state
+          if (this.game.running && !this.game.paused) {
+            this.elements.btnStart.textContent = '⏸ Pause';
+          } else if (this.game.paused) {
+            this.elements.btnStart.textContent = '▶ Resume';
+          }
+        }
+      } else {
+        // Show menu initially
+        this.showScreen('menu');
+      }
+      
+      console.log('[game-panel] Mounted, hasSharedGame:', hasGame);
     }
     
     setupScreenNavigation(container) {
@@ -491,18 +528,19 @@ module.exports = function({ SidebarModule, registerModule }) {
     showScreen(screenId) {
       this.currentScreen = screenId;
       
-      console.log('[game-panel] showScreen:', screenId, 'screens:', this.screens);
+      // Save current screen to shared state
+      GamePanelModule._sharedState = GamePanelModule._sharedState || {};
+      GamePanelModule._sharedState.currentScreen = screenId;
+      
+      console.log('[game-panel] showScreen:', screenId);
       
       Object.entries(this.screens).forEach(([id, el]) => {
         if (el) {
           el.style.display = id === screenId ? 'flex' : 'none';
-          console.log(`[game-panel] Screen ${id}: display=${el.style.display}`);
         } else {
           console.warn(`[game-panel] Screen ${id} element not found!`);
         }
       });
-      
-      console.log('[game-panel] Active screen:', screenId);
     }
     
     initializeGame() {
@@ -512,18 +550,32 @@ module.exports = function({ SidebarModule, registerModule }) {
         return;
       }
       
+      // Check if we have shared game state (from previous detach)
+      if (GamePanelModule._sharedGame) {
+        console.log('[game-panel] Restoring shared game instance');
+        this.game = GamePanelModule._sharedGame;
+        this.camera = GamePanelModule._sharedCamera;
+      } else {
+        // Create new instances
+        this.camera = new Camera();
+        this.camera.setViewportSize(this.canvas.width, this.canvas.height);
+        this.camera.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2, true);
+        
+        this.game = new GameCore();
+        
+        // Store in shared state
+        GamePanelModule._sharedGame = this.game;
+        GamePanelModule._sharedCamera = this.camera;
+      }
+      
       // Set canvas size from config
       this.canvas.width = CONFIG.CANVAS_WIDTH;
       this.canvas.height = CONFIG.CANVAS_HEIGHT;
       
-      // Init camera
-      this.camera = new Camera();
+      // Update camera viewport size
       this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-      // Center camera on map center initially
-      this.camera.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2, true);
       
-      // Init game
-      this.game = new GameCore();
+      // Create new renderer (canvas specific)
       this.renderer = new GameRenderer(this.canvas, this.camera);
       
       this.setupEventListeners();
@@ -532,7 +584,7 @@ module.exports = function({ SidebarModule, registerModule }) {
       this.renderGame();
       this.updateUI(this.game.getState());
       
-      console.log('[game-panel] Game initialized');
+      console.log('[game-panel] Game initialized, running:', this.game.running);
     }
 
     setupEventListeners() {
@@ -561,6 +613,33 @@ module.exports = function({ SidebarModule, registerModule }) {
       el.overlayBtn.addEventListener('click', () => this.restartGame());
       el.btnUpgrade.addEventListener('click', () => this.upgradeSelectedTower());
       el.btnSell.addEventListener('click', () => this.sellSelectedTower());
+      
+      // Handle window resize for canvas scaling
+      this.resizeObserver = new ResizeObserver(() => this.handleCanvasResize());
+      this.resizeObserver.observe(this.canvas.parentElement);
+    }
+    
+    handleCanvasResize() {
+      if (!this.canvas || !this.camera) return;
+      
+      const container = this.canvas.parentElement;
+      if (!container) return;
+      
+      // Get container size
+      const rect = container.getBoundingClientRect();
+      const size = Math.min(rect.width, rect.height);
+      
+      // Keep canvas square and update internal resolution
+      if (size > 0) {
+        this.canvas.width = CONFIG.CANVAS_WIDTH;
+        this.canvas.height = CONFIG.CANVAS_HEIGHT;
+        this.camera.setViewportSize(this.canvas.width, this.canvas.height);
+        
+        // Re-render
+        if (this.renderer && this.game) {
+          this.renderGame();
+        }
+      }
     }
 
     setupGameEvents() {
@@ -822,11 +901,18 @@ module.exports = function({ SidebarModule, registerModule }) {
     }
 
     onUnmount() {
-      if (this.game) {
-        this.game.destroy();
-        this.game = null;
+      // Cleanup resize observer
+      if (this.resizeObserver) {
+        this.resizeObserver.disconnect();
+        this.resizeObserver = null;
       }
+      
+      // DON'T destroy shared game - just detach from this instance
+      // Game state stays in static _sharedGame
+      this.game = null;
       this.renderer = null;
+      this.camera = null;
+      
       super.onUnmount();
     }
   }
