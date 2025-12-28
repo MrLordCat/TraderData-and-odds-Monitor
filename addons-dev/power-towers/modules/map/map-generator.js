@@ -492,18 +492,43 @@ class MapGenerator {
   /**
    * Generate mandatory waypoints that force path to SPIRAL towards the base
    * Path goes around the base multiple times, getting closer with each loop
+   * Variability: 3/4 loop to 3 full loops
    */
   _generateMandatoryWaypoints(startX, startY, baseX, baseY, margin) {
     const waypoints = [];
     const edge = this.spawnPoint.edge;
     
-    // Start with large radius, shrink with each loop
-    const startRadius = this.rng.int(35, 42); // Start far from base
-    const radiusShrink = this.rng.int(8, 12); // How much closer each loop
-    const minRadius = 8; // Stop spiraling when this close
+    // Determine how many corners to visit (variability)
+    // 3 corners = 3/4 loop, 4 = 1 loop, 8 = 2 loops, 12 = 3 loops
+    const roll = this.rng.next();
+    let totalCorners;
+    if (roll < 0.15) {
+      // 15% chance: partial loop (3/4)
+      totalCorners = 3;
+    } else if (roll < 0.45) {
+      // 30% chance: 1 full loop
+      totalCorners = 4;
+    } else if (roll < 0.80) {
+      // 35% chance: 2 loops
+      totalCorners = 8;
+    } else {
+      // 20% chance: 3 loops (longest path)
+      totalCorners = 12;
+    }
+    
+    console.log(`[MapGenerator] Spiral will visit ${totalCorners} corners (${totalCorners / 4} loops)`);
+    
+    // Start radius depends on number of loops - more loops = start further
+    const baseRadius = 25;
+    const radiusPerLoop = 10;
+    const loops = Math.ceil(totalCorners / 4);
+    const startRadius = baseRadius + (loops * radiusPerLoop) + this.rng.int(-3, 3);
+    
+    // How much to shrink per corner
+    const totalShrink = startRadius - 8; // End at radius ~8
+    const shrinkPerCorner = totalShrink / totalCorners;
     
     // Determine starting corner based on spawn edge
-    // We want to start from the corner closest to spawn
     let currentCorner;
     if (edge === 'top') {
       currentCorner = startX < baseX ? 'topLeft' : 'topRight';
@@ -527,29 +552,22 @@ class MapGenerator {
     let cornerIndex = order.indexOf(currentCorner);
     
     let radius = startRadius;
-    let loopCount = 0;
-    const maxLoops = 4; // Maximum spiral loops
     
     // First waypoint: move towards first corner at starting radius
     const firstCorner = this._getCornerPosition(currentCorner, baseX, baseY, radius, margin);
     waypoints.push(firstCorner);
     
     // Generate spiral by visiting corners with decreasing radius
-    while (radius > minRadius && loopCount < maxLoops) {
-      // Visit 4 corners (one full loop)
-      for (let i = 0; i < 4; i++) {
-        cornerIndex = (cornerIndex + 1) % 4;
-        const cornerName = order[cornerIndex];
-        
-        // Shrink radius slightly at each corner for smooth spiral
-        radius -= radiusShrink / 4;
-        if (radius < minRadius) radius = minRadius;
-        
-        const cornerPos = this._getCornerPosition(cornerName, baseX, baseY, radius, margin);
-        waypoints.push(cornerPos);
-      }
+    for (let i = 0; i < totalCorners; i++) {
+      cornerIndex = (cornerIndex + 1) % 4;
+      const cornerName = order[cornerIndex];
       
-      loopCount++;
+      // Shrink radius for spiral effect
+      radius -= shrinkPerCorner;
+      if (radius < 6) radius = 6;
+      
+      const cornerPos = this._getCornerPosition(cornerName, baseX, baseY, radius, margin);
+      waypoints.push(cornerPos);
     }
     
     // Final approach waypoint near base
