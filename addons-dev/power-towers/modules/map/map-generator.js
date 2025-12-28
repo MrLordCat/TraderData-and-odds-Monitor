@@ -491,92 +491,90 @@ class MapGenerator {
   
   /**
    * Generate mandatory waypoints that force path to SPIRAL towards the base
-   * Path goes around the base multiple times, getting closer with each loop
-   * Variability: 3/4 loop to 3 full loops
+   * Path goes around the base with organic, non-parallel curves
+   * Uses 8 points per loop for smoother curves with random offsets
    */
   _generateMandatoryWaypoints(startX, startY, baseX, baseY, margin) {
     const waypoints = [];
     const edge = this.spawnPoint.edge;
     
-    // Determine how many corners to visit (variability)
-    // 3 corners = 3/4 loop, 4 = 1 loop, 8 = 2 loops, 12 = 3 loops
+    // Determine how many points to visit (more points = smoother spiral)
+    // Each "loop" has 8 points (not 4 corners - smoother)
     const roll = this.rng.next();
-    let totalCorners;
+    let totalPoints;
     if (roll < 0.15) {
-      // 15% chance: partial loop (3/4)
-      totalCorners = 3;
+      // 15% chance: partial loop
+      totalPoints = 6;
     } else if (roll < 0.45) {
-      // 30% chance: 1 full loop
-      totalCorners = 4;
+      // 30% chance: ~1 loop
+      totalPoints = 8;
     } else if (roll < 0.80) {
-      // 35% chance: 2 loops
-      totalCorners = 8;
+      // 35% chance: ~1.5-2 loops  
+      totalPoints = this.rng.int(12, 16);
     } else {
-      // 20% chance: 3 loops (longest path)
-      totalCorners = 12;
+      // 20% chance: 2-3 loops (longest path)
+      totalPoints = this.rng.int(18, 24);
     }
     
-    console.log(`[MapGenerator] Spiral will visit ${totalCorners} corners (${totalCorners / 4} loops)`);
+    console.log(`[MapGenerator] Spiral will visit ${totalPoints} points`);
     
-    // Start radius depends on number of loops - more loops = start further
-    const baseRadius = 25;
-    const radiusPerLoop = 10;
-    const loops = Math.ceil(totalCorners / 4);
-    const startRadius = baseRadius + (loops * radiusPerLoop) + this.rng.int(-3, 3);
+    // Start radius - further for more points
+    const loops = totalPoints / 8;
+    const startRadius = 20 + (loops * 12) + this.rng.int(-2, 5);
+    const endRadius = 6;
     
-    // How much to shrink per corner
-    const totalShrink = startRadius - 8; // End at radius ~8
-    const shrinkPerCorner = totalShrink / totalCorners;
+    // Calculate shrink per point
+    const radiusShrink = (startRadius - endRadius) / totalPoints;
     
-    // Determine starting corner based on spawn edge
-    let currentCorner;
+    // Determine starting angle based on spawn edge
+    let startAngle;
     if (edge === 'top') {
-      currentCorner = startX < baseX ? 'topLeft' : 'topRight';
+      startAngle = startX < baseX ? Math.PI * 1.25 : Math.PI * 1.75; // Coming from top
     } else if (edge === 'bottom') {
-      currentCorner = startX < baseX ? 'bottomLeft' : 'bottomRight';
+      startAngle = startX < baseX ? Math.PI * 0.75 : Math.PI * 0.25; // Coming from bottom
     } else if (edge === 'left') {
-      currentCorner = startY < baseY ? 'topLeft' : 'bottomLeft';
+      startAngle = startY < baseY ? Math.PI * 1.0 : Math.PI * 1.5; // Coming from left
     } else {
-      currentCorner = startY < baseY ? 'topRight' : 'bottomRight';
+      startAngle = startY < baseY ? Math.PI * 0.0 : Math.PI * 0.5; // Coming from right
     }
     
     // Direction: clockwise or counter-clockwise
     const clockwise = this.rng.next() > 0.5;
+    const angleStep = (Math.PI * 2 / 8) * (clockwise ? 1 : -1); // 8 points per full circle
     
-    // Corner order for clockwise and counter-clockwise
-    const cwOrder = ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'];
-    const ccwOrder = ['topLeft', 'bottomLeft', 'bottomRight', 'topRight'];
-    const order = clockwise ? cwOrder : ccwOrder;
-    
-    // Find starting index in order
-    let cornerIndex = order.indexOf(currentCorner);
-    
+    let angle = startAngle;
     let radius = startRadius;
     
-    // First waypoint: move towards first corner at starting radius
-    const firstCorner = this._getCornerPosition(currentCorner, baseX, baseY, radius, margin);
-    waypoints.push(firstCorner);
-    
-    // Generate spiral by visiting corners with decreasing radius
-    for (let i = 0; i < totalCorners; i++) {
-      cornerIndex = (cornerIndex + 1) % 4;
-      const cornerName = order[cornerIndex];
+    // Generate spiral points
+    for (let i = 0; i < totalPoints; i++) {
+      // Add randomness to both angle and radius for organic look
+      const angleOffset = this.rng.float(-0.3, 0.3); // Random angle wobble
+      const radiusOffset = this.rng.float(-4, 4); // Random radius wobble
       
-      // Shrink radius for spiral effect
-      radius -= shrinkPerCorner;
-      if (radius < 6) radius = 6;
+      const actualAngle = angle + angleOffset;
+      const actualRadius = Math.max(endRadius, radius + radiusOffset);
       
-      const cornerPos = this._getCornerPosition(cornerName, baseX, baseY, radius, margin);
-      waypoints.push(cornerPos);
+      // Convert polar to cartesian
+      const x = baseX + Math.cos(actualAngle) * actualRadius;
+      const y = baseY + Math.sin(actualAngle) * actualRadius;
+      
+      waypoints.push({
+        x: this._clamp(Math.round(x), margin, this.width - margin - 1),
+        y: this._clamp(Math.round(y), margin, this.height - margin - 1)
+      });
+      
+      // Move to next position
+      angle += angleStep;
+      radius -= radiusShrink;
     }
     
     // Final approach waypoint near base
-    const approachOffset = 5;
-    const approachX = baseX + (this.rng.next() > 0.5 ? approachOffset : -approachOffset);
-    const approachY = baseY + (this.rng.next() > 0.5 ? approachOffset : -approachOffset);
+    const approachAngle = angle + this.rng.float(-0.5, 0.5);
+    const approachX = baseX + Math.cos(approachAngle) * 4;
+    const approachY = baseY + Math.sin(approachAngle) * 4;
     waypoints.push({ 
-      x: this._clamp(approachX, margin, this.width - margin - 1),
-      y: this._clamp(approachY, margin, this.height - margin - 1)
+      x: this._clamp(Math.round(approachX), margin, this.width - margin - 1),
+      y: this._clamp(Math.round(approachY), margin, this.height - margin - 1)
     });
     
     return waypoints;
