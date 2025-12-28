@@ -576,7 +576,8 @@ class MapGenerator {
 
     // Occupancy for clearance checks
     const occupied = new Set(path.map(p => `${p.x},${p.y}`));
-    const clearance = 2;
+    let lastSegmentCells = new Set([`${x},${y}`]);
+    const clearance = 1;
     const minBendLen = 6;
 
     const lineHasClearance = (x1, y1, x2, y2) => {
@@ -586,7 +587,7 @@ class MapGenerator {
           for (let dx = -clearance; dx <= clearance; dx++) {
             const key = `${c.x + dx},${c.y + dy}`;
             if (occupied.has(key)) {
-              if (!(c.x + dx === x && c.y + dy === y)) return false;
+              if (!(c.x + dx === x && c.y + dy === y) && !lastSegmentCells.has(key)) return false;
             }
           }
         }
@@ -635,23 +636,31 @@ class MapGenerator {
           if (horizontalFirst) {
             if (x !== jMidX && lineHasClearance(x, y, jMidX, y)) {
               this._pushLineNoDup(path, x, y, jMidX, y);
-              this._getLineCells(x, y, jMidX, y).forEach(c => occupied.add(`${c.x},${c.y}`));
+              const cells = this._getLineCells(x, y, jMidX, y);
+              cells.forEach(c => occupied.add(`${c.x},${c.y}`));
+              lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
               x = jMidX;
             }
             if (y !== jMidY && lineHasClearance(x, y, x, jMidY)) {
               this._pushLineNoDup(path, x, y, x, jMidY);
-              this._getLineCells(x, y, x, jMidY).forEach(c => occupied.add(`${c.x},${c.y}`));
+              const cells = this._getLineCells(x, y, x, jMidY);
+              cells.forEach(c => occupied.add(`${c.x},${c.y}`));
+              lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
               y = jMidY;
             }
           } else {
             if (y !== jMidY && lineHasClearance(x, y, x, jMidY)) {
               this._pushLineNoDup(path, x, y, x, jMidY);
-              this._getLineCells(x, y, x, jMidY).forEach(c => occupied.add(`${c.x},${c.y}`));
+              const cells = this._getLineCells(x, y, x, jMidY);
+              cells.forEach(c => occupied.add(`${c.x},${c.y}`));
+              lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
               y = jMidY;
             }
             if (x !== jMidX && lineHasClearance(x, y, jMidX, y)) {
               this._pushLineNoDup(path, x, y, jMidX, y);
-              this._getLineCells(x, y, jMidX, y).forEach(c => occupied.add(`${c.x},${c.y}`));
+              const cells = this._getLineCells(x, y, jMidX, y);
+              cells.forEach(c => occupied.add(`${c.x},${c.y}`));
+              lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
               x = jMidX;
             }
           }
@@ -664,12 +673,16 @@ class MapGenerator {
     // Final snap to target with clearance
     if (x !== targetX && lineHasClearance(x, y, targetX, y)) {
       this._pushLineNoDup(path, x, y, targetX, y);
-      this._getLineCells(x, y, targetX, y).forEach(c => occupied.add(`${c.x},${c.y}`));
+      const cells = this._getLineCells(x, y, targetX, y);
+      cells.forEach(c => occupied.add(`${c.x},${c.y}`));
+      lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
       x = targetX;
     }
     if (y !== targetY && lineHasClearance(x, y, x, targetY)) {
       this._pushLineNoDup(path, x, y, x, targetY);
-      this._getLineCells(x, y, x, targetY).forEach(c => occupied.add(`${c.x},${c.y}`));
+      const cells = this._getLineCells(x, y, x, targetY);
+      cells.forEach(c => occupied.add(`${c.x},${c.y}`));
+      lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
       y = targetY;
     }
 
