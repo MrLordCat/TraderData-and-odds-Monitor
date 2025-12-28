@@ -3,7 +3,10 @@
 Concise, project-specific guidance for AI assistants working in this Electron prototype. Focus on current reality—avoid inventing new patterns without matching existing style.
 
 ## 0. Terminal Rules
-**Always reuse the active terminal for commands.** Do not create new terminal instances unless the current one is busy or has failed. Combine commands (e.g., `cd backend && npm start`) instead of running them separately.
+**CRITICAL: NEVER create new terminal instances.** Always reuse the existing active terminal.
+- Combine all commands with `;` (e.g., `git add -A; git commit -m "msg"; git push`)
+- If terminal appears busy, wait or ask user to confirm
+- Creating new terminals causes Unicode bugs (cyrillic 'с' prefix)
 
 ## 1. Big Picture
 Electron desktop app that:
