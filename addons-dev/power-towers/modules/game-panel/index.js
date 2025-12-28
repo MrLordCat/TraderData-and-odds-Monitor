@@ -413,13 +413,13 @@ module.exports = function({ SidebarModule, registerModule }) {
       styleEl.textContent = this.getStyles();
       container.appendChild(styleEl);
       
-      // Screen refs
+      // Screen refs (IDs are screen-<name>)
       this.screens = {
-        menu: container.querySelector('#menu-screen'),
-        upgrades: container.querySelector('#upgrades-screen'),
-        tips: container.querySelector('#tips-screen'),
-        settings: container.querySelector('#settings-screen'),
-        game: container.querySelector('#gameplay-screen')
+        menu: container.querySelector('#screen-menu'),
+        upgrades: container.querySelector('#screen-upgrades'),
+        tips: container.querySelector('#screen-tips'),
+        settings: container.querySelector('#screen-settings'),
+        game: container.querySelector('#screen-game')
       };
       
       // Game DOM refs (will be used when game screen is active)
@@ -452,6 +452,8 @@ module.exports = function({ SidebarModule, registerModule }) {
       // Show menu initially
       this.showScreen('menu');
       
+      // Debug: log which screens were found
+      console.log('[game-panel] Screens found:', Object.entries(this.screens).map(([k, v]) => `${k}:${!!v}`).join(', '));
       console.log('[game-panel] Mounted - showing menu');
     }
     
@@ -460,10 +462,12 @@ module.exports = function({ SidebarModule, registerModule }) {
       container.querySelectorAll('.menu-btn[data-screen]').forEach(btn => {
         btn.addEventListener('click', () => {
           const screen = btn.dataset.screen;
+          console.log('[game-panel] Button clicked, switching to:', screen);
           this.showScreen(screen);
           
           // Initialize game when entering game screen for first time
           if (screen === 'game' && !this.game) {
+            console.log('[game-panel] First time entering game, initializing...');
             this.initializeGame();
           }
         });
@@ -487,11 +491,18 @@ module.exports = function({ SidebarModule, registerModule }) {
     showScreen(screenId) {
       this.currentScreen = screenId;
       
+      console.log('[game-panel] showScreen:', screenId, 'screens:', this.screens);
+      
       Object.entries(this.screens).forEach(([id, el]) => {
-        if (el) el.style.display = id === screenId ? 'flex' : 'none';
+        if (el) {
+          el.style.display = id === screenId ? 'flex' : 'none';
+          console.log(`[game-panel] Screen ${id}: display=${el.style.display}`);
+        } else {
+          console.warn(`[game-panel] Screen ${id} element not found!`);
+        }
       });
       
-      console.log('[game-panel] Screen:', screenId);
+      console.log('[game-panel] Active screen:', screenId);
     }
     
     initializeGame() {
