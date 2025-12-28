@@ -188,8 +188,34 @@ class MyModule extends SidebarModule {
 registerModule(MyModule);
 ```
 
+**Detachable Modules:**
+Sidebar modules can be detached into separate windows:
+```javascript
+class MyModule extends SidebarModule {
+  static detachable = true;   // Enable detach button (default: true)
+  detachWidth = 400;          // Optional window width
+  detachHeight = 500;         // Optional window height
+}
+```
+
+IPC channels for detach:
+- `module-detach` - Open module in separate window
+- `module-attach` - Close detached window, return to sidebar
+- `module-is-detached` - Check if module is detached
+- `module-get-detached` - Get list of detached modules
+
+Files:
+- `src/main/modules/ipc/moduleDetach.js` - IPC handlers
+- `src/renderer/pages/module_detach.html` - Detached window template
+- `src/renderer/scripts/addon_loader.js` - SidebarModule base with detach support
+
 ## 14. Addon System
 External modules loaded from `%APPDATA%/oddsmoni/addons/<addon-id>/`.
+
+**Channels:** `dev` (pre-release builds) and `release` (stable tags).
+- Channel selector in Settings → Addons
+- Dev channel: `addon-<id>-dev` tags (prerelease)
+- Release channel: `addon-<id>-v*` tags
 
 **Structure:**
 ```
@@ -203,28 +229,58 @@ addon-id/
 ```
 
 **Key files:**
-- `src/main/modules/addonManager/index.js` - Install, uninstall, enable/disable
+- `src/main/modules/addonManager/index.js` - Install, uninstall, enable/disable, update
 - `src/main/modules/ipc/addons.js` - IPC handlers
 - `src/renderer/scripts/settings.js` - Addons UI in Settings
-- `addon-registry.json` - Available addons list (fetched from GitHub)
+- `addon-registry.json` - Available addons list (fallback for release channel)
+- `.github/workflows/build-addon.yml` - Addon build & release workflow
 
 **API (via desktopAPI):**
 - `addonsGetInfo()` - Get installed addons
-- `addonsFetchAvailable()` - Fetch registry
+- `addonsFetchAvailable()` - Fetch from GitHub releases
 - `addonsInstall(id, url)` - Download & install
 - `addonsUninstall(id)` - Remove addon
 - `addonsSetEnabled(id, bool)` - Toggle
+- `addonsCheckUpdates()` - Check for updates
+- `addonsUpdate(id)` - Update addon to latest
+- `addonsGetChannel()` / `addonsSetChannel(ch)` - Get/set update channel
 - `addonsGetEnabledPaths()` - For sidebar loader
+
+**Version format:**
+- Release: `1.0.0`
+- Dev: `0.1.0-dev.abc1234` (base version + commit hash)
 
 See `docs/ADDON_SYSTEM.md` for full documentation.
 
-## 15. Build / Run / Dist
+## 15. Power Towers TD (Example Addon)
+Located in `addons-dev/power-towers/`:
+- Roguelike Tower Defense game with energy system
+- Tower paths: Fire 🔥, Ice ❄️, Lightning ⚡, Nature 🌿, Dark 💀
+- Menu system with Start/Upgrades/Tips/Settings screens
+- Detachable game panel
+
+Structure:
+```
+power-towers/
+├── manifest.json
+├── core/              # Game logic
+│   ├── config.js      # Game constants
+│   └── game-core.js   # GameCore class (state, events)
+├── renderer/
+│   └── game-renderer.js  # Canvas rendering
+└── modules/
+    └── game-panel/
+        └── index.js   # SidebarModule with menu + game UI
+```
+
+## 16. Build / Run / Dist
 - Dev: `npm run dev` (no bundler, ASAR disabled)
 - Portable: `npm run dist:portable`
 - Unpacked: `npm run dist:dir`
 - GitHub Actions auto-builds on push to main (dev) and tags (release)
+- Addon builds: push to `addons-dev/**` triggers dev release
 
-## 16. Common Pitfalls
+## 17. Common Pitfalls
 - Don't remove `views[id]` without destroying `webContents` & updating `activeBrokerIdsRef`.
 - Respect IPC initialization order (some depend on managers existing).
 - Don't duplicate hotkey handlers (causes double toggle).
@@ -232,13 +288,7 @@ See `docs/ADDON_SYSTEM.md` for full documentation.
 - Keep delayed rebroadcasts (400/1400ms) for SPA transitions.
 - Dev build won't trigger on release tags (tags-ignore in workflow).
 - Addons install to userData, not project directory.
+- Addon updates require force-refresh to get latest downloadUrl (handled automatically).
+- Cache errors on restart are normal (previous process releasing files).
 
-## 17. Code Style
-- CommonJS `require/module.exports` (no ES modules).
-- Defensive `try/catch` everywhere.
-- Verbose mode via `verbose` parameter for debugging.
-- CSS variables for theming (`--sidebar-*`, `--board-*`).
-- IPC channel naming: `noun-verb` (e.g. `broker-opened`, `auto-toggle-all`).
-- Paths: use `src/main/`, `src/renderer/`, `src/brokers/` structure.
-
-Keep instructions concise; update this file when structural changes occur.
+## 18. Code Style
