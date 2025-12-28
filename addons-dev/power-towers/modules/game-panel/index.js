@@ -37,6 +37,9 @@ module.exports = function({ SidebarModule, registerModule }) {
     static title = 'Power Towers TD';
     static icon = null;
     static order = 100;
+    static detachable = true;
+    static detachWidth = 500;
+    static detachHeight = 700;
 
     constructor(options = {}) {
       super(options);
@@ -48,81 +51,205 @@ module.exports = function({ SidebarModule, registerModule }) {
       
       this.placingTower = false;
       this.selectedPath = null;
+      
+      // Menu state
+      this.currentScreen = 'menu';  // 'menu', 'game', 'upgrades', 'tips', 'settings'
     }
 
     getTemplate() {
       return `
         <div class="game-panel-container">
-          <!-- Stats Bar -->
-          <div class="game-stats-bar">
-            <div class="stat-item">
-              <span class="stat-icon">💰</span>
-              <span class="stat-value" id="stat-gold">100</span>
+          <!-- Main Menu Screen -->
+          <div class="game-screen menu-screen" id="screen-menu">
+            <div class="menu-title">
+              <span class="menu-icon">🗼</span>
+              <h2>Power Towers TD</h2>
+              <p class="menu-subtitle">Roguelike Tower Defense</p>
             </div>
-            <div class="stat-item">
-              <span class="stat-icon">❤️</span>
-              <span class="stat-value" id="stat-lives">20</span>
+            <div class="menu-buttons">
+              <button class="menu-btn primary" data-screen="game">▶ Start Game</button>
+              <button class="menu-btn" data-screen="upgrades">🔧 Upgrades</button>
+              <button class="menu-btn" data-screen="tips">💡 Tips</button>
+              <button class="menu-btn" data-screen="settings">⚙️ Settings</button>
             </div>
-            <div class="stat-item">
-              <span class="stat-icon">⚡</span>
-              <span class="stat-value" id="stat-energy">50</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-icon">🌊</span>
-              <span class="stat-value" id="stat-wave">0</span>
+            <div class="menu-footer">
+              <p class="version">v0.1.0</p>
             </div>
           </div>
           
-          <!-- Game Canvas -->
-          <div class="canvas-container">
-            <canvas id="game-canvas" width="300" height="300"></canvas>
-            
-            <!-- Overlay -->
-            <div class="game-overlay" id="game-overlay" style="display: none;">
-              <div class="overlay-content">
-                <h3 id="overlay-title">Game Over</h3>
-                <p id="overlay-message">Wave 5</p>
-                <button id="overlay-btn" class="game-btn primary">Restart</button>
+          <!-- Upgrades Screen -->
+          <div class="game-screen upgrades-screen" id="screen-upgrades" style="display: none;">
+            <div class="screen-header">
+              <button class="back-btn" data-screen="menu">← Back</button>
+              <h3>Permanent Upgrades</h3>
+            </div>
+            <div class="upgrades-list">
+              <div class="upgrade-item">
+                <span class="upgrade-icon">💰</span>
+                <div class="upgrade-info">
+                  <span class="upgrade-name">Starting Gold</span>
+                  <span class="upgrade-desc">+50 gold per level</span>
+                </div>
+                <button class="upgrade-btn" disabled>Lvl 0</button>
+              </div>
+              <div class="upgrade-item">
+                <span class="upgrade-icon">❤️</span>
+                <div class="upgrade-info">
+                  <span class="upgrade-name">Extra Lives</span>
+                  <span class="upgrade-desc">+5 lives per level</span>
+                </div>
+                <button class="upgrade-btn" disabled>Lvl 0</button>
+              </div>
+              <div class="upgrade-item">
+                <span class="upgrade-icon">⚡</span>
+                <div class="upgrade-info">
+                  <span class="upgrade-name">Energy Boost</span>
+                  <span class="upgrade-desc">+25 max energy per level</span>
+                </div>
+                <button class="upgrade-btn" disabled>Lvl 0</button>
+              </div>
+            </div>
+            <p class="upgrade-note">Complete waves to earn upgrade points</p>
+          </div>
+          
+          <!-- Tips Screen -->
+          <div class="game-screen tips-screen" id="screen-tips" style="display: none;">
+            <div class="screen-header">
+              <button class="back-btn" data-screen="menu">← Back</button>
+              <h3>Tips & Strategy</h3>
+            </div>
+            <div class="tips-list">
+              <div class="tip-item">
+                <span class="tip-icon">🔥</span>
+                <p><b>Fire</b> - High damage, burn DoT, AoE at higher tiers</p>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">❄️</span>
+                <p><b>Ice</b> - Slows enemies, freeze at higher tiers</p>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">⚡</span>
+                <p><b>Lightning</b> - Chain attacks, instant hit</p>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">🌿</span>
+                <p><b>Nature</b> - Poison DoT, energy regen</p>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">💀</span>
+                <p><b>Dark</b> - True damage, ignores armor</p>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">💡</span>
+                <p><b>Tip:</b> Combine tower paths for synergies!</p>
               </div>
             </div>
           </div>
           
-          <!-- Tower Selection -->
-          <div class="tower-select" id="tower-select">
-            <button class="tower-btn" data-path="fire" title="Fire - Burn, AoE">🔥</button>
-            <button class="tower-btn" data-path="ice" title="Ice - Slow, Freeze">❄️</button>
-            <button class="tower-btn" data-path="lightning" title="Lightning - Chain">⚡</button>
-            <button class="tower-btn" data-path="nature" title="Nature - Poison">🌿</button>
-            <button class="tower-btn" data-path="dark" title="Dark - True DMG">💀</button>
+          <!-- Settings Screen -->
+          <div class="game-screen settings-screen" id="screen-settings" style="display: none;">
+            <div class="screen-header">
+              <button class="back-btn" data-screen="menu">← Back</button>
+              <h3>Settings</h3>
+            </div>
+            <div class="settings-list">
+              <label class="setting-item">
+                <span>Sound Effects</span>
+                <input type="checkbox" id="setting-sfx" checked disabled>
+              </label>
+              <label class="setting-item">
+                <span>Show Grid</span>
+                <input type="checkbox" id="setting-grid" checked>
+              </label>
+              <label class="setting-item">
+                <span>Show Range</span>
+                <input type="checkbox" id="setting-range" checked>
+              </label>
+              <label class="setting-item">
+                <span>Game Speed</span>
+                <select id="setting-speed">
+                  <option value="1">1x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2">2x</option>
+                </select>
+              </label>
+            </div>
+            <button class="menu-btn danger" id="btn-reset-progress">Reset Progress</button>
           </div>
           
-          <!-- Controls -->
-          <div class="game-controls">
-            <button id="btn-start" class="game-btn primary">▶ Start</button>
-            <button id="btn-tower" class="game-btn" disabled>🗼 Tower (50g)</button>
-          </div>
-          
-          <!-- Tower Info -->
-          <div class="tower-info" id="tower-info" style="display: none;">
-            <div class="tower-info-header">
-              <span id="tower-name">Base Tower</span>
-              <span id="tower-tier">Tier 0</span>
+          <!-- Game Screen -->
+          <div class="game-screen gameplay-screen" id="screen-game" style="display: none;">
+            <!-- Stats Bar -->
+            <div class="game-stats-bar">
+              <div class="stat-item">
+                <span class="stat-icon">💰</span>
+                <span class="stat-value" id="stat-gold">100</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-icon">❤️</span>
+                <span class="stat-value" id="stat-lives">20</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-icon">⚡</span>
+                <span class="stat-value" id="stat-energy">50</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-icon">🌊</span>
+                <span class="stat-value" id="stat-wave">0</span>
+              </div>
             </div>
-            <div class="tower-info-stats">
-              <span>DMG: <b id="tower-dmg">10</b></span>
-              <span>RNG: <b id="tower-rng">60</b></span>
-              <span>SPD: <b id="tower-spd">1.0</b></span>
+            
+            <!-- Game Canvas -->
+            <div class="canvas-container">
+              <canvas id="game-canvas" width="300" height="300"></canvas>
+              
+              <!-- Overlay -->
+              <div class="game-overlay" id="game-overlay" style="display: none;">
+                <div class="overlay-content">
+                  <h3 id="overlay-title">Game Over</h3>
+                  <p id="overlay-message">Wave 5</p>
+                  <button id="overlay-btn" class="game-btn primary">Restart</button>
+                </div>
+              </div>
             </div>
-            <div class="tower-info-actions">
-              <button id="btn-upgrade" class="game-btn small">⬆️ Upgrade</button>
-              <button id="btn-sell" class="game-btn small danger">💰 Sell</button>
+            
+            <!-- Tower Selection -->
+            <div class="tower-select" id="tower-select">
+              <button class="tower-btn" data-path="fire" title="Fire - Burn, AoE">🔥</button>
+              <button class="tower-btn" data-path="ice" title="Ice - Slow, Freeze">❄️</button>
+              <button class="tower-btn" data-path="lightning" title="Lightning - Chain">⚡</button>
+              <button class="tower-btn" data-path="nature" title="Nature - Poison">🌿</button>
+              <button class="tower-btn" data-path="dark" title="Dark - True DMG">💀</button>
             </div>
-          </div>
-          
-          <!-- Info -->
-          <div class="game-info">
-            <p>Select tower type, click canvas to place</p>
-            <p class="version">Power Towers TD v0.1.0</p>
+            
+            <!-- Controls -->
+            <div class="game-controls">
+              <button id="btn-start" class="game-btn primary">▶ Start Wave</button>
+              <button id="btn-tower" class="game-btn" disabled>🗼 Tower (50g)</button>
+            </div>
+            
+            <!-- Tower Info -->
+            <div class="tower-info" id="tower-info" style="display: none;">
+              <div class="tower-info-header">
+                <span id="tower-name">Base Tower</span>
+                <span id="tower-tier">Tier 0</span>
+              </div>
+              <div class="tower-info-stats">
+                <span>DMG: <b id="tower-dmg">10</b></span>
+                <span>RNG: <b id="tower-rng">60</b></span>
+                <span>SPD: <b id="tower-spd">1.0</b></span>
+              </div>
+              <div class="tower-info-actions">
+                <button id="btn-upgrade" class="game-btn small">⬆️ Upgrade</button>
+                <button id="btn-sell" class="game-btn small danger">💰 Sell</button>
+              </div>
+            </div>
+            
+            <!-- Menu Button -->
+            <div class="game-footer">
+              <button class="back-btn small" data-screen="menu">☰ Menu</button>
+              <p class="hint">Select tower type, click canvas to place</p>
+            </div>
           </div>
         </div>
       `;
@@ -136,7 +263,72 @@ module.exports = function({ SidebarModule, registerModule }) {
           flex-direction: column;
           gap: 8px;
           font-family: 'Segoe UI', sans-serif;
+          min-height: 400px;
         }
+        
+        /* Screens */
+        .game-screen { display: flex; flex-direction: column; gap: 12px; }
+        .game-screen.menu-screen { align-items: center; justify-content: center; padding: 20px 10px; }
+        
+        /* Menu Title */
+        .menu-title { text-align: center; margin-bottom: 20px; }
+        .menu-icon { font-size: 48px; display: block; margin-bottom: 8px; }
+        .menu-title h2 { margin: 0; font-size: 20px; color: #fff; }
+        .menu-subtitle { margin: 4px 0 0; font-size: 12px; color: #a0aec0; }
+        
+        /* Menu Buttons */
+        .menu-buttons { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 200px; }
+        .menu-btn {
+          padding: 12px 16px; border: none; border-radius: 8px;
+          background: #4a5568; color: white; cursor: pointer;
+          font-size: 14px; font-weight: 500; transition: all 0.2s;
+          text-align: center;
+        }
+        .menu-btn:hover { background: #5a6578; transform: translateY(-1px); }
+        .menu-btn.primary { background: linear-gradient(135deg, #48bb78, #38a169); }
+        .menu-btn.primary:hover { background: linear-gradient(135deg, #38a169, #2f8e5c); }
+        .menu-btn.danger { background: #e53e3e; }
+        .menu-btn.danger:hover { background: #c53030; }
+        
+        .menu-footer { margin-top: auto; text-align: center; }
+        .menu-footer .version { font-size: 10px; color: #718096; }
+        
+        /* Screen Header */
+        .screen-header { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .screen-header h3 { margin: 0; font-size: 14px; flex: 1; }
+        .back-btn {
+          padding: 4px 10px; border: 1px solid #4a5568; border-radius: 4px;
+          background: transparent; color: #a0aec0; cursor: pointer;
+          font-size: 11px; transition: all 0.2s;
+        }
+        .back-btn:hover { background: #4a5568; color: #fff; }
+        .back-btn.small { padding: 3px 8px; font-size: 10px; }
+        
+        /* Tips */
+        .tips-list { display: flex; flex-direction: column; gap: 8px; }
+        .tip-item { display: flex; gap: 8px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 6px; }
+        .tip-icon { font-size: 20px; }
+        .tip-item p { margin: 0; font-size: 11px; color: #cbd5e0; line-height: 1.4; }
+        
+        /* Upgrades */
+        .upgrades-list { display: flex; flex-direction: column; gap: 8px; }
+        .upgrade-item { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; }
+        .upgrade-icon { font-size: 24px; }
+        .upgrade-info { flex: 1; }
+        .upgrade-name { display: block; font-size: 12px; font-weight: 500; color: #fff; }
+        .upgrade-desc { display: block; font-size: 10px; color: #a0aec0; }
+        .upgrade-btn { padding: 6px 12px; border: 1px solid #4a5568; border-radius: 4px; background: #2d3748; color: #a0aec0; font-size: 10px; cursor: pointer; }
+        .upgrade-btn:not(:disabled):hover { background: #4a5568; }
+        .upgrade-note { text-align: center; font-size: 10px; color: #718096; font-style: italic; }
+        
+        /* Settings */
+        .settings-list { display: flex; flex-direction: column; gap: 8px; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .setting-item:hover { background: rgba(0,0,0,0.4); }
+        .setting-item input, .setting-item select { accent-color: #48bb78; }
+        .setting-item select { padding: 4px; border-radius: 4px; background: #2d3748; color: #fff; border: 1px solid #4a5568; }
+        
+        /* Game Screen */
         .game-stats-bar {
           display: flex;
           justify-content: space-between;
@@ -204,9 +396,8 @@ module.exports = function({ SidebarModule, registerModule }) {
         .tower-info-stats { display: flex; gap: 12px; margin-bottom: 8px; color: #a0aec0; }
         .tower-info-actions { display: flex; gap: 6px; }
         
-        .game-info { text-align: center; font-size: 10px; color: #718096; }
-        .game-info p { margin: 2px 0; }
-        .version { opacity: 0.6; }
+        .game-footer { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+        .game-footer .hint { font-size: 10px; color: #718096; margin: 0; }
       `;
     }
 
@@ -218,7 +409,16 @@ module.exports = function({ SidebarModule, registerModule }) {
       styleEl.textContent = this.getStyles();
       container.appendChild(styleEl);
       
-      // Get DOM refs
+      // Screen refs
+      this.screens = {
+        menu: container.querySelector('#menu-screen'),
+        upgrades: container.querySelector('#upgrades-screen'),
+        tips: container.querySelector('#tips-screen'),
+        settings: container.querySelector('#settings-screen'),
+        game: container.querySelector('#gameplay-screen')
+      };
+      
+      // Game DOM refs (will be used when game screen is active)
       this.canvas = container.querySelector('#game-canvas');
       this.elements = {
         gold: container.querySelector('#stat-gold'),
@@ -242,6 +442,55 @@ module.exports = function({ SidebarModule, registerModule }) {
         btnSell: container.querySelector('#btn-sell')
       };
       
+      // Setup screen navigation
+      this.setupScreenNavigation(container);
+      
+      // Show menu initially
+      this.showScreen('menu');
+      
+      console.log('[game-panel] Mounted - showing menu');
+    }
+    
+    setupScreenNavigation(container) {
+      // Menu buttons
+      container.querySelectorAll('.menu-btn[data-screen]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const screen = btn.dataset.screen;
+          this.showScreen(screen);
+          
+          // Initialize game when entering game screen for first time
+          if (screen === 'game' && !this.game) {
+            this.initializeGame();
+          }
+        });
+      });
+      
+      // Back buttons
+      container.querySelectorAll('.back-btn[data-screen]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const screen = btn.dataset.screen;
+          this.showScreen(screen);
+          
+          // Pause game when leaving game screen
+          if (this.game && this.game.running && !this.game.paused) {
+            this.game.pause();
+            this.elements.btnStart.textContent = '▶ Resume';
+          }
+        });
+      });
+    }
+    
+    showScreen(screenId) {
+      this.currentScreen = screenId;
+      
+      Object.entries(this.screens).forEach(([id, el]) => {
+        if (el) el.style.display = id === screenId ? 'flex' : 'none';
+      });
+      
+      console.log('[game-panel] Screen:', screenId);
+    }
+    
+    initializeGame() {
       // Check modules loaded
       if (!GameCore || !GameRenderer) {
         this.showError('Failed to load game engine');
@@ -258,7 +507,7 @@ module.exports = function({ SidebarModule, registerModule }) {
       this.renderGame();
       this.updateUI(this.game.getState());
       
-      console.log('[game-panel] Mounted with GameCore');
+      console.log('[game-panel] Game initialized');
     }
 
     setupEventListeners() {

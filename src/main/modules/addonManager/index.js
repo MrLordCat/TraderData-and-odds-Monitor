@@ -198,12 +198,20 @@ function createAddonManager({ store, mainWindow }) {
         const zipAsset = release.assets.find(a => a.name.endsWith('.zip'));
         if (!zipAsset) continue;
         
-        // Extract version from asset name or tag
+        // Extract version from asset name or release body
         let version;
         if (isDev) {
-          // power-towers-dev-abc1234.zip → extract from release body or use tag
-          const match = zipAsset.name.match(/-dev-([a-f0-9]+)\.zip$/);
-          version = match ? `dev.${match[1]}` : 'dev';
+          // Try to get full version from release body: **Version:** 0.1.0-dev.abc1234
+          const bodyVersionMatch = release.body ? release.body.match(/\*\*Version:\*\*\s*(\S+)/i) : null;
+          if (bodyVersionMatch) {
+            version = bodyVersionMatch[1];
+            console.log(`[AddonManager] Dev version from body: ${version}`);
+          } else {
+            // Fallback: extract from asset name (power-towers-dev-abc1234.zip)
+            const match = zipAsset.name.match(/-dev-([a-f0-9]+)\.zip$/);
+            version = match ? `dev.${match[1]}` : 'dev';
+            console.log(`[AddonManager] Dev version from asset: ${version}`);
+          }
         } else {
           // power-towers-v1.0.0.zip
           const match = tag.match(/-v([\d.]+)$/);
@@ -329,11 +337,14 @@ function createAddonManager({ store, mainWindow }) {
     const tempDir = app.getPath('temp');
     const zipPath = path.join(tempDir, `addon-${addonId}-${Date.now()}.zip`);
     
+    console.log(`[AddonManager] Installing ${addonId} from ${downloadUrl}`);
+    
     try {
       broadcast('addon-install-status', { addonId, status: 'downloading' });
       
       // Download zip
       await downloadFile(downloadUrl, zipPath);
+      console.log(`[AddonManager] Downloaded to ${zipPath}`);
       
       broadcast('addon-install-status', { addonId, status: 'extracting' });
       
@@ -343,10 +354,12 @@ function createAddonManager({ store, mainWindow }) {
       
       // Remove old version if exists
       if (fs.existsSync(addonDir)) {
+        console.log(`[AddonManager] Removing old version at ${addonDir}`);
         fs.rmSync(addonDir, { recursive: true, force: true });
       }
       
       zip.extractAllTo(addonDir, true);
+      console.log(`[AddonManager] Extracted to ${addonDir}`);
       
       // Handle nested directory (GitHub releases often have root folder)
       const entries = fs.readdirSync(addonDir);
@@ -444,10 +457,37 @@ function createAddonManager({ store, mainWindow }) {
   /**
    * Compare semver versions (basic)
    * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+   * Handles dev versions like 'dev.abc1234' or '0.1.0-dev.abc1234'
    */
   function compareVersions(v1, v2) {
     if (!v1 || !v2) return 0;
+    if (v1 === v2) return 0;
     
+    // Extract dev hash if present
+    // Format: "dev.abc1234" or "0.1.0-dev.abc1234"
+    const extractDevHash = (v) => {
+      const match = v.match(/(?:^dev\.|.*-dev\.)([a-f0-9]+)$/i);
+      return match ? match[1] : null;
+    };
+    
+    const hash1 = extractDevHash(v1);
+    const hash2 = extractDevHash(v2);
+    const isDev1 = hash1 !== null || v1.startsWith('dev');
+    const isDev2 = hash2 !== null || v2.startsWith('dev');
+    
+    // If both are dev versions
+    if (isDev1 && isDev2) {
+      // Different hash = update available (remote is newer)
+      if (hash1 && hash2 && hash1 !== hash2) return 1;
+      // Same hash or can't compare
+      return 0;
+    }
+    
+    // Dev is always considered newer than release
+    if (isDev1 && !isDev2) return 1;
+    if (!isDev1 && isDev2) return -1;
+    
+    // Standard semver comparison
     const parse = (v) => {
       const parts = v.replace(/^v/, '').split('.').map(p => parseInt(p, 10) || 0);
       while (parts.length < 3) parts.push(0);
@@ -495,16 +535,25 @@ function createAddonManager({ store, mainWindow }) {
    * Update addon to latest version
    */
   async function updateAddon(addonId) {
+    // Force refresh to get latest downloadUrl
+    console.log(`[AddonManager] Updating addon: ${addonId}`);
+    await fetchAvailableAddons(true);
+    
     const available = availableAddons.find(a => a.id === addonId);
     if (!available) {
       return { success: false, error: 'Addon not found in registry' };
     }
     
+    console.log(`[AddonManager] Downloading from: ${available.downloadUrl}`);
+    
     // Use installAddon which handles removal of old version
     const result = await installAddon(addonId, available.downloadUrl);
     
     if (result.success) {
+      // Clear cache to force fresh check next time
+      lastFetchTime = 0;
       broadcast('addon-updated', { addonId, version: available.version });
+      console.log(`[AddonManager] Update complete: ${addonId} → v${available.version}`);
     }
     
     return result;

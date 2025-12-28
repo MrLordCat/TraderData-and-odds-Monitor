@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Module</title>
+  <link rel="stylesheet" href="../styles/m3-tokens.css" />
+  <link rel="stylesheet" href="../styles/common.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--md-sys-color-surface);
+      color: var(--md-sys-color-on-surface);
+    }
+    
+    #moduleContainer {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    #moduleHeader {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--md-sys-color-surface-container);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      flex-shrink: 0;
+      -webkit-app-region: drag;
+    }
+    
+    #moduleTitle {
+      font-weight: 500;
+      font-size: 14px;
+      flex: 1;
+    }
+    
+    #attachBtn {
+      -webkit-app-region: no-drag;
+      padding: 4px 12px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 4px;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    #attachBtn:hover {
+      background: var(--md-sys-color-surface-container-highest);
+    }
+    
+    #moduleBody {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+    }
+    
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    
+    .error {
+      padding: 20px;
+      color: var(--md-sys-color-error);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="moduleContainer">
+    <div id="moduleHeader">
+      <span id="moduleTitle">Module</span>
+      <button id="attachBtn" title="Reattach to sidebar">⬅ Attach</button>
+    </div>
+    <div id="moduleBody">
+      <div class="loading">Loading module...</div>
+    </div>
+  </div>
+  
+  <script>
+    (function() {
+      const { ipcRenderer } = require('electron');
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Parse query params
+      const params = new URLSearchParams(window.location.search);
+      const moduleId = params.get('moduleId');
+      const modulePath = decodeURIComponent(params.get('modulePath') || '');
+      const title = params.get('title') || 'Module';
+      
+      // Update title
+      document.title = title;
+      document.getElementById('moduleTitle').textContent = title;
+      
+      // Attach button
+      document.getElementById('attachBtn').addEventListener('click', () => {
+        ipcRenderer.invoke('module-attach', { moduleId });
+      });
+      
+      // Load module
+      async function loadModule() {
+        const body = document.getElementById('moduleBody');
+        
+        if (!modulePath || !fs.existsSync(modulePath)) {
+          body.innerHTML = '<div class="error">Module file not found</div>';
+          return;
+        }
+        
+        try {
+          // Simple SidebarModule base for detached mode
+          class SidebarModule {
+            static id = 'base';
+            static title = 'Module';
+            static order = 100;
+            
+            constructor(options = {}) {
+              this.options = options;
+              this.container = null;
+              this.isDetached = true;
+            }
+            
+            getTemplate() { return '<div>Module content</div>'; }
+            getStyles() { return ''; }
+            
+            onMount(container) {
+              this.container = container;
+            }
+            
+            onUnmount() {
+              this.container = null;
+            }
+          }
+          
+          // Clear cache and load
+          delete require.cache[require.resolve(modulePath)];
+          const exported = require(modulePath);
+          
+          let ModuleClass;
+          if (typeof exported === 'function' && !exported.id) {
+            ModuleClass = exported({ SidebarModule, registerModule: () => {} });
+          } else {
+            ModuleClass = exported;
+          }
+          
+          if (!ModuleClass || !ModuleClass.id) {
+            body.innerHTML = '<div class="error">Invalid module</div>';
+            return;
+          }
+          
+          // Create instance with detached flag
+          const instance = new ModuleClass({ isDetached: true });
+          
+          // Render
+          body.innerHTML = instance.getTemplate();
+          
+          // Add styles
+          const styles = instance.getStyles();
+          if (styles) {
+            const styleEl = document.createElement('style');
+            styleEl.textContent = styles;
+            document.head.appendChild(styleEl);
+          }
+          
+          // Mount
+          instance.onMount(body);
+          
+          console.log(`[detach] Module loaded: ${ModuleClass.id}`);
+          
+        } catch (e) {
+          console.error('[detach] Failed to load module:', e);
+          body.innerHTML = `<div class="error">Failed to load module: ${e.message}</div>`;
+        }
+      }
+      
+      loadModule();
+    })();
+  </script>
+</body>
+</html>

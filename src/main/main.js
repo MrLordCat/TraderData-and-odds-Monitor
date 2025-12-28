@@ -259,6 +259,8 @@ const { initUpdaterIpc } = require('./modules/ipc/updater');
 // Addon Manager for loading external modules
 const { createAddonManager } = require('./modules/addonManager');
 const { registerAddonIpc } = require('./modules/ipc/addons');
+// Module detach for sidebar modules
+const { registerModuleDetachIpc } = require('./modules/ipc/moduleDetach');
 let addonManager = null; // initialized in bootstrap()
 let updateManager = null; // initialized in bootstrap()
 // External Excel odds JSON watcher (pseudo broker 'excel')
@@ -560,6 +562,7 @@ function bootstrap() {
   try {
     addonManager = createAddonManager({ store, mainWindow });
     registerAddonIpc({ addonManager });
+    registerModuleDetachIpc({ mainWindow, store });
     console.log('[addons] AddonManager initialized');
   } catch(e){ console.warn('[addons] createAddonManager failed', e.message); }
   // Menu intentionally suppressed (user prefers F12 only)
