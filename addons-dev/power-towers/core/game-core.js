@@ -61,10 +61,10 @@ class GameCore {
    * Initialize path waypoints
    */
   initPath() {
-    // Convert relative waypoints to absolute
+    // Convert relative waypoints to absolute (using map dimensions)
     this.waypoints = CONFIG.PATH_WAYPOINTS.map(wp => ({
-      x: wp.x * CONFIG.CANVAS_WIDTH,
-      y: wp.y * CONFIG.CANVAS_HEIGHT
+      x: wp.x * CONFIG.MAP_WIDTH,
+      y: wp.y * CONFIG.MAP_HEIGHT
     }));
     
     // Calculate grid cells occupied by path

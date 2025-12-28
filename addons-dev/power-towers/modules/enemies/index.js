@@ -1,0 +1,438 @@
+/**
+ * Power Towers TD - Enemies Module
+ * 
+ * Manages enemy spawning, movement along path, and death.
+ * Handles wave composition and difficulty scaling.
+ */
+
+const { GameEvents } = require('../../core/event-bus');
+
+// Enemy type definitions
+const ENEMY_TYPES = {
+  basic: {
+    name: 'Minion',
+    emoji: '👾',
+    baseHealth: 50,
+    baseSpeed: 40,   // pixels per second
+    reward: 10,
+    color: '#ff6b6b'
+  },
+  fast: {
+    name: 'Scout',
+    emoji: '🦎',
+    baseHealth: 30,
+    baseSpeed: 80,
+    reward: 15,
+    color: '#4ecdc4'
+  },
+  tank: {
+    name: 'Brute',
+    emoji: '🐗',
+    baseHealth: 200,
+    baseSpeed: 25,
+    reward: 30,
+    color: '#a55eea'
+  },
+  swarm: {
+    name: 'Swarmling',
+    emoji: '🐜',
+    baseHealth: 15,
+    baseSpeed: 60,
+    reward: 5,
+    color: '#26de81'
+  },
+  boss: {
+    name: 'Boss',
+    emoji: '👹',
+    baseHealth: 1000,
+    baseSpeed: 20,
+    reward: 200,
+    color: '#eb3b5a'
+  }
+};
+
+class EnemiesModule {
+  /**
+   * @param {EventBus} eventBus - Event system
+   * @param {object} config - Game configuration
+   */
+  constructor(eventBus, config) {
+    this.eventBus = eventBus;
+    this.config = config;
+    
+    // Enemy instances
+    this.enemies = [];
+    this.nextEnemyId = 1;
+    
+    // Path data (received from MapModule)
+    this.waypoints = [];
+    
+    // Wave management
+    this.currentWave = 0;
+    this.spawnQueue = [];
+    this.spawnTimer = 0;
+    this.waveInProgress = false;
+    
+    // Stats
+    this.totalKills = 0;
+    this.escapedEnemies = 0;
+  }
+
+  /**
+   * Initialize module
+   */
+  init() {
+    this.eventBus.on(GameEvents.GAME_START, () => this.onGameStart());
+    this.eventBus.on('map:generated', (data) => this.onMapGenerated(data));
+    this.eventBus.on('wave:start', () => this.startNextWave());
+    this.eventBus.on('enemy:damage', (data) => this.damageEnemy(data));
+  }
+
+  /**
+   * Update enemies
+   */
+  update(deltaTime) {
+    // Process spawn queue
+    this.processSpawnQueue(deltaTime);
+    
+    // Update all enemies
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+      
+      if (enemy.health <= 0) {
+        this.killEnemy(enemy, i);
+        continue;
+      }
+      
+      this.updateEnemy(enemy, deltaTime);
+      
+      // Check if reached end
+      if (enemy.pathProgress >= 1) {
+        this.enemyReachedBase(enemy, i);
+      }
+    }
+    
+    // Check if wave complete
+    if (this.waveInProgress && this.enemies.length === 0 && this.spawnQueue.length === 0) {
+      this.waveInProgress = false;
+      this.eventBus.emit('wave:complete', { wave: this.currentWave });
+    }
+  }
+
+  /**
+   * Reset enemies
+   */
+  reset() {
+    this.enemies = [];
+    this.nextEnemyId = 1;
+    this.currentWave = 0;
+    this.spawnQueue = [];
+    this.spawnTimer = 0;
+    this.waveInProgress = false;
+    this.totalKills = 0;
+    this.escapedEnemies = 0;
+  }
+
+  /**
+   * Cleanup
+   */
+  destroy() {
+    this.reset();
+  }
+
+  /**
+   * On game start
+   */
+  onGameStart() {
+    this.reset();
+  }
+
+  /**
+   * Receive waypoints from MapModule
+   */
+  onMapGenerated({ waypoints }) {
+    this.waypoints = waypoints;
+  }
+
+  /**
+   * Start next wave
+   */
+  startNextWave() {
+    if (this.waveInProgress) return;
+    
+    this.currentWave++;
+    this.waveInProgress = true;
+    
+    // Generate wave composition
+    const waveEnemies = this.generateWaveComposition(this.currentWave);
+    this.spawnQueue = waveEnemies;
+    this.spawnTimer = 0;
+    
+    this.eventBus.emit('wave:started', { 
+      wave: this.currentWave, 
+      enemyCount: waveEnemies.length 
+    });
+  }
+
+  /**
+   * Generate enemies for a wave
+   */
+  generateWaveComposition(waveNum) {
+    const enemies = [];
+    
+    // Base count scales with wave
+    const baseCount = 5 + Math.floor(waveNum * 1.5);
+    
+    // Add basic enemies
+    for (let i = 0; i < baseCount; i++) {
+      enemies.push({ type: 'basic', delay: i * 0.5 });
+    }
+    
+    // Add fast enemies (from wave 2)
+    if (waveNum >= 2) {
+      const fastCount = Math.floor(waveNum / 2);
+      for (let i = 0; i < fastCount; i++) {
+        enemies.push({ type: 'fast', delay: baseCount * 0.5 + i * 0.3 });
+      }
+    }
+    
+    // Add tank enemies (from wave 3)
+    if (waveNum >= 3) {
+      const tankCount = Math.floor(waveNum / 3);
+      for (let i = 0; i < tankCount; i++) {
+        enemies.push({ type: 'tank', delay: baseCount * 0.5 + 3 + i * 1.5 });
+      }
+    }
+    
+    // Add swarm (from wave 5)
+    if (waveNum >= 5) {
+      const swarmCount = waveNum;
+      for (let i = 0; i < swarmCount; i++) {
+        enemies.push({ type: 'swarm', delay: i * 0.15 + 2 });
+      }
+    }
+    
+    // Boss every 10 waves
+    if (waveNum % 10 === 0) {
+      enemies.push({ type: 'boss', delay: 5 });
+    }
+    
+    // Sort by delay
+    enemies.sort((a, b) => a.delay - b.delay);
+    
+    return enemies;
+  }
+
+  /**
+   * Process spawn queue
+   */
+  processSpawnQueue(deltaTime) {
+    if (this.spawnQueue.length === 0) return;
+    
+    this.spawnTimer += deltaTime;
+    
+    while (this.spawnQueue.length > 0 && this.spawnTimer >= this.spawnQueue[0].delay) {
+      const spawn = this.spawnQueue.shift();
+      this.spawnEnemy(spawn.type);
+    }
+  }
+
+  /**
+   * Spawn an enemy
+   */
+  spawnEnemy(type) {
+    const enemyDef = ENEMY_TYPES[type];
+    if (!enemyDef || this.waypoints.length === 0) return;
+
+    // Difficulty scaling
+    const healthMultiplier = 1 + (this.currentWave - 1) * 0.15;
+    const speedMultiplier = 1 + (this.currentWave - 1) * 0.02;
+
+    const spawnPoint = this.waypoints[0];
+    
+    const enemy = {
+      id: this.nextEnemyId++,
+      type,
+      // Position
+      x: spawnPoint.x,
+      y: spawnPoint.y,
+      // Stats
+      health: enemyDef.baseHealth * healthMultiplier,
+      maxHealth: enemyDef.baseHealth * healthMultiplier,
+      speed: enemyDef.baseSpeed * speedMultiplier,
+      reward: enemyDef.reward,
+      // Path
+      pathProgress: 0,
+      waypointIndex: 0,
+      // Visual
+      emoji: enemyDef.emoji,
+      color: enemyDef.color,
+      // Status effects
+      effects: [],
+      slowMultiplier: 1
+    };
+
+    this.enemies.push(enemy);
+    this.eventBus.emit('enemy:spawned', { enemy });
+    
+    return enemy;
+  }
+
+  /**
+   * Update single enemy
+   */
+  updateEnemy(enemy, deltaTime) {
+    // Update status effects
+    this.updateEffects(enemy, deltaTime);
+    
+    // Calculate effective speed
+    const effectiveSpeed = enemy.speed * enemy.slowMultiplier;
+    
+    // Move along path
+    this.moveAlongPath(enemy, effectiveSpeed * deltaTime);
+  }
+
+  /**
+   * Move enemy along waypoint path
+   */
+  moveAlongPath(enemy, distance) {
+    if (enemy.waypointIndex >= this.waypoints.length - 1) {
+      enemy.pathProgress = 1;
+      return;
+    }
+
+    let remaining = distance;
+
+    while (remaining > 0 && enemy.waypointIndex < this.waypoints.length - 1) {
+      const current = this.waypoints[enemy.waypointIndex];
+      const next = this.waypoints[enemy.waypointIndex + 1];
+
+      const dx = next.x - enemy.x;
+      const dy = next.y - enemy.y;
+      const distToNext = Math.sqrt(dx * dx + dy * dy);
+
+      if (distToNext <= remaining) {
+        // Reach waypoint
+        enemy.x = next.x;
+        enemy.y = next.y;
+        enemy.waypointIndex++;
+        remaining -= distToNext;
+      } else {
+        // Move towards waypoint
+        const ratio = remaining / distToNext;
+        enemy.x += dx * ratio;
+        enemy.y += dy * ratio;
+        remaining = 0;
+      }
+    }
+
+    // Calculate total path progress
+    enemy.pathProgress = enemy.waypointIndex / (this.waypoints.length - 1);
+  }
+
+  /**
+   * Update status effects
+   */
+  updateEffects(enemy, deltaTime) {
+    enemy.slowMultiplier = 1;
+    
+    for (let i = enemy.effects.length - 1; i >= 0; i--) {
+      const effect = enemy.effects[i];
+      effect.duration -= deltaTime;
+      
+      if (effect.duration <= 0) {
+        enemy.effects.splice(i, 1);
+        continue;
+      }
+      
+      // Apply effect
+      switch (effect.type) {
+        case 'slow':
+          enemy.slowMultiplier = Math.min(enemy.slowMultiplier, effect.value);
+          break;
+        case 'poison':
+          enemy.health -= effect.value * deltaTime;
+          break;
+      }
+    }
+  }
+
+  /**
+   * Damage an enemy
+   */
+  damageEnemy({ enemyId, damage, effects }) {
+    const enemy = this.enemies.find(e => e.id === enemyId);
+    if (!enemy) return;
+
+    enemy.health -= damage;
+    
+    // Apply effects
+    if (effects && effects.length > 0) {
+      for (const effect of effects) {
+        // Check if same effect exists, refresh it
+        const existing = enemy.effects.find(e => e.type === effect.type);
+        if (existing) {
+          existing.duration = effect.duration;
+          existing.value = Math.min(existing.value, effect.value);
+        } else {
+          enemy.effects.push({ ...effect });
+        }
+      }
+    }
+
+    this.eventBus.emit('enemy:damaged', { 
+      enemy, 
+      damage, 
+      remaining: enemy.health 
+    });
+  }
+
+  /**
+   * Kill enemy
+   */
+  killEnemy(enemy, index) {
+    this.enemies.splice(index, 1);
+    this.totalKills++;
+    
+    this.eventBus.emit('enemy:killed', { 
+      enemy, 
+      reward: enemy.reward 
+    });
+    this.eventBus.emit('economy:gain', enemy.reward);
+  }
+
+  /**
+   * Enemy reached base
+   */
+  enemyReachedBase(enemy, index) {
+    this.enemies.splice(index, 1);
+    this.escapedEnemies++;
+    
+    // Calculate damage based on enemy type
+    const damage = enemy.type === 'boss' ? 5 : 1;
+    
+    this.eventBus.emit('enemy:escaped', { enemy, damage });
+    this.eventBus.emit('player:damage', { damage });
+  }
+
+  /**
+   * Get enemies array for other modules
+   */
+  getEnemiesArray() {
+    return this.enemies;
+  }
+
+  /**
+   * Get render data
+   */
+  getRenderData() {
+    return {
+      enemies: this.enemies,
+      currentWave: this.currentWave,
+      waveInProgress: this.waveInProgress,
+      spawnQueueSize: this.spawnQueue.length
+    };
+  }
+}
+
+module.exports = { EnemiesModule, ENEMY_TYPES };

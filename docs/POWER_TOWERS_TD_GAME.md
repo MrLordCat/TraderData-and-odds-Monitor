@@ -21,6 +21,38 @@ A Tower Defense game with a unique **energy system mechanic** — towers require
 ## 🎮 Gameplay
 
 ### Map & Terrain
+
+#### Technical Specifications
+| Property | Value | Notes |
+|----------|-------|-------|
+| **Map Size** | 2000×2000 px | Large canvas for detailed textures |
+| **Tower Size** | 20×20 px | Grid-aligned placement |
+| **Grid Cell** | 20×20 px | Map divided into 100×100 cells |
+| **Tile Size** | 20×20 px | Terrain tiles match tower grid |
+
+> These dimensions are chosen for easier texture creation — sprites scale well at 20px base.
+
+#### Map Grid
+```
+Map: 2000×2000 px = 100×100 grid cells
+Each cell: 20×20 px
+
+┌──────────────────────────────────────┐
+│  100 cells wide (2000px)             │
+│ ┌──┬──┬──┬──┬──┬──┬──┬──┬──┬──┐     │
+│ │  │  │  │  │  │  │  │  │  │  │ ... │  100
+│ ├──┼──┼──┼──┼──┼──┼──┼──┼──┼──┤     │  cells
+│ │  │🗼│  │  │🛤️│  │  │  │  │  │ ... │  tall
+│ ├──┼──┼──┼──┼──┼──┼──┼──┼──┼──┤     │  (2000px)
+│ │  │  │  │🛤️│🛤️│🛤️│  │  │  │  │ ... │
+│ └──┴──┴──┴──┴──┴──┴──┴──┴──┴──┘     │
+└──────────────────────────────────────┘
+
+🗼 = Tower (occupies 1 cell = 20×20px)
+🛤️ = Path (enemies walk here)
+```
+
+#### Map Elements
 ```
 Map Elements:
 ├── 🏰 Player Base (defended target)
@@ -207,43 +239,190 @@ Cards can combine for powerful effects:
 
 ## 🏗️ Technical Architecture
 
-### Application Integration
+### ⚠️ Version Control
+**IMPORTANT:** Game version changes only on explicit request from the developer.
+Current version: **0.1.0**
+
+### Modular Design Philosophy
+
+The game follows a **strict modular architecture**. Each feature is isolated in its own module with:
+- Clear interface (input/output)
+- Single responsibility
+- Loose coupling via EventBus
+- Easy to modify/replace independently
+
+**Core** acts as the orchestrator — it connects all modules but doesn't contain business logic.
+
+### Module Structure
 
 ```
-TraderData-and-odds-Monitor/
-└── src/
-    └── renderer/
-        └── sidebar/
-            └── modules/
-                └── power-towers/          # ← New game module
-                    ├── index.js           # Sidebar integration
-                    ├── styles.css         # Module styles
-                    ├── core/              # Game logic
-                    │   ├── game-core.js   # Main engine
-                    │   ├── map-generator.js
-                    │   ├── enemy-manager.js
-                    │   ├── tower-manager.js
-                    │   ├── energy-system.js
-                    │   ├── wave-system.js
-                    │   └── progression.js # XP and upgrades
-                    ├── renderer/          # Rendering
-                    │   ├── game-renderer.js
-                    │   ├── ui-renderer.js
-                    │   └── sprites/
-                    ├── data/              # Configurations
-                    │   ├── towers.json
-                    │   ├── enemies.json
-                    │   ├── upgrades.json
-                    │   └── terrain.json
-                    ├── detach/            # Separate window
-                    │   ├── window.html
-                    │   ├── window.js
-                    │   ├── window.css
-                    │   └── preload.js
-                    └── assets/            # Graphics
-                        ├── sprites/
-                        ├── tiles/
-                        └── ui/
+addons-dev/power-towers/
+├── manifest.json              # Addon metadata
+├── index.js                   # Entry point (exports for sidebar)
+│
+├── core/                      # 🎯 GAME CORE (orchestrator)
+│   ├── game-core.js           # Main engine - connects all modules
+│   ├── config.js              # Global constants & tuning
+│   └── event-bus.js           # Event system for module communication
+│
+├── modules/                   # 📦 GAME MODULES (features)
+│   │
+│   ├── map/                   # 🗺️ Map Module
+│   │   ├── index.js           # Map manager
+│   │   ├── map-generator.js   # Procedural generation
+│   │   ├── path-finder.js     # Enemy path calculation
+│   │   └── terrain.js         # Terrain types & effects
+│   │
+│   ├── towers/                # 🗼 Tower Module
+│   │   ├── index.js           # Tower manager
+│   │   ├── tower-factory.js   # Tower creation
+│   │   ├── tower-paths.js     # Upgrade paths (fire/ice/etc)
+│   │   └── targeting.js       # Target selection AI
+│   │
+│   ├── enemies/               # 👾 Enemy Module
+│   │   ├── index.js           # Enemy manager
+│   │   ├── enemy-factory.js   # Enemy creation
+│   │   ├── wave-system.js     # Wave spawning logic
+│   │   └── enemy-types.js     # Enemy definitions
+│   │
+│   ├── combat/                # ⚔️ Combat Module
+│   │   ├── index.js           # Combat manager
+│   │   ├── damage-calc.js     # Damage formulas
+│   │   ├── projectiles.js     # Projectile system
+│   │   └── effects.js         # Burn/slow/poison effects
+│   │
+│   ├── energy/                # ⚡ Energy Module
+│   │   ├── index.js           # Energy manager
+│   │   ├── generators.js      # Energy production
+│   │   └── grid.js            # Energy distribution
+│   │
+│   ├── economy/               # 💰 Economy Module
+│   │   ├── index.js           # Economy manager
+│   │   ├── gold.js            # Gold system
+│   │   └── shop.js            # Tower costs & selling
+│   │
+│   ├── progression/           # 📈 Progression Module (meta)
+│   │   ├── index.js           # Progression manager
+│   │   ├── xp-system.js       # XP calculation
+│   │   ├── skill-tree.js      # Talent unlocks
+│   │   └── achievements.js    # Achievement tracking
+│   │
+│   ├── cards/                 # 🃏 Card Module
+│   │   ├── index.js           # Card manager
+│   │   ├── card-pool.js       # Available cards
+│   │   ├── card-effects.js    # Card implementations
+│   │   └── deck-builder.js    # Run deck management
+│   │
+│   └── game-panel/            # 🖥️ UI Module (sidebar integration)
+│       ├── index.js           # SidebarModule implementation
+│       └── screens/           # UI screens
+│           ├── menu.js        # Main menu
+│           ├── game.js        # Game screen
+│           ├── upgrades.js    # Upgrades screen
+│           ├── tips.js        # Tips screen
+│           └── settings.js    # Settings screen
+│
+├── renderer/                  # 🎨 RENDERING
+│   ├── game-renderer.js       # Main canvas renderer
+│   ├── ui-renderer.js         # HUD elements
+│   ├── minimap.js             # Minimap rendering
+│   └── effects/               # Visual effects
+│       ├── particles.js
+│       └── animations.js
+│
+├── systems/                   # ⚙️ LOW-LEVEL SYSTEMS
+│   ├── camera.js              # Viewport & scrolling
+│   ├── input.js               # Mouse/keyboard handling
+│   ├── audio.js               # Sound effects
+│   └── storage.js             # Save/load (electron-store)
+│
+├── data/                      # 📊 STATIC DATA (JSON configs)
+│   ├── towers.json            # Tower stats & upgrades
+│   ├── enemies.json           # Enemy definitions
+│   ├── waves.json             # Wave compositions
+│   ├── cards.json             # Card definitions
+│   ├── terrain.json           # Terrain types
+│   └── skills.json            # Skill tree data
+│
+└── assets/                    # 🎨 GRAPHICS (future)
+    ├── sprites/
+    ├── tiles/
+    └── ui/
+```
+
+### Module Communication
+
+Modules communicate via **EventBus** — no direct calls between modules:
+
+```javascript
+// ❌ Wrong: Direct coupling
+towerModule.onDamageDealt = (dmg) => economyModule.addGold(dmg * 0.1);
+
+// ✅ Correct: Event-based
+eventBus.on('enemy:killed', ({ reward }) => {
+  eventBus.emit('economy:add-gold', { amount: reward });
+});
+```
+
+### Module Interface Pattern
+
+Each module exports a standard interface:
+
+```javascript
+// modules/towers/index.js
+class TowerModule {
+  constructor(eventBus, config) {
+    this.eventBus = eventBus;
+    this.config = config;
+    this.towers = [];
+  }
+  
+  // Lifecycle
+  init() { /* subscribe to events */ }
+  update(deltaTime) { /* per-frame logic */ }
+  reset() { /* clear state */ }
+  destroy() { /* cleanup */ }
+  
+  // Public API
+  placeTower(gridX, gridY, path) { }
+  upgradeTower(towerId) { }
+  sellTower(towerId) { }
+  
+  // State for renderer
+  getRenderData() { return this.towers; }
+}
+```
+
+### Core Orchestration
+
+GameCore connects all modules:
+
+```javascript
+class GameCore {
+  constructor() {
+    this.eventBus = new EventBus();
+    
+    // Initialize modules
+    this.modules = {
+      map: new MapModule(this.eventBus, CONFIG),
+      towers: new TowerModule(this.eventBus, CONFIG),
+      enemies: new EnemyModule(this.eventBus, CONFIG),
+      combat: new CombatModule(this.eventBus, CONFIG),
+      energy: new EnergyModule(this.eventBus, CONFIG),
+      economy: new EconomyModule(this.eventBus, CONFIG),
+      progression: new ProgressionModule(this.eventBus, CONFIG),
+      cards: new CardModule(this.eventBus, CONFIG),
+    };
+  }
+  
+  start() {
+    Object.values(this.modules).forEach(m => m.init());
+  }
+  
+  update(deltaTime) {
+    Object.values(this.modules).forEach(m => m.update(deltaTime));
+  }
+}
 ```
 
 ### Data Storage
@@ -802,5 +981,110 @@ Copy the existing `game` module as template and rename to `power-towers`.
 
 ---
 
+## 💻 Modular Architecture (Implemented)
+
+### Version Control
+> **ВАЖНО:** Версия игры остаётся `0.1.0` до явного указания на изменение. Изменять версию только по запросу!
+
+### Current File Structure
+```
+addons-dev/power-towers/
+├── manifest.json              # Addon manifest (version: 0.1.0)
+├── index.js                   # Entry point
+│
+├── core/
+│   ├── config.js              # Game constants (MAP_WIDTH: 2000, GRID_SIZE: 20)
+│   ├── event-bus.js           # EventBus for module communication
+│   ├── game-core.js           # Legacy game engine
+│   ├── game-core-modular.js   # NEW: Modular orchestrator
+│   │
+│   ├── entities/              # Legacy entity classes
+│   │   ├── tower.js
+│   │   ├── enemy.js
+│   │   └── projectile.js
+│   │
+│   └── systems/               # Legacy systems + camera
+│       ├── wave-system.js
+│       ├── energy-system.js
+│       ├── economy.js
+│       └── camera.js          # Viewport/zoom system
+│
+├── modules/                   # NEW: Modular architecture
+│   ├── map/
+│   │   └── index.js           # MapModule - terrain, path, buildable cells
+│   │
+│   ├── towers/
+│   │   └── index.js           # TowersModule - tower creation, upgrades, targeting
+│   │
+│   ├── enemies/
+│   │   └── index.js           # EnemiesModule - spawning, movement, waves
+│   │
+│   ├── combat/
+│   │   └── index.js           # CombatModule - projectiles, damage, effects
+│   │
+│   ├── economy/
+│   │   └── index.js           # EconomyModule - gold management
+│   │
+│   ├── energy/
+│   │   └── index.js           # EnergyModule - energy regeneration
+│   │
+│   ├── player/
+│   │   └── index.js           # PlayerModule - lives, XP, level
+│   │
+│   ├── menu/
+│   │   └── index.js           # MenuModule - screens, permanent upgrades
+│   │
+│   └── game-panel/
+│       └── index.js           # SidebarModule integration
+│
+└── renderer/
+    └── game-renderer.js       # Canvas renderer with camera support
+```
+
+### Module Communication Pattern
+```javascript
+// All modules communicate via EventBus
+// No direct module-to-module dependencies
+
+// Example: Tower attacks enemy
+TowersModule:   emit('combat:tower-attack', { damage, targetId })
+CombatModule:   on('combat:tower-attack') → creates projectile
+CombatModule:   emit('enemy:damage', { enemyId, damage })
+EnemiesModule:  on('enemy:damage') → reduces health
+EnemiesModule:  emit('enemy:killed', { reward })
+EconomyModule:  on('enemy:killed') → adds gold
+```
+
+### Event Categories
+| Module | Events Emitted | Events Listened |
+|--------|---------------|-----------------|
+| MapModule | `map:generated` | `GAME_START`, `map:regenerate` |
+| TowersModule | `tower:built`, `tower:sold`, `tower:upgraded`, `combat:tower-attack` | `tower:build-request`, `tower:sell-request` |
+| EnemiesModule | `enemy:spawned`, `enemy:killed`, `enemy:escaped`, `wave:started`, `wave:complete` | `wave:start`, `enemy:damage`, `map:generated` |
+| CombatModule | `enemy:damage` | `combat:tower-attack` |
+| EconomyModule | `economy:updated`, `economy:wave-bonus` | `economy:gain`, `economy:spend`, `wave:complete` |
+| EnergyModule | `energy:updated` | `energy:spend`, `energy:gain`, `enemy:killed` |
+| PlayerModule | `player:updated`, `player:level-up`, `GAME_OVER` | `player:damage`, `enemy:killed`, `wave:complete` |
+| MenuModule | `menu:updated`, `GAME_START`, `menu:gems-earned` | `menu:open`, `menu:start-game`, `GAME_OVER` |
+
+### Using Modular vs Legacy
+```javascript
+// In game-core-modular.js
+class GameCore {
+  constructor() {
+    this.useModularArchitecture = true; // Toggle modular vs legacy
+    
+    if (this.useModularArchitecture) {
+      this.initModules();  // Initialize all modules
+    } else {
+      this.initLegacy();   // Use old systems
+    }
+  }
+}
+```
+
+---
+
 *Document created: 27.12.2025*
+*Last updated: Module architecture implemented*
 *Version: 1.0*

@@ -8,7 +8,7 @@
 module.exports = function({ SidebarModule, registerModule }) {
   
   // Import game modules
-  let GameCore, GameRenderer, GameEvents, TOWER_PATHS, CONFIG;
+  let GameCore, GameRenderer, GameEvents, TOWER_PATHS, CONFIG, Camera;
   
   try {
     const path = require('path');
@@ -24,6 +24,9 @@ module.exports = function({ SidebarModule, registerModule }) {
     
     const tower = require(path.join(corePath, 'entities', 'tower.js'));
     TOWER_PATHS = tower.TOWER_PATHS;
+    
+    const cameraModule = require(path.join(corePath, 'systems', 'camera.js'));
+    Camera = cameraModule.Camera;
     
     CONFIG = require(path.join(corePath, 'config.js'));
     
@@ -46,6 +49,7 @@ module.exports = function({ SidebarModule, registerModule }) {
       
       this.game = null;
       this.renderer = null;
+      this.camera = null;
       this.canvas = null;
       this.elements = {};
       
@@ -492,14 +496,24 @@ module.exports = function({ SidebarModule, registerModule }) {
     
     initializeGame() {
       // Check modules loaded
-      if (!GameCore || !GameRenderer) {
+      if (!GameCore || !GameRenderer || !Camera) {
         this.showError('Failed to load game engine');
         return;
       }
       
+      // Set canvas size from config
+      this.canvas.width = CONFIG.CANVAS_WIDTH;
+      this.canvas.height = CONFIG.CANVAS_HEIGHT;
+      
+      // Init camera
+      this.camera = new Camera();
+      this.camera.setViewportSize(this.canvas.width, this.canvas.height);
+      // Center camera on map center initially
+      this.camera.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2, true);
+      
       // Init game
       this.game = new GameCore();
-      this.renderer = new GameRenderer(this.canvas);
+      this.renderer = new GameRenderer(this.canvas, this.camera);
       
       this.setupEventListeners();
       this.setupGameEvents();
@@ -522,7 +536,16 @@ module.exports = function({ SidebarModule, registerModule }) {
       
       this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
       this.canvas.addEventListener('mousemove', (e) => this.handleCanvasHover(e));
-      this.canvas.addEventListener('mouseleave', () => this.renderer.clearHover());
+      this.canvas.addEventListener('mouseleave', () => {
+        this.renderer.clearHover();
+        if (this.camera) this.camera.endDrag();
+      });
+      
+      // Camera controls
+      this.canvas.addEventListener('wheel', (e) => this.handleCanvasWheel(e), { passive: false });
+      this.canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
+      this.canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
+      this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());  // Disable right-click menu
       
       el.overlayBtn.addEventListener('click', () => this.restartGame());
       el.btnUpgrade.addEventListener('click', () => this.upgradeSelectedTower());
@@ -621,7 +644,10 @@ module.exports = function({ SidebarModule, registerModule }) {
     handleCanvasClick(e) {
       if (!this.game) return;
       
-      const { gridX, gridY, canvasX, canvasY } = this.renderer.screenToGrid(e.clientX, e.clientY);
+      // Don't handle click if camera was dragging
+      if (this.camera && this.camera.isDragging) return;
+      
+      const { gridX, gridY, worldX, worldY } = this.renderer.screenToGrid(e.clientX, e.clientY);
       
       if (this.placingTower && this.selectedPath) {
         if (this.game.placeTower(gridX, gridY, this.selectedPath)) {
@@ -630,9 +656,9 @@ module.exports = function({ SidebarModule, registerModule }) {
         return;
       }
       
-      // Tower selection
+      // Tower selection (using world coordinates)
       const clickedTower = this.game.towers.find(t => {
-        const dx = t.x - canvasX, dy = t.y - canvasY;
+        const dx = t.x - worldX, dy = t.y - worldY;
         return Math.sqrt(dx * dx + dy * dy) < t.size;
       });
       
@@ -646,14 +672,64 @@ module.exports = function({ SidebarModule, registerModule }) {
     }
 
     handleCanvasHover(e) {
-      if (!this.placingTower || !this.game) return;
+      if (!this.game) return;
+      
+      // Handle camera dragging
+      if (this.camera && this.camera.isDragging) {
+        const rect = this.canvas.getBoundingClientRect();
+        const canvasX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        const canvasY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        this.camera.updateDrag(canvasX, canvasY);
+        this.renderGame();
+        return;
+      }
+      
+      if (!this.placingTower) return;
       
       const { gridX, gridY } = this.renderer.screenToGrid(e.clientX, e.clientY);
+      
+      // Check grid bounds (100x100 for 2000/20)
+      const maxGrid = Math.floor(CONFIG.MAP_WIDTH / CONFIG.GRID_SIZE);
       const isValid = !this.game.pathCells.some(c => c.x === gridX && c.y === gridY) &&
                      !this.game.towers.some(t => t.gridX === gridX && t.gridY === gridY) &&
-                     gridX >= 0 && gridX < 10 && gridY >= 0 && gridY < 10;
+                     gridX >= 0 && gridX < maxGrid && gridY >= 0 && gridY < maxGrid;
       
       this.renderer.setHover(gridX, gridY, isValid);
+    }
+
+    handleCanvasWheel(e) {
+      if (!this.camera) return;
+      e.preventDefault();
+      
+      const rect = this.canvas.getBoundingClientRect();
+      const canvasX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+      const canvasY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+      
+      // Zoom in/out
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      this.camera.zoomBy(zoomFactor, canvasX, canvasY);
+      this.renderGame();
+    }
+
+    handleCanvasMouseDown(e) {
+      if (!this.camera) return;
+      
+      // Middle mouse or right mouse for camera drag
+      if (e.button === 1 || e.button === 2) {
+        e.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const canvasX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        const canvasY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        this.camera.startDrag(canvasX, canvasY);
+      }
+    }
+
+    handleCanvasMouseUp(e) {
+      if (!this.camera) return;
+      
+      if (e.button === 1 || e.button === 2) {
+        this.camera.endDrag();
+      }
     }
 
     showTowerInfo(tower) {
@@ -702,6 +778,12 @@ module.exports = function({ SidebarModule, registerModule }) {
 
     renderGame() {
       if (!this.game || !this.renderer) return;
+      
+      // Update camera smooth scrolling
+      if (this.camera) {
+        this.camera.update();
+      }
+      
       this.renderer.render(this.game.getRenderData());
     }
 

@@ -4,13 +4,26 @@
  */
 
 const CONFIG = {
-  // Canvas & Display
-  CANVAS_WIDTH: 300,
-  CANVAS_HEIGHT: 300,
-  GRID_SIZE: 30,      // 10x10 grid
+  // =========================================
+  // World & Map (logical game world)
+  // =========================================
+  MAP_WIDTH: 2000,        // Total map width in pixels
+  MAP_HEIGHT: 2000,       // Total map height in pixels
+  GRID_SIZE: 20,          // Each cell is 20x20 px (tower size)
+  // Grid dimensions: 100x100 cells (2000/20)
+  
+  // =========================================
+  // Display & Viewport (rendered canvas)
+  // =========================================
+  CANVAS_WIDTH: 400,      // Display canvas width
+  CANVAS_HEIGHT: 400,     // Display canvas height
+  // Viewport shows portion of map, can scroll/zoom
+  VIEWPORT_ZOOM: 1.0,     // 1.0 = 1 map pixel = 1 canvas pixel
   TARGET_FPS: 60,
   
+  // =========================================
   // Game Balance
+  // =========================================
   STARTING_GOLD: 100,
   STARTING_LIVES: 20,
   STARTING_ENERGY: 50,
