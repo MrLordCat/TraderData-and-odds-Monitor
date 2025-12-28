@@ -323,27 +323,39 @@ class MapGenerator {
     
     let spawnGridX, spawnGridY, spawnX, spawnY;
     
+    // Helper to pick spawn position avoiding center of edge
+    // Pick from first 30% or last 30% of edge (avoiding middle 40%)
+    const pickEdgePosition = (edgeLength) => {
+      const zoneSize = Math.floor(edgeLength * 0.30);
+      const useFirstZone = this.rng.next() < 0.5;
+      if (useFirstZone) {
+        return this.rng.int(margin, margin + zoneSize);
+      } else {
+        return this.rng.int(edgeLength - margin - zoneSize, edgeLength - margin - 1);
+      }
+    };
+    
     switch (edge) {
       case 'left':
         spawnGridX = -1;
-        spawnGridY = this.rng.int(margin, this.height - margin - 1);
+        spawnGridY = pickEdgePosition(this.height);
         spawnX = -this.gridSize;
         spawnY = (spawnGridY + 0.5) * this.gridSize;
         break;
       case 'right':
         spawnGridX = this.width;
-        spawnGridY = this.rng.int(margin, this.height - margin - 1);
+        spawnGridY = pickEdgePosition(this.height);
         spawnX = (this.width + 0.5) * this.gridSize;
         spawnY = (spawnGridY + 0.5) * this.gridSize;
         break;
       case 'top':
-        spawnGridX = this.rng.int(margin, this.width - margin - 1);
+        spawnGridX = pickEdgePosition(this.width);
         spawnGridY = -1;
         spawnX = (spawnGridX + 0.5) * this.gridSize;
         spawnY = -this.gridSize;
         break;
       case 'bottom':
-        spawnGridX = this.rng.int(margin, this.width - margin - 1);
+        spawnGridX = pickEdgePosition(this.width);
         spawnGridY = this.height;
         spawnX = (spawnGridX + 0.5) * this.gridSize;
         spawnY = (this.height + 0.5) * this.gridSize;
@@ -415,76 +427,821 @@ class MapGenerator {
   }
   
   /**
-   * Generate safe path that doesn't intersect itself
-   * Two-phase approach:
-   * 1. Build simple spiral path with L-shaped connections
-   * 2. Distort the path to add variety while avoiding self-intersection
+   * Generate safe path using Segment-Walker approach
+   * Builds path segment by segment with dynamic bounds shrinking
    */
   _generateSafePath(startX, startY, endX, endY) {
     const margin = GENERATOR_CONFIG.PATH_MARGIN;
+    const CLEARANCE = 2;
+    const MIN_SEGMENT = 10; // Reduced for more flexibility
+    const MAX_SEGMENT = 15;
+    const FIRST_SEGMENT_MIN = 20; // Minimum first segment into the map
     
-    // PHASE 1: Build simple spiral path
-    const simplePath = this._buildSimpleSpiralPath(startX, startY, endX, endY, margin);
+    console.log(`[MapGenerator] Starting Segment-Walker from (${startX},${startY}) to base (${endX},${endY})`);
     
-    if (simplePath.length === 0) {
-      console.warn('[MapGenerator] Simple spiral failed');
-      return [];
+    // Initialize path and tracking
+    const path = [];
+    const occupied = new Set();
+    
+    // Dynamic bounds - include full map area for path drawing
+    // We use soft bounds for collision, not hard bounds
+    const initialBounds = {
+      left: margin,
+      right: this.width - margin - 1,
+      top: margin,
+      bottom: this.height - margin - 1
+    };
+    const initialWidth = initialBounds.right - initialBounds.left;
+    const initialHeight = initialBounds.bottom - initialBounds.top;
+    
+    let bounds = { ...initialBounds };
+    let shrinkStep = 0;
+    
+    // Mark cell as occupied with clearance
+    const markOccupied = (x, y) => {
+      for (let dy = -CLEARANCE; dy <= CLEARANCE; dy++) {
+        for (let dx = -CLEARANCE; dx <= CLEARANCE; dx++) {
+          occupied.add(`${x + dx},${y + dy}`);
+        }
+      }
+    };
+    
+    // Check if cell is free (for collision detection only, not bounds)
+    // currentPos is used to allow cells near the turn point
+    const isFree = (cellX, cellY, currentX, currentY) => {
+      // Allow cells outside bounds but within map (for spawn connection)
+      if (cellX < 0 || cellX >= this.width || cellY < 0 || cellY >= this.height) {
+        return false;
+      }
+      
+      // Allow cells within CLEARANCE of current position (for turns)
+      const distFromCurrent = Math.abs(cellX - currentX) + Math.abs(cellY - currentY);
+      if (distFromCurrent <= CLEARANCE + 1) {
+        return true;
+      }
+      
+      return !occupied.has(`${cellX},${cellY}`);
+    };
+    
+    // Check if cell is within shrinking bounds (for direction choice)
+    const isInBounds = (x, y) => {
+      return x >= bounds.left && x <= bounds.right &&
+             y >= bounds.top && y <= bounds.bottom;
+    };
+    
+    // Check if line segment is free from collisions
+    // startX, startY = current position (used to allow cells near turn point)
+    const canDrawLine = (x1, y1, x2, y2, debug = false) => {
+      const cells = this._getLineCells(x1, y1, x2, y2);
+      for (let i = 1; i < cells.length; i++) {
+        if (!isFree(cells[i].x, cells[i].y, x1, y1)) {
+          if (debug) {
+            console.log(`[MapGenerator] canDrawLine BLOCKED at cell (${cells[i].x},${cells[i].y}), i=${i}/${cells.length}`);
+          }
+          return false;
+        }
+      }
+      return true;
+    };
+    
+    // Add line to path
+    const addLine = (x1, y1, x2, y2) => {
+      const cells = this._getLineCells(x1, y1, x2, y2);
+      for (const c of cells) {
+        if (!path.some(p => p.x === c.x && p.y === c.y)) {
+          path.push(c);
+          markOccupied(c.x, c.y);
+        }
+      }
+    };
+    
+    // Start position
+    let x = startX;
+    let y = startY;
+    path.push({ x, y });
+    markOccupied(x, y);
+    
+    // Determine initial direction (from edge inward)
+    let currentDir = this._getInitialDirection(startX, startY);
+    console.log(`[MapGenerator] Initial direction: ${currentDir}`);
+    
+    // === MANDATORY FIRST SEGMENT: Go straight into the map ===
+    const firstSegmentLength = this.rng.int(FIRST_SEGMENT_MIN, FIRST_SEGMENT_MIN + 20);
+    const { endPt: firstEnd } = this._calcSegmentEndpoint(currentDir, x, y, firstSegmentLength, {
+      left: 0, right: this.width - 1, top: 0, bottom: this.height - 1
+    });
+    
+    console.log(`[MapGenerator] First mandatory segment: ${currentDir} for ${firstSegmentLength} cells to (${firstEnd.x},${firstEnd.y})`);
+    addLine(x, y, firstEnd.x, firstEnd.y);
+    x = firstEnd.x;
+    y = firstEnd.y;
+    let totalPathLength = firstSegmentLength;
+    
+    // Track last turn and base side for probability adjustment
+    let lastTurnToBase = false;
+    let prevBaseSide = this._getBaseSide(currentDir, x, y, endX, endY);
+    
+    // Segment history for rollback
+    const segmentHistory = []; // Each entry: { x, y, pathLength, boundsSnapshot, shrinkStep }
+    let consecutiveRollbacks = 0; // Track consecutive rollbacks to increase depth
+    let lastRollbackPos = null; // Track last rollback position
+    
+    // Main loop - max 30 iterations
+    const mapSize = Math.min(this.width, this.height);
+    const finishThreshold = mapSize * 0.20; // 20% of map size (~20 cells on 100x100 map)
+    let iterations = 0;
+    const maxIterations = 30;
+    // totalPathLength already initialized above with first segment
+    const minTotalPathLength = mapSize * 1.2; // Path should be at least 1.2x map size
+    
+    while (iterations < maxIterations) {
+      iterations++;
+      
+      const distToBase = Math.abs(x - endX) + Math.abs(y - endY);
+      console.log(`[MapGenerator] Iter ${iterations}: pos=(${x},${y}), distToBase=${distToBase}, totalLen=${totalPathLength}, shrink=${shrinkStep}`);
+      
+      // Check if close enough to base AND path is long enough - finish with direct path
+      if (distToBase <= finishThreshold && totalPathLength >= minTotalPathLength) {
+        console.log(`[MapGenerator] Close to base and path long enough, finishing directly`);
+        this._finishPathToBase(x, y, endX, endY, path, addLine, canDrawLine);
+        break;
+      }
+      
+      // Force continue if path is too short even if close to base
+      if (distToBase <= finishThreshold && totalPathLength < minTotalPathLength) {
+        console.log(`[MapGenerator] Close to base but path too short (${totalPathLength}/${minTotalPathLength}), continuing`);
+      }
+      
+      // Save state for potential rollback
+      segmentHistory.push({
+        x, y,
+        pathLength: path.length,
+        totalPathLength,
+        bounds: { ...bounds },
+        shrinkStep,
+        currentDir,
+        lastTurnToBase,
+        prevBaseSide
+      });
+      
+      // Get current base side
+      const baseSide = this._getBaseSide(currentDir, x, y, endX, endY);
+      
+      // Check if base side changed to opposite - shrink bounds
+      if (this._isOppositeSide(prevBaseSide, baseSide)) {
+        shrinkStep++;
+        const shrinkAmount = shrinkStep * 0.10;
+        bounds = {
+          left: initialBounds.left + Math.floor(shrinkAmount * initialWidth / 2),
+          right: initialBounds.right - Math.floor(shrinkAmount * initialWidth / 2),
+          top: initialBounds.top + Math.floor(shrinkAmount * initialHeight / 2),
+          bottom: initialBounds.bottom - Math.floor(shrinkAmount * initialHeight / 2)
+        };
+        console.log(`[MapGenerator] Base side changed ${prevBaseSide}->${baseSide}, shrink to ${shrinkStep * 10}%`);
+      }
+      prevBaseSide = baseSide;
+      
+      // Check if we can still go toward edge (for probability adjustment)
+      const canGoToEdge = this._canGoToEdge(currentDir, x, y, bounds, MIN_SEGMENT);
+      
+      // If close to base and path is reasonably long, force direction toward base
+      const closeToBase = distToBase < 25;
+      const pathReasonablyLong = totalPathLength >= minTotalPathLength * 0.8;
+      const forceTowardBase = closeToBase && pathReasonablyLong;
+      
+      // Choose next direction
+      const nextDir = forceTowardBase 
+        ? this._getDirectionTowardBase(currentDir, x, y, endX, endY)
+        : this._chooseNextDirection(currentDir, baseSide, lastTurnToBase, canGoToEdge, this.rng);
+      
+      // Calculate segment length
+      const segmentLength = this._calcSegmentLength(nextDir, x, y, bounds, endX, endY, MIN_SEGMENT, MAX_SEGMENT, this.rng);
+      
+      console.log(`[MapGenerator] Trying dir=${nextDir}, segmentLength=${segmentLength}`);
+      
+      if (segmentLength < MIN_SEGMENT) {
+        console.log(`[MapGenerator] Segment too short (${segmentLength}), trying other directions`);
+        
+        // Try other available directions
+        const tried = new Set([nextDir]);
+        let found = false;
+        
+        for (const tryDir of [this._getTurnLeft(currentDir), this._getTurnRight(currentDir), currentDir]) {
+          if (tried.has(tryDir)) continue;
+          tried.add(tryDir);
+          
+          const tryLength = this._calcSegmentLength(tryDir, x, y, bounds, endX, endY, MIN_SEGMENT, MAX_SEGMENT, this.rng);
+          if (tryLength >= MIN_SEGMENT) {
+            const { endPt: tryEnd, actualLength: tryActual } = this._calcSegmentEndpoint(tryDir, x, y, tryLength, bounds);
+            if (canDrawLine(x, y, tryEnd.x, tryEnd.y)) {
+              addLine(x, y, tryEnd.x, tryEnd.y);
+              totalPathLength += tryActual;
+              x = tryEnd.x;
+              y = tryEnd.y;
+              currentDir = tryDir;
+              found = true;
+              console.log(`[MapGenerator] Found alternate: ${tryDir} to (${x},${y}), len=${tryActual}`);
+              break;
+            }
+          }
+        }
+        
+        if (!found) {
+          // Progressive rollback - increase depth if stuck in same area
+          if (lastRollbackPos && Math.abs(x - lastRollbackPos.x) < 10 && Math.abs(y - lastRollbackPos.y) < 10) {
+            consecutiveRollbacks++;
+          } else {
+            consecutiveRollbacks = 1;
+          }
+          lastRollbackPos = { x, y };
+          
+          // Try rollback with progressive depth
+          const recovered = this._tryRollback(segmentHistory, path, occupied, CLEARANCE, consecutiveRollbacks);
+          if (recovered) {
+            x = recovered.x;
+            y = recovered.y;
+            bounds = recovered.bounds;
+            shrinkStep = recovered.shrinkStep;
+            currentDir = recovered.currentDir;
+            lastTurnToBase = recovered.lastTurnToBase;
+            prevBaseSide = recovered.prevBaseSide;
+            totalPathLength = recovered.totalPathLength;
+            console.log(`[MapGenerator] Rolled back to (${x},${y}), totalLen=${totalPathLength}`);
+            continue;
+          } else {
+            console.log(`[MapGenerator] Rollback failed, finishing`);
+            break;
+          }
+        }
+        continue;
+      }
+      
+      // Calculate end point
+      const { endPt, actualLength } = this._calcSegmentEndpoint(nextDir, x, y, segmentLength, bounds);
+      
+      console.log(`[MapGenerator] Trying to draw from (${x},${y}) to (${endPt.x},${endPt.y})`);
+      
+      // Try to draw segment - if blocked, try progressively shorter lengths
+      let drawnSegment = false;
+      let tryLength = segmentLength;
+      
+      while (tryLength >= MIN_SEGMENT && !drawnSegment) {
+        const { endPt: tryEnd, actualLength: tryActual } = this._calcSegmentEndpoint(nextDir, x, y, tryLength, bounds);
+        
+        if (canDrawLine(x, y, tryEnd.x, tryEnd.y, true)) {
+          addLine(x, y, tryEnd.x, tryEnd.y);
+          totalPathLength += tryActual;
+          
+          // Track if this was a turn toward base
+          const turnedToBase = (baseSide === 'left' && this._isTurnLeft(currentDir, nextDir)) ||
+                              (baseSide === 'right' && this._isTurnRight(currentDir, nextDir));
+          lastTurnToBase = turnedToBase;
+          
+          x = tryEnd.x;
+          y = tryEnd.y;
+          currentDir = nextDir;
+          drawnSegment = true;
+          consecutiveRollbacks = 0; // Reset on successful segment
+          
+          console.log(`[MapGenerator] Drew segment to (${x},${y}), dir=${currentDir}, len=${tryActual}, total=${totalPathLength}`);
+        } else {
+          // Try shorter
+          tryLength = Math.floor(tryLength * 0.7);
+        }
+      }
+      
+      if (!drawnSegment) {
+        // Segment blocked even at minimum - try alternate direction
+        console.log(`[MapGenerator] Segment blocked in ${nextDir}, trying alternates`);
+        
+        const alternates = [this._getTurnLeft(currentDir), this._getTurnRight(currentDir), currentDir]
+          .filter(d => d !== nextDir && d !== this._getOppositeDir(currentDir));
+        
+        for (const altDir of alternates) {
+          const altLength = this._calcSegmentLength(altDir, x, y, bounds, endX, endY, MIN_SEGMENT, MAX_SEGMENT, this.rng);
+          
+          if (altLength >= MIN_SEGMENT) {
+            const { endPt: altEnd, actualLength: altActual } = this._calcSegmentEndpoint(altDir, x, y, altLength, bounds);
+            
+            if (canDrawLine(x, y, altEnd.x, altEnd.y)) {
+              addLine(x, y, altEnd.x, altEnd.y);
+              totalPathLength += altActual;
+              lastTurnToBase = false;
+              x = altEnd.x;
+              y = altEnd.y;
+              currentDir = altDir;
+              drawnSegment = true;
+              consecutiveRollbacks = 0; // Reset on successful segment
+              console.log(`[MapGenerator] Used alternate dir ${altDir} to (${x},${y}), total=${totalPathLength}`);
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!drawnSegment) {
+        // All directions blocked - rollback
+        console.log(`[MapGenerator] All directions blocked, rolling back`);
+        
+        // Progressive rollback - increase depth if stuck in same area
+        if (lastRollbackPos && Math.abs(x - lastRollbackPos.x) < 10 && Math.abs(y - lastRollbackPos.y) < 10) {
+          consecutiveRollbacks++;
+        } else {
+          consecutiveRollbacks = 1;
+        }
+        lastRollbackPos = { x, y };
+        
+        const recovered = this._tryRollback(segmentHistory, path, occupied, CLEARANCE, consecutiveRollbacks);
+        if (recovered) {
+          x = recovered.x;
+          y = recovered.y;
+          bounds = recovered.bounds;
+          shrinkStep = recovered.shrinkStep;
+          currentDir = recovered.currentDir;
+          lastTurnToBase = recovered.lastTurnToBase;
+          prevBaseSide = recovered.prevBaseSide;
+          totalPathLength = recovered.totalPathLength;
+          console.log(`[MapGenerator] Rolled back to (${x},${y}), totalLen=${totalPathLength}`);
+        } else {
+          console.log(`[MapGenerator] No recovery possible, finishing`);
+          break;
+        }
+      }
     }
     
-    console.log(`[MapGenerator] Phase 1 complete: ${simplePath.length} cells (simple spiral)`);
+    // Ensure we reach base
+    if (path.length > 0) {
+      const last = path[path.length - 1];
+      if (last.x !== endX || last.y !== endY) {
+        console.log(`[MapGenerator] Path ended at (${last.x},${last.y}), finishing to base (${endX},${endY})`);
+        this._finishPathToBase(last.x, last.y, endX, endY, path, addLine, canDrawLine);
+      }
+    }
     
-    // PHASE 2: Distort the path to add variety
-    const distortedPath = this._distortPath(simplePath, margin);
-    
-    console.log(`[MapGenerator] Phase 2 complete: ${distortedPath.length} cells (distorted)`);
-    
-    return distortedPath;
+    console.log(`[MapGenerator] Segment-Walker complete: ${path.length} cells`);
+    return path;
   }
   
   /**
-   * PHASE 1: Build simple spiral path using L-shaped connections
-   * No complex rules - just connect waypoints with simple orthogonal lines
+   * Get initial direction based on spawn position (from edge inward)
    */
-  _buildSimpleSpiralPath(startX, startY, endX, endY, margin) {
+  _getInitialDirection(startX, startY) {
+    const margin = GENERATOR_CONFIG.PATH_MARGIN;
+    
+    // Determine which edge spawn is on
+    if (startX <= margin + 2) return 'right';
+    if (startX >= this.width - margin - 3) return 'left';
+    if (startY <= margin + 2) return 'down';
+    if (startY >= this.height - margin - 3) return 'up';
+    
+    return 'right'; // default
+  }
+  
+  /**
+   * Get base position relative to current direction
+   * Returns: 'left', 'right', 'front', 'back'
+   */
+  _getBaseSide(currentDir, x, y, baseX, baseY) {
+    const dx = baseX - x;
+    const dy = baseY - y;
+    
+    // Transform to direction-relative coordinates
+    let relX, relY;
+    switch (currentDir) {
+      case 'right': relX = dx; relY = dy; break;
+      case 'left': relX = -dx; relY = -dy; break;
+      case 'down': relX = -dy; relY = dx; break;
+      case 'up': relX = dy; relY = -dx; break;
+    }
+    
+    // Determine which side base is on
+    if (Math.abs(relY) > Math.abs(relX)) {
+      return relY < 0 ? 'left' : 'right';
+    } else {
+      return relX > 0 ? 'front' : 'back';
+    }
+  }
+  
+  /**
+   * Check if two sides are opposite
+   */
+  _isOppositeSide(side1, side2) {
+    return (side1 === 'left' && side2 === 'right') ||
+           (side1 === 'right' && side2 === 'left');
+  }
+  
+  /**
+   * Get direction that moves toward base (avoiding 180-degree turns)
+   */
+  _getDirectionTowardBase(currentDir, x, y, baseX, baseY) {
+    const dx = baseX - x;
+    const dy = baseY - y;
+    const opposite = this._getOppositeDir(currentDir);
+    
+    // Prefer the axis with larger distance
+    const candidates = [];
+    
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      // Prefer horizontal
+      if (dx > 0) candidates.push('right');
+      else if (dx < 0) candidates.push('left');
+      if (dy > 0) candidates.push('down');
+      else if (dy < 0) candidates.push('up');
+    } else {
+      // Prefer vertical
+      if (dy > 0) candidates.push('down');
+      else if (dy < 0) candidates.push('up');
+      if (dx > 0) candidates.push('right');
+      else if (dx < 0) candidates.push('left');
+    }
+    
+    // Pick first candidate that isn't opposite to current direction
+    for (const dir of candidates) {
+      if (dir !== opposite) {
+        return dir;
+      }
+    }
+    
+    // Fallback to current direction
+    return currentDir;
+  }
+  
+  /**
+   * Check if we can go toward nearest edge
+   */
+  _canGoToEdge(currentDir, x, y, bounds, minDist) {
+    // Calculate distances to edges based on perpendicular directions
+    let leftDist, rightDist;
+    switch (currentDir) {
+      case 'right':
+      case 'left':
+        leftDist = y - bounds.top;
+        rightDist = bounds.bottom - y;
+        break;
+      case 'up':
+      case 'down':
+        leftDist = x - bounds.left;
+        rightDist = bounds.right - x;
+        break;
+    }
+    
+    return leftDist >= minDist || rightDist >= minDist;
+  }
+  
+  /**
+   * Choose next direction based on base position and history
+   * 
+   * Probabilities when base is on one side:
+   * - Toward base: 60% (50% if last turn was also toward base)
+   * - Straight: 30%
+   * - Away from base: 10% (20% if last turn was toward base)
+   * 
+   * Never returns opposite of current direction (180° turn)
+   */
+  _chooseNextDirection(currentDir, baseSide, lastTurnToBase, canGoToEdge, rng) {
+    const opposite = this._getOppositeDir(currentDir);
+    
+    // Available directions (exclude 180° turn)
+    const available = ['up', 'down', 'left', 'right'].filter(d => d !== opposite);
+    
+    // Map to relative directions (straight, left, right relative to current)
+    const straight = currentDir;
+    const turnLeft = this._getTurnLeft(currentDir);
+    const turnRight = this._getTurnRight(currentDir);
+    
+    // Determine which turn goes toward base
+    let towardBase, awayFromBase;
+    if (baseSide === 'left') {
+      towardBase = turnLeft;
+      awayFromBase = turnRight;
+    } else if (baseSide === 'right') {
+      towardBase = turnRight;
+      awayFromBase = turnLeft;
+    } else {
+      // Base is front or back - prefer straight or random turn
+      towardBase = straight;
+      awayFromBase = rng.next() > 0.5 ? turnLeft : turnRight;
+    }
+    
+    // Calculate probabilities
+    let probToward = 60;
+    let probStraight = 30;
+    let probAway = 10;
+    
+    // Reduce toward probability if last turn was also toward base
+    if (lastTurnToBase && baseSide !== 'front' && baseSide !== 'back') {
+      probToward -= 10;
+      probAway += 10;
+    }
+    
+    // If can't go to edge, remove away option and redistribute
+    if (!canGoToEdge && (baseSide === 'left' || baseSide === 'right')) {
+      probToward += probAway / 2;
+      probStraight += probAway / 2;
+      probAway = 0;
+    }
+    
+    // Roll dice
+    const roll = rng.float(0, 100);
+    
+    if (roll < probToward) {
+      return towardBase;
+    } else if (roll < probToward + probStraight) {
+      return straight;
+    } else {
+      return awayFromBase;
+    }
+  }
+  
+  /**
+   * Get direction after turning left
+   */
+  _getTurnLeft(dir) {
+    const map = { right: 'up', up: 'left', left: 'down', down: 'right' };
+    return map[dir];
+  }
+  
+  /**
+   * Get direction after turning right
+   */
+  _getTurnRight(dir) {
+    const map = { right: 'down', down: 'left', left: 'up', up: 'right' };
+    return map[dir];
+  }
+  
+  /**
+   * Get opposite direction
+   */
+  _getOppositeDir(dir) {
+    const map = { right: 'left', left: 'right', up: 'down', down: 'up' };
+    return map[dir];
+  }
+  
+  /**
+   * Check if nextDir is a left turn from currentDir
+   */
+  _isTurnLeft(currentDir, nextDir) {
+    return this._getTurnLeft(currentDir) === nextDir;
+  }
+  
+  /**
+   * Check if nextDir is a right turn from currentDir
+   */
+  _isTurnRight(currentDir, nextDir) {
+    return this._getTurnRight(currentDir) === nextDir;
+  }
+  
+  /**
+   * Calculate segment length - shorter toward edge, longer toward center
+   * Range: MIN_SEGMENT to MAX_SEGMENT
+   */
+  _calcSegmentLength(dir, x, y, bounds, baseX, baseY, minLen, maxLen, rng) {
+    // Calculate available space in direction
+    let maxAvailable;
+    switch (dir) {
+      case 'right': maxAvailable = bounds.right - x; break;
+      case 'left': maxAvailable = x - bounds.left; break;
+      case 'down': maxAvailable = bounds.bottom - y; break;
+      case 'up': maxAvailable = y - bounds.top; break;
+    }
+    
+    // Use a reasonable range: 20-70 cells typically
+    // More randomness, less dependency on position
+    const baseMin = Math.max(minLen, 20);
+    const baseMax = Math.min(maxLen, 70);
+    
+    // Random length in range
+    let length = rng.int(baseMin, baseMax);
+    
+    // Clamp to available space and limits
+    length = Math.min(length, maxAvailable, maxLen);
+    length = Math.max(length, Math.min(minLen, maxAvailable));
+    
+    return length;
+  }
+  
+  /**
+   * Calculate endpoint for segment
+   */
+  _calcSegmentEndpoint(dir, x, y, length, bounds) {
+    let endX = x, endY = y;
+    
+    switch (dir) {
+      case 'right':
+        endX = Math.min(x + length, bounds.right);
+        break;
+      case 'left':
+        endX = Math.max(x - length, bounds.left);
+        break;
+      case 'down':
+        endY = Math.min(y + length, bounds.bottom);
+        break;
+      case 'up':
+        endY = Math.max(y - length, bounds.top);
+        break;
+    }
+    
+    const actualLength = Math.abs(endX - x) + Math.abs(endY - y);
+    return { endPt: { x: endX, y: endY }, actualLength };
+  }
+  
+  /**
+   * Get alternate direction when primary is blocked
+   */
+  _getAlternateDirection(currentDir, blockedDir, baseSide) {
+    const opposite = this._getOppositeDir(currentDir);
+    const candidates = ['up', 'down', 'left', 'right'].filter(d => 
+      d !== opposite && d !== blockedDir
+    );
+    
+    // Prefer direction toward base
+    if (baseSide === 'left') {
+      const left = this._getTurnLeft(currentDir);
+      if (candidates.includes(left)) return left;
+    } else if (baseSide === 'right') {
+      const right = this._getTurnRight(currentDir);
+      if (candidates.includes(right)) return right;
+    }
+    
+    return candidates[0] || currentDir;
+  }
+  
+  /**
+   * Try to rollback several segments and retry
+   * @param {number} rollbackDepth - How many consecutive rollbacks (increases segments to remove)
+   */
+  _tryRollback(history, path, occupied, clearance, rollbackDepth = 1) {
+    // Progressive rollback: 1st attempt = 1 segment, 2nd = 2, 3rd = 3, etc.
+    // Cap at half of history to avoid rolling back too far
+    const maxRollback = Math.max(1, Math.floor(history.length / 2));
+    const rollbackCount = Math.min(rollbackDepth, maxRollback, history.length - 1);
+    
+    if (rollbackCount <= 0) return null;
+    
+    console.log(`[MapGenerator] Rolling back ${rollbackCount} segments (depth ${rollbackDepth})`);
+    
+    // Get recovery point
+    for (let i = 0; i < rollbackCount; i++) {
+      history.pop();
+    }
+    
+    if (history.length === 0) return null;
+    
+    const recovery = { ...history[history.length - 1] };
+    
+    // Trim path to recovery point
+    while (path.length > recovery.pathLength) {
+      const removed = path.pop();
+      // Clear occupied around removed cell
+      for (let dy = -clearance; dy <= clearance; dy++) {
+        for (let dx = -clearance; dx <= clearance; dx++) {
+          occupied.delete(`${removed.x + dx},${removed.y + dy}`);
+        }
+      }
+    }
+    
+    // Force change direction after rollback to avoid repeating same path
+    // Turn left from the recovered direction (or right randomly)
+    const oldDir = recovery.currentDir;
+    const forceLeft = this.rng.next() < 0.5;
+    recovery.currentDir = forceLeft ? this._getTurnLeft(oldDir) : this._getTurnRight(oldDir);
+    console.log(`[MapGenerator] Rollback: force direction ${oldDir} -> ${recovery.currentDir}`);
+    
+    return recovery;
+  }
+  
+  /**
+   * Finish path to base with L-path
+   */
+  _finishPathToBase(x, y, baseX, baseY, path, addLine, canDrawLine) {
+    // Try H-first
+    if (x !== baseX) {
+      if (canDrawLine(x, y, baseX, y)) {
+        addLine(x, y, baseX, y);
+        x = baseX;
+      }
+    }
+    if (y !== baseY) {
+      if (canDrawLine(x, y, x, baseY)) {
+        addLine(x, y, x, baseY);
+      } else {
+        // Force it
+        const cells = this._getLineCells(x, y, x, baseY);
+        for (const c of cells) {
+          if (!path.some(p => p.x === c.x && p.y === c.y)) {
+            path.push(c);
+          }
+        }
+      }
+    }
+    
+    // If still not at base X, force horizontal
+    const last = path[path.length - 1];
+    if (last && last.x !== baseX) {
+      const cells = this._getLineCells(last.x, last.y, baseX, last.y);
+      for (const c of cells) {
+        if (!path.some(p => p.x === c.x && p.y === c.y)) {
+          path.push(c);
+        }
+      }
+    }
+  }
+  
+  /**
+   * Connect waypoints with L-shaped paths, avoiding collisions
+   */
+  _connectWaypointsWithLPaths(startX, startY, waypoints, endX, endY, margin, clearance) {
     const path = [];
+    const occupied = new Set();
     
-    // Generate spiral waypoints
-    const waypoints = this._generateSpiralWaypoints(startX, startY, endX, endY, margin);
+    // Mark cell as occupied with clearance
+    const markOccupied = (x, y) => {
+      for (let dy = -clearance; dy <= clearance; dy++) {
+        for (let dx = -clearance; dx <= clearance; dx++) {
+          occupied.add(`${x + dx},${y + dy}`);
+        }
+      }
+    };
     
-    console.log(`[MapGenerator] Spiral waypoints: ${waypoints.length}`);
+    // Check if cell is free
+    const isFree = (x, y) => {
+      if (x < margin || x >= this.width - margin ||
+          y < margin || y >= this.height - margin) {
+        return false;
+      }
+      return !occupied.has(`${x},${y}`);
+    };
     
+    // Check if line segment is free (skip first cell which is current pos)
+    const canDrawLine = (x1, y1, x2, y2, skipFirst = true) => {
+      const cells = this._getLineCells(x1, y1, x2, y2);
+      const startIdx = skipFirst ? 1 : 0;
+      for (let i = startIdx; i < cells.length; i++) {
+        if (!isFree(cells[i].x, cells[i].y)) return false;
+      }
+      return true;
+    };
+    
+    // Add line to path
+    const addLine = (x1, y1, x2, y2) => {
+      const cells = this._getLineCells(x1, y1, x2, y2);
+      for (const c of cells) {
+        if (!path.some(p => p.x === c.x && p.y === c.y)) {
+          path.push(c);
+          markOccupied(c.x, c.y);
+        }
+      }
+    };
+    
+    // Start
     let x = startX;
     let y = startY;
+    path.push({ x, y });
+    markOccupied(x, y);
     
-    // Connect to each waypoint with simple L-shaped path
+    // Connect to each waypoint
     const allTargets = [...waypoints, { x: endX, y: endY }];
     
-    for (const target of allTargets) {
-      // Simple L-connection: horizontal then vertical (or vice versa randomly)
-      const horizontalFirst = this.rng.next() > 0.5;
+    for (let i = 0; i < allTargets.length; i++) {
+      const target = allTargets[i];
+      const connected = this._connectToTarget(
+        x, y, target.x, target.y, 
+        canDrawLine, addLine, margin, 
+        i === allTargets.length - 1 // isLastTarget
+      );
       
-      if (horizontalFirst) {
-        // Horizontal segment
-        if (x !== target.x) {
-          this._pushLineNoDup(path, x, y, target.x, y);
-          x = target.x;
-        }
-        // Vertical segment
-        if (y !== target.y) {
-          this._pushLineNoDup(path, x, y, x, target.y);
-          y = target.y;
-        }
+      if (connected.success) {
+        x = connected.x;
+        y = connected.y;
       } else {
-        // Vertical segment first
-        if (y !== target.y) {
-          this._pushLineNoDup(path, x, y, x, target.y);
-          y = target.y;
+        // Failed to connect - try adjusting waypoint
+        const adjusted = this._findAlternativeWaypoint(
+          x, y, target.x, target.y, canDrawLine, margin
+        );
+        
+        if (adjusted) {
+          const retryConnected = this._connectToTarget(
+            x, y, adjusted.x, adjusted.y,
+            canDrawLine, addLine, margin, false
+          );
+          
+          if (retryConnected.success) {
+            x = retryConnected.x;
+            y = retryConnected.y;
+          }
         }
-        // Then horizontal
-        if (x !== target.x) {
-          this._pushLineNoDup(path, x, y, target.x, y);
-          x = target.x;
-        }
+      }
+    }
+    
+    // Ensure we reach the base
+    if (x !== endX || y !== endY) {
+      // Force connection (ignore collisions for final stretch)
+      if (x !== endX) {
+        this._pushLineNoDup(path, x, y, endX, y);
+        x = endX;
+      }
+      if (y !== endY) {
+        this._pushLineNoDup(path, x, y, x, endY);
       }
     }
     
@@ -492,212 +1249,106 @@ class MapGenerator {
   }
   
   /**
-   * Generate spiral waypoints (simplified version)
-   * Creates points that spiral inward toward the base
+   * Try to connect to target with L-path
    */
-  _generateSpiralWaypoints(startX, startY, baseX, baseY, margin) {
-    const waypoints = [];
-    const edge = this.spawnPoint.edge;
+  _connectToTarget(fromX, fromY, toX, toY, canDrawLine, addLine, margin, isLastTarget) {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
     
-    // Number of spiral points (1-2 loops)
-    const totalPoints = this.rng.int(10, 20);
+    if (dx === 0 && dy === 0) {
+      return { success: true, x: toX, y: toY };
+    }
     
-    // Start and end radius
-    const startRadius = Math.min(
-      Math.abs(startX - baseX),
-      Math.abs(startY - baseY),
-      25
-    ) + this.rng.int(5, 15);
-    const endRadius = 4;
+    // Try Horizontal-then-Vertical
+    let hFirstOk = true;
+    if (dx !== 0 && !canDrawLine(fromX, fromY, toX, fromY)) hFirstOk = false;
+    if (hFirstOk && dy !== 0 && !canDrawLine(toX, fromY, toX, toY)) hFirstOk = false;
     
-    const radiusShrink = (startRadius - endRadius) / totalPoints;
+    // Try Vertical-then-Horizontal
+    let vFirstOk = true;
+    if (dy !== 0 && !canDrawLine(fromX, fromY, fromX, toY)) vFirstOk = false;
+    if (vFirstOk && dx !== 0 && !canDrawLine(fromX, toY, toX, toY)) vFirstOk = false;
     
-    // Starting angle based on spawn edge
-    let startAngle;
-    if (edge === 'top') {
-      startAngle = startX < baseX ? Math.PI * 1.25 : Math.PI * 1.75;
-    } else if (edge === 'bottom') {
-      startAngle = startX < baseX ? Math.PI * 0.75 : Math.PI * 0.25;
-    } else if (edge === 'left') {
-      startAngle = startY < baseY ? Math.PI * 1.0 : Math.PI * 1.5;
+    // Choose path
+    let useHFirst;
+    if (hFirstOk && vFirstOk) {
+      useHFirst = this.rng.next() > 0.5;
+    } else if (hFirstOk) {
+      useHFirst = true;
+    } else if (vFirstOk) {
+      useHFirst = false;
     } else {
-      startAngle = startY < baseY ? Math.PI * 0.0 : Math.PI * 0.5;
+      // Neither works
+      return { success: false, x: fromX, y: fromY };
     }
     
-    // Direction
-    const clockwise = this.rng.next() > 0.5;
-    const angleStep = (Math.PI * 2 / 8) * (clockwise ? 1 : -1); // 8 points per loop
+    // Draw the path
+    let x = fromX, y = fromY;
     
-    let angle = startAngle;
-    let radius = startRadius;
-    let prevX = startX;
-    let prevY = startY;
-    
-    for (let i = 0; i < totalPoints; i++) {
-      // Small angle wobble for organic feel
-      const angleOffset = this.rng.float(-0.2, 0.2);
-      const radiusOffset = this.rng.float(-2, 2);
-      
-      const actualAngle = angle + angleOffset;
-      const actualRadius = Math.max(endRadius, radius + radiusOffset);
-      
-      const x = Math.round(baseX + Math.cos(actualAngle) * actualRadius);
-      const y = Math.round(baseY + Math.sin(actualAngle) * actualRadius);
-      
-      const clampedX = this._clamp(x, margin, this.width - margin - 1);
-      const clampedY = this._clamp(y, margin, this.height - margin - 1);
-      
-      // Only add if far enough from previous
-      const dist = Math.abs(clampedX - prevX) + Math.abs(clampedY - prevY);
-      if (dist > 5) {
-        waypoints.push({ x: clampedX, y: clampedY });
-        prevX = clampedX;
-        prevY = clampedY;
+    if (useHFirst) {
+      if (dx !== 0) {
+        addLine(x, y, toX, y);
+        x = toX;
       }
-      
-      angle += angleStep;
-      radius -= radiusShrink;
+      if (dy !== 0) {
+        addLine(x, y, x, toY);
+        y = toY;
+      }
+    } else {
+      if (dy !== 0) {
+        addLine(x, y, x, toY);
+        y = toY;
+      }
+      if (dx !== 0) {
+        addLine(x, y, toX, y);
+        x = toX;
+      }
     }
     
-    return waypoints;
+    return { success: true, x, y };
   }
   
   /**
-   * PHASE 2: Distort existing path to add variety
-   * Takes a simple path and adds bends/detours while checking for self-intersection
+   * Find alternative waypoint position when direct path is blocked
    */
-  _distortPath(originalPath, margin) {
-    if (originalPath.length < 10) return originalPath;
+  _findAlternativeWaypoint(fromX, fromY, targetX, targetY, canDrawLine, margin) {
+    // Try positions around the target
+    const offsets = [
+      { dx: 0, dy: -8 }, { dx: 0, dy: 8 },
+      { dx: -8, dy: 0 }, { dx: 8, dy: 0 },
+      { dx: -6, dy: -6 }, { dx: 6, dy: -6 },
+      { dx: -6, dy: 6 }, { dx: 6, dy: 6 },
+      { dx: 0, dy: -12 }, { dx: 0, dy: 12 },
+      { dx: -12, dy: 0 }, { dx: 12, dy: 0 }
+    ];
     
-    const result = [];
-    const occupied = new Set();
-    const clearance = 2;
-    
-    // Helper: check if segment is safe
-    const canPlace = (x1, y1, x2, y2) => {
-      const cells = this._getLineCells(x1, y1, x2, y2);
-      for (const c of cells) {
-        // Check clearance around each cell
-        for (let dy = -clearance; dy <= clearance; dy++) {
-          for (let dx = -clearance; dx <= clearance; dx++) {
-            const key = `${c.x + dx},${c.y + dy}`;
-            if (occupied.has(key)) return false;
-          }
-        }
-        // Check bounds
-        if (c.x < margin || c.x >= this.width - margin ||
-            c.y < margin || c.y >= this.height - margin) {
-          return false;
-        }
-      }
-      return true;
-    };
-    
-    // Helper: add cells to result and occupied
-    const addSegment = (x1, y1, x2, y2) => {
-      const cells = this._getLineCells(x1, y1, x2, y2);
-      for (const c of cells) {
-        if (!result.some(p => p.x === c.x && p.y === c.y)) {
-          result.push(c);
-        }
-        occupied.add(`${c.x},${c.y}`);
-      }
-    };
-    
-    // Find direction change points (corners) in original path
-    const corners = this._findCorners(originalPath);
-    
-    // Process path segment by segment between corners
-    let x = originalPath[0].x;
-    let y = originalPath[0].y;
-    result.push({ x, y });
-    occupied.add(`${x},${y}`);
-    
-    for (let i = 0; i < corners.length; i++) {
-      const target = corners[i];
+    for (const off of offsets) {
+      const altX = this._clamp(targetX + off.dx, margin, this.width - margin - 1);
+      const altY = this._clamp(targetY + off.dy, margin, this.height - margin - 1);
       
-      // Distance to corner
-      const dist = Math.abs(target.x - x) + Math.abs(target.y - y);
+      // Check if we can reach this alternative
+      const dx = altX - fromX;
+      const dy = altY - fromY;
       
-      // Try to add a detour if segment is long enough
-      if (dist > 12 && this.rng.next() > 0.3) {
-        // Calculate detour point
-        const midX = Math.round((x + target.x) / 2);
-        const midY = Math.round((y + target.y) / 2);
-        
-        // Perpendicular offset
-        const isHorizontal = Math.abs(target.x - x) > Math.abs(target.y - y);
-        const detourAmount = this.rng.int(3, 7) * (this.rng.next() > 0.5 ? 1 : -1);
-        
-        let detourX = midX;
-        let detourY = midY;
-        
-        if (isHorizontal) {
-          detourY = this._clamp(midY + detourAmount, margin, this.height - margin - 1);
-        } else {
-          detourX = this._clamp(midX + detourAmount, margin, this.width - margin - 1);
-        }
-        
-        // Try to place detour (3 segments: current->detour horizontal, detour vertical, detour->target)
-        const seg1ok = isHorizontal 
-          ? canPlace(x, y, detourX, y) && canPlace(detourX, y, detourX, detourY)
-          : canPlace(x, y, x, detourY) && canPlace(x, detourY, detourX, detourY);
-        
-        const seg2ok = isHorizontal
-          ? canPlace(detourX, detourY, target.x, detourY) && canPlace(target.x, detourY, target.x, target.y)
-          : canPlace(detourX, detourY, detourX, target.y) && canPlace(detourX, target.y, target.x, target.y);
-        
-        if (seg1ok && seg2ok) {
-          // Place detour
-          if (isHorizontal) {
-            addSegment(x, y, detourX, y);
-            x = detourX;
-            addSegment(x, y, x, detourY);
-            y = detourY;
-            addSegment(x, y, target.x, y);
-            x = target.x;
-            addSegment(x, y, x, target.y);
-            y = target.y;
-          } else {
-            addSegment(x, y, x, detourY);
-            y = detourY;
-            addSegment(x, y, detourX, y);
-            x = detourX;
-            addSegment(x, y, x, target.y);
-            y = target.y;
-            addSegment(x, y, target.x, y);
-            x = target.x;
-          }
-          continue;
-        }
-      }
+      // H-first
+      let hOk = true;
+      if (dx !== 0 && !canDrawLine(fromX, fromY, altX, fromY)) hOk = false;
+      if (hOk && dy !== 0 && !canDrawLine(altX, fromY, altX, altY)) hOk = false;
       
-      // Fallback: simple L-connection
-      const horizontalFirst = this.rng.next() > 0.5;
+      // V-first
+      let vOk = true;
+      if (dy !== 0 && !canDrawLine(fromX, fromY, fromX, altY)) vOk = false;
+      if (vOk && dx !== 0 && !canDrawLine(fromX, altY, altX, altY)) vOk = false;
       
-      if (horizontalFirst) {
-        if (x !== target.x && canPlace(x, y, target.x, y)) {
-          addSegment(x, y, target.x, y);
-          x = target.x;
-        }
-        if (y !== target.y && canPlace(x, y, x, target.y)) {
-          addSegment(x, y, x, target.y);
-          y = target.y;
-        }
-      } else {
-        if (y !== target.y && canPlace(x, y, x, target.y)) {
-          addSegment(x, y, x, target.y);
-          y = target.y;
-        }
-        if (x !== target.x && canPlace(x, y, target.x, y)) {
-          addSegment(x, y, target.x, y);
-          x = target.x;
-        }
+      if (hOk || vOk) {
+        return { x: altX, y: altY };
       }
     }
     
-    return result;
+    return null;
   }
+  
+  // ============ UTILITY METHODS ============
   
   /**
    * Find corner points (direction changes) in a path

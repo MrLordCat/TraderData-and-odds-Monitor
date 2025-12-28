@@ -541,13 +541,42 @@ module.exports = function({ SidebarModule, registerModule }) {
           const screen = btn.dataset.screen;
           this.showScreen(screen);
           
-          // Pause game when leaving game screen
-          if (this.game && this.game.running && !this.game.paused) {
-            this.game.pause();
-            this.elements.btnStart.textContent = '▶ Resume';
+          // Reset game when going back to menu (new game on next Start)
+          if (screen === 'menu' && this.game) {
+            console.log('[game-panel] Returning to menu - resetting game');
+            this.resetGame();
           }
         });
       });
+    }
+    
+    /**
+     * Reset game state for a fresh start
+     */
+    resetGame() {
+      // Stop any running game loop
+      if (this.game) {
+        if (this.game.running && !this.game.paused) {
+          this.game.pause();
+        }
+        this.game = null;
+      }
+      
+      // Clear renderer
+      if (this.renderer) {
+        this.renderer = null;
+      }
+      
+      // Reset UI state
+      this.placingTower = false;
+      this.selectedPath = null;
+      
+      // Reset button text
+      if (this.elements.btnStart) {
+        this.elements.btnStart.textContent = '▶ Start Wave';
+      }
+      
+      console.log('[game-panel] Game reset complete');
     }
     
     showScreen(screenId) {

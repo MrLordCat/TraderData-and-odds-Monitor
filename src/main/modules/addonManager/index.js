@@ -27,6 +27,85 @@ const GITHUB_API_BASE = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}
 // Fallback registry (for release channel, updated by workflow)
 const ADDON_REGISTRY_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/addon-registry.json`;
 
+/**
+ * Sync addons from local addons-dev/ folder to userData/addons/
+ * Only runs in dev mode to avoid GitHub API rate limits
+ */
+function syncDevAddons(addonsDir) {
+  try {
+    // Find addons-dev folder relative to app root
+    const appRoot = path.join(__dirname, '..', '..', '..', '..');
+    const devAddonsDir = path.join(appRoot, 'addons-dev');
+    
+    if (!fs.existsSync(devAddonsDir)) {
+      console.log('[AddonManager] No addons-dev folder found, skipping dev sync');
+      return;
+    }
+    
+    console.log(`[AddonManager] Dev mode: syncing addons from ${devAddonsDir}`);
+    
+    // Get list of addon folders (exclude README and other files)
+    const entries = fs.readdirSync(devAddonsDir, { withFileTypes: true });
+    const addonFolders = entries.filter(e => e.isDirectory());
+    
+    for (const folder of addonFolders) {
+      const srcDir = path.join(devAddonsDir, folder.name);
+      const manifestPath = path.join(srcDir, 'manifest.json');
+      
+      // Skip if no manifest
+      if (!fs.existsSync(manifestPath)) {
+        console.log(`[AddonManager] Skipping ${folder.name} - no manifest.json`);
+        continue;
+      }
+      
+      // Read manifest to get addon ID
+      let manifest;
+      try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      } catch (e) {
+        console.warn(`[AddonManager] Failed to parse manifest for ${folder.name}:`, e.message);
+        continue;
+      }
+      
+      const addonId = manifest.id || folder.name;
+      const destDir = path.join(addonsDir, addonId);
+      
+      // Copy addon folder to userData/addons/
+      console.log(`[AddonManager] Syncing dev addon: ${addonId}`);
+      copyDirRecursive(srcDir, destDir);
+    }
+    
+    console.log('[AddonManager] Dev addon sync complete');
+  } catch (e) {
+    console.warn('[AddonManager] Dev addon sync failed:', e.message);
+  }
+}
+
+/**
+ * Recursively copy directory
+ */
+function copyDirRecursive(src, dest) {
+  // Remove destination if exists (for clean sync)
+  if (fs.existsSync(dest)) {
+    fs.rmSync(dest, { recursive: true, force: true });
+  }
+  
+  fs.mkdirSync(dest, { recursive: true });
+  
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
 function createAddonManager({ store, mainWindow }) {
   // Paths
   const addonsDir = path.join(app.getPath('userData'), 'addons');
@@ -34,6 +113,12 @@ function createAddonManager({ store, mainWindow }) {
   // Ensure addons directory exists
   if (!fs.existsSync(addonsDir)) {
     fs.mkdirSync(addonsDir, { recursive: true });
+  }
+  
+  // Dev mode: sync addons from addons-dev/ folder (avoids GitHub download limits)
+  const isDevMode = !app.isPackaged;
+  if (isDevMode) {
+    syncDevAddons(addonsDir);
   }
   
   // State
