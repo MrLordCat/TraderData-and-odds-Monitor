@@ -448,97 +448,97 @@ class MapGenerator {
   }
   
   /**
-   * Generate mandatory waypoints that force path to go around the base
-   * Creates a winding path from spawn edge, around the base, then to base
+   * Generate mandatory waypoints that force path to go FULLY around the base
+   * Path must visit at least 3 corners of a square around the base
    */
   _generateMandatoryWaypoints(startX, startY, baseX, baseY, margin) {
     const waypoints = [];
     const edge = this.spawnPoint.edge;
     
-    // Determine which quadrant we're coming from
-    const fromLeft = (edge === 'left');
-    const fromRight = (edge === 'right');
-    const fromTop = (edge === 'top');
-    const fromBottom = (edge === 'bottom');
+    // Large orbit radius - path goes far from base
+    const orbitRadius = this.rng.int(20, 30);
     
-    // Calculate orbit radius around base (how far to go around)
-    const orbitRadius = this.rng.int(15, 25);
+    // Define the 4 corners of the orbit square around base
+    const corners = {
+      topLeft:     { x: baseX - orbitRadius, y: baseY - orbitRadius },
+      topRight:    { x: baseX + orbitRadius, y: baseY - orbitRadius },
+      bottomLeft:  { x: baseX - orbitRadius, y: baseY + orbitRadius },
+      bottomRight: { x: baseX + orbitRadius, y: baseY + orbitRadius }
+    };
     
-    // First waypoint: move into the map from spawn edge
-    const entryDepth = this.rng.int(15, 30);
-    let wp1x, wp1y;
-    
-    if (fromLeft) {
-      wp1x = margin + entryDepth;
-      wp1y = startY + this.rng.int(-10, 10);
-    } else if (fromRight) {
-      wp1x = this.width - margin - entryDepth;
-      wp1y = startY + this.rng.int(-10, 10);
-    } else if (fromTop) {
-      wp1x = startX + this.rng.int(-10, 10);
-      wp1y = margin + entryDepth;
-    } else {
-      wp1x = startX + this.rng.int(-10, 10);
-      wp1y = this.height - margin - entryDepth;
+    // Clamp all corners to map bounds
+    for (const key of Object.keys(corners)) {
+      corners[key].x = this._clamp(corners[key].x, margin + 5, this.width - margin - 5);
+      corners[key].y = this._clamp(corners[key].y, margin + 5, this.height - margin - 5);
     }
-    wp1x = this._clamp(wp1x, margin, this.width - margin - 1);
-    wp1y = this._clamp(wp1y, margin, this.height - margin - 1);
-    waypoints.push({ x: wp1x, y: wp1y });
     
-    // Second waypoint: go to opposite side of base (start circling)
-    // Pick a corner/side to go to first
-    const circleDir = this.rng.next() > 0.5 ? 1 : -1; // clockwise or counter-clockwise
+    // Determine path based on spawn edge
+    // Path should go to far corner first, then circle around
+    const clockwise = this.rng.next() > 0.5;
     
-    let wp2x, wp2y;
-    if (fromLeft || fromRight) {
-      // Coming from sides - go up or down first
-      wp2y = baseY + circleDir * orbitRadius;
-      wp2x = fromLeft ? baseX - orbitRadius : baseX + orbitRadius;
-    } else {
-      // Coming from top/bottom - go left or right first  
-      wp2x = baseX + circleDir * orbitRadius;
-      wp2y = fromTop ? baseY - orbitRadius : baseY + orbitRadius;
+    if (edge === 'top') {
+      // Coming from top - go down to one side, then circle
+      if (clockwise) {
+        // Top -> bottomLeft -> bottomRight -> topRight -> approach
+        waypoints.push({ x: startX, y: baseY - orbitRadius + 5 }); // Move down a bit
+        waypoints.push(corners.bottomLeft);
+        waypoints.push(corners.bottomRight);
+        waypoints.push(corners.topRight);
+        waypoints.push({ x: baseX + 5, y: baseY - 8 }); // Approach from right-top
+      } else {
+        // Top -> bottomRight -> bottomLeft -> topLeft -> approach
+        waypoints.push({ x: startX, y: baseY - orbitRadius + 5 });
+        waypoints.push(corners.bottomRight);
+        waypoints.push(corners.bottomLeft);
+        waypoints.push(corners.topLeft);
+        waypoints.push({ x: baseX - 5, y: baseY - 8 });
+      }
+    } else if (edge === 'bottom') {
+      // Coming from bottom
+      if (clockwise) {
+        waypoints.push({ x: startX, y: baseY + orbitRadius - 5 });
+        waypoints.push(corners.topRight);
+        waypoints.push(corners.topLeft);
+        waypoints.push(corners.bottomLeft);
+        waypoints.push({ x: baseX - 5, y: baseY + 8 });
+      } else {
+        waypoints.push({ x: startX, y: baseY + orbitRadius - 5 });
+        waypoints.push(corners.topLeft);
+        waypoints.push(corners.topRight);
+        waypoints.push(corners.bottomRight);
+        waypoints.push({ x: baseX + 5, y: baseY + 8 });
+      }
+    } else if (edge === 'left') {
+      // Coming from left
+      if (clockwise) {
+        waypoints.push({ x: baseX - orbitRadius + 5, y: startY });
+        waypoints.push(corners.topRight);
+        waypoints.push(corners.bottomRight);
+        waypoints.push(corners.bottomLeft);
+        waypoints.push({ x: baseX - 8, y: baseY + 5 });
+      } else {
+        waypoints.push({ x: baseX - orbitRadius + 5, y: startY });
+        waypoints.push(corners.bottomRight);
+        waypoints.push(corners.topRight);
+        waypoints.push(corners.topLeft);
+        waypoints.push({ x: baseX - 8, y: baseY - 5 });
+      }
+    } else { // right
+      // Coming from right
+      if (clockwise) {
+        waypoints.push({ x: baseX + orbitRadius - 5, y: startY });
+        waypoints.push(corners.bottomLeft);
+        waypoints.push(corners.topLeft);
+        waypoints.push(corners.topRight);
+        waypoints.push({ x: baseX + 8, y: baseY - 5 });
+      } else {
+        waypoints.push({ x: baseX + orbitRadius - 5, y: startY });
+        waypoints.push(corners.topLeft);
+        waypoints.push(corners.bottomLeft);
+        waypoints.push(corners.bottomRight);
+        waypoints.push({ x: baseX + 8, y: baseY + 5 });
+      }
     }
-    wp2x = this._clamp(wp2x, margin, this.width - margin - 1);
-    wp2y = this._clamp(wp2y, margin, this.height - margin - 1);
-    waypoints.push({ x: wp2x, y: wp2y });
-    
-    // Third waypoint: continue around the base (90 degrees further)
-    let wp3x, wp3y;
-    if (fromLeft || fromRight) {
-      wp3x = baseX + (fromLeft ? orbitRadius : -orbitRadius);
-      wp3y = wp2y;
-    } else {
-      wp3x = wp2x;
-      wp3y = baseY + (fromTop ? orbitRadius : -orbitRadius);
-    }
-    wp3x = this._clamp(wp3x, margin, this.width - margin - 1);
-    wp3y = this._clamp(wp3y, margin, this.height - margin - 1);
-    waypoints.push({ x: wp3x, y: wp3y });
-    
-    // Fourth waypoint: complete more of the circle (opposite side)
-    let wp4x, wp4y;
-    if (fromLeft || fromRight) {
-      wp4x = wp3x;
-      wp4y = baseY - circleDir * (orbitRadius - 5);
-    } else {
-      wp4x = baseX - circleDir * (orbitRadius - 5);
-      wp4y = wp3y;
-    }
-    wp4x = this._clamp(wp4x, margin, this.width - margin - 1);
-    wp4y = this._clamp(wp4y, margin, this.height - margin - 1);
-    waypoints.push({ x: wp4x, y: wp4y });
-    
-    // Fifth waypoint: approach towards base area
-    let wp5x, wp5y;
-    wp5x = baseX + this.rng.int(-8, 8);
-    wp5y = baseY + this.rng.int(-8, 8);
-    // Make sure it's not too close to base
-    if (Math.abs(wp5x - baseX) < 5) wp5x = baseX + (this.rng.next() > 0.5 ? 6 : -6);
-    if (Math.abs(wp5y - baseY) < 5) wp5y = baseY + (this.rng.next() > 0.5 ? 6 : -6);
-    wp5x = this._clamp(wp5x, margin, this.width - margin - 1);
-    wp5y = this._clamp(wp5y, margin, this.height - margin - 1);
-    waypoints.push({ x: wp5x, y: wp5y });
     
     return waypoints;
   }
