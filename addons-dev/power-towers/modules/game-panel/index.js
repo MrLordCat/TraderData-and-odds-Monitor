@@ -1,8 +1,8 @@
 /**
  * Power Towers TD - Game Panel Sidebar Module
  * 
- * Integrates GameCore with sidebar UI
- * Exports factory function that receives { SidebarModule, registerModule }
+ * ATTACHED MODE: Shows launcher button to open game in separate window
+ * DETACHED MODE: Full game with dynamic canvas sizing
  */
 
 module.exports = function({ SidebarModule, registerModule }) {
@@ -30,7 +30,7 @@ module.exports = function({ SidebarModule, registerModule }) {
     
     CONFIG = require(path.join(corePath, 'config.js'));
     
-    console.log('[game-panel] Game modules loaded successfully');
+    console.log('[game-panel] Game modules loaded');
   } catch (err) {
     console.error('[game-panel] Failed to load game modules:', err);
   }
@@ -41,29 +41,57 @@ module.exports = function({ SidebarModule, registerModule }) {
     static icon = null;
     static order = 100;
     static detachable = true;
-    static detachWidth = 500;
-    static detachHeight = 700;
+    static detachWidth = 800;
+    static detachHeight = 950;
 
     constructor(options = {}) {
       super(options);
       
+      // Detached mode check (base class sets this.isDetached in detached window)
+      this.isDetached = this.isDetached || options.isDetached || false;
+      
+      // Game state (only used in detached mode)
       this.game = null;
       this.renderer = null;
       this.camera = null;
       this.canvas = null;
+      this.canvasContainer = null;
       this.elements = {};
+      this.resizeObserver = null;
       
       this.placingTower = false;
       this.selectedPath = null;
+      this.currentScreen = 'menu';
       
-      // Menu state
-      this.currentScreen = 'menu';  // 'menu', 'game', 'upgrades', 'tips', 'settings'
-      
-      // Saved state from detach/attach (passed via options)
       this._savedState = options.savedState || null;
+      
+      console.log('[game-panel] Constructor, isDetached:', this.isDetached);
     }
 
     getTemplate() {
+      // ═══════════════════════════════════════════════════════════════
+      // ATTACHED MODE: Simple launcher
+      // ═══════════════════════════════════════════════════════════════
+      if (!this.isDetached) {
+        return `
+          <div class="game-launcher">
+            <div class="launcher-content">
+              <div class="launcher-icon">🗼</div>
+              <h2 class="launcher-title">Power Towers TD</h2>
+              <p class="launcher-subtitle">Roguelike Tower Defense</p>
+              <button class="launcher-btn" id="btn-launch">
+                <span class="btn-icon">🎮</span>
+                <span class="btn-text">Запустить игру</span>
+              </button>
+              <p class="launcher-hint">Игра откроется в отдельном окне</p>
+            </div>
+          </div>
+        `;
+      }
+      
+      // ═══════════════════════════════════════════════════════════════
+      // DETACHED MODE: Full game
+      // ═══════════════════════════════════════════════════════════════
       return `
         <div class="game-panel-container">
           <!-- Main Menu Screen -->
@@ -100,56 +128,30 @@ module.exports = function({ SidebarModule, registerModule }) {
                 <button class="upgrade-btn" disabled>Lvl 0</button>
               </div>
               <div class="upgrade-item">
-                <span class="upgrade-icon">❤️</span>
-                <div class="upgrade-info">
-                  <span class="upgrade-name">Extra Lives</span>
-                  <span class="upgrade-desc">+5 lives per level</span>
-                </div>
-                <button class="upgrade-btn" disabled>Lvl 0</button>
-              </div>
-              <div class="upgrade-item">
                 <span class="upgrade-icon">⚡</span>
                 <div class="upgrade-info">
-                  <span class="upgrade-name">Energy Boost</span>
-                  <span class="upgrade-desc">+25 max energy per level</span>
+                  <span class="upgrade-name">Max Energy</span>
+                  <span class="upgrade-desc">+25 energy per level</span>
                 </div>
                 <button class="upgrade-btn" disabled>Lvl 0</button>
               </div>
             </div>
-            <p class="upgrade-note">Complete waves to earn upgrade points</p>
+            <p class="coming-soon">Coming in future update!</p>
           </div>
           
           <!-- Tips Screen -->
           <div class="game-screen tips-screen" id="screen-tips" style="display: none;">
             <div class="screen-header">
               <button class="back-btn" data-screen="menu">← Back</button>
-              <h3>Tips & Strategy</h3>
+              <h3>Tips & Guide</h3>
             </div>
             <div class="tips-list">
-              <div class="tip-item">
-                <span class="tip-icon">🔥</span>
-                <p><b>Fire</b> - High damage, burn DoT, AoE at higher tiers</p>
-              </div>
-              <div class="tip-item">
-                <span class="tip-icon">❄️</span>
-                <p><b>Ice</b> - Slows enemies, freeze at higher tiers</p>
-              </div>
-              <div class="tip-item">
-                <span class="tip-icon">⚡</span>
-                <p><b>Lightning</b> - Chain attacks, instant hit</p>
-              </div>
-              <div class="tip-item">
-                <span class="tip-icon">🌿</span>
-                <p><b>Nature</b> - Poison DoT, energy regen</p>
-              </div>
-              <div class="tip-item">
-                <span class="tip-icon">💀</span>
-                <p><b>Dark</b> - True damage, ignores armor</p>
-              </div>
-              <div class="tip-item">
-                <span class="tip-icon">💡</span>
-                <p><b>Tip:</b> Combine tower paths for synergies!</p>
-              </div>
+              <div class="tip-item">🔥 <b>Fire</b> - Burn DoT, AoE upgrades</div>
+              <div class="tip-item">❄️ <b>Ice</b> - Slows, can freeze</div>
+              <div class="tip-item">⚡ <b>Lightning</b> - Chain attacks</div>
+              <div class="tip-item">🌿 <b>Nature</b> - Poison + regen</div>
+              <div class="tip-item">💀 <b>Dark</b> - True damage</div>
+              <div class="tip-item">💡 Energy regenerates each wave!</div>
             </div>
           </div>
           
@@ -160,57 +162,23 @@ module.exports = function({ SidebarModule, registerModule }) {
               <h3>Settings</h3>
             </div>
             <div class="settings-list">
-              <label class="setting-item">
-                <span>Sound Effects</span>
-                <input type="checkbox" id="setting-sfx" checked disabled>
-              </label>
-              <label class="setting-item">
-                <span>Show Grid</span>
-                <input type="checkbox" id="setting-grid" checked>
-              </label>
-              <label class="setting-item">
-                <span>Show Range</span>
-                <input type="checkbox" id="setting-range" checked>
-              </label>
-              <label class="setting-item">
-                <span>Game Speed</span>
-                <select id="setting-speed">
-                  <option value="1">1x</option>
-                  <option value="1.5">1.5x</option>
-                  <option value="2">2x</option>
-                </select>
-              </label>
+              <div class="setting-item"><span>Sound Effects</span><button class="toggle-btn" disabled>OFF</button></div>
+              <div class="setting-item"><span>Music</span><button class="toggle-btn" disabled>OFF</button></div>
             </div>
-            <button class="menu-btn danger" id="btn-reset-progress">Reset Progress</button>
+            <p class="coming-soon">Coming in future update!</p>
           </div>
           
           <!-- Game Screen -->
           <div class="game-screen gameplay-screen" id="screen-game" style="display: none;">
-            <!-- Stats Bar -->
             <div class="game-stats-bar">
-              <div class="stat-item">
-                <span class="stat-icon">💰</span>
-                <span class="stat-value" id="stat-gold">100</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-icon">❤️</span>
-                <span class="stat-value" id="stat-lives">20</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-icon">⚡</span>
-                <span class="stat-value" id="stat-energy">50</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-icon">🌊</span>
-                <span class="stat-value" id="stat-wave">0</span>
-              </div>
+              <div class="stat-item"><span class="stat-icon">💰</span><span class="stat-value" id="stat-gold">100</span></div>
+              <div class="stat-item"><span class="stat-icon">❤️</span><span class="stat-value" id="stat-lives">20</span></div>
+              <div class="stat-item"><span class="stat-icon">⚡</span><span class="stat-value" id="stat-energy">50</span></div>
+              <div class="stat-item"><span class="stat-icon">🌊</span><span class="stat-value" id="stat-wave">0</span></div>
             </div>
             
-            <!-- Game Canvas -->
             <div class="canvas-container">
-              <canvas id="game-canvas" width="300" height="300"></canvas>
-              
-              <!-- Overlay -->
+              <canvas id="game-canvas"></canvas>
               <div class="game-overlay" id="game-overlay" style="display: none;">
                 <div class="overlay-content">
                   <h3 id="overlay-title">Game Over</h3>
@@ -220,25 +188,22 @@ module.exports = function({ SidebarModule, registerModule }) {
               </div>
             </div>
             
-            <!-- Tower Selection -->
             <div class="tower-select" id="tower-select">
-              <button class="tower-btn" data-path="fire" title="Fire - Burn, AoE">🔥</button>
-              <button class="tower-btn" data-path="ice" title="Ice - Slow, Freeze">❄️</button>
-              <button class="tower-btn" data-path="lightning" title="Lightning - Chain">⚡</button>
-              <button class="tower-btn" data-path="nature" title="Nature - Poison">🌿</button>
-              <button class="tower-btn" data-path="dark" title="Dark - True DMG">💀</button>
+              <button class="tower-btn" data-path="fire" title="Fire">🔥</button>
+              <button class="tower-btn" data-path="ice" title="Ice">❄️</button>
+              <button class="tower-btn" data-path="lightning" title="Lightning">⚡</button>
+              <button class="tower-btn" data-path="nature" title="Nature">🌿</button>
+              <button class="tower-btn" data-path="dark" title="Dark">💀</button>
             </div>
             
-            <!-- Controls -->
             <div class="game-controls">
               <button id="btn-start" class="game-btn primary">▶ Start Wave</button>
               <button id="btn-tower" class="game-btn" disabled>🗼 Tower (50g)</button>
             </div>
             
-            <!-- Tower Info -->
             <div class="tower-info" id="tower-info" style="display: none;">
               <div class="tower-info-header">
-                <span id="tower-name">Base Tower</span>
+                <span id="tower-name">Tower</span>
                 <span id="tower-tier">Tier 0</span>
               </div>
               <div class="tower-info-stats">
@@ -252,10 +217,9 @@ module.exports = function({ SidebarModule, registerModule }) {
               </div>
             </div>
             
-            <!-- Menu Button -->
             <div class="game-footer">
               <button class="back-btn small" data-screen="menu">☰ Menu</button>
-              <p class="hint">Select tower type, click canvas to place</p>
+              <p class="hint">Select tower, click to place</p>
             </div>
           </div>
         </div>
@@ -263,12 +227,59 @@ module.exports = function({ SidebarModule, registerModule }) {
     }
 
     getStyles() {
+      // ═══════════════════════════════════════════════════════════════
+      // ATTACHED MODE: Launcher styles
+      // ═══════════════════════════════════════════════════════════════
+      if (!this.isDetached) {
+        return `
+          .game-launcher {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+          }
+          .launcher-content { text-align: center; max-width: 280px; }
+          .launcher-icon { font-size: 64px; margin-bottom: 12px; }
+          .launcher-title { margin: 0 0 4px 0; font-size: 20px; color: #fff; }
+          .launcher-subtitle { margin: 0 0 24px 0; font-size: 13px; color: #a0aec0; }
+          .launcher-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+          }
+          .launcher-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+          }
+          .launcher-btn:active { transform: translateY(0); }
+          .launcher-btn .btn-icon { font-size: 20px; }
+          .launcher-hint { margin: 16px 0 0 0; font-size: 11px; color: #718096; }
+        `;
+      }
+      
+      // ═══════════════════════════════════════════════════════════════
+      // DETACHED MODE: Full game styles
+      // ═══════════════════════════════════════════════════════════════
       return `
         .game-panel-container {
-          padding: 8px;
+          padding: 12px;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 10px;
           font-family: 'Segoe UI', sans-serif;
           height: 100%;
           min-height: 0;
@@ -276,168 +287,154 @@ module.exports = function({ SidebarModule, registerModule }) {
           overflow: hidden;
         }
         
-        /* Screens */
-        .game-screen { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; overflow: hidden; }
-        .game-screen.menu-screen { align-items: center; justify-content: center; padding: 20px 10px; overflow: auto; }
+        .game-screen { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: hidden; }
+        .game-screen.menu-screen { align-items: center; justify-content: center; padding: 20px; }
         .gameplay-screen { flex: 1; min-height: 0; }
         
-        /* Menu Title */
-        .menu-title { text-align: center; margin-bottom: 20px; }
-        .menu-icon { font-size: 48px; display: block; margin-bottom: 8px; }
-        .menu-title h2 { margin: 0; font-size: 20px; color: #fff; }
-        .menu-subtitle { margin: 4px 0 0; font-size: 12px; color: #a0aec0; }
+        .menu-title { text-align: center; margin-bottom: 24px; }
+        .menu-icon { font-size: 64px; display: block; margin-bottom: 12px; }
+        .menu-title h2 { margin: 0; font-size: 28px; color: #fff; }
+        .menu-subtitle { margin: 6px 0 0; font-size: 15px; color: #a0aec0; }
         
-        /* Menu Buttons */
-        .menu-buttons { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 200px; }
+        .menu-buttons { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 260px; }
         .menu-btn {
-          padding: 12px 16px; border: none; border-radius: 8px;
-          background: #4a5568; color: white; cursor: pointer;
-          font-size: 14px; font-weight: 500; transition: all 0.2s;
-          text-align: center;
+          padding: 14px 20px; border: none; border-radius: 10px;
+          background: rgba(255,255,255,0.1); color: #e2e8f0;
+          font-size: 16px; cursor: pointer; transition: all 0.2s;
         }
-        .menu-btn:hover { background: #5a6578; transform: translateY(-1px); }
-        .menu-btn.primary { background: linear-gradient(135deg, #48bb78, #38a169); }
-        .menu-btn.primary:hover { background: linear-gradient(135deg, #38a169, #2f8e5c); }
-        .menu-btn.danger { background: #e53e3e; }
-        .menu-btn.danger:hover { background: #c53030; }
+        .menu-btn:hover { background: rgba(255,255,255,0.15); transform: translateX(4px); }
+        .menu-btn.primary { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; font-weight: 600; }
+        .menu-btn.primary:hover { box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3); }
         
-        .menu-footer { margin-top: auto; text-align: center; }
-        .menu-footer .version { font-size: 10px; color: #718096; }
+        .menu-footer { margin-top: 32px; }
+        .menu-footer .version { font-size: 11px; color: #718096; }
         
-        /* Screen Header */
-        .screen-header { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .screen-header h3 { margin: 0; font-size: 14px; flex: 1; }
+        .screen-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-shrink: 0; }
+        .screen-header h3 { margin: 0; font-size: 18px; color: #fff; }
         .back-btn {
-          padding: 4px 10px; border: 1px solid #4a5568; border-radius: 4px;
-          background: transparent; color: #a0aec0; cursor: pointer;
-          font-size: 11px; transition: all 0.2s;
+          padding: 8px 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+          background: transparent; color: #a0aec0; font-size: 13px; cursor: pointer;
         }
-        .back-btn:hover { background: #4a5568; color: #fff; }
-        .back-btn.small { padding: 3px 8px; font-size: 10px; }
+        .back-btn:hover { background: rgba(255,255,255,0.1); }
+        .back-btn.small { padding: 6px 10px; font-size: 12px; }
         
-        /* Tips */
-        .tips-list { display: flex; flex-direction: column; gap: 8px; }
-        .tip-item { display: flex; gap: 8px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 6px; }
-        .tip-icon { font-size: 20px; }
-        .tip-item p { margin: 0; font-size: 11px; color: #cbd5e0; line-height: 1.4; }
-        
-        /* Upgrades */
-        .upgrades-list { display: flex; flex-direction: column; gap: 8px; }
-        .upgrade-item { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; }
-        .upgrade-icon { font-size: 24px; }
+        .upgrades-list, .tips-list, .settings-list { display: flex; flex-direction: column; gap: 10px; }
+        .upgrade-item, .setting-item {
+          display: flex; align-items: center; gap: 12px;
+          padding: 14px; background: rgba(0,0,0,0.3); border-radius: 10px;
+        }
+        .upgrade-icon { font-size: 28px; }
         .upgrade-info { flex: 1; }
-        .upgrade-name { display: block; font-size: 12px; font-weight: 500; color: #fff; }
-        .upgrade-desc { display: block; font-size: 10px; color: #a0aec0; }
-        .upgrade-btn { padding: 6px 12px; border: 1px solid #4a5568; border-radius: 4px; background: #2d3748; color: #a0aec0; font-size: 10px; cursor: pointer; }
-        .upgrade-btn:not(:disabled):hover { background: #4a5568; }
-        .upgrade-note { text-align: center; font-size: 10px; color: #718096; font-style: italic; }
+        .upgrade-name { display: block; font-weight: 500; color: #fff; font-size: 15px; }
+        .upgrade-desc { font-size: 12px; color: #a0aec0; }
+        .upgrade-btn { padding: 8px 14px; border: none; border-radius: 6px; background: rgba(255,255,255,0.1); color: #a0aec0; }
+        .tip-item { padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 14px; color: #e2e8f0; }
+        .setting-item { justify-content: space-between; font-size: 14px; color: #e2e8f0; }
+        .toggle-btn { padding: 6px 14px; border: none; border-radius: 6px; background: rgba(255,255,255,0.1); color: #a0aec0; }
+        .coming-soon { text-align: center; color: #718096; font-size: 13px; margin-top: 16px; }
         
-        /* Settings */
-        .settings-list { display: flex; flex-direction: column; gap: 8px; }
-        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 12px; cursor: pointer; }
-        .setting-item:hover { background: rgba(0,0,0,0.4); }
-        .setting-item input, .setting-item select { accent-color: #48bb78; }
-        .setting-item select { padding: 4px; border-radius: 4px; background: #2d3748; color: #fff; border: 1px solid #4a5568; }
-        
-        /* Game Screen */
         .game-stats-bar {
-          display: flex;
-          justify-content: space-between;
-          padding: 6px 10px;
-          background: rgba(0,0,0,0.4);
-          border-radius: 6px;
-          font-size: 12px;
+          display: flex; justify-content: space-between;
+          padding: 10px 14px; background: rgba(0,0,0,0.4); border-radius: 8px;
+          font-size: 15px; flex-shrink: 0;
         }
-        .stat-item { display: flex; align-items: center; gap: 4px; }
-        .stat-icon { font-size: 14px; }
-        .stat-value { font-weight: bold; min-width: 24px; }
+        .stat-item { display: flex; align-items: center; gap: 6px; }
+        .stat-icon { font-size: 18px; }
+        .stat-value { font-weight: bold; min-width: 28px; }
         .stat-value.danger { color: #fc8181; }
         .stat-value.warning { color: #f6ad55; }
         
         .canvas-container { 
-          position: relative; 
-          border-radius: 8px; 
-          overflow: hidden; 
-          flex: 1; 
-          min-height: 0; 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          position: relative; border-radius: 10px; overflow: hidden; 
+          flex: 1; min-height: 0;
+          display: flex; align-items: center; justify-content: center;
           background: #0a0a12;
         }
         #game-canvas {
           display: block;
-          max-width: 100%;
-          max-height: 100%;
-          aspect-ratio: 1 / 1;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
           cursor: crosshair;
         }
         
         .game-overlay {
           position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0,0,0,0.8);
+          background: rgba(0,0,0,0.85);
           display: flex; align-items: center; justify-content: center;
         }
-        .overlay-content { text-align: center; padding: 20px; }
-        .overlay-content h3 { margin: 0 0 10px; font-size: 20px; color: #fc8181; }
-        .overlay-content p { margin: 0 0 15px; color: #a0aec0; white-space: pre-line; }
+        .overlay-content { text-align: center; }
+        .overlay-content h3 { margin: 0 0 10px; font-size: 28px; color: #fff; }
+        .overlay-content p { margin: 0 0 20px; color: #a0aec0; font-size: 16px; }
         
         .tower-select {
-          display: flex; gap: 4px; justify-content: center;
-          padding: 6px; background: rgba(0,0,0,0.3); border-radius: 6px;
-          opacity: 0.5; pointer-events: none; transition: opacity 0.2s;
-          flex-shrink: 0;
+          display: flex; justify-content: center; gap: 10px;
+          padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; flex-shrink: 0;
         }
-        .tower-select.active { opacity: 1; pointer-events: auto; }
         .tower-btn {
-          width: 36px; height: 36px;
-          border: 2px solid #4a5568; border-radius: 6px;
-          background: #2d3748; font-size: 18px;
-          cursor: pointer; transition: all 0.2s;
+          width: 52px; height: 52px;
+          border: 2px solid transparent; border-radius: 10px;
+          background: rgba(255,255,255,0.1);
+          font-size: 24px; cursor: pointer; transition: all 0.2s;
         }
-        .tower-btn:hover { border-color: #718096; background: #3d4758; }
-        .tower-btn.selected { border-color: #48bb78; background: rgba(72, 187, 120, 0.2); }
+        .tower-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.1); }
+        .tower-btn.selected { border-color: #48bb78; background: rgba(72,187,120,0.2); }
         
-        .game-controls { display: flex; gap: 8px; flex-shrink: 0; }
+        .game-controls { display: flex; gap: 10px; flex-shrink: 0; }
         .game-btn {
-          flex: 1; padding: 10px; border: none; border-radius: 6px;
-          background: #4a5568; color: white; cursor: pointer;
-          font-size: 12px; font-weight: 500; transition: all 0.2s;
+          flex: 1; padding: 14px; border: none; border-radius: 8px;
+          font-size: 15px; font-weight: 500; cursor: pointer; transition: all 0.2s;
         }
-        .game-btn:hover:not(:disabled) { background: #5a6578; }
+        .game-btn.primary { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; }
+        .game-btn.primary:hover { box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3); }
+        .game-btn:not(.primary) { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+        .game-btn:not(.primary):hover { background: rgba(255,255,255,0.15); }
         .game-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .game-btn.primary { background: #48bb78; }
-        .game-btn.primary:hover:not(:disabled) { background: #38a169; }
+        .game-btn.small { flex: none; padding: 10px 16px; font-size: 13px; }
+        .game-btn.danger { background: rgba(252,129,129,0.2); color: #fc8181; }
         .game-btn.active { background: #ecc94b; color: #1a202c; }
-        .game-btn.danger { background: #e53e3e; }
-        .game-btn.small { padding: 6px 10px; font-size: 11px; }
         
         .tower-info {
-          padding: 8px; background: rgba(0,0,0,0.4);
-          border-radius: 6px; font-size: 11px;
-          flex-shrink: 0;
+          padding: 12px; background: rgba(0,0,0,0.4); border-radius: 8px; flex-shrink: 0;
         }
-        .tower-info-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: bold; }
-        .tower-info-stats { display: flex; gap: 12px; margin-bottom: 8px; color: #a0aec0; }
-        .tower-info-actions { display: flex; gap: 6px; }
+        .tower-info-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .tower-info-header span:first-child { font-weight: 600; color: #fff; font-size: 15px; }
+        .tower-info-header span:last-child { color: #a0aec0; font-size: 13px; }
+        .tower-info-stats { display: flex; gap: 16px; margin-bottom: 10px; font-size: 14px; color: #e2e8f0; }
+        .tower-info-actions { display: flex; gap: 10px; }
         
-        .game-footer { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-shrink: 0; }
-        .game-footer .hint { font-size: 10px; color: #718096; margin: 0; }
-        
-        .game-stats-bar { flex-shrink: 0; }
+        .game-footer { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+        .game-footer .hint { margin: 0; font-size: 12px; color: #718096; flex: 1; text-align: right; }
       `;
     }
 
     onMount(container) {
       super.onMount(container);
       
-      // Inject styles
-      const styleEl = document.createElement('style');
-      styleEl.textContent = this.getStyles();
-      container.appendChild(styleEl);
+      console.log('[game-panel] onMount, isDetached:', this.isDetached);
       
-      // Screen refs (IDs are screen-<name>)
+      // ═══════════════════════════════════════════════════════════════
+      // ATTACHED MODE: Setup launch button
+      // ═══════════════════════════════════════════════════════════════
+      if (!this.isDetached) {
+        const launchBtn = container.querySelector('#btn-launch');
+        if (launchBtn) {
+          launchBtn.addEventListener('click', () => {
+            console.log('[game-panel] Launch button clicked');
+            // Request detach via IPC
+            const { ipcRenderer } = require('electron');
+            ipcRenderer.invoke('module-detach', { moduleId: 'game-panel' });
+          });
+        }
+        return;
+      }
+      
+      // ═══════════════════════════════════════════════════════════════
+      // DETACHED MODE: Full game setup
+      // ═══════════════════════════════════════════════════════════════
+      this.setupDetachedGame(container);
+    }
+    
+    setupDetachedGame(container) {
+      // Cache screen elements
       this.screens = {
         menu: container.querySelector('#screen-menu'),
         upgrades: container.querySelector('#screen-upgrades'),
@@ -446,8 +443,9 @@ module.exports = function({ SidebarModule, registerModule }) {
         game: container.querySelector('#screen-game')
       };
       
-      // Game DOM refs (will be used when game screen is active)
+      // Cache game elements
       this.canvas = container.querySelector('#game-canvas');
+      this.canvasContainer = container.querySelector('.canvas-container');
       this.elements = {
         gold: container.querySelector('#stat-gold'),
         lives: container.querySelector('#stat-lives'),
@@ -470,218 +468,169 @@ module.exports = function({ SidebarModule, registerModule }) {
         btnSell: container.querySelector('#btn-sell')
       };
       
-      // Setup screen navigation
+      // Setup navigation
       this.setupScreenNavigation(container);
       
-      // Check for saved state from detach/attach (passed via IPC)
+      // Setup resize observer
+      this.setupResizeObserver();
+      
+      // Check saved state
       if (this._savedState) {
-        console.log('[game-panel] Restoring from saved state (detach/attach)');
         this.restoreFromSavedState(this._savedState);
       } else {
-        // Show menu initially
         this.showScreen('menu');
       }
-      
-      console.log('[game-panel] Mounted, hasSavedState:', !!this._savedState);
     }
     
-    /**
-     * Restore game from saved state (from detach/attach)
-     */
-    restoreFromSavedState(state) {
-      if (!state) return;
+    setupResizeObserver() {
+      if (!this.canvasContainer) return;
       
-      // Restore screen
-      const savedScreen = state.currentScreen || 'menu';
-      this.showScreen(savedScreen);
+      this.resizeObserver = new ResizeObserver(() => {
+        this.resizeCanvas();
+      });
+      this.resizeObserver.observe(this.canvasContainer);
       
-      // If game was active, restore game state
-      if (savedScreen === 'game' && state.gameState) {
-        console.log('[game-panel] Restoring game state');
-        this.initializeGameWithState(state.gameState);
+      // Initial resize
+      setTimeout(() => this.resizeCanvas(), 50);
+    }
+    
+    resizeCanvas() {
+      if (!this.canvas || !this.canvasContainer) return;
+      
+      const rect = this.canvasContainer.getBoundingClientRect();
+      const size = Math.floor(Math.min(rect.width, rect.height) - 10);
+      
+      if (size < 200 || Math.abs(this.canvas.width - size) < 5) return;
+      
+      console.log('[game-panel] Canvas resize:', size);
+      
+      this.canvas.width = size;
+      this.canvas.height = size;
+      
+      if (this.camera) {
+        this.camera.setViewportSize(size, size);
       }
+      if (this.renderer) {
+        this.renderer.width = size;
+        this.renderer.height = size;
+      }
+      
+      this.renderGame();
     }
     
-    /**
-     * Get serialized state for saving (called before detach/attach)
-     */
     getSerializedState() {
-      const state = {
-        currentScreen: this.currentScreen
-      };
-      
-      // If game is active, serialize game state
-      if (this.game) {
-        state.gameState = this.game.serialize();
-      }
-      
-      console.log('[game-panel] Serialized state, screen:', state.currentScreen, 'hasGame:', !!state.gameState);
+      const state = { currentScreen: this.currentScreen };
+      if (this.game) state.gameState = this.game.serialize();
       return state;
     }
     
     setupScreenNavigation(container) {
-      // Menu buttons
       container.querySelectorAll('.menu-btn[data-screen]').forEach(btn => {
         btn.addEventListener('click', () => {
           const screen = btn.dataset.screen;
-          console.log('[game-panel] Button clicked, switching to:', screen);
           this.showScreen(screen);
-          
-          // Initialize game when entering game screen for first time
           if (screen === 'game' && !this.game) {
-            console.log('[game-panel] First time entering game, initializing...');
             this.initializeGame();
           }
         });
       });
       
-      // Back buttons
       container.querySelectorAll('.back-btn[data-screen]').forEach(btn => {
         btn.addEventListener('click', () => {
           const screen = btn.dataset.screen;
           this.showScreen(screen);
-          
-          // Reset game when going back to menu (new game on next Start)
           if (screen === 'menu' && this.game) {
-            console.log('[game-panel] Returning to menu - resetting game');
             this.resetGame();
           }
         });
       });
     }
     
-    /**
-     * Reset game state for a fresh start
-     */
     resetGame() {
-      // Stop any running game loop
       if (this.game) {
-        if (this.game.running && !this.game.paused) {
-          this.game.pause();
-        }
+        if (this.game.running && !this.game.paused) this.game.pause();
         this.game = null;
       }
-      
-      // Clear renderer
-      if (this.renderer) {
-        this.renderer = null;
-      }
-      
-      // Reset UI state
+      this.renderer = null;
       this.placingTower = false;
       this.selectedPath = null;
-      
-      // Reset button text
-      if (this.elements.btnStart) {
-        this.elements.btnStart.textContent = '▶ Start Wave';
-      }
-      
-      console.log('[game-panel] Game reset complete');
+      if (this.elements.btnStart) this.elements.btnStart.textContent = '▶ Start Wave';
     }
     
     showScreen(screenId) {
       this.currentScreen = screenId;
-      
-      console.log('[game-panel] showScreen:', screenId);
-      
       Object.entries(this.screens).forEach(([id, el]) => {
-        if (el) {
-          el.style.display = id === screenId ? 'flex' : 'none';
-        } else {
-          console.warn(`[game-panel] Screen ${id} element not found!`);
-        }
+        if (el) el.style.display = id === screenId ? 'flex' : 'none';
       });
+      if (screenId === 'game') {
+        requestAnimationFrame(() => this.resizeCanvas());
+      }
     }
     
     initializeGame() {
-      // Check modules loaded
       if (!GameCore || !GameRenderer || !Camera) {
         this.showError('Failed to load game engine');
         return;
       }
       
-      // Create new instances
+      // Initial canvas size
+      this.resizeCanvas();
+      
       this.camera = new Camera();
       this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-      this.camera.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2, true);
       
       this.game = new GameCore();
-      
-      // Set canvas size from config
-      this.canvas.width = CONFIG.CANVAS_WIDTH;
-      this.canvas.height = CONFIG.CANVAS_HEIGHT;
-      
-      // Update camera viewport size
-      this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-      
-      // Create new renderer (canvas specific)
       this.renderer = new GameRenderer(this.canvas, this.camera);
+      
+      // Center on base
+      const basePos = this.game.map.base;
+      if (basePos) this.camera.centerOn(basePos.x, basePos.y);
       
       this.setupEventListeners();
       this.setupGameEvents();
-      
       this.renderGame();
       this.updateUI(this.game.getState());
       
-      console.log('[game-panel] Game initialized, running:', this.game.running);
+      console.log('[game-panel] Game initialized');
     }
     
-    /**
-     * Initialize game with saved state (from detach/attach)
-     */
-    initializeGameWithState(gameState) {
-      // Check modules loaded
-      if (!GameCore || !GameRenderer || !Camera) {
-        this.showError('Failed to load game engine');
-        return;
-      }
+    restoreFromSavedState(state) {
+      if (!state) return;
       
-      // Create new instances
-      this.camera = new Camera();
-      this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-      this.camera.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2, true);
+      this.currentScreen = state.currentScreen || 'menu';
       
-      this.game = new GameCore();
-      
-      // Restore state from serialized data
-      const restored = this.game.restoreFromSerialized(gameState);
-      
-      if (!restored) {
-        console.warn('[game-panel] Failed to restore game state, starting fresh');
-      }
-      
-      // Set canvas size from config
-      this.canvas.width = CONFIG.CANVAS_WIDTH;
-      this.canvas.height = CONFIG.CANVAS_HEIGHT;
-      
-      // Update camera viewport size
-      this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-      
-      // Create new renderer (canvas specific)
-      this.renderer = new GameRenderer(this.canvas, this.camera);
-      
-      this.setupEventListeners();
-      this.setupGameEvents();
-      
-      this.renderGame();
-      this.updateUI(this.game.getState());
-      
-      // Update button states based on restored game state
-      if (this.game.gameOver) {
-        this.elements.btnStart.textContent = '▶ Start';
-        this.elements.btnTower.disabled = true;
-      } else if (this.game.running && !this.game.paused) {
-        this.elements.btnStart.textContent = '⏸ Pause';
-        this.elements.btnTower.disabled = this.game.economy.gold < 50;
-      } else if (this.game.paused) {
-        this.elements.btnStart.textContent = '▶ Resume';
-        this.elements.btnTower.disabled = true;
+      if (state.currentScreen === 'game' && state.gameState) {
+        this.resizeCanvas();
+        
+        this.camera = new Camera();
+        this.camera.setViewportSize(this.canvas.width, this.canvas.height);
+        
+        this.game = GameCore.deserialize(state.gameState);
+        this.renderer = new GameRenderer(this.canvas, this.camera);
+        
+        const basePos = this.game.map.base;
+        if (basePos) this.camera.centerOn(basePos.x, basePos.y);
+        
+        this.setupEventListeners();
+        this.setupGameEvents();
+        this.showScreen('game');
+        this.renderGame();
+        this.updateUI(this.game.getState());
+        
+        // Update buttons
+        if (this.game.gameOver) {
+          this.elements.btnStart.textContent = '▶ Start';
+          this.elements.btnTower.disabled = true;
+        } else if (this.game.running && !this.game.paused) {
+          this.elements.btnStart.textContent = '⏸ Pause';
+          this.elements.btnTower.disabled = this.game.economy.gold < 50;
+        } else if (this.game.paused) {
+          this.elements.btnStart.textContent = '▶ Resume';
+          this.elements.btnTower.disabled = true;
+        }
       } else {
-        this.elements.btnStart.textContent = '▶ Start Wave';
-        this.elements.btnTower.disabled = true;
+        this.showScreen(this.currentScreen);
       }
-      
-      console.log('[game-panel] Game restored from state, running:', this.game.running, 'paused:', this.game.paused);
     }
 
     setupEventListeners() {
@@ -689,75 +638,85 @@ module.exports = function({ SidebarModule, registerModule }) {
       
       el.btnStart.addEventListener('click', () => this.toggleGame());
       el.btnTower.addEventListener('click', () => this.togglePlacementMode());
-      
-      el.towerSelect.querySelectorAll('.tower-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => this.selectPath(e.currentTarget.dataset.path));
-      });
-      
-      this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-      this.canvas.addEventListener('mousemove', (e) => this.handleCanvasHover(e));
-      this.canvas.addEventListener('mouseleave', () => {
-        this.renderer.clearHover();
-        if (this.camera) this.camera.endDrag();
-      });
-      
-      // Camera controls
-      this.canvas.addEventListener('wheel', (e) => this.handleCanvasWheel(e), { passive: false });
-      this.canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
-      this.canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
-      this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());  // Disable right-click menu
-      
       el.overlayBtn.addEventListener('click', () => this.restartGame());
       el.btnUpgrade.addEventListener('click', () => this.upgradeSelectedTower());
       el.btnSell.addEventListener('click', () => this.sellSelectedTower());
       
-      // Handle window resize for canvas scaling
-      this.resizeObserver = new ResizeObserver(() => this.handleCanvasResize());
-      this.resizeObserver.observe(this.canvas.parentElement);
-    }
-    
-    handleCanvasResize() {
-      if (!this.canvas || !this.camera) return;
+      // Tower path selection
+      el.towerSelect.querySelectorAll('.tower-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          el.towerSelect.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          this.selectedPath = btn.dataset.path;
+        });
+      });
       
-      const container = this.canvas.parentElement;
-      if (!container) return;
+      // Select fire by default
+      const fireBtn = el.towerSelect.querySelector('[data-path="fire"]');
+      if (fireBtn) {
+        fireBtn.classList.add('selected');
+        this.selectedPath = 'fire';
+      }
       
-      // Get container size
-      const rect = container.getBoundingClientRect();
-      const size = Math.min(rect.width, rect.height);
+      // Canvas events
+      this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+      this.canvas.addEventListener('mousemove', (e) => this.handleCanvasMove(e));
+      this.canvas.addEventListener('wheel', (e) => this.handleCanvasWheel(e));
       
-      // Keep canvas square and update internal resolution
-      if (size > 0) {
-        this.canvas.width = CONFIG.CANVAS_WIDTH;
-        this.canvas.height = CONFIG.CANVAS_HEIGHT;
-        this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-        
-        // Re-render
-        if (this.renderer && this.game) {
+      // Pan with middle/right mouse
+      let isPanning = false, lastX = 0, lastY = 0;
+      
+      this.canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 1 || e.button === 2) {
+          isPanning = true;
+          lastX = e.clientX;
+          lastY = e.clientY;
+          e.preventDefault();
+        }
+      });
+      
+      this.canvas.addEventListener('mousemove', (e) => {
+        if (isPanning && this.camera) {
+          this.camera.pan(-(e.clientX - lastX) / this.camera.zoom, -(e.clientY - lastY) / this.camera.zoom);
+          lastX = e.clientX;
+          lastY = e.clientY;
           this.renderGame();
         }
-      }
+      });
+      
+      window.addEventListener('mouseup', (e) => {
+        if (e.button === 1 || e.button === 2) isPanning = false;
+      });
+      
+      this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
     setupGameEvents() {
-      this.game.on(GameEvents.GAME_TICK, ({ state }) => {
+      if (!this.game) return;
+      
+      this.game.on(GameEvents.STATE_CHANGE, (state) => {
         this.updateUI(state);
         this.renderGame();
       });
       
-      this.game.on(GameEvents.GAME_OVER, ({ wave, stats }) => {
-        this.showOverlay('Game Over', `Reached Wave ${wave}\nKills: ${stats.enemiesKilled}`, 'Restart');
-        this.elements.btnStart.textContent = '▶ Start';
-        this.elements.btnTower.disabled = true;
-        this.exitPlacementMode();
-      });
-      
-      this.game.on(GameEvents.GOLD_CHANGED, ({ gold }) => {
-        this.elements.btnTower.disabled = !this.game.running || gold < 50;
-      });
-      
       this.game.on(GameEvents.TOWER_PLACED, () => {
-        this.exitPlacementMode();
+        this.placingTower = false;
+        this.elements.btnTower.classList.remove('active');
+      });
+      
+      this.game.on(GameEvents.TOWER_SELECTED, (tower) => {
+        tower ? this.showTowerInfo(tower) : this.hideTowerInfo();
+      });
+      
+      this.game.on(GameEvents.WAVE_COMPLETE, () => {
+        this.elements.btnStart.textContent = '▶ Start Wave';
+        this.elements.btnTower.disabled = false;
+      });
+      
+      this.game.on(GameEvents.GAME_OVER, (data) => {
+        this.showOverlay('Game Over!', `Reached Wave ${data.wave}`, 'Try Again');
+        this.elements.btnStart.disabled = true;
+        this.elements.btnTower.disabled = true;
       });
     }
 
@@ -769,119 +728,92 @@ module.exports = function({ SidebarModule, registerModule }) {
         return;
       }
       
-      if (this.game.running && !this.game.paused) {
-        this.game.pause();
-        this.elements.btnStart.textContent = '▶ Resume';
+      if (!this.game.running) {
+        this.game.start();
+        this.elements.btnStart.textContent = '⏸ Pause';
         this.elements.btnTower.disabled = true;
+        this.gameLoop();
       } else if (this.game.paused) {
         this.game.resume();
         this.elements.btnStart.textContent = '⏸ Pause';
-        this.elements.btnTower.disabled = this.game.economy.gold < 50;
+        this.gameLoop();
       } else {
-        this.game.start();
-        this.elements.btnStart.textContent = '⏸ Pause';
-        this.elements.btnTower.disabled = this.game.economy.gold < 50;
+        this.game.pause();
+        this.elements.btnStart.textContent = '▶ Resume';
       }
+    }
+
+    gameLoop() {
+      if (!this.game || !this.game.running || this.game.paused) return;
+      this.game.tick();
+      this.renderGame();
+      requestAnimationFrame(() => this.gameLoop());
     }
 
     restartGame() {
-      if (!this.game) return;
-      this.game.reset();
       this.hideOverlay();
-      this.elements.btnStart.textContent = '▶ Start';
-      this.elements.btnTower.disabled = true;
-      this.exitPlacementMode();
-      this.updateUI(this.game.getState());
+      this.game = new GameCore();
+      
+      const basePos = this.game.map.base;
+      if (basePos && this.camera) this.camera.centerOn(basePos.x, basePos.y);
+      
+      this.setupGameEvents();
       this.renderGame();
+      this.updateUI(this.game.getState());
+      
+      this.elements.btnStart.disabled = false;
+      this.elements.btnStart.textContent = '▶ Start Wave';
+      this.elements.btnTower.disabled = true;
     }
 
     togglePlacementMode() {
-      if (this.placingTower) {
-        this.exitPlacementMode();
-      } else {
-        this.enterPlacementMode();
+      this.placingTower = !this.placingTower;
+      this.elements.btnTower.classList.toggle('active', this.placingTower);
+      if (this.placingTower && this.game.selectedTower) {
+        this.game.deselectTower();
       }
-    }
-
-    enterPlacementMode() {
-      this.placingTower = true;
-      this.elements.btnTower.classList.add('active');
-      this.elements.towerSelect.classList.add('active');
-      if (!this.selectedPath) this.selectPath('fire');
-    }
-
-    exitPlacementMode() {
-      this.placingTower = false;
-      this.selectedPath = null;
-      this.elements.btnTower.classList.remove('active');
-      this.elements.towerSelect.classList.remove('active');
-      this.elements.towerSelect.querySelectorAll('.tower-btn').forEach(btn => {
-        btn.classList.remove('selected');
-      });
-      this.renderer.clearHover();
-    }
-
-    selectPath(path) {
-      this.selectedPath = path;
-      this.elements.towerSelect.querySelectorAll('.tower-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.path === path);
-      });
     }
 
     handleCanvasClick(e) {
-      if (!this.game) return;
+      if (!this.game || !this.camera) return;
       
-      // Don't handle click if camera was dragging
-      if (this.camera && this.camera.isDragging) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
       
-      const { gridX, gridY, worldX, worldY } = this.renderer.screenToGrid(e.clientX, e.clientY);
+      const worldPos = this.camera.screenToWorld(screenX, screenY);
+      const gridX = Math.floor(worldPos.x / CONFIG.GRID_SIZE);
+      const gridY = Math.floor(worldPos.y / CONFIG.GRID_SIZE);
       
-      if (this.placingTower && this.selectedPath) {
-        if (this.game.placeTower(gridX, gridY, this.selectedPath)) {
-          if (!e.shiftKey) this.exitPlacementMode();
-        }
-        return;
-      }
-      
-      // Tower selection (using world coordinates)
-      const clickedTower = this.game.towers.find(t => {
-        const dx = t.x - worldX, dy = t.y - worldY;
-        return Math.sqrt(dx * dx + dy * dy) < t.size;
-      });
-      
-      if (clickedTower) {
-        this.game.selectTower(clickedTower.id);
-        this.showTowerInfo(clickedTower);
+      if (this.placingTower) {
+        const pathIndex = TOWER_PATHS.findIndex(p => p.id === this.selectedPath);
+        this.game.placeTower(gridX, gridY, pathIndex >= 0 ? pathIndex : 0);
       } else {
-        this.game.selectTower(null);
-        this.hideTowerInfo();
+        this.game.selectTowerAt(gridX, gridY);
       }
+      
+      this.renderGame();
     }
 
-    handleCanvasHover(e) {
-      if (!this.game) return;
+    handleCanvasMove(e) {
+      if (!this.game || !this.renderer || !this.camera) return;
       
-      // Handle camera dragging
-      if (this.camera && this.camera.isDragging) {
-        const rect = this.canvas.getBoundingClientRect();
-        const canvasX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
-        const canvasY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
-        this.camera.updateDrag(canvasX, canvasY);
-        this.renderGame();
-        return;
+      const rect = this.canvas.getBoundingClientRect();
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      
+      const worldPos = this.camera.screenToWorld(screenX, screenY);
+      const gridX = Math.floor(worldPos.x / CONFIG.GRID_SIZE);
+      const gridY = Math.floor(worldPos.y / CONFIG.GRID_SIZE);
+      
+      if (this.placingTower) {
+        const canPlace = this.game.canPlaceTower(gridX, gridY);
+        this.renderer.setHoverCell(gridX, gridY, canPlace);
+      } else {
+        this.renderer.setHoverCell(-1, -1, false);
       }
       
-      if (!this.placingTower) return;
-      
-      const { gridX, gridY } = this.renderer.screenToGrid(e.clientX, e.clientY);
-      
-      // Check grid bounds (100x100 for 2000/20)
-      const maxGrid = Math.floor(CONFIG.MAP_WIDTH / CONFIG.GRID_SIZE);
-      const isValid = !this.game.pathCells.some(c => c.x === gridX && c.y === gridY) &&
-                     !this.game.towers.some(t => t.gridX === gridX && t.gridY === gridY) &&
-                     gridX >= 0 && gridX < maxGrid && gridY >= 0 && gridY < maxGrid;
-      
-      this.renderer.setHover(gridX, gridY, isValid);
+      this.renderGame();
     }
 
     handleCanvasWheel(e) {
@@ -889,45 +821,29 @@ module.exports = function({ SidebarModule, registerModule }) {
       e.preventDefault();
       
       const rect = this.canvas.getBoundingClientRect();
-      const canvasX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
-      const canvasY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
       
-      // Zoom in/out
       const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-      this.camera.zoomBy(zoomFactor, canvasX, canvasY);
+      this.camera.zoomAt(mouseX, mouseY, zoomFactor);
       this.renderGame();
-    }
-
-    handleCanvasMouseDown(e) {
-      if (!this.camera) return;
-      
-      // Middle mouse or right mouse for camera drag
-      if (e.button === 1 || e.button === 2) {
-        e.preventDefault();
-        const rect = this.canvas.getBoundingClientRect();
-        const canvasX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
-        const canvasY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
-        this.camera.startDrag(canvasX, canvasY);
-      }
-    }
-
-    handleCanvasMouseUp(e) {
-      if (!this.camera) return;
-      
-      if (e.button === 1 || e.button === 2) {
-        this.camera.endDrag();
-      }
     }
 
     showTowerInfo(tower) {
       const el = this.elements;
-      el.towerInfo.style.display = 'block';
-      el.towerName.textContent = tower.type || 'Base Tower';
+      const pathInfo = TOWER_PATHS[tower.pathIndex];
+      
+      el.towerName.textContent = pathInfo ? pathInfo.name : 'Tower';
       el.towerTier.textContent = `Tier ${tower.tier}`;
-      el.towerDmg.textContent = tower.damage;
-      el.towerRng.textContent = tower.range;
-      el.towerSpd.textContent = tower.fireRate.toFixed(1);
-      el.btnUpgrade.disabled = tower.tier >= 3;
+      el.towerDmg.textContent = tower.damage.toFixed(0);
+      el.towerRng.textContent = tower.range.toFixed(0);
+      el.towerSpd.textContent = tower.attackSpeed.toFixed(1);
+      
+      el.towerInfo.style.display = 'block';
+      
+      const canUpgrade = this.game.economy.gold >= tower.upgradeCost && tower.tier < 3;
+      el.btnUpgrade.disabled = !canUpgrade;
+      el.btnUpgrade.textContent = tower.tier >= 3 ? 'MAX' : `⬆️ ${tower.upgradeCost}g`;
     }
 
     hideTowerInfo() {
@@ -936,15 +852,8 @@ module.exports = function({ SidebarModule, registerModule }) {
 
     upgradeSelectedTower() {
       if (!this.game?.selectedTower) return;
-      const tower = this.game.selectedTower;
-      
-      if (tower.tier === 0) {
-        this.game.upgradeTower(tower.id, this.selectedPath || 'fire');
-      } else {
-        this.game.upgradeTower(tower.id);
-      }
-      
-      if (this.game.selectedTower) this.showTowerInfo(this.game.selectedTower);
+      this.game.upgradeTower(this.game.selectedTower.id);
+      this.showTowerInfo(this.game.selectedTower);
     }
 
     sellSelectedTower() {
@@ -955,6 +864,8 @@ module.exports = function({ SidebarModule, registerModule }) {
 
     updateUI(state) {
       const el = this.elements;
+      if (!el.gold) return;
+      
       el.gold.textContent = state.gold;
       el.lives.textContent = state.lives;
       el.lives.classList.toggle('danger', state.lives <= 5);
@@ -965,12 +876,7 @@ module.exports = function({ SidebarModule, registerModule }) {
 
     renderGame() {
       if (!this.game || !this.renderer) return;
-      
-      // Update camera smooth scrolling
-      if (this.camera) {
-        this.camera.update();
-      }
-      
+      if (this.camera) this.camera.update();
       this.renderer.render(this.game.getRenderData());
     }
 
@@ -998,18 +904,15 @@ module.exports = function({ SidebarModule, registerModule }) {
     }
 
     onUnmount() {
-      // Cleanup resize observer
       if (this.resizeObserver) {
         this.resizeObserver.disconnect();
         this.resizeObserver = null;
       }
       
-      // Pause game if running (to preserve state)
       if (this.game && this.game.running && !this.game.paused) {
         this.game.pause();
       }
       
-      // Clean up renderer but keep game state available for serialization
       this.renderer = null;
       this.camera = null;
       
