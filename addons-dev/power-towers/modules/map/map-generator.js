@@ -421,126 +421,182 @@ class MapGenerator {
   _generateSafePath(startX, startY, endX, endY) {
     const path = [];
     const margin = GENERATOR_CONFIG.PATH_MARGIN;
-    const clearance = GENERATOR_CONFIG.PATH_CLEARANCE;
     
     // Generate mandatory waypoints that go AROUND the base before reaching it
     const waypoints = this._generateMandatoryWaypoints(startX, startY, endX, endY, margin);
     
-    console.log(`[MapGenerator] Generated ${waypoints.length} mandatory waypoints`);
+    console.log(`[MapGenerator] Generated ${waypoints.length} mandatory waypoints:`, 
+      waypoints.map((w, i) => `WP${i}: (${w.x},${w.y})`).join(' -> '));
     
+    // Build path through ALL waypoints using simple orthogonal lines
+    // NO collision detection - just draw the path
     let x = startX;
     let y = startY;
     
-    // Add starting cell
-    this._addPathSegment(path, x, y, x, y);
+    // Add all waypoints plus the base as final destination
+    const allTargets = [...waypoints, { x: endX, y: endY }];
     
-    // Navigate through each waypoint
-    for (const wp of waypoints) {
-      const result = this._navigateToPoint(path, x, y, wp.x, wp.y, margin, clearance);
-      x = result.x;
-      y = result.y;
+    for (const target of allTargets) {
+      // Draw orthogonal path: horizontal first, then vertical (or vice versa)
+      // Alternate to create natural-looking turns
+      const useHorizontalFirst = Math.abs(x - target.x) > Math.abs(y - target.y);
+      
+      if (useHorizontalFirst) {
+        // Horizontal then vertical
+        if (x !== target.x) {
+          const cells = this._getLineCells(x, y, target.x, y);
+          for (const cell of cells) {
+            if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
+              path.push(cell);
+            }
+          }
+          x = target.x;
+        }
+        if (y !== target.y) {
+          const cells = this._getLineCells(x, y, x, target.y);
+          for (const cell of cells) {
+            if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
+              path.push(cell);
+            }
+          }
+          y = target.y;
+        }
+      } else {
+        // Vertical then horizontal
+        if (y !== target.y) {
+          const cells = this._getLineCells(x, y, x, target.y);
+          for (const cell of cells) {
+            if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
+              path.push(cell);
+            }
+          }
+          y = target.y;
+        }
+        if (x !== target.x) {
+          const cells = this._getLineCells(x, y, target.x, y);
+          for (const cell of cells) {
+            if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
+              path.push(cell);
+            }
+          }
+          x = target.x;
+        }
+      }
     }
     
-    // Final approach to base
-    this._connectToBase(path, x, y, endX, endY);
+    console.log(`[MapGenerator] Path built: ${path.length} cells`);
     
     return path;
   }
   
   /**
-   * Generate mandatory waypoints that force path to go FULLY around the base
-   * Path must visit at least 3 corners of a square around the base
+   * Generate mandatory waypoints that force path to SPIRAL towards the base
+   * Path goes around the base multiple times, getting closer with each loop
    */
   _generateMandatoryWaypoints(startX, startY, baseX, baseY, margin) {
     const waypoints = [];
     const edge = this.spawnPoint.edge;
     
-    // Large orbit radius - path goes far from base
-    const orbitRadius = this.rng.int(20, 30);
+    // Start with large radius, shrink with each loop
+    const startRadius = this.rng.int(35, 42); // Start far from base
+    const radiusShrink = this.rng.int(8, 12); // How much closer each loop
+    const minRadius = 8; // Stop spiraling when this close
     
-    // Define the 4 corners of the orbit square around base
-    const corners = {
-      topLeft:     { x: baseX - orbitRadius, y: baseY - orbitRadius },
-      topRight:    { x: baseX + orbitRadius, y: baseY - orbitRadius },
-      bottomLeft:  { x: baseX - orbitRadius, y: baseY + orbitRadius },
-      bottomRight: { x: baseX + orbitRadius, y: baseY + orbitRadius }
-    };
-    
-    // Clamp all corners to map bounds
-    for (const key of Object.keys(corners)) {
-      corners[key].x = this._clamp(corners[key].x, margin + 5, this.width - margin - 5);
-      corners[key].y = this._clamp(corners[key].y, margin + 5, this.height - margin - 5);
+    // Determine starting corner based on spawn edge
+    // We want to start from the corner closest to spawn
+    let currentCorner;
+    if (edge === 'top') {
+      currentCorner = startX < baseX ? 'topLeft' : 'topRight';
+    } else if (edge === 'bottom') {
+      currentCorner = startX < baseX ? 'bottomLeft' : 'bottomRight';
+    } else if (edge === 'left') {
+      currentCorner = startY < baseY ? 'topLeft' : 'bottomLeft';
+    } else {
+      currentCorner = startY < baseY ? 'topRight' : 'bottomRight';
     }
     
-    // Determine path based on spawn edge
-    // Path should go to far corner first, then circle around
+    // Direction: clockwise or counter-clockwise
     const clockwise = this.rng.next() > 0.5;
     
-    if (edge === 'top') {
-      // Coming from top - go down to one side, then circle
-      if (clockwise) {
-        // Top -> bottomLeft -> bottomRight -> topRight -> approach
-        waypoints.push({ x: startX, y: baseY - orbitRadius + 5 }); // Move down a bit
-        waypoints.push(corners.bottomLeft);
-        waypoints.push(corners.bottomRight);
-        waypoints.push(corners.topRight);
-        waypoints.push({ x: baseX + 5, y: baseY - 8 }); // Approach from right-top
-      } else {
-        // Top -> bottomRight -> bottomLeft -> topLeft -> approach
-        waypoints.push({ x: startX, y: baseY - orbitRadius + 5 });
-        waypoints.push(corners.bottomRight);
-        waypoints.push(corners.bottomLeft);
-        waypoints.push(corners.topLeft);
-        waypoints.push({ x: baseX - 5, y: baseY - 8 });
+    // Corner order for clockwise and counter-clockwise
+    const cwOrder = ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'];
+    const ccwOrder = ['topLeft', 'bottomLeft', 'bottomRight', 'topRight'];
+    const order = clockwise ? cwOrder : ccwOrder;
+    
+    // Find starting index in order
+    let cornerIndex = order.indexOf(currentCorner);
+    
+    let radius = startRadius;
+    let loopCount = 0;
+    const maxLoops = 4; // Maximum spiral loops
+    
+    // First waypoint: move towards first corner at starting radius
+    const firstCorner = this._getCornerPosition(currentCorner, baseX, baseY, radius, margin);
+    waypoints.push(firstCorner);
+    
+    // Generate spiral by visiting corners with decreasing radius
+    while (radius > minRadius && loopCount < maxLoops) {
+      // Visit 4 corners (one full loop)
+      for (let i = 0; i < 4; i++) {
+        cornerIndex = (cornerIndex + 1) % 4;
+        const cornerName = order[cornerIndex];
+        
+        // Shrink radius slightly at each corner for smooth spiral
+        radius -= radiusShrink / 4;
+        if (radius < minRadius) radius = minRadius;
+        
+        const cornerPos = this._getCornerPosition(cornerName, baseX, baseY, radius, margin);
+        waypoints.push(cornerPos);
       }
-    } else if (edge === 'bottom') {
-      // Coming from bottom
-      if (clockwise) {
-        waypoints.push({ x: startX, y: baseY + orbitRadius - 5 });
-        waypoints.push(corners.topRight);
-        waypoints.push(corners.topLeft);
-        waypoints.push(corners.bottomLeft);
-        waypoints.push({ x: baseX - 5, y: baseY + 8 });
-      } else {
-        waypoints.push({ x: startX, y: baseY + orbitRadius - 5 });
-        waypoints.push(corners.topLeft);
-        waypoints.push(corners.topRight);
-        waypoints.push(corners.bottomRight);
-        waypoints.push({ x: baseX + 5, y: baseY + 8 });
-      }
-    } else if (edge === 'left') {
-      // Coming from left
-      if (clockwise) {
-        waypoints.push({ x: baseX - orbitRadius + 5, y: startY });
-        waypoints.push(corners.topRight);
-        waypoints.push(corners.bottomRight);
-        waypoints.push(corners.bottomLeft);
-        waypoints.push({ x: baseX - 8, y: baseY + 5 });
-      } else {
-        waypoints.push({ x: baseX - orbitRadius + 5, y: startY });
-        waypoints.push(corners.bottomRight);
-        waypoints.push(corners.topRight);
-        waypoints.push(corners.topLeft);
-        waypoints.push({ x: baseX - 8, y: baseY - 5 });
-      }
-    } else { // right
-      // Coming from right
-      if (clockwise) {
-        waypoints.push({ x: baseX + orbitRadius - 5, y: startY });
-        waypoints.push(corners.bottomLeft);
-        waypoints.push(corners.topLeft);
-        waypoints.push(corners.topRight);
-        waypoints.push({ x: baseX + 8, y: baseY - 5 });
-      } else {
-        waypoints.push({ x: baseX + orbitRadius - 5, y: startY });
-        waypoints.push(corners.topLeft);
-        waypoints.push(corners.bottomLeft);
-        waypoints.push(corners.bottomRight);
-        waypoints.push({ x: baseX + 8, y: baseY + 5 });
-      }
+      
+      loopCount++;
     }
     
+    // Final approach waypoint near base
+    const approachOffset = 5;
+    const approachX = baseX + (this.rng.next() > 0.5 ? approachOffset : -approachOffset);
+    const approachY = baseY + (this.rng.next() > 0.5 ? approachOffset : -approachOffset);
+    waypoints.push({ 
+      x: this._clamp(approachX, margin, this.width - margin - 1),
+      y: this._clamp(approachY, margin, this.height - margin - 1)
+    });
+    
     return waypoints;
+  }
+  
+  /**
+   * Get corner position at given radius from base
+   */
+  _getCornerPosition(corner, baseX, baseY, radius, margin) {
+    let x, y;
+    
+    switch (corner) {
+      case 'topLeft':
+        x = baseX - radius;
+        y = baseY - radius;
+        break;
+      case 'topRight':
+        x = baseX + radius;
+        y = baseY - radius;
+        break;
+      case 'bottomRight':
+        x = baseX + radius;
+        y = baseY + radius;
+        break;
+      case 'bottomLeft':
+        x = baseX - radius;
+        y = baseY + radius;
+        break;
+    }
+    
+    // Add some randomness to make it less perfect
+    x += this.rng.int(-3, 3);
+    y += this.rng.int(-3, 3);
+    
+    return {
+      x: this._clamp(x, margin, this.width - margin - 1),
+      y: this._clamp(y, margin, this.height - margin - 1)
+    };
   }
   
   /**
