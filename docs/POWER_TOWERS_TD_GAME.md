@@ -260,95 +260,65 @@ addons-dev/power-towers/
 ├── manifest.json              # Addon metadata
 ├── index.js                   # Entry point (exports for sidebar)
 │
-├── core/                      # 🎯 GAME CORE (orchestrator)
-│   ├── game-core.js           # Main engine - connects all modules
-│   ├── config.js              # Global constants & tuning
-│   └── event-bus.js           # Event system for module communication
+├── core/                      # 🎯 GAME CORE
+│   ├── game-core.js           # Main engine - game state, events, API
+│   ├── game-core-modular.js   # Alternative modular implementation
+│   ├── config.js              # Global constants (GRID_SIZE, etc.)
+│   ├── event-bus.js           # Event system for communication
+│   │
+│   ├── entities/              # 📦 Game entities
+│   │   ├── tower.js           # Tower class, TOWER_PATHS definitions
+│   │   ├── enemy.js           # Enemy class
+│   │   └── projectile.js      # Projectile class
+│   │
+│   └── systems/               # ⚙️ Game systems
+│       ├── camera.js          # Viewport, scrolling, zoom, coordinate transforms
+│       ├── economy.js         # Gold management
+│       ├── energy-system.js   # Energy production & consumption
+│       └── wave-system.js     # Wave spawning logic
 │
-├── modules/                   # 📦 GAME MODULES (features)
+├── modules/                   # 📦 FEATURE MODULES (planned)
 │   │
-│   ├── map/                   # 🗺️ Map Module
-│   │   ├── index.js           # Map manager
-│   │   ├── map-generator.js   # Procedural generation
-│   │   ├── path-finder.js     # Enemy path calculation
-│   │   └── terrain.js         # Terrain types & effects
-│   │
-│   ├── towers/                # 🗼 Tower Module
-│   │   ├── index.js           # Tower manager
-│   │   ├── tower-factory.js   # Tower creation
-│   │   ├── tower-paths.js     # Upgrade paths (fire/ice/etc)
-│   │   └── targeting.js       # Target selection AI
-│   │
-│   ├── enemies/               # 👾 Enemy Module
-│   │   ├── index.js           # Enemy manager
-│   │   ├── enemy-factory.js   # Enemy creation
-│   │   ├── wave-system.js     # Wave spawning logic
-│   │   └── enemy-types.js     # Enemy definitions
-│   │
-│   ├── combat/                # ⚔️ Combat Module
-│   │   ├── index.js           # Combat manager
-│   │   ├── damage-calc.js     # Damage formulas
-│   │   ├── projectiles.js     # Projectile system
-│   │   └── effects.js         # Burn/slow/poison effects
-│   │
-│   ├── energy/                # ⚡ Energy Module
-│   │   ├── index.js           # Energy manager
-│   │   ├── generators.js      # Energy production
-│   │   └── grid.js            # Energy distribution
-│   │
-│   ├── economy/               # 💰 Economy Module
-│   │   ├── index.js           # Economy manager
-│   │   ├── gold.js            # Gold system
-│   │   └── shop.js            # Tower costs & selling
-│   │
-│   ├── progression/           # 📈 Progression Module (meta)
-│   │   ├── index.js           # Progression manager
-│   │   ├── xp-system.js       # XP calculation
-│   │   ├── skill-tree.js      # Talent unlocks
-│   │   └── achievements.js    # Achievement tracking
-│   │
-│   ├── cards/                 # 🃏 Card Module
-│   │   ├── index.js           # Card manager
-│   │   ├── card-pool.js       # Available cards
-│   │   ├── card-effects.js    # Card implementations
-│   │   └── deck-builder.js    # Run deck management
+│   ├── combat/                # ⚔️ Combat (planned)
+│   ├── economy/               # 💰 Economy (planned)
+│   ├── enemies/               # 👾 Enemies (planned)
+│   ├── energy/                # ⚡ Energy (planned)
+│   ├── map/                   # 🗺️ Map (planned)
+│   ├── menu/                  # 📋 Menu (planned)
+│   ├── player/                # 🎮 Player (planned)
+│   ├── towers/                # 🗼 Towers (planned)
 │   │
 │   └── game-panel/            # 🖥️ UI Module (sidebar integration)
-│       ├── index.js           # SidebarModule implementation
-│       └── screens/           # UI screens
-│           ├── menu.js        # Main menu
-│           ├── game.js        # Game screen
-│           ├── upgrades.js    # Upgrades screen
-│           ├── tips.js        # Tips screen
-│           └── settings.js    # Settings screen
+│       ├── index.js           # SidebarModule - entry point, launcher/detach
+│       ├── templates.js       # HTML templates (launcher & game screens)
+│       ├── styles.js          # CSS styles (launcher & game modes)
+│       └── game-controller.js # Game logic, canvas, events, UI handling
 │
 ├── renderer/                  # 🎨 RENDERING
-│   ├── game-renderer.js       # Main canvas renderer
-│   ├── ui-renderer.js         # HUD elements
-│   ├── minimap.js             # Minimap rendering
-│   └── effects/               # Visual effects
-│       ├── particles.js
-│       └── animations.js
-│
-├── systems/                   # ⚙️ LOW-LEVEL SYSTEMS
-│   ├── camera.js              # Viewport & scrolling
-│   ├── input.js               # Mouse/keyboard handling
-│   ├── audio.js               # Sound effects
-│   └── storage.js             # Save/load (electron-store)
-│
-├── data/                      # 📊 STATIC DATA (JSON configs)
-│   ├── towers.json            # Tower stats & upgrades
-│   ├── enemies.json           # Enemy definitions
-│   ├── waves.json             # Wave compositions
-│   ├── cards.json             # Card definitions
-│   ├── terrain.json           # Terrain types
-│   └── skills.json            # Skill tree data
+│   └── game-renderer.js       # Main canvas renderer (map, towers, enemies)
 │
 └── assets/                    # 🎨 GRAPHICS (future)
     ├── sprites/
     ├── tiles/
     └── ui/
 ```
+
+### Game Panel Module Architecture
+
+The `game-panel` module is split into focused files for maintainability (max ~500 lines per file):
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| `index.js` | SidebarModule class, launcher button, detach handling | ~120 |
+| `templates.js` | HTML templates for launcher and game UI | ~130 |
+| `styles.js` | CSS styles for both modes | ~140 |
+| `game-controller.js` | All game logic: canvas, events, tower placement, UI | ~450 |
+
+**Key APIs used:**
+- `GameCore` - game state, `on()` event subscription, `selectTower()`, `canPlaceTower()`
+- `GameRenderer` - `render()`, `setHover()`, `clearHover()`
+- `Camera` - `screenToWorld()`, `centerOn()`, `zoomBy()`, `pan()`, `setViewportSize()`
+- `GameEvents` - `GAME_TICK`, `STATE_CHANGE`, `TOWER_PLACED`, `WAVE_COMPLETE`, `GAME_OVER`
 
 ### Module Communication
 

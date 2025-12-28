@@ -260,20 +260,27 @@ Located in `addons-dev/power-towers/`:
 - Roguelike Tower Defense game with energy system
 - Tower paths: Fire 🔥, Ice ❄️, Lightning ⚡, Nature 🌿, Dark 💀
 - Menu system with Start/Upgrades/Tips/Settings screens
-- Detachable game panel
+- Detachable game panel (800x950)
 
 Structure:
 ```
 power-towers/
 ├── manifest.json
-├── core/              # Game logic
-│   ├── config.js      # Game constants
-│   └── game-core.js   # GameCore class (state, events)
+├── index.js                 # Addon entry
+├── core/                    # Game logic
+│   ├── config.js            # Constants (GRID_SIZE, MAP_WIDTH, etc.)
+│   ├── game-core.js         # GameCore class (state, events, API)
+│   ├── event-bus.js         # Event system
+│   ├── entities/            # Tower, Enemy, Projectile classes
+│   └── systems/             # Camera, Economy, Energy, Wave systems
 ├── renderer/
-│   └── game-renderer.js  # Canvas rendering
+│   └── game-renderer.js     # Canvas rendering
 └── modules/
-    └── game-panel/
-        └── index.js   # SidebarModule with menu + game UI
+    └── game-panel/          # SidebarModule (split for maintainability)
+        ├── index.js         # Entry point, detach handling
+        ├── templates.js     # HTML templates
+        ├── styles.js        # CSS styles
+        └── game-controller.js  # Game logic, canvas, events
 ```
 
 ## 16. Build / Run / Dist
