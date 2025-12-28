@@ -572,58 +572,104 @@ class MapGenerator {
     if (totalDist === 0) return { x, y };
 
     // Number of intermediate steps based on distance (more distance -> more bends)
-    const steps = Math.max(2, Math.min(10, Math.floor(totalDist / 12)));
+    const steps = Math.max(2, Math.min(8, Math.floor(totalDist / 14)));
+
+    // Occupancy for clearance checks
+    const occupied = new Set(path.map(p => `${p.x},${p.y}`));
+    const clearance = 2;
+    const minBendLen = 6;
+
+    const lineHasClearance = (x1, y1, x2, y2) => {
+      const cells = this._getLineCells(x1, y1, x2, y2);
+      for (const c of cells) {
+        for (let dy = -clearance; dy <= clearance; dy++) {
+          for (let dx = -clearance; dx <= clearance; dx++) {
+            const key = `${c.x + dx},${c.y + dy}`;
+            if (occupied.has(key)) {
+              if (!(c.x + dx === x && c.y + dy === y)) return false;
+            }
+          }
+        }
+      }
+      return true;
+    };
 
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
-      // Linear interpolation towards target
       let midX = Math.round(x + (targetX - x) * t);
       let midY = Math.round(y + (targetY - y) * t);
 
-      // Decide main axis for this segment
       const dx = Math.abs(targetX - x);
       const dy = Math.abs(targetY - y);
       const horizontalMain = dx >= dy;
 
-      // Apply perpendicular jitter to break parallelism
-      const jitter = this.rng.int(-4, 4);
-      if (horizontalMain) {
-        midY = this._clamp(midY + jitter, margin, this.height - margin - 1);
-      } else {
-        midX = this._clamp(midX + jitter, margin, this.width - margin - 1);
-      }
+      let attempt = 0;
+      let placed = false;
+      while (attempt < 4 && !placed) {
+        const jitter = this.rng.int(-4 + attempt, 4 - attempt); // reduce on retries
+        let jMidX = midX;
+        let jMidY = midY;
+        if (horizontalMain) {
+          jMidY = this._clamp(midY + jitter, margin, this.height - margin - 1);
+        } else {
+          jMidX = this._clamp(midX + jitter, margin, this.width - margin - 1);
+        }
 
-      // Occasionally flip axis choice to add variety
-      const horizontalFirst = this.rng.next() > 0.5;
+        // ensure bend length
+        if (Math.abs(jMidX - x) + Math.abs(jMidY - y) < minBendLen) {
+          if (horizontalMain) {
+            const dir = targetX > x ? 1 : -1;
+            jMidX = this._clamp(x + dir * minBendLen, margin, this.width - margin - 1);
+          } else {
+            const dir = targetY > y ? 1 : -1;
+            jMidY = this._clamp(y + dir * minBendLen, margin, this.height - margin - 1);
+          }
+        }
 
-      if (horizontalFirst) {
-        if (x !== midX) {
-          this._pushLineNoDup(path, x, y, midX, y);
-          x = midX;
+        const first = horizontalMain ? [x, y, jMidX, y] : [x, y, x, jMidY];
+        const second = horizontalMain ? [jMidX, y, jMidX, jMidY] : [x, jMidY, jMidX, jMidY];
+
+        if (lineHasClearance(...first) && lineHasClearance(...second)) {
+          const horizontalFirst = this.rng.next() > 0.5;
+
+          if (horizontalFirst) {
+            if (x !== jMidX && lineHasClearance(x, y, jMidX, y)) {
+              this._pushLineNoDup(path, x, y, jMidX, y);
+              this._getLineCells(x, y, jMidX, y).forEach(c => occupied.add(`${c.x},${c.y}`));
+              x = jMidX;
+            }
+            if (y !== jMidY && lineHasClearance(x, y, x, jMidY)) {
+              this._pushLineNoDup(path, x, y, x, jMidY);
+              this._getLineCells(x, y, x, jMidY).forEach(c => occupied.add(`${c.x},${c.y}`));
+              y = jMidY;
+            }
+          } else {
+            if (y !== jMidY && lineHasClearance(x, y, x, jMidY)) {
+              this._pushLineNoDup(path, x, y, x, jMidY);
+              this._getLineCells(x, y, x, jMidY).forEach(c => occupied.add(`${c.x},${c.y}`));
+              y = jMidY;
+            }
+            if (x !== jMidX && lineHasClearance(x, y, jMidX, y)) {
+              this._pushLineNoDup(path, x, y, jMidX, y);
+              this._getLineCells(x, y, jMidX, y).forEach(c => occupied.add(`${c.x},${c.y}`));
+              x = jMidX;
+            }
+          }
+          placed = true;
         }
-        if (y !== midY) {
-          this._pushLineNoDup(path, x, y, x, midY);
-          y = midY;
-        }
-      } else {
-        if (y !== midY) {
-          this._pushLineNoDup(path, x, y, x, midY);
-          y = midY;
-        }
-        if (x !== midX) {
-          this._pushLineNoDup(path, x, y, midX, y);
-          x = midX;
-        }
+        attempt++;
       }
     }
 
-    // Final snap to target
-    if (x !== targetX) {
+    // Final snap to target with clearance
+    if (x !== targetX && lineHasClearance(x, y, targetX, y)) {
       this._pushLineNoDup(path, x, y, targetX, y);
+      this._getLineCells(x, y, targetX, y).forEach(c => occupied.add(`${c.x},${c.y}`));
       x = targetX;
     }
-    if (y !== targetY) {
+    if (y !== targetY && lineHasClearance(x, y, x, targetY)) {
       this._pushLineNoDup(path, x, y, x, targetY);
+      this._getLineCells(x, y, x, targetY).forEach(c => occupied.add(`${c.x},${c.y}`));
       y = targetY;
     }
 
