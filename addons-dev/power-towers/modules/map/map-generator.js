@@ -437,51 +437,9 @@ class MapGenerator {
     const allTargets = [...waypoints, { x: endX, y: endY }];
     
     for (const target of allTargets) {
-      // Draw orthogonal path: horizontal first, then vertical (or vice versa)
-      // Alternate to create natural-looking turns
-      const useHorizontalFirst = Math.abs(x - target.x) > Math.abs(y - target.y);
-      
-      if (useHorizontalFirst) {
-        // Horizontal then vertical
-        if (x !== target.x) {
-          const cells = this._getLineCells(x, y, target.x, y);
-          for (const cell of cells) {
-            if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
-              path.push(cell);
-            }
-          }
-          x = target.x;
-        }
-        if (y !== target.y) {
-          const cells = this._getLineCells(x, y, x, target.y);
-          for (const cell of cells) {
-            if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
-              path.push(cell);
-            }
-          }
-          y = target.y;
-        }
-      } else {
-        // Vertical then horizontal
-        if (y !== target.y) {
-          const cells = this._getLineCells(x, y, x, target.y);
-          for (const cell of cells) {
-            if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
-              path.push(cell);
-            }
-          }
-          y = target.y;
-        }
-        if (x !== target.x) {
-          const cells = this._getLineCells(x, y, target.x, y);
-          for (const cell of cells) {
-            if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
-              path.push(cell);
-            }
-          }
-          x = target.x;
-        }
-      }
+      const result = this._connectWithJitteredPath(path, x, y, target.x, target.y, margin);
+      x = result.x;
+      y = result.y;
     }
     
     console.log(`[MapGenerator] Path built: ${path.length} cells`);
@@ -600,6 +558,76 @@ class MapGenerator {
     });
     
     return waypoints;
+  }
+
+  /**
+   * Connect current point to target using jittered Manhattan steps
+   * Breaks long parallel lines by inserting small detours
+   */
+  _connectWithJitteredPath(path, startX, startY, targetX, targetY, margin) {
+    let x = startX;
+    let y = startY;
+
+    const totalDist = Math.abs(targetX - x) + Math.abs(targetY - y);
+    if (totalDist === 0) return { x, y };
+
+    // Number of intermediate steps based on distance (more distance -> more bends)
+    const steps = Math.max(2, Math.min(10, Math.floor(totalDist / 12)));
+
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      // Linear interpolation towards target
+      let midX = Math.round(x + (targetX - x) * t);
+      let midY = Math.round(y + (targetY - y) * t);
+
+      // Decide main axis for this segment
+      const dx = Math.abs(targetX - x);
+      const dy = Math.abs(targetY - y);
+      const horizontalMain = dx >= dy;
+
+      // Apply perpendicular jitter to break parallelism
+      const jitter = this.rng.int(-4, 4);
+      if (horizontalMain) {
+        midY = this._clamp(midY + jitter, margin, this.height - margin - 1);
+      } else {
+        midX = this._clamp(midX + jitter, margin, this.width - margin - 1);
+      }
+
+      // Occasionally flip axis choice to add variety
+      const horizontalFirst = this.rng.next() > 0.5;
+
+      if (horizontalFirst) {
+        if (x !== midX) {
+          this._pushLineNoDup(path, x, y, midX, y);
+          x = midX;
+        }
+        if (y !== midY) {
+          this._pushLineNoDup(path, x, y, x, midY);
+          y = midY;
+        }
+      } else {
+        if (y !== midY) {
+          this._pushLineNoDup(path, x, y, x, midY);
+          y = midY;
+        }
+        if (x !== midX) {
+          this._pushLineNoDup(path, x, y, midX, y);
+          x = midX;
+        }
+      }
+    }
+
+    // Final snap to target
+    if (x !== targetX) {
+      this._pushLineNoDup(path, x, y, targetX, y);
+      x = targetX;
+    }
+    if (y !== targetY) {
+      this._pushLineNoDup(path, x, y, x, targetY);
+      y = targetY;
+    }
+
+    return { x, y };
   }
   
   /**
@@ -868,6 +896,18 @@ class MapGenerator {
     }
     
     return cells;
+  }
+
+  /**
+   * Push line cells into path without duplicates
+   */
+  _pushLineNoDup(path, x1, y1, x2, y2) {
+    const cells = this._getLineCells(x1, y1, x2, y2);
+    for (const cell of cells) {
+      if (!path.some(p => p.x === cell.x && p.y === cell.y)) {
+        path.push(cell);
+      }
+    }
   }
   
   /**
