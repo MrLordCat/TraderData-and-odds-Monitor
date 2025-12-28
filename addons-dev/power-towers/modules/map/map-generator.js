@@ -416,75 +416,103 @@ class MapGenerator {
   
   /**
    * Generate safe path that doesn't intersect itself
-   * Uses iterative segment-by-segment approach
+   * Two-phase approach:
+   * 1. Build simple spiral path with L-shaped connections
+   * 2. Distort the path to add variety while avoiding self-intersection
    */
   _generateSafePath(startX, startY, endX, endY) {
-    const path = [];
     const margin = GENERATOR_CONFIG.PATH_MARGIN;
     
-    // Generate mandatory waypoints that go AROUND the base before reaching it
-    const waypoints = this._generateMandatoryWaypoints(startX, startY, endX, endY, margin);
+    // PHASE 1: Build simple spiral path
+    const simplePath = this._buildSimpleSpiralPath(startX, startY, endX, endY, margin);
     
-    console.log(`[MapGenerator] Generated ${waypoints.length} mandatory waypoints:`, 
-      waypoints.map((w, i) => `WP${i}: (${w.x},${w.y})`).join(' -> '));
+    if (simplePath.length === 0) {
+      console.warn('[MapGenerator] Simple spiral failed');
+      return [];
+    }
     
-    // Build path through ALL waypoints using simple orthogonal lines
-    // NO collision detection - just draw the path
+    console.log(`[MapGenerator] Phase 1 complete: ${simplePath.length} cells (simple spiral)`);
+    
+    // PHASE 2: Distort the path to add variety
+    const distortedPath = this._distortPath(simplePath, margin);
+    
+    console.log(`[MapGenerator] Phase 2 complete: ${distortedPath.length} cells (distorted)`);
+    
+    return distortedPath;
+  }
+  
+  /**
+   * PHASE 1: Build simple spiral path using L-shaped connections
+   * No complex rules - just connect waypoints with simple orthogonal lines
+   */
+  _buildSimpleSpiralPath(startX, startY, endX, endY, margin) {
+    const path = [];
+    
+    // Generate spiral waypoints
+    const waypoints = this._generateSpiralWaypoints(startX, startY, endX, endY, margin);
+    
+    console.log(`[MapGenerator] Spiral waypoints: ${waypoints.length}`);
+    
     let x = startX;
     let y = startY;
     
-    // Add all waypoints plus the base as final destination
+    // Connect to each waypoint with simple L-shaped path
     const allTargets = [...waypoints, { x: endX, y: endY }];
     
     for (const target of allTargets) {
-      const result = this._connectWithJitteredPath(path, x, y, target.x, target.y, margin);
-      x = result.x;
-      y = result.y;
+      // Simple L-connection: horizontal then vertical (or vice versa randomly)
+      const horizontalFirst = this.rng.next() > 0.5;
+      
+      if (horizontalFirst) {
+        // Horizontal segment
+        if (x !== target.x) {
+          this._pushLineNoDup(path, x, y, target.x, y);
+          x = target.x;
+        }
+        // Vertical segment
+        if (y !== target.y) {
+          this._pushLineNoDup(path, x, y, x, target.y);
+          y = target.y;
+        }
+      } else {
+        // Vertical segment first
+        if (y !== target.y) {
+          this._pushLineNoDup(path, x, y, x, target.y);
+          y = target.y;
+        }
+        // Then horizontal
+        if (x !== target.x) {
+          this._pushLineNoDup(path, x, y, target.x, y);
+          x = target.x;
+        }
+      }
     }
-    
-    console.log(`[MapGenerator] Path built: ${path.length} cells`);
     
     return path;
   }
   
   /**
-   * Generate mandatory waypoints that force path to SPIRAL towards the base
-   * Path goes around the base with organic, non-parallel curves
-   * Uses 12 points per loop for smoother curves with large random offsets
+   * Generate spiral waypoints (simplified version)
+   * Creates points that spiral inward toward the base
    */
-  _generateMandatoryWaypoints(startX, startY, baseX, baseY, margin) {
+  _generateSpiralWaypoints(startX, startY, baseX, baseY, margin) {
     const waypoints = [];
     const edge = this.spawnPoint.edge;
     
-    // Determine how many points to visit (more points = smoother spiral)
-    // Each "loop" has ~12 points for very smooth curves
-    const roll = this.rng.next();
-    let totalPoints;
-    if (roll < 0.15) {
-      // 15% chance: partial loop
-      totalPoints = this.rng.int(8, 10);
-    } else if (roll < 0.45) {
-      // 30% chance: ~1 loop
-      totalPoints = this.rng.int(11, 14);
-    } else if (roll < 0.80) {
-      // 35% chance: ~1.5-2 loops  
-      totalPoints = this.rng.int(16, 22);
-    } else {
-      // 20% chance: 2-3 loops (longest path)
-      totalPoints = this.rng.int(24, 32);
-    }
+    // Number of spiral points (1-2 loops)
+    const totalPoints = this.rng.int(10, 20);
     
-    console.log(`[MapGenerator] Spiral will visit ${totalPoints} points`);
+    // Start and end radius
+    const startRadius = Math.min(
+      Math.abs(startX - baseX),
+      Math.abs(startY - baseY),
+      25
+    ) + this.rng.int(5, 15);
+    const endRadius = 4;
     
-    // Start radius - further for more points
-    const loops = totalPoints / 12;
-    const startRadius = 22 + (loops * 14) + this.rng.int(-3, 6);
-    const endRadius = 5;
-    
-    // Calculate shrink per point
     const radiusShrink = (startRadius - endRadius) / totalPoints;
     
-    // Determine starting angle based on spawn edge
+    // Starting angle based on spawn edge
     let startAngle;
     if (edge === 'top') {
       startAngle = startX < baseX ? Math.PI * 1.25 : Math.PI * 1.75;
@@ -496,197 +524,208 @@ class MapGenerator {
       startAngle = startY < baseY ? Math.PI * 0.0 : Math.PI * 0.5;
     }
     
-    // Direction: clockwise or counter-clockwise
+    // Direction
     const clockwise = this.rng.next() > 0.5;
-    // 12 points per full circle for smoother curves
-    const angleStep = (Math.PI * 2 / 12) * (clockwise ? 1 : -1);
+    const angleStep = (Math.PI * 2 / 8) * (clockwise ? 1 : -1); // 8 points per loop
     
     let angle = startAngle;
     let radius = startRadius;
-    
-    // Track previous point to ensure minimum distance
     let prevX = startX;
     let prevY = startY;
     
-    // Generate spiral points
     for (let i = 0; i < totalPoints; i++) {
-      // LARGE randomness for organic, non-parallel paths
-      // Angle wobble increases as we go inward (more chaotic near center)
-      const wobbleFactor = 1 + (i / totalPoints) * 0.5;
-      const angleOffset = this.rng.float(-0.5, 0.5) * wobbleFactor;
-      
-      // Radius wobble - significant variation
-      const radiusOffset = this.rng.float(-6, 6);
+      // Small angle wobble for organic feel
+      const angleOffset = this.rng.float(-0.2, 0.2);
+      const radiusOffset = this.rng.float(-2, 2);
       
       const actualAngle = angle + angleOffset;
       const actualRadius = Math.max(endRadius, radius + radiusOffset);
       
-      // Convert polar to cartesian
-      let x = baseX + Math.cos(actualAngle) * actualRadius;
-      let y = baseY + Math.sin(actualAngle) * actualRadius;
+      const x = Math.round(baseX + Math.cos(actualAngle) * actualRadius);
+      const y = Math.round(baseY + Math.sin(actualAngle) * actualRadius);
       
-      // Add extra perpendicular offset to break parallel lines
-      const perpAngle = actualAngle + Math.PI / 2;
-      const perpOffset = this.rng.float(-5, 5);
-      x += Math.cos(perpAngle) * perpOffset;
-      y += Math.sin(perpAngle) * perpOffset;
+      const clampedX = this._clamp(x, margin, this.width - margin - 1);
+      const clampedY = this._clamp(y, margin, this.height - margin - 1);
       
-      // Clamp to bounds
-      const clampedX = this._clamp(Math.round(x), margin, this.width - margin - 1);
-      const clampedY = this._clamp(Math.round(y), margin, this.height - margin - 1);
-      
-      // Only add if not too close to previous point (avoid bunching)
-      const distToPrev = Math.abs(clampedX - prevX) + Math.abs(clampedY - prevY);
-      if (distToPrev > 6) {
+      // Only add if far enough from previous
+      const dist = Math.abs(clampedX - prevX) + Math.abs(clampedY - prevY);
+      if (dist > 5) {
         waypoints.push({ x: clampedX, y: clampedY });
         prevX = clampedX;
         prevY = clampedY;
       }
       
-      // Move to next position
       angle += angleStep;
       radius -= radiusShrink;
     }
     
-    // Final approach waypoint near base
-    const approachAngle = angle + this.rng.float(-0.8, 0.8);
-    const approachX = baseX + Math.cos(approachAngle) * 4;
-    const approachY = baseY + Math.sin(approachAngle) * 4;
-    waypoints.push({ 
-      x: this._clamp(Math.round(approachX), margin, this.width - margin - 1),
-      y: this._clamp(Math.round(approachY), margin, this.height - margin - 1)
-    });
-    
     return waypoints;
   }
-
+  
   /**
-   * Connect current point to target using jittered Manhattan steps
-   * Breaks long parallel lines by inserting small detours
+   * PHASE 2: Distort existing path to add variety
+   * Takes a simple path and adds bends/detours while checking for self-intersection
    */
-  _connectWithJitteredPath(path, startX, startY, targetX, targetY, margin) {
-    let x = startX;
-    let y = startY;
-
-    const totalDist = Math.abs(targetX - x) + Math.abs(targetY - y);
-    if (totalDist === 0) return { x, y };
-
-    // Number of intermediate steps based on distance (more distance -> more bends)
-    const steps = Math.max(2, Math.min(8, Math.floor(totalDist / 14)));
-
-    // Occupancy for clearance checks
-    const occupied = new Set(path.map(p => `${p.x},${p.y}`));
-    let lastSegmentCells = new Set([`${x},${y}`]);
-    const clearance = 1;
-    const minBendLen = 6;
-
-    const lineHasClearance = (x1, y1, x2, y2) => {
+  _distortPath(originalPath, margin) {
+    if (originalPath.length < 10) return originalPath;
+    
+    const result = [];
+    const occupied = new Set();
+    const clearance = 2;
+    
+    // Helper: check if segment is safe
+    const canPlace = (x1, y1, x2, y2) => {
       const cells = this._getLineCells(x1, y1, x2, y2);
       for (const c of cells) {
+        // Check clearance around each cell
         for (let dy = -clearance; dy <= clearance; dy++) {
           for (let dx = -clearance; dx <= clearance; dx++) {
             const key = `${c.x + dx},${c.y + dy}`;
-            if (occupied.has(key)) {
-              if (!(c.x + dx === x && c.y + dy === y) && !lastSegmentCells.has(key)) return false;
-            }
+            if (occupied.has(key)) return false;
           }
+        }
+        // Check bounds
+        if (c.x < margin || c.x >= this.width - margin ||
+            c.y < margin || c.y >= this.height - margin) {
+          return false;
         }
       }
       return true;
     };
-
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      let midX = Math.round(x + (targetX - x) * t);
-      let midY = Math.round(y + (targetY - y) * t);
-
-      const dx = Math.abs(targetX - x);
-      const dy = Math.abs(targetY - y);
-      const horizontalMain = dx >= dy;
-
-      let attempt = 0;
-      let placed = false;
-      while (attempt < 4 && !placed) {
-        const jitter = this.rng.int(-4 + attempt, 4 - attempt); // reduce on retries
-        let jMidX = midX;
-        let jMidY = midY;
-        if (horizontalMain) {
-          jMidY = this._clamp(midY + jitter, margin, this.height - margin - 1);
+    
+    // Helper: add cells to result and occupied
+    const addSegment = (x1, y1, x2, y2) => {
+      const cells = this._getLineCells(x1, y1, x2, y2);
+      for (const c of cells) {
+        if (!result.some(p => p.x === c.x && p.y === c.y)) {
+          result.push(c);
+        }
+        occupied.add(`${c.x},${c.y}`);
+      }
+    };
+    
+    // Find direction change points (corners) in original path
+    const corners = this._findCorners(originalPath);
+    
+    // Process path segment by segment between corners
+    let x = originalPath[0].x;
+    let y = originalPath[0].y;
+    result.push({ x, y });
+    occupied.add(`${x},${y}`);
+    
+    for (let i = 0; i < corners.length; i++) {
+      const target = corners[i];
+      
+      // Distance to corner
+      const dist = Math.abs(target.x - x) + Math.abs(target.y - y);
+      
+      // Try to add a detour if segment is long enough
+      if (dist > 12 && this.rng.next() > 0.3) {
+        // Calculate detour point
+        const midX = Math.round((x + target.x) / 2);
+        const midY = Math.round((y + target.y) / 2);
+        
+        // Perpendicular offset
+        const isHorizontal = Math.abs(target.x - x) > Math.abs(target.y - y);
+        const detourAmount = this.rng.int(3, 7) * (this.rng.next() > 0.5 ? 1 : -1);
+        
+        let detourX = midX;
+        let detourY = midY;
+        
+        if (isHorizontal) {
+          detourY = this._clamp(midY + detourAmount, margin, this.height - margin - 1);
         } else {
-          jMidX = this._clamp(midX + jitter, margin, this.width - margin - 1);
+          detourX = this._clamp(midX + detourAmount, margin, this.width - margin - 1);
         }
-
-        // ensure bend length
-        if (Math.abs(jMidX - x) + Math.abs(jMidY - y) < minBendLen) {
-          if (horizontalMain) {
-            const dir = targetX > x ? 1 : -1;
-            jMidX = this._clamp(x + dir * minBendLen, margin, this.width - margin - 1);
+        
+        // Try to place detour (3 segments: current->detour horizontal, detour vertical, detour->target)
+        const seg1ok = isHorizontal 
+          ? canPlace(x, y, detourX, y) && canPlace(detourX, y, detourX, detourY)
+          : canPlace(x, y, x, detourY) && canPlace(x, detourY, detourX, detourY);
+        
+        const seg2ok = isHorizontal
+          ? canPlace(detourX, detourY, target.x, detourY) && canPlace(target.x, detourY, target.x, target.y)
+          : canPlace(detourX, detourY, detourX, target.y) && canPlace(detourX, target.y, target.x, target.y);
+        
+        if (seg1ok && seg2ok) {
+          // Place detour
+          if (isHorizontal) {
+            addSegment(x, y, detourX, y);
+            x = detourX;
+            addSegment(x, y, x, detourY);
+            y = detourY;
+            addSegment(x, y, target.x, y);
+            x = target.x;
+            addSegment(x, y, x, target.y);
+            y = target.y;
           } else {
-            const dir = targetY > y ? 1 : -1;
-            jMidY = this._clamp(y + dir * minBendLen, margin, this.height - margin - 1);
+            addSegment(x, y, x, detourY);
+            y = detourY;
+            addSegment(x, y, detourX, y);
+            x = detourX;
+            addSegment(x, y, x, target.y);
+            y = target.y;
+            addSegment(x, y, target.x, y);
+            x = target.x;
           }
+          continue;
         }
-
-        const first = horizontalMain ? [x, y, jMidX, y] : [x, y, x, jMidY];
-        const second = horizontalMain ? [jMidX, y, jMidX, jMidY] : [x, jMidY, jMidX, jMidY];
-
-        if (lineHasClearance(...first) && lineHasClearance(...second)) {
-          const horizontalFirst = this.rng.next() > 0.5;
-
-          if (horizontalFirst) {
-            if (x !== jMidX && lineHasClearance(x, y, jMidX, y)) {
-              this._pushLineNoDup(path, x, y, jMidX, y);
-              const cells = this._getLineCells(x, y, jMidX, y);
-              cells.forEach(c => occupied.add(`${c.x},${c.y}`));
-              lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
-              x = jMidX;
-            }
-            if (y !== jMidY && lineHasClearance(x, y, x, jMidY)) {
-              this._pushLineNoDup(path, x, y, x, jMidY);
-              const cells = this._getLineCells(x, y, x, jMidY);
-              cells.forEach(c => occupied.add(`${c.x},${c.y}`));
-              lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
-              y = jMidY;
-            }
-          } else {
-            if (y !== jMidY && lineHasClearance(x, y, x, jMidY)) {
-              this._pushLineNoDup(path, x, y, x, jMidY);
-              const cells = this._getLineCells(x, y, x, jMidY);
-              cells.forEach(c => occupied.add(`${c.x},${c.y}`));
-              lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
-              y = jMidY;
-            }
-            if (x !== jMidX && lineHasClearance(x, y, jMidX, y)) {
-              this._pushLineNoDup(path, x, y, jMidX, y);
-              const cells = this._getLineCells(x, y, jMidX, y);
-              cells.forEach(c => occupied.add(`${c.x},${c.y}`));
-              lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
-              x = jMidX;
-            }
-          }
-          placed = true;
+      }
+      
+      // Fallback: simple L-connection
+      const horizontalFirst = this.rng.next() > 0.5;
+      
+      if (horizontalFirst) {
+        if (x !== target.x && canPlace(x, y, target.x, y)) {
+          addSegment(x, y, target.x, y);
+          x = target.x;
         }
-        attempt++;
+        if (y !== target.y && canPlace(x, y, x, target.y)) {
+          addSegment(x, y, x, target.y);
+          y = target.y;
+        }
+      } else {
+        if (y !== target.y && canPlace(x, y, x, target.y)) {
+          addSegment(x, y, x, target.y);
+          y = target.y;
+        }
+        if (x !== target.x && canPlace(x, y, target.x, y)) {
+          addSegment(x, y, target.x, y);
+          x = target.x;
+        }
       }
     }
-
-    // Final snap to target with clearance
-    if (x !== targetX && lineHasClearance(x, y, targetX, y)) {
-      this._pushLineNoDup(path, x, y, targetX, y);
-      const cells = this._getLineCells(x, y, targetX, y);
-      cells.forEach(c => occupied.add(`${c.x},${c.y}`));
-      lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
-      x = targetX;
+    
+    return result;
+  }
+  
+  /**
+   * Find corner points (direction changes) in a path
+   */
+  _findCorners(path) {
+    const corners = [];
+    if (path.length < 3) {
+      return path.slice(1);
     }
-    if (y !== targetY && lineHasClearance(x, y, x, targetY)) {
-      this._pushLineNoDup(path, x, y, x, targetY);
-      const cells = this._getLineCells(x, y, x, targetY);
-      cells.forEach(c => occupied.add(`${c.x},${c.y}`));
-      lastSegmentCells = new Set(cells.map(c => `${c.x},${c.y}`));
-      y = targetY;
+    
+    let lastDx = path[1].x - path[0].x;
+    let lastDy = path[1].y - path[0].y;
+    
+    for (let i = 2; i < path.length; i++) {
+      const dx = path[i].x - path[i-1].x;
+      const dy = path[i].y - path[i-1].y;
+      
+      if (dx !== lastDx || dy !== lastDy) {
+        corners.push(path[i-1]);
+        lastDx = dx;
+        lastDy = dy;
+      }
     }
-
-    return { x, y };
+    
+    // Always include final point
+    corners.push(path[path.length - 1]);
+    
+    return corners;
   }
   
   /**
