@@ -10,7 +10,24 @@ const path = require('path');
 // Track detached windows by module id
 const detachedWindows = new Map();
 
-function registerModuleDetachIpc({ mainWindow, store }) {
+/**
+ * Close all detached windows (called on app quit)
+ */
+function closeAllDetachedWindows() {
+  console.log(`[moduleDetach] Closing all detached windows (${detachedWindows.size})`);
+  for (const [id, win] of detachedWindows) {
+    try {
+      if (win && !win.isDestroyed()) {
+        win.destroy(); // Force destroy to avoid blocking quit
+      }
+    } catch (e) {
+      console.warn(`[moduleDetach] Error closing ${id}:`, e.message);
+    }
+  }
+  detachedWindows.clear();
+}
+
+function registerModuleDetachIpc({ mainWindow, store, getStatsWebContentsList }) {
   
   /**
    * Create detached window for a module
@@ -25,6 +42,8 @@ function registerModuleDetachIpc({ mainWindow, store }) {
           return { success: true, reused: true };
         }
       }
+      
+      console.log(`[moduleDetach] Creating window for: ${moduleId}, path: ${modulePath}`);
       
       const win = new BrowserWindow({
         width: width || 600,
@@ -44,6 +63,8 @@ function registerModuleDetachIpc({ mainWindow, store }) {
       
       // Load detach HTML template
       const detachHtmlPath = path.join(__dirname, '..', '..', '..', 'renderer', 'pages', 'module_detach.html');
+      console.log(`[moduleDetach] Loading HTML: ${detachHtmlPath}`);
+      
       await win.loadFile(detachHtmlPath, {
         query: {
           moduleId,
@@ -52,13 +73,41 @@ function registerModuleDetachIpc({ mainWindow, store }) {
         }
       });
       
+      // Show window - use both ready-to-show and a fallback timer
+      let shown = false;
       win.once('ready-to-show', () => {
-        win.show();
+        if (!shown) {
+          shown = true;
+          win.show();
+          console.log(`[moduleDetach] Window shown (ready-to-show): ${moduleId}`);
+        }
       });
+      
+      // Fallback: show after 500ms if ready-to-show didn't fire
+      setTimeout(() => {
+        if (!shown && win && !win.isDestroyed()) {
+          shown = true;
+          win.show();
+          console.log(`[moduleDetach] Window shown (fallback timer): ${moduleId}`);
+        }
+      }, 500);
       
       win.on('closed', () => {
         detachedWindows.delete(moduleId);
-        // Notify main window that module was reattached
+        // Notify stats panel (where addon_loader lives) that module was reattached
+        // Send to all stats webContents since addon_loader is in stats panel
+        try {
+          const statsWcList = getStatsWebContentsList ? getStatsWebContentsList() : [];
+          for (const wc of statsWcList) {
+            if (wc && !wc.isDestroyed()) {
+              wc.send('module-reattached', { moduleId });
+            }
+          }
+          console.log(`[moduleDetach] Sent module-reattached to ${statsWcList.length} stats webContents`);
+        } catch (e) {
+          console.warn(`[moduleDetach] Failed to notify stats panel:`, e.message);
+        }
+        // Also notify main window (for potential future use)
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('module-reattached', { moduleId });
         }
@@ -113,4 +162,4 @@ function registerModuleDetachIpc({ mainWindow, store }) {
   });
 }
 
-module.exports = { registerModuleDetachIpc };
+module.exports = { registerModuleDetachIpc, closeAllDetachedWindows };

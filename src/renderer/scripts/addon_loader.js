@@ -98,8 +98,11 @@
       const header = document.createElement('div');
       header.className = 'sectionHeader';
       
+      // Escape path for HTML attribute (Windows paths have backslashes)
+      const escapedPath = modulePath.replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
+      
       const detachBtn = (ModuleClass.detachable !== false) 
-        ? `<button class="addon-detach-btn" data-module-id="${ModuleClass.id}" data-module-path="${modulePath}" data-module-title="${ModuleClass.title || ModuleClass.id}" title="Open in separate window">⬈</button>`
+        ? `<button class="addon-detach-btn" data-module-id="${ModuleClass.id}" data-module-path="${escapedPath}" data-module-title="${ModuleClass.title || ModuleClass.id}" title="Open in separate window">⬈</button>`
         : '';
       
       header.innerHTML = `

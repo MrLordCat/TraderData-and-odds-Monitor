@@ -260,7 +260,7 @@ const { initUpdaterIpc } = require('./modules/ipc/updater');
 const { createAddonManager } = require('./modules/addonManager');
 const { registerAddonIpc } = require('./modules/ipc/addons');
 // Module detach for sidebar modules
-const { registerModuleDetachIpc } = require('./modules/ipc/moduleDetach');
+const { registerModuleDetachIpc, closeAllDetachedWindows } = require('./modules/ipc/moduleDetach');
 let addonManager = null; // initialized in bootstrap()
 let updateManager = null; // initialized in bootstrap()
 // External Excel odds JSON watcher (pseudo broker 'excel')
@@ -302,6 +302,8 @@ function createMainWindow() {
   } catch(_) {}
   mainWindow.on('close', () => {
     try { store.set('mainBounds', mainWindow.getBounds()); } catch(e) {}
+    // Close all detached module windows when main window closes
+    try { closeAllDetachedWindows(); } catch(e) { console.warn('[mainWindow.close] closeAllDetachedWindows error:', e.message); }
   });
   // Auto-focus mainWindow webContents after load so hotkeys work immediately
   mainWindow.webContents.once('did-finish-load', () => {
@@ -562,7 +564,11 @@ function bootstrap() {
   try {
     addonManager = createAddonManager({ store, mainWindow });
     registerAddonIpc({ addonManager });
-    registerModuleDetachIpc({ mainWindow, store });
+    registerModuleDetachIpc({ 
+      mainWindow, 
+      store, 
+      getStatsWebContentsList: () => getStatsWebContentsList(getBroadcastCtx()) 
+    });
     console.log('[addons] AddonManager initialized');
   } catch(e){ console.warn('[addons] createAddonManager failed', e.message); }
   // Menu intentionally suppressed (user prefers F12 only)
@@ -883,5 +889,9 @@ app.on('browser-window-created', (_e, win)=>{
     });
   } catch(_) {}
 });
-app.on('before-quit', ()=>{ quittingRef.value=true; });
+app.on('before-quit', ()=>{ 
+  quittingRef.value=true; 
+  // Close all detached module windows to prevent zombie processes
+  try { closeAllDetachedWindows(); } catch(e){ console.warn('[before-quit] closeAllDetachedWindows error:', e.message); }
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

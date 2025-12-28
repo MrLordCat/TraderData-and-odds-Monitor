@@ -93,11 +93,15 @@
       const fs = require('fs');
       const path = require('path');
       
+      console.log('[detach] Script started');
+      
       // Parse query params
       const params = new URLSearchParams(window.location.search);
       const moduleId = params.get('moduleId');
       const modulePath = decodeURIComponent(params.get('modulePath') || '');
       const title = params.get('title') || 'Module';
+      
+      console.log(`[detach] Params: moduleId=${moduleId}, title=${title}, modulePath=${modulePath}`);
       
       // Update title
       document.title = title;
