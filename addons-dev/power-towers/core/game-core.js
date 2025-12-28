@@ -11,6 +11,7 @@ const { Projectile } = require('./entities/projectile');
 const { WaveSystem } = require('./systems/wave-system');
 const { EnergySystem } = require('./systems/energy-system');
 const { Economy } = require('./systems/economy');
+const { MapModule, TERRAIN_TYPES } = require('../modules/map');
 
 class GameCore {
   constructor() {
@@ -21,6 +22,10 @@ class GameCore {
     this.waveSystem = new WaveSystem(this.eventBus);
     this.energySystem = new EnergySystem(this.eventBus);
     this.economy = new Economy(this.eventBus);
+    
+    // Map module for procedural generation
+    this.mapModule = new MapModule(this.eventBus, CONFIG);
+    this.mapModule.init();
     
     // Entities
     this.towers = [];
@@ -33,9 +38,14 @@ class GameCore {
     this.paused = false;
     this.gameOver = false;
     
-    // Path (waypoints in absolute coords)
+    // Path (waypoints in absolute coords) - will be populated by MapModule
     this.waypoints = [];
     this.pathCells = [];  // grid cells occupied by path
+    
+    // Terrain data - will be populated by MapModule
+    this.terrain = [];
+    this.energyNodes = [];
+    this.resourceVeins = [];
     
     // Timing
     this.lastTick = 0;
@@ -58,24 +68,52 @@ class GameCore {
   }
 
   /**
-   * Initialize path waypoints
+   * Initialize path using procedural map generation
    */
   initPath() {
-    // Convert relative waypoints to absolute (using map dimensions)
-    this.waypoints = CONFIG.PATH_WAYPOINTS.map(wp => ({
-      x: wp.x * CONFIG.MAP_WIDTH,
-      y: wp.y * CONFIG.MAP_HEIGHT
-    }));
+    // Generate procedural map
+    this.mapModule.generateMap();
     
-    // Calculate grid cells occupied by path
-    this.calculatePathCells();
+    // Get generated data from MapModule
+    this.waypoints = this.mapModule.waypoints;
+    this.pathCells = this.mapModule.pathCells;
+    this.terrain = this.mapModule.terrain;
+    this.energyNodes = this.mapModule.energyNodes;
+    this.resourceVeins = this.mapModule.resourceVeins;
     
     // Set wave system start position
-    this.waveSystem.init(this.waypoints[0]);
+    if (this.waypoints.length > 0) {
+      this.waveSystem.init(this.waypoints[0]);
+    }
+    
+    console.log('[GameCore] Map initialized with', this.pathCells.length, 'path cells');
+  }
+
+  /**
+   * Regenerate map with optional seed
+   * @param {number} seed - Optional seed for reproducible generation
+   */
+  regenerateMap(seed = null) {
+    this.mapModule.generateMap(seed);
+    
+    // Update local references
+    this.waypoints = this.mapModule.waypoints;
+    this.pathCells = this.mapModule.pathCells;
+    this.terrain = this.mapModule.terrain;
+    this.energyNodes = this.mapModule.energyNodes;
+    this.resourceVeins = this.mapModule.resourceVeins;
+    
+    // Reset wave system position
+    if (this.waypoints.length > 0) {
+      this.waveSystem.init(this.waypoints[0]);
+    }
+    
+    this.eventBus.emit(GameEvents.GAME_RESET);
   }
 
   /**
    * Calculate which grid cells the path occupies
+   * @deprecated - Now handled by MapModule
    */
   calculatePathCells() {
     this.pathCells = [];
@@ -570,6 +608,10 @@ class GameCore {
       projectiles: this.projectiles,
       waypoints: this.waypoints,
       pathCells: this.pathCells,
+      terrain: this.terrain,
+      terrainTypes: TERRAIN_TYPES,
+      energyNodes: this.energyNodes,
+      resourceVeins: this.resourceVeins,
       selectedTower: this.selectedTower,
       state: this.getState()
     };
