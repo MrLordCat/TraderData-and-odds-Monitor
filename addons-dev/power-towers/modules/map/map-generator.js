@@ -492,36 +492,36 @@ class MapGenerator {
   /**
    * Generate mandatory waypoints that force path to SPIRAL towards the base
    * Path goes around the base with organic, non-parallel curves
-   * Uses 8 points per loop for smoother curves with random offsets
+   * Uses 12 points per loop for smoother curves with large random offsets
    */
   _generateMandatoryWaypoints(startX, startY, baseX, baseY, margin) {
     const waypoints = [];
     const edge = this.spawnPoint.edge;
     
     // Determine how many points to visit (more points = smoother spiral)
-    // Each "loop" has 8 points (not 4 corners - smoother)
+    // Each "loop" has ~12 points for very smooth curves
     const roll = this.rng.next();
     let totalPoints;
     if (roll < 0.15) {
       // 15% chance: partial loop
-      totalPoints = 6;
+      totalPoints = this.rng.int(8, 10);
     } else if (roll < 0.45) {
       // 30% chance: ~1 loop
-      totalPoints = 8;
+      totalPoints = this.rng.int(11, 14);
     } else if (roll < 0.80) {
       // 35% chance: ~1.5-2 loops  
-      totalPoints = this.rng.int(12, 16);
+      totalPoints = this.rng.int(16, 22);
     } else {
       // 20% chance: 2-3 loops (longest path)
-      totalPoints = this.rng.int(18, 24);
+      totalPoints = this.rng.int(24, 32);
     }
     
     console.log(`[MapGenerator] Spiral will visit ${totalPoints} points`);
     
     // Start radius - further for more points
-    const loops = totalPoints / 8;
-    const startRadius = 20 + (loops * 12) + this.rng.int(-2, 5);
-    const endRadius = 6;
+    const loops = totalPoints / 12;
+    const startRadius = 22 + (loops * 14) + this.rng.int(-3, 6);
+    const endRadius = 5;
     
     // Calculate shrink per point
     const radiusShrink = (startRadius - endRadius) / totalPoints;
@@ -529,39 +529,61 @@ class MapGenerator {
     // Determine starting angle based on spawn edge
     let startAngle;
     if (edge === 'top') {
-      startAngle = startX < baseX ? Math.PI * 1.25 : Math.PI * 1.75; // Coming from top
+      startAngle = startX < baseX ? Math.PI * 1.25 : Math.PI * 1.75;
     } else if (edge === 'bottom') {
-      startAngle = startX < baseX ? Math.PI * 0.75 : Math.PI * 0.25; // Coming from bottom
+      startAngle = startX < baseX ? Math.PI * 0.75 : Math.PI * 0.25;
     } else if (edge === 'left') {
-      startAngle = startY < baseY ? Math.PI * 1.0 : Math.PI * 1.5; // Coming from left
+      startAngle = startY < baseY ? Math.PI * 1.0 : Math.PI * 1.5;
     } else {
-      startAngle = startY < baseY ? Math.PI * 0.0 : Math.PI * 0.5; // Coming from right
+      startAngle = startY < baseY ? Math.PI * 0.0 : Math.PI * 0.5;
     }
     
     // Direction: clockwise or counter-clockwise
     const clockwise = this.rng.next() > 0.5;
-    const angleStep = (Math.PI * 2 / 8) * (clockwise ? 1 : -1); // 8 points per full circle
+    // 12 points per full circle for smoother curves
+    const angleStep = (Math.PI * 2 / 12) * (clockwise ? 1 : -1);
     
     let angle = startAngle;
     let radius = startRadius;
     
+    // Track previous point to ensure minimum distance
+    let prevX = startX;
+    let prevY = startY;
+    
     // Generate spiral points
     for (let i = 0; i < totalPoints; i++) {
-      // Add randomness to both angle and radius for organic look
-      const angleOffset = this.rng.float(-0.3, 0.3); // Random angle wobble
-      const radiusOffset = this.rng.float(-4, 4); // Random radius wobble
+      // LARGE randomness for organic, non-parallel paths
+      // Angle wobble increases as we go inward (more chaotic near center)
+      const wobbleFactor = 1 + (i / totalPoints) * 0.5;
+      const angleOffset = this.rng.float(-0.5, 0.5) * wobbleFactor;
+      
+      // Radius wobble - significant variation
+      const radiusOffset = this.rng.float(-6, 6);
       
       const actualAngle = angle + angleOffset;
       const actualRadius = Math.max(endRadius, radius + radiusOffset);
       
       // Convert polar to cartesian
-      const x = baseX + Math.cos(actualAngle) * actualRadius;
-      const y = baseY + Math.sin(actualAngle) * actualRadius;
+      let x = baseX + Math.cos(actualAngle) * actualRadius;
+      let y = baseY + Math.sin(actualAngle) * actualRadius;
       
-      waypoints.push({
-        x: this._clamp(Math.round(x), margin, this.width - margin - 1),
-        y: this._clamp(Math.round(y), margin, this.height - margin - 1)
-      });
+      // Add extra perpendicular offset to break parallel lines
+      const perpAngle = actualAngle + Math.PI / 2;
+      const perpOffset = this.rng.float(-5, 5);
+      x += Math.cos(perpAngle) * perpOffset;
+      y += Math.sin(perpAngle) * perpOffset;
+      
+      // Clamp to bounds
+      const clampedX = this._clamp(Math.round(x), margin, this.width - margin - 1);
+      const clampedY = this._clamp(Math.round(y), margin, this.height - margin - 1);
+      
+      // Only add if not too close to previous point (avoid bunching)
+      const distToPrev = Math.abs(clampedX - prevX) + Math.abs(clampedY - prevY);
+      if (distToPrev > 6) {
+        waypoints.push({ x: clampedX, y: clampedY });
+        prevX = clampedX;
+        prevY = clampedY;
+      }
       
       // Move to next position
       angle += angleStep;
@@ -569,7 +591,7 @@ class MapGenerator {
     }
     
     // Final approach waypoint near base
-    const approachAngle = angle + this.rng.float(-0.5, 0.5);
+    const approachAngle = angle + this.rng.float(-0.8, 0.8);
     const approachX = baseX + Math.cos(approachAngle) * 4;
     const approachY = baseY + Math.sin(approachAngle) * 4;
     waypoints.push({ 
