@@ -100,27 +100,29 @@ class GameController {
   }
   
   /**
-   * Resize canvas to fit container
+   * Resize canvas to fit container (uses full available space)
    */
   resizeCanvas() {
     if (!this.canvas || !this.canvasContainer) return;
     
     const rect = this.canvasContainer.getBoundingClientRect();
-    const size = Math.floor(Math.min(rect.width, rect.height) - 10);
+    const width = Math.floor(rect.width);
+    const height = Math.floor(rect.height);
     
-    if (size < 200 || Math.abs(this.canvas.width - size) < 5) return;
+    if (width < 200 || height < 200) return;
+    if (Math.abs(this.canvas.width - width) < 5 && Math.abs(this.canvas.height - height) < 5) return;
     
-    console.log('[game-controller] Canvas resize:', size);
+    console.log('[game-controller] Canvas resize:', width, 'x', height);
     
-    this.canvas.width = size;
-    this.canvas.height = size;
+    this.canvas.width = width;
+    this.canvas.height = height;
     
     if (this.camera) {
-      this.camera.setViewportSize(size, size);
+      this.camera.setViewportSize(width, height);
     }
     if (this.renderer) {
-      this.renderer.width = size;
-      this.renderer.height = size;
+      this.renderer.width = width;
+      this.renderer.height = height;
     }
     
     this.renderGame();
@@ -205,9 +207,12 @@ class GameController {
     this.game = new this.GameCore();
     this.renderer = new this.GameRenderer(this.canvas, this.camera);
     
-    // Center on base
-    const basePos = this.game.map.base;
-    if (basePos) this.camera.centerOn(basePos.x, basePos.y);
+    // Center on base (last waypoint)
+    const waypoints = this.game.waypoints;
+    if (waypoints && waypoints.length > 0) {
+      const basePos = waypoints[waypoints.length - 1];
+      this.camera.centerOn(basePos.x, basePos.y);
+    }
     
     this.setupEventListeners();
     this.setupGameEvents();
@@ -234,8 +239,12 @@ class GameController {
       this.game = this.GameCore.deserialize(state.gameState);
       this.renderer = new this.GameRenderer(this.canvas, this.camera);
       
-      const basePos = this.game.map.base;
-      if (basePos) this.camera.centerOn(basePos.x, basePos.y);
+      // Center on base (last waypoint)
+      const waypoints = this.game.waypoints;
+      if (waypoints && waypoints.length > 0) {
+        const basePos = waypoints[waypoints.length - 1];
+        this.camera.centerOn(basePos.x, basePos.y);
+      }
       
       this.setupEventListeners();
       this.setupGameEvents();
@@ -326,6 +335,12 @@ class GameController {
   setupGameEvents() {
     if (!this.game) return;
     
+    // Render on every game tick
+    this.game.on(this.GameEvents.GAME_TICK, () => {
+      this.renderGame();
+      this.updateUI(this.game.getState());
+    });
+    
     this.game.on(this.GameEvents.STATE_CHANGE, (state) => {
       this.updateUI(state);
       this.renderGame();
@@ -367,25 +382,13 @@ class GameController {
       this.game.start();
       this.elements.btnStart.textContent = '⏸ Pause';
       this.elements.btnTower.disabled = true;
-      this.gameLoop();
     } else if (this.game.paused) {
       this.game.resume();
       this.elements.btnStart.textContent = '⏸ Pause';
-      this.gameLoop();
     } else {
       this.game.pause();
       this.elements.btnStart.textContent = '▶ Resume';
     }
-  }
-
-  /**
-   * Main game loop
-   */
-  gameLoop() {
-    if (!this.game || !this.game.running || this.game.paused) return;
-    this.game.tick();
-    this.renderGame();
-    requestAnimationFrame(() => this.gameLoop());
   }
 
   /**
@@ -395,8 +398,12 @@ class GameController {
     this.hideOverlay();
     this.game = new this.GameCore();
     
-    const basePos = this.game.map.base;
-    if (basePos && this.camera) this.camera.centerOn(basePos.x, basePos.y);
+    // Center on base (last waypoint)
+    const waypoints = this.game.waypoints;
+    if (waypoints && waypoints.length > 0 && this.camera) {
+      const basePos = waypoints[waypoints.length - 1];
+      this.camera.centerOn(basePos.x, basePos.y);
+    }
     
     this.setupGameEvents();
     this.renderGame();
@@ -414,7 +421,7 @@ class GameController {
     this.placingTower = !this.placingTower;
     this.elements.btnTower.classList.toggle('active', this.placingTower);
     if (this.placingTower && this.game.selectedTower) {
-      this.game.deselectTower();
+      this.game.selectTower(null);
     }
   }
 
@@ -436,7 +443,13 @@ class GameController {
       const pathIndex = this.TOWER_PATHS.findIndex(p => p.id === this.selectedPath);
       this.game.placeTower(gridX, gridY, pathIndex >= 0 ? pathIndex : 0);
     } else {
-      this.game.selectTowerAt(gridX, gridY);
+      // Find tower at grid position
+      const tower = this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY);
+      if (tower) {
+        this.game.selectTower(tower.id);
+      } else {
+        this.game.selectTower(null);
+      }
     }
     
     this.renderGame();
@@ -458,9 +471,9 @@ class GameController {
     
     if (this.placingTower) {
       const canPlace = this.game.canPlaceTower(gridX, gridY);
-      this.renderer.setHoverCell(gridX, gridY, canPlace);
+      this.renderer.setHover(gridX, gridY, canPlace);
     } else {
-      this.renderer.setHoverCell(-1, -1, false);
+      this.renderer.clearHover();
     }
     
     this.renderGame();
@@ -478,7 +491,7 @@ class GameController {
     const mouseY = e.clientY - rect.top;
     
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    this.camera.zoomAt(mouseX, mouseY, zoomFactor);
+    this.camera.zoomBy(zoomFactor, mouseX, mouseY);
     this.renderGame();
   }
 

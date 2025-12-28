@@ -383,11 +383,18 @@ class GameCore {
   }
 
   /**
+   * Check if tower can be placed at grid position
+   */
+  canPlaceTower(gridX, gridY) {
+    return Tower.canPlace(gridX, gridY, this.towers, this.pathCells);
+  }
+
+  /**
    * Place a new tower
    */
   placeTower(gridX, gridY, path = null) {
     // Validate placement
-    if (!Tower.canPlace(gridX, gridY, this.towers, this.pathCells)) {
+    if (!this.canPlaceTower(gridX, gridY)) {
       this.eventBus.emit(GameEvents.UI_MESSAGE, { 
         type: 'error', 
         text: 'Cannot place tower here!' 

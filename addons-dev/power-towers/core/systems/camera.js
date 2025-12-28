@@ -15,7 +15,8 @@ class Camera {
     this.y = 0;
     
     // Zoom level (1.0 = 1:1, 0.5 = zoomed out, 2.0 = zoomed in)
-    this.zoom = 0.2;  // Default: show 5x more of map (2000*0.2 = 400px visible)
+    // Initial value will be adjusted to minZoom when setViewportSize is called
+    this.zoom = 1.0;
     
     // Viewport size (display canvas size)
     this.viewportWidth = CONFIG.CANVAS_WIDTH;
@@ -40,10 +41,14 @@ class Camera {
 
   /**
    * Set viewport size (when canvas resizes)
+   * Recalculates zoom to ensure map fills viewport
    */
   setViewportSize(width, height) {
     this.viewportWidth = width;
     this.viewportHeight = height;
+    
+    // Recalculate zoom to ensure map fills viewport
+    this.setZoom(this.zoom);
   }
 
   /**
@@ -158,16 +163,16 @@ class Camera {
 
   /**
    * Set zoom level with bounds checking
-   * Prevents zooming out beyond map boundaries
+   * Prevents zooming out beyond map boundaries - viewport always filled with map
    */
   setZoom(newZoom, centerX = null, centerY = null) {
     const oldZoom = this.zoom;
     
-    // Calculate minimum zoom to fit map in viewport
-    // Ensures you can't zoom out beyond the map boundaries
+    // Calculate minimum zoom to fill viewport completely
+    // This ensures map always fills the entire viewport (no empty borders)
     const minZoomX = this.viewportWidth / this.mapWidth;
     const minZoomY = this.viewportHeight / this.mapHeight;
-    const minZoom = Math.max(minZoomX, minZoomY, 0.15); // At least show whole map
+    const minZoom = Math.max(minZoomX, minZoomY); // Must fill viewport in both dimensions
     
     this.zoom = Math.max(minZoom, Math.min(2.0, newZoom));
     
