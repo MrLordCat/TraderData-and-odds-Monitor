@@ -162,17 +162,12 @@ class NoiseGenerator {
  * Map Generator Configuration
  */
 const GENERATOR_CONFIG = {
-  // Path generation
-  PATH_MIN_LENGTH_FACTOR: 1.8,    // Min path length relative to direct distance
-  PATH_MAX_LENGTH_FACTOR: 3.0,    // Max path length relative to direct distance
-  PATH_SEGMENT_MIN: 3,            // Min cells per straight segment (shorter = more turns)
-  PATH_SEGMENT_MAX: 8,            // Max cells per straight segment (shorter = more turns)
+  // Path generation - waypoint-based approach
+  PATH_WAYPOINTS_MIN: 3,          // Minimum intermediate waypoints
+  PATH_WAYPOINTS_MAX: 5,          // Maximum intermediate waypoints  
+  PATH_VERTICAL_AMPLITUDE: 0.7,   // How far path can deviate vertically (0-1 of map height)
   PATH_WIDTH: 3,                  // Path width in cells (3 = enemy walks in center)
-  
-  // Path meandering
-  TURN_CHANCE: 0.4,               // Chance to change direction
-  FORWARD_BIAS: 0.5,              // How much to favor forward movement (lower = more meander)
-  VERTICAL_WANDER: 0.35,          // Chance for random vertical movement
+  PATH_MARGIN: 8,                 // Minimum distance from map edges for waypoints
   
   // Terrain distribution thresholds (based on noise value 0-1)
   TERRAIN_THRESHOLDS: {
@@ -319,6 +314,7 @@ class MapGenerator {
   
   /**
    * Generate meandering path from spawn to base
+   * Uses waypoint-based approach for smoother, more strategic paths
    */
   _generatePath() {
     this.waypoints = [];
@@ -338,17 +334,24 @@ class MapGenerator {
       y: this.spawnPoint.y
     });
     
-    // Generate path using random walk with direction bias
-    const path = this._randomWalkPath(startX, startY, endX, endY);
+    // Generate intermediate control points
+    const controlPoints = this._generateControlPoints(startX, startY, endX, endY);
     
-    // Convert path cells to waypoints (simplify to key points)
-    const simplifiedWaypoints = this._simplifyPath(path);
+    // Connect points with straight lines (Bresenham-like)
+    const allPoints = [
+      { x: startX, y: startY },
+      ...controlPoints,
+      { x: endX, y: endY }
+    ];
     
-    // Add simplified waypoints
-    for (const wp of simplifiedWaypoints) {
+    // Generate path cells by connecting control points
+    const path = this._connectControlPoints(allPoints);
+    
+    // Add waypoints for each control point
+    for (const cp of controlPoints) {
       this.waypoints.push({
-        x: (wp.x + 0.5) * this.gridSize,
-        y: (wp.y + 0.5) * this.gridSize
+        x: (cp.x + 0.5) * this.gridSize,
+        y: (cp.y + 0.5) * this.gridSize
       });
     }
     
@@ -363,172 +366,75 @@ class MapGenerator {
   }
   
   /**
-   * Generate path using biased random walk
+   * Generate control points that create a meandering but smooth path
    */
-  _randomWalkPath(startX, startY, endX, endY) {
+  _generateControlPoints(startX, startY, endX, endY) {
+    const points = [];
+    const margin = GENERATOR_CONFIG.PATH_MARGIN;
+    const amplitude = GENERATOR_CONFIG.PATH_VERTICAL_AMPLITUDE;
+    
+    // Number of intermediate waypoints
+    const numPoints = this.rng.int(
+      GENERATOR_CONFIG.PATH_WAYPOINTS_MIN,
+      GENERATOR_CONFIG.PATH_WAYPOINTS_MAX
+    );
+    
+    // Divide horizontal space into segments
+    const segmentWidth = (endX - startX - margin * 2) / (numPoints + 1);
+    
+    // Alternate between going up and down for snake-like pattern
+    let goingUp = this.rng.next() > 0.5;
+    
+    for (let i = 0; i < numPoints; i++) {
+      // X position: evenly distributed with some randomness
+      const baseX = startX + margin + segmentWidth * (i + 1);
+      const x = Math.floor(baseX + this.rng.float(-segmentWidth * 0.2, segmentWidth * 0.2));
+      
+      // Y position: alternate between top and bottom halves
+      const centerY = this.height / 2;
+      const maxDeviation = (this.height / 2 - margin) * amplitude;
+      
+      let y;
+      if (goingUp) {
+        // Go to upper part of map
+        y = Math.floor(centerY - this.rng.float(maxDeviation * 0.3, maxDeviation));
+      } else {
+        // Go to lower part of map
+        y = Math.floor(centerY + this.rng.float(maxDeviation * 0.3, maxDeviation));
+      }
+      
+      // Clamp to valid range
+      y = Math.max(margin, Math.min(this.height - margin - 1, y));
+      
+      points.push({ x: Math.max(margin, Math.min(this.width - margin - 1, x)), y });
+      
+      // Alternate direction for next point
+      goingUp = !goingUp;
+    }
+    
+    return points;
+  }
+  
+  /**
+   * Connect control points with straight line segments
+   */
+  _connectControlPoints(points) {
     const path = [];
     const visited = new Set();
     
-    let x = startX;
-    let y = startY;
-    
-    // Add starting point
-    path.push({ x, y });
-    visited.add(`${x},${y}`);
-    
-    // Direction vectors: right, up, down, left
-    const directions = [
-      { dx: 1, dy: 0, name: 'right' },
-      { dx: 0, dy: -1, name: 'up' },
-      { dx: 0, dy: 1, name: 'down' },
-      { dx: -1, dy: 0, name: 'left' }
-    ];
-    
-    let lastDir = 'right';
-    let straightCount = 0;
-    const maxStraight = this.rng.int(
-      GENERATOR_CONFIG.PATH_SEGMENT_MIN,
-      GENERATOR_CONFIG.PATH_SEGMENT_MAX
-    );
-    
-    const maxIterations = this.width * this.height;
-    let iterations = 0;
-    
-    while (x !== endX || Math.abs(y - endY) > 1) {
-      iterations++;
-      if (iterations > maxIterations) {
-        console.warn('[MapGenerator] Path generation exceeded max iterations');
-        break;
-      }
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
       
-      // Calculate weights for each direction
-      const weights = [];
+      // Draw line from start to end using Bresenham-like approach
+      const lineCells = this._drawLine(start.x, start.y, end.x, end.y);
       
-      for (const dir of directions) {
-        const nx = x + dir.dx;
-        const ny = y + dir.dy;
-        
-        // Skip if out of bounds or visited
-        if (nx < 0 || nx >= this.width || ny < 0 || ny >= this.height) {
-          weights.push(0);
-          continue;
+      for (const cell of lineCells) {
+        const key = `${cell.x},${cell.y}`;
+        if (!visited.has(key)) {
+          path.push(cell);
+          visited.add(key);
         }
-        if (visited.has(`${nx},${ny}`)) {
-          weights.push(0);
-          continue;
-        }
-        
-        // Calculate weight based on:
-        // 1. Progress towards goal
-        // 2. Randomness for meandering
-        // 3. Continuing in same direction for segments
-        
-        let weight = 1;
-        
-        // Progress weight - favor moves that get closer, but not too strongly
-        const distToEnd = Math.abs(endX - nx) + Math.abs(endY - ny);
-        const currentDist = Math.abs(endX - x) + Math.abs(endY - y);
-        
-        if (distToEnd < currentDist) {
-          weight *= 1.5; // Reduced from 3 - less aggressive forward progress
-        }
-        
-        // Right direction bonus (main progression) - reduced for more meandering
-        if (dir.name === 'right') {
-          weight *= GENERATOR_CONFIG.FORWARD_BIAS * 5; // 0.5 * 5 = 2.5
-        }
-        
-        // Same direction bonus (for straight segments)
-        if (dir.name === lastDir && straightCount < maxStraight) {
-          weight *= 1.5;
-        }
-        
-        // Random turn chance - add weight to perpendicular directions
-        if ((dir.name === 'up' || dir.name === 'down') && this.rng.next() < GENERATOR_CONFIG.TURN_CHANCE) {
-          weight *= 3; // Encourage turns
-        }
-        
-        // Random vertical wandering even when not needed
-        if ((dir.name === 'up' || dir.name === 'down') && this.rng.next() < GENERATOR_CONFIG.VERTICAL_WANDER) {
-          weight *= 2;
-        }
-        
-        // Vertical movement when we need to align with end Y (but don't force it)
-        if (dir.name === 'up' && y > endY) weight *= 1.3;
-        if (dir.name === 'down' && y < endY) weight *= 1.3;
-        
-        // Avoid going back left too much
-        if (dir.name === 'left') {
-          weight *= 0.15; // Reduced from 0.3 - even less backtracking
-        }
-        
-        // Terrain preference (avoid water for path)
-        const terrainAt = this.terrain[ny]?.[nx];
-        if (terrainAt === 'water') {
-          weight *= 0.2;
-        }
-        
-        weights.push(weight);
-      }
-      
-      // Pick direction based on weights
-      const totalWeight = weights.reduce((a, b) => a + b, 0);
-      
-      if (totalWeight === 0) {
-        // Dead end - backtrack
-        if (path.length > 1) {
-          path.pop();
-          const last = path[path.length - 1];
-          x = last.x;
-          y = last.y;
-        }
-        continue;
-      }
-      
-      let random = this.rng.float(0, totalWeight);
-      let chosenDir = 0;
-      
-      for (let i = 0; i < weights.length; i++) {
-        random -= weights[i];
-        if (random <= 0) {
-          chosenDir = i;
-          break;
-        }
-      }
-      
-      // Move in chosen direction
-      const dir = directions[chosenDir];
-      x += dir.dx;
-      y += dir.dy;
-      
-      // Update straight count
-      if (dir.name === lastDir) {
-        straightCount++;
-      } else {
-        straightCount = 0;
-      }
-      lastDir = dir.name;
-      
-      // Add to path
-      path.push({ x, y });
-      visited.add(`${x},${y}`);
-    }
-    
-    // Connect to end Y if needed
-    while (y !== endY) {
-      y += y < endY ? 1 : -1;
-      if (!visited.has(`${x},${y}`)) {
-        path.push({ x, y });
-        visited.add(`${x},${y}`);
-      }
-    }
-    
-    // Ensure we reach the end
-    while (x < endX) {
-      x++;
-      if (!visited.has(`${x},${y}`)) {
-        path.push({ x, y });
-        visited.add(`${x},${y}`);
       }
     }
     
@@ -536,6 +442,49 @@ class MapGenerator {
   }
   
   /**
+   * Draw a line between two points (grid cells)
+   * Uses a modified Bresenham algorithm for smooth diagonal lines
+   */
+  _drawLine(x0, y0, x1, y1) {
+    const cells = [];
+    
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    
+    let err = dx - dy;
+    let x = x0;
+    let y = y0;
+    
+    while (true) {
+      cells.push({ x, y });
+      
+      if (x === x1 && y === y1) break;
+      
+      const e2 = 2 * err;
+      
+      // Move diagonally when possible for smoother lines
+      if (e2 > -dy && e2 < dx) {
+        // Can move diagonally
+        err -= dy;
+        err += dx;
+        x += sx;
+        y += sy;
+      } else if (e2 > -dy) {
+        err -= dy;
+        x += sx;
+      } else {
+        err += dx;
+        y += sy;
+      }
+    }
+    
+    return cells;
+  }
+  
+  /**
+   * @deprecated - Kept for reference, not used
    * Simplify path to key waypoints (direction changes)
    */
   _simplifyPath(path) {
