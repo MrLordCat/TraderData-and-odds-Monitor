@@ -344,22 +344,54 @@ class GameCore {
 
   /**
    * Get all data for rendering
+   * Flattens module data for renderer compatibility
    */
   getRenderData() {
+    const mapData = this.modules.map.getRenderData();
+    const towersData = this.modules.towers.getRenderData();
+    const enemiesData = this.modules.enemies.getRenderData();
+    const combatData = this.modules.combat.getRenderData();
+    const economyData = this.modules.economy.getRenderData();
+    const energyData = this.modules.energy.getRenderData();
+    const playerData = this.modules.player.getRenderData();
+    const menuData = this.modules.menu.getRenderData();
+    
     return {
-      map: this.modules.map.getRenderData(),
-      towers: this.modules.towers.getRenderData(),
-      enemies: this.modules.enemies.getRenderData(),
-      combat: this.modules.combat.getRenderData(),
-      economy: this.modules.economy.getRenderData(),
-      energy: this.modules.energy.getRenderData(),
-      player: this.modules.player.getRenderData(),
-      menu: this.modules.menu.getRenderData(),
-      state: this.getState(),
-      // Compatibility with renderer
-      waypoints: this.modules.map.waypoints,
-      pathCells: this.modules.map.pathCells,
-      selectedTower: this.selectedTower
+      // Map data
+      terrain: mapData.terrain,
+      terrainTypes: mapData.terrainTypes,
+      waypoints: mapData.waypoints,
+      pathCells: mapData.pathCells,
+      energyNodes: mapData.energyNodes,
+      resourceVeins: mapData.resourceVeins,
+      
+      // Towers
+      towers: towersData.towers || [],
+      selectedTower: this.selectedTower,
+      towerTypes: towersData.towerTypes,
+      
+      // Enemies & Combat
+      enemies: enemiesData.enemies || [],
+      projectiles: combatData.projectiles || [],
+      
+      // Economy
+      gold: economyData.gold,
+      
+      // Energy
+      energy: energyData.currentEnergy,
+      maxEnergy: energyData.maxEnergy,
+      energyRegen: energyData.energyRegen,
+      
+      // Player
+      lives: playerData.lives,
+      maxLives: playerData.maxLives,
+      wave: playerData.wave,
+      
+      // Menu
+      menu: menuData,
+      
+      // State
+      state: this.getState()
     };
   }
 
