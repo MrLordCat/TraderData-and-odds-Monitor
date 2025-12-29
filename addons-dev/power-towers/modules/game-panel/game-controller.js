@@ -315,6 +315,11 @@ class GameController {
   setupEventListeners() {
     const el = this.elements;
     
+    // Re-query tower items as they might not have been available during init
+    el.towerItems = this.screens.game?.querySelectorAll('.tower-item') || [];
+    
+    console.log('[game-controller] setupEventListeners, towerItems:', el.towerItems.length);
+    
     el.btnStart.addEventListener('click', () => this.toggleGame());
     el.overlayBtn.addEventListener('click', () => this.restartGame());
     el.btnUpgrade.addEventListener('click', () => this.upgradeSelectedTower());
@@ -322,8 +327,10 @@ class GameController {
     
     // Tower selection - click to enter build mode
     el.towerItems.forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
         const path = item.dataset.path;
+        console.log('[game-controller] Tower item clicked:', path, 'disabled:', item.classList.contains('disabled'));
         if (item.classList.contains('disabled')) return;
         
         // Toggle: if already placing this tower, cancel; otherwise select it
@@ -457,6 +464,7 @@ class GameController {
    * Enter tower placement mode for specific path
    */
   enterPlacementMode(path) {
+    console.log('[game-controller] enterPlacementMode:', path);
     this.placingTower = true;
     this.selectedPath = path;
     
@@ -472,12 +480,16 @@ class GameController {
     if (this.game && this.game.selectedTower) {
       this.game.selectTower(null);
     }
+    
+    // Force re-render to show hover
+    this.renderGame();
   }
   
   /**
    * Exit tower placement mode
    */
   exitPlacementMode() {
+    console.log('[game-controller] exitPlacementMode');
     this.placingTower = false;
     this.selectedPath = null;
     
@@ -485,6 +497,12 @@ class GameController {
     this.elements.towerItems.forEach(item => {
       item.classList.remove('placing');
     });
+    
+    // Clear hover and re-render
+    if (this.renderer) {
+      this.renderer.clearHover();
+      this.renderGame();
+    }
   }
 
   /**

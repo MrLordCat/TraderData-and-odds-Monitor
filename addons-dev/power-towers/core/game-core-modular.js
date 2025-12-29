@@ -297,6 +297,32 @@ class GameCore {
   // ============= PUBLIC API =============
 
   /**
+   * Check if a tower can be placed at grid position
+   */
+  canPlaceTower(gridX, gridY) {
+    if (this.useModularArchitecture) {
+      // Check if position is valid for building
+      if (!this.modules.map.isBuildable(gridX, gridY)) {
+        return false;
+      }
+      // Check if tower already exists
+      if (this.modules.towers.getTowerAt(gridX, gridY)) {
+        return false;
+      }
+      return true;
+    } else {
+      // Legacy: check map and existing towers
+      const map = this.map;
+      if (!map || gridX < 0 || gridY < 0 || gridX >= map[0]?.length || gridY >= map.length) {
+        return false;
+      }
+      if (map[gridY][gridX] !== 0) return false;
+      if (this.towers?.some(t => t.gridX === gridX && t.gridY === gridY)) return false;
+      return true;
+    }
+  }
+
+  /**
    * Place a tower at grid position
    */
   placeTower(gridX, gridY, towerType = 'fire') {

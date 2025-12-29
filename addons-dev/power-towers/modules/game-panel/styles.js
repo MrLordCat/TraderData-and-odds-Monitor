@@ -160,11 +160,13 @@ function getGameStyles() {
       width: 48px; height: 48px;
       border: 2px solid rgba(255,255,255,0.2); border-radius: 10px;
       background: rgba(255,255,255,0.1);
-      font-size: 22px; cursor: pointer; transition: all 0.2s;
+      font-size: 22px; transition: all 0.2s;
+      pointer-events: none; /* Let parent handle clicks */
     }
-    .tower-btn:hover { background: rgba(255,255,255,0.2); }
+    .tower-item:hover .tower-btn { background: rgba(255,255,255,0.2); }
     .tower-price {
       font-size: 11px; color: #ffd700; font-weight: 600;
+      pointer-events: none; /* Let parent handle clicks */
     }
     .tower-item.disabled .tower-price { color: #fc8181; }
     @keyframes pulse-build {
