@@ -25,9 +25,10 @@ module.exports = function({ SidebarModule, registerModule }) {
     const corePath = path.join(__dirname, '..', '..', 'core');
     const rendererPath = path.join(__dirname, '..', '..', 'renderer');
     
-    const gameCore = require(path.join(corePath, 'game-core.js'));
+    // Use modular game core
+    const gameCore = require(path.join(corePath, 'game-core-modular.js'));
     GameCore = gameCore.GameCore;
-    GameEvents = gameCore.GameEvents;
+    GameEvents = require(path.join(corePath, 'event-bus.js')).GameEvents;
     
     const renderer = require(path.join(rendererPath, 'game-renderer.js'));
     GameRenderer = renderer.GameRenderer;

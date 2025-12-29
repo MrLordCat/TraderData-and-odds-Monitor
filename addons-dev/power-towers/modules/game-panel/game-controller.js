@@ -523,8 +523,13 @@ class GameController {
     
     if (this.placingTower && this.selectedPath) {
       // Place tower with selected path type
-      const result = this.game.placeTower(gridX, gridY, this.selectedPath);
-      console.log('[game-controller] placeTower result:', result);
+      console.log('[game-controller] Calling game.placeTower, game exists:', !!this.game, 'typeof placeTower:', typeof this.game?.placeTower);
+      try {
+        const result = this.game.placeTower(gridX, gridY, this.selectedPath);
+        console.log('[game-controller] placeTower result:', result);
+      } catch (err) {
+        console.error('[game-controller] placeTower error:', err);
+      }
     } else {
       // Find tower at grid position
       const tower = this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY);
