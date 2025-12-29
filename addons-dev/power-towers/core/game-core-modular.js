@@ -76,6 +76,12 @@ class GameCore {
       module.init();
     }
     
+    // Generate initial map (for menu preview)
+    this.modules.map.generateMap();
+    
+    // Set initial gold for UI display
+    this.modules.economy.gold = CONFIG.STARTING_GOLD;
+    
     // Create proxy getter for towers array (for backwards compatibility with renderer)
     Object.defineProperty(this, 'towers', {
       get: () => this.modules.towers.getTowersArray(),
@@ -102,8 +108,10 @@ class GameCore {
     // Menu events
     this.eventBus.on(GameEvents.GAME_START, (data) => this.onGameStart(data));
     this.eventBus.on(GameEvents.GAME_OVER, (data) => this.onGameOver(data));
-    this.eventBus.on('game:pause', () => this.pause());
-    this.eventBus.on('game:resume', () => this.resume());
+    
+    // Pause/resume from menu (use internal methods, don't re-emit)
+    this.eventBus.on('menu:pause-game', () => this.pauseInternal());
+    this.eventBus.on('menu:resume-game', () => this.resumeInternal());
     
     // Wave events
     this.eventBus.on('wave:complete', () => this.onWaveComplete());
@@ -126,15 +134,28 @@ class GameCore {
    * Game start handler
    */
   onGameStart(data = {}) {
+    console.log('[GameCore] onGameStart called');
     this.running = true;
     this.paused = false;
     this.gameOver = false;
     this.lastTick = performance.now();
     
-    // Generate map (triggers cascade)
+    // Close menu if open
+    this.modules.menu.isOpen = false;
+    
+    // Generate NEW map for this game
     this.modules.map.generateMap();
     
+    // Start game loop
     this.gameLoop();
+    
+    // Start first wave after short delay
+    setTimeout(() => {
+      if (this.running && !this.paused) {
+        console.log('[GameCore] Starting first wave');
+        this.eventBus.emit('wave:start');
+      }
+    }, 1000);
   }
 
   /**
@@ -163,26 +184,59 @@ class GameCore {
   }
 
   /**
-   * Start game (from external call)
+   * Start game (from external call - e.g. Start Wave button)
    */
   start() {
+    console.log('[GameCore] start() called, running:', this.running);
+    if (this.running) {
+      // Already running, start next wave
+      this.eventBus.emit('wave:start');
+      return;
+    }
+    
+    // First start - emit GAME_START which triggers onGameStart
+    this.eventBus.emit(GameEvents.GAME_START, {});
+  }
+
+  /**
+   * Open menu (for external use)
+   */
+  openMenu() {
     this.modules.menu.openMenu();
   }
 
   /**
-   * Pause game
+   * Internal pause (no event emit - called from event handler)
    */
-  pause() {
+  pauseInternal() {
     this.paused = true;
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
+  }
+
+  /**
+   * Pause game (with event emit - called from external)
+   */
+  pause() {
+    this.pauseInternal();
     this.eventBus.emit(GameEvents.GAME_PAUSE, this.getState());
   }
 
   /**
-   * Resume game
+   * Internal resume (no event emit)
+   */
+  resumeInternal() {
+    if (!this.running || !this.paused) return;
+    
+    this.paused = false;
+    this.lastTick = performance.now();
+    this.gameLoop();
+  }
+
+  /**
+   * Resume game (with event emit)
    */
   resume() {
     if (!this.running || !this.paused) return;
@@ -208,7 +262,9 @@ class GameCore {
    * Main game loop
    */
   gameLoop() {
-    if (!this.running || this.paused) return;
+    if (!this.running || this.paused) {
+      return;
+    }
     
     const now = performance.now();
     const deltaTime = (now - this.lastTick) / 1000; // Convert to seconds
@@ -355,6 +411,11 @@ class GameCore {
     const energyData = this.modules.energy.getRenderData();
     const playerData = this.modules.player.getRenderData();
     const menuData = this.modules.menu.getRenderData();
+    
+    // Debug: check if map data exists
+    if (!mapData.terrain || mapData.terrain.length === 0) {
+      console.warn('[GameCore] getRenderData: terrain is empty!', mapData);
+    }
     
     return {
       // Map data

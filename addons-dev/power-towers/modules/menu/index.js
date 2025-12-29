@@ -83,7 +83,7 @@ class MenuModule {
     this.isOpen = true;
     this.currentScreen = MENU_SCREENS.MAIN;
     this.emitUpdate();
-    this.eventBus.emit('game:pause');
+    this.eventBus.emit('menu:pause-game');
   }
 
   /**
@@ -92,7 +92,7 @@ class MenuModule {
   closeMenu() {
     this.isOpen = false;
     this.emitUpdate();
-    this.eventBus.emit('game:resume');
+    this.eventBus.emit('menu:resume-game');
   }
 
   /**
