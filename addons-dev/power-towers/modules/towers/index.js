@@ -125,10 +125,8 @@ class TowersModule {
    * Handle tower build request
    */
   handleBuildRequest({ type, gridX, gridY }) {
-    console.log('[towers] handleBuildRequest:', type, gridX, gridY);
     const towerDef = TOWER_TYPES[type];
     if (!towerDef) {
-      console.log('[towers] Invalid tower type:', type);
       this.eventBus.emit('tower:build-failed', { reason: 'Invalid tower type' });
       return;
     }
@@ -136,7 +134,6 @@ class TowersModule {
     // Check if position is valid (via MapModule event)
     // For now, just create the tower
     const tower = this.createTower(type, gridX, gridY);
-    console.log('[towers] Created tower:', tower);
     
     if (tower) {
       this.eventBus.emit('economy:spend', towerDef.baseCost);
@@ -167,9 +164,12 @@ class TowersModule {
       attackSpeed: towerDef.baseAttackSpeed,
       // State
       level: 1,
+      tier: 1,  // Visual tier indicator
       attackCooldown: 0,
       target: null,
+      rotation: 0,  // Turret rotation in radians
       // Visual
+      size: gridSize,  // Tower size in pixels
       emoji: towerDef.emoji,
       color: towerDef.color,
       // Combat stats
@@ -231,6 +231,7 @@ class TowersModule {
    */
   upgradeTower(tower, upgradeType) {
     tower.level++;
+    tower.tier = tower.level;  // Update visual tier
     
     // Increase stats based on upgrade type or general upgrade
     switch (upgradeType) {
@@ -283,6 +284,13 @@ class TowersModule {
     // Find target if none or current target out of range/dead
     if (!tower.target || !this.isValidTarget(tower, tower.target, enemies)) {
       tower.target = this.findTarget(tower, enemies);
+    }
+
+    // Rotate towards target
+    if (tower.target) {
+      const dx = tower.target.x - tower.x;
+      const dy = tower.target.y - tower.y;
+      tower.rotation = Math.atan2(dy, dx);
     }
 
     // Attack if target and ready

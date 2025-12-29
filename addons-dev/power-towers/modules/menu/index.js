@@ -23,8 +23,8 @@ class MenuModule {
     this.eventBus = eventBus;
     this.config = config;
     
-    // Menu state
-    this.isOpen = true;
+    // Menu state - default to false since external UI handles menu screens
+    this.isOpen = false;
     this.currentScreen = MENU_SCREENS.MAIN;
     
     // Permanent upgrades (persist between games)

@@ -40,8 +40,6 @@ module.exports = function({ SidebarModule, registerModule }) {
     Camera = cameraModule.Camera;
     
     CONFIG = require(path.join(corePath, 'config.js'));
-    
-    console.log('[game-panel] Game modules loaded');
   } catch (err) {
     console.error('[game-panel] Failed to load game modules:', err);
   }
@@ -64,8 +62,6 @@ module.exports = function({ SidebarModule, registerModule }) {
       // Game controller (only used in detached mode)
       this.gameController = null;
       this._savedState = options.savedState || null;
-      
-      console.log('[game-panel] Constructor, isDetached:', this.isDetached);
     }
 
     getTemplate() {
@@ -79,8 +75,6 @@ module.exports = function({ SidebarModule, registerModule }) {
     onMount(container) {
       super.onMount(container);
       
-      console.log('[game-panel] onMount, isDetached:', this.isDetached);
-      
       // ═══════════════════════════════════════════════════════════════
       // ATTACHED MODE: Setup launch button
       // ═══════════════════════════════════════════════════════════════
@@ -88,7 +82,6 @@ module.exports = function({ SidebarModule, registerModule }) {
         const launchBtn = container.querySelector('#btn-launch');
         if (launchBtn) {
           launchBtn.addEventListener('click', () => {
-            console.log('[game-panel] Launch button clicked');
             const { ipcRenderer } = require('electron');
             const modulePath = path.join(__dirname, 'index.js');
             ipcRenderer.invoke('module-detach', { 

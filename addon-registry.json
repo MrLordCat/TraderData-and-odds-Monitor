@@ -1,5 +1,20 @@
 {
-  "addons": [],
-  "lastUpdated": "2025-12-27T19:30:00Z",
+  "addons": [
+    {
+      "id": "power-towers",
+      "name": "Power Towers TD",
+      "description": "Roguelike Tower Defense game with energy system",
+      "author": "oddsMoni",
+      "version": "0.1.0"
+    },
+    {
+      "id": "pt-editor",
+      "name": "Power Towers Editor",
+      "description": "Balance editor for Power Towers TD - edit waves, enemies, towers and economy",
+      "author": "oddsMoni",
+      "version": "1.0.0"
+    }
+  ],
+  "lastUpdated": "2025-12-29T12:00:00Z",
   "note": "Release channel addons will be added here when stable releases are created"
 }

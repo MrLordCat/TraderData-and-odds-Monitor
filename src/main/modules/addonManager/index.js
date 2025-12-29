@@ -37,6 +37,12 @@ function syncDevAddons(addonsDir) {
     const appRoot = path.join(__dirname, '..', '..', '..', '..');
     const devAddonsDir = path.join(appRoot, 'addons-dev');
     
+    console.log('[AddonManager] syncDevAddons called');
+    console.log('[AddonManager] __dirname:', __dirname);
+    console.log('[AddonManager] appRoot:', appRoot);
+    console.log('[AddonManager] devAddonsDir:', devAddonsDir);
+    console.log('[AddonManager] devAddonsDir exists:', fs.existsSync(devAddonsDir));
+    
     if (!fs.existsSync(devAddonsDir)) {
       console.log('[AddonManager] No addons-dev folder found, skipping dev sync');
       return;
@@ -71,7 +77,6 @@ function syncDevAddons(addonsDir) {
       const destDir = path.join(addonsDir, addonId);
       
       // Copy addon folder to userData/addons/
-      console.log(`[AddonManager] Syncing dev addon: ${addonId}`);
       copyDirRecursive(srcDir, destDir);
     }
     
@@ -119,6 +124,8 @@ function createAddonManager({ store, mainWindow }) {
   const isDevMode = !app.isPackaged;
   if (isDevMode) {
     syncDevAddons(addonsDir);
+  } else {
+    console.log('[AddonManager] Not in dev mode, skipping addons-dev sync');
   }
   
   // State

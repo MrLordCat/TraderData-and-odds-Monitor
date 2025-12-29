@@ -79,11 +79,13 @@ const GameEvents = {
   GAME_OVER: 'game:over',
   GAME_WIN: 'game:win',
   GAME_TICK: 'game:tick',
+  STATE_CHANGE: 'game:state-change',
   
   // Wave events
   WAVE_START: 'wave:start',
   WAVE_END: 'wave:end',
   WAVE_CLEAR: 'wave:clear',
+  WAVE_COMPLETE: 'wave:complete',
   
   // Entity events
   ENEMY_SPAWN: 'enemy:spawn',
@@ -95,6 +97,7 @@ const GameEvents = {
   TOWER_ATTACK: 'tower:attack',
   TOWER_UPGRADED: 'tower:upgraded',
   TOWER_SOLD: 'tower:sold',
+  TOWER_SELECTED: 'tower:selected',
   
   PROJECTILE_SPAWN: 'projectile:spawn',
   PROJECTILE_HIT: 'projectile:hit',

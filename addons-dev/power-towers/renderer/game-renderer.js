@@ -516,8 +516,9 @@ class GameRenderer {
       ctx.fill();
     }
     
-    // Health bar
-    this.drawHealthBar(enemy.x, enemy.y - size - 8, size * 2, 4 / zoom, enemy.getHealthPercent());
+    // Health bar (enemy is plain object, calculate percent directly)
+    const healthPercent = enemy.maxHealth > 0 ? enemy.health / enemy.maxHealth : 0;
+    this.drawHealthBar(enemy.x, enemy.y - size - 8, size * 2, 4 / zoom, healthPercent);
   }
 
   /**

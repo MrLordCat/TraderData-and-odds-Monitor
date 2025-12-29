@@ -122,8 +122,6 @@ class GameController {
     if (width < 200 || height < 200) return;
     if (Math.abs(this.canvas.width - width) < 5 && Math.abs(this.canvas.height - height) < 5) return;
     
-    console.log('[game-controller] Canvas resize:', width, 'x', height);
-    
     this.canvas.width = width;
     this.canvas.height = height;
     
@@ -140,11 +138,13 @@ class GameController {
   
   /**
    * Get serialized state for save
+   * Note: Full game serialization not yet implemented
    */
   getSerializedState() {
-    const state = { currentScreen: this.currentScreen };
-    if (this.game) state.gameState = this.game.serialize();
-    return state;
+    return { 
+      currentScreen: this.currentScreen,
+      // Game state serialization would go here when implemented
+    };
   }
   
   /**
@@ -155,8 +155,14 @@ class GameController {
       btn.addEventListener('click', () => {
         const screen = btn.dataset.screen;
         this.showScreen(screen);
-        if (screen === 'game' && !this.game) {
-          this.initializeGame();
+        if (screen === 'game') {
+          if (!this.game) {
+            this.initializeGame();
+          }
+          // Close menu module so game updates run
+          if (this.game && this.game.modules && this.game.modules.menu) {
+            this.game.modules.menu.isOpen = false;
+          }
         }
       });
     });
@@ -165,8 +171,14 @@ class GameController {
       btn.addEventListener('click', () => {
         const screen = btn.dataset.screen;
         this.showScreen(screen);
-        if (screen === 'menu' && this.game) {
-          this.resetGame();
+        if (screen === 'menu') {
+          // Open menu module to pause game updates
+          if (this.game && this.game.modules && this.game.modules.menu) {
+            this.game.modules.menu.isOpen = true;
+          }
+          if (this.game) {
+            this.resetGame();
+          }
         }
       });
     });
@@ -248,6 +260,11 @@ class GameController {
     this.game = new this.GameCore();
     this.renderer = new this.GameRenderer(this.canvas, this.camera);
     
+    // Close menu module to allow game updates to run
+    if (this.game.modules && this.game.modules.menu) {
+      this.game.modules.menu.isOpen = false;
+    }
+    
     // Center on base (last waypoint)
     const waypoints = this.game.waypoints;
     if (waypoints && waypoints.length > 0) {
@@ -259,53 +276,21 @@ class GameController {
     this.setupGameEvents();
     this.renderGame();
     this.updateUI(this.game.getState());
-    
-    console.log('[game-controller] Game initialized');
   }
   
   /**
    * Restore game from saved state
+   * Note: Full game deserialization not yet implemented - just restore screen
    */
   restoreFromSavedState(state) {
     if (!state) return;
     
     this.currentScreen = state.currentScreen || 'menu';
+    this.showScreen(this.currentScreen);
     
-    if (state.currentScreen === 'game' && state.gameState) {
-      this.resizeCanvas();
-      
-      this.camera = new this.Camera();
-      this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-      
-      this.game = this.GameCore.deserialize(state.gameState);
-      this.renderer = new this.GameRenderer(this.canvas, this.camera);
-      
-      // Center on base (last waypoint)
-      const waypoints = this.game.waypoints;
-      if (waypoints && waypoints.length > 0) {
-        const basePos = waypoints[waypoints.length - 1];
-        this.camera.centerOn(basePos.x, basePos.y);
-      }
-      
-      this.setupEventListeners();
-      this.setupGameEvents();
-      this.showScreen('game');
-      this.renderGame();
-      this.updateUI(this.game.getState());
-      
-      // Update buttons
-      if (this.game.gameOver) {
-        this.elements.btnStart.textContent = '▶ Start';
-        this.exitPlacementMode();
-      } else if (this.game.running && !this.game.paused) {
-        this.elements.btnStart.textContent = '⏸ Pause';
-        this.updateTowerAffordability();
-      } else if (this.game.paused) {
-        this.elements.btnStart.textContent = '▶ Resume';
-        this.updateTowerAffordability();
-      }
-    } else {
-      this.showScreen(this.currentScreen);
+    // If was in game, initialize fresh game
+    if (this.currentScreen === 'game') {
+      this.initializeGame();
     }
   }
 
@@ -318,8 +303,6 @@ class GameController {
     // Re-query tower items as they might not have been available during init
     el.towerItems = this.screens.game?.querySelectorAll('.tower-item') || [];
     
-    console.log('[game-controller] setupEventListeners, towerItems:', el.towerItems.length);
-    
     el.btnStart.addEventListener('click', () => this.toggleGame());
     el.overlayBtn.addEventListener('click', () => this.restartGame());
     el.btnUpgrade.addEventListener('click', () => this.upgradeSelectedTower());
@@ -330,7 +313,6 @@ class GameController {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         const path = item.dataset.path;
-        console.log('[game-controller] Tower item clicked:', path, 'disabled:', item.classList.contains('disabled'));
         if (item.classList.contains('disabled')) return;
         
         // Toggle: if already placing this tower, cancel; otherwise select it
@@ -372,7 +354,13 @@ class GameController {
       if (e.button === 1 || e.button === 2) isPanning = false;
     });
     
-    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    this.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      // Right click exits placement mode
+      if (this.placingTower) {
+        this.exitPlacementMode();
+      }
+    });
   }
 
   /**
@@ -398,8 +386,8 @@ class GameController {
       this.updateTowerAffordability();
     });
     
-    this.game.on(this.GameEvents.TOWER_SELECTED, (tower) => {
-      tower ? this.showTowerInfo(tower) : this.hideTowerInfo();
+    this.game.on(this.GameEvents.TOWER_SELECTED, (data) => {
+      data?.tower ? this.showTowerInfo(data.tower) : this.hideTowerInfo();
     });
     
     this.game.on(this.GameEvents.WAVE_COMPLETE, () => {
@@ -408,7 +396,9 @@ class GameController {
     });
     
     this.game.on(this.GameEvents.GAME_OVER, (data) => {
-      this.showOverlay('Game Over!', `Reached Wave ${data.wave}`, 'Try Again');
+      // data contains {reason, level, totalXp} - get wave from game state
+      const wave = this.game?.getState?.()?.wave || data.level || 0;
+      this.showOverlay('Game Over!', `Reached Wave ${wave}`, 'Try Again');
       this.elements.btnStart.disabled = true;
       this.exitPlacementMode();
     });
@@ -425,10 +415,17 @@ class GameController {
       return;
     }
     
-    if (!this.game.running) {
-      this.game.start();
+    const waveInProgress = !!this.game?.modules?.enemies?.waveInProgress;
+
+    // If no wave is running, the button should start a wave.
+    if (!waveInProgress) {
+      this.game.startWave();
       this.elements.btnStart.textContent = '⏸ Pause';
-    } else if (this.game.paused) {
+      return;
+    }
+
+    // If a wave is running, the button toggles pause/resume.
+    if (this.game.paused) {
       this.game.resume();
       this.elements.btnStart.textContent = '⏸ Pause';
     } else {
@@ -464,7 +461,6 @@ class GameController {
    * Enter tower placement mode for specific path
    */
   enterPlacementMode(path) {
-    console.log('[game-controller] enterPlacementMode:', path);
     this.placingTower = true;
     this.selectedPath = path;
     
@@ -489,7 +485,6 @@ class GameController {
    * Exit tower placement mode
    */
   exitPlacementMode() {
-    console.log('[game-controller] exitPlacementMode');
     this.placingTower = false;
     this.selectedPath = null;
     
@@ -519,14 +514,14 @@ class GameController {
     const gridX = Math.floor(worldPos.x / this.CONFIG.GRID_SIZE);
     const gridY = Math.floor(worldPos.y / this.CONFIG.GRID_SIZE);
     
-    console.log('[game-controller] Canvas click at grid:', gridX, gridY, 'placingTower:', this.placingTower, 'selectedPath:', this.selectedPath);
-    
     if (this.placingTower && this.selectedPath) {
       // Place tower with selected path type
-      console.log('[game-controller] Calling game.placeTower, game exists:', !!this.game, 'typeof placeTower:', typeof this.game?.placeTower);
       try {
         const result = this.game.placeTower(gridX, gridY, this.selectedPath);
-        console.log('[game-controller] placeTower result:', result);
+        if (result) {
+          // Exit placement mode after successful build
+          this.exitPlacementMode();
+        }
       } catch (err) {
         console.error('[game-controller] placeTower error:', err);
       }
@@ -584,19 +579,29 @@ class GameController {
    */
   showTowerInfo(tower) {
     const el = this.elements;
-    const pathInfo = this.TOWER_PATHS[tower.path] || this.TOWER_PATHS[tower.pathIndex];
+    // TOWER_TYPES uses tower.type, not tower.path
+    const towerDef = this.towerCosts ? null : null; // towerCosts is just costs
     
-    el.towerName.textContent = pathInfo ? pathInfo.name : 'Tower';
-    el.towerTier.textContent = `Tier ${tower.tier}`;
-    el.towerDmg.textContent = tower.damage.toFixed(0);
-    el.towerRng.textContent = tower.range.toFixed(0);
-    el.towerSpd.textContent = tower.attackSpeed.toFixed(1);
+    // Get tower type info from game if available
+    const towerTypes = this.game?.getRenderData?.()?.towerTypes || {};
+    const typeInfo = towerTypes[tower.type];
+    
+    el.towerName.textContent = typeInfo?.name || tower.type || 'Tower';
+    el.towerTier.textContent = `Level ${tower.level || 1}`;
+    el.towerDmg.textContent = Math.floor(tower.damage || 0);
+    el.towerRng.textContent = Math.floor(tower.range || 0);
+    el.towerSpd.textContent = (tower.attackSpeed || 1).toFixed(1);
     
     el.towerInfo.style.display = 'block';
     
-    const canUpgrade = this.game.economy.gold >= tower.upgradeCost && tower.tier < 3;
+    // Calculate upgrade cost
+    const baseCost = typeInfo?.baseCost || 100;
+    const upgradeCost = Math.floor(baseCost * (tower.level || 1) * 0.75);
+    const gold = this.game?.getState?.()?.gold || 0;
+    const canUpgrade = gold >= upgradeCost && (tower.level || 1) < 5;
+    
     el.btnUpgrade.disabled = !canUpgrade;
-    el.btnUpgrade.textContent = tower.tier >= 3 ? 'MAX' : `⬆️ ${tower.upgradeCost}g`;
+    el.btnUpgrade.textContent = (tower.level || 1) >= 5 ? 'MAX' : `⬆️ ${upgradeCost}g`;
   }
 
   /**
@@ -635,8 +640,8 @@ class GameController {
     el.lives.textContent = state.lives;
     el.lives.classList.toggle('danger', state.lives <= 5);
     el.lives.classList.toggle('warning', state.lives > 5 && state.lives <= 10);
-    el.energy.textContent = state.energy.current;
-    el.wave.textContent = state.wave.wave;
+    el.energy.textContent = Math.floor(state.energy?.energy || 0);
+    el.wave.textContent = state.wave || 0;
     
     // Update tower affordability
     this.updateTowerAffordability();

@@ -82,7 +82,8 @@ class EnemiesModule {
    * Initialize module
    */
   init() {
-    this.eventBus.on(GameEvents.GAME_START, () => this.onGameStart());
+    // Don't listen to GAME_START - it causes race condition with wave:start
+    // Reset is handled by explicit reset() call from GameCore
     this.eventBus.on('map:generated', (data) => this.onMapGenerated(data));
     this.eventBus.on('wave:start', () => this.startNextWave());
     this.eventBus.on('enemy:damage', (data) => this.damageEnemy(data));
@@ -115,7 +116,7 @@ class EnemiesModule {
     // Check if wave complete
     if (this.waveInProgress && this.enemies.length === 0 && this.spawnQueue.length === 0) {
       this.waveInProgress = false;
-      this.eventBus.emit('wave:complete', { wave: this.currentWave });
+      this.eventBus.emit(GameEvents.WAVE_COMPLETE, { wave: this.currentWave });
     }
   }
 
@@ -141,10 +142,18 @@ class EnemiesModule {
   }
 
   /**
-   * On game start
+   * On game start - only reset wave state, not everything
+   * Full reset happens via reset() method when game is restarted
    */
   onGameStart() {
-    this.reset();
+    // Don't reset everything here - keep waypoints!
+    // Just ensure wave state is ready
+    this.enemies = [];
+    this.spawnQueue = [];
+    this.spawnTimer = 0;
+    this.waveInProgress = false;
+    // Keep currentWave at 0 for fresh start
+    this.currentWave = 0;
   }
 
   /**
@@ -159,6 +168,11 @@ class EnemiesModule {
    */
   startNextWave() {
     if (this.waveInProgress) return;
+    
+    if (!this.waypoints || this.waypoints.length === 0) {
+      console.error('[EnemiesModule] No waypoints! Cannot start wave');
+      return;
+    }
     
     this.currentWave++;
     this.waveInProgress = true;
@@ -265,11 +279,14 @@ class EnemiesModule {
       pathProgress: 0,
       waypointIndex: 0,
       // Visual
+      size: type === 'boss' ? 16 : (type === 'tank' ? 12 : (type === 'swarm' ? 6 : 10)),
       emoji: enemyDef.emoji,
       color: enemyDef.color,
       // Status effects
       effects: [],
-      slowMultiplier: 1
+      slowMultiplier: 1,
+      slowDuration: 0,
+      burnDuration: 0
     };
 
     this.enemies.push(enemy);
@@ -430,7 +447,9 @@ class EnemiesModule {
       enemies: this.enemies,
       currentWave: this.currentWave,
       waveInProgress: this.waveInProgress,
-      spawnQueueSize: this.spawnQueue.length
+      spawnQueueSize: this.spawnQueue.length,
+      totalKills: this.totalKills,
+      escapedEnemies: this.escapedEnemies
     };
   }
 }

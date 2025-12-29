@@ -33,10 +33,7 @@ class GameCore {
   constructor() {
     // Event system (shared by all modules)
     this.eventBus = new EventBus();
-    
-    // Initialize modules
-    this.initModules();
-    
+
     // Game state
     this.running = false;
     this.paused = false;
@@ -50,6 +47,9 @@ class GameCore {
     // Selection state (UI)
     this.selectedTower = null;
     this.placingTowerPath = null;
+
+    // Initialize modules
+    this.initModules();
     
     // Bind event handlers
     this.setupEventHandlers();
@@ -79,8 +79,15 @@ class GameCore {
     // Generate initial map (for menu preview)
     this.modules.map.generateMap();
     
-    // Set initial gold for UI display
+    // Set initial gold and lives for UI display
     this.modules.economy.gold = CONFIG.STARTING_GOLD;
+    this.modules.player.lives = CONFIG.STARTING_LIVES;
+    this.modules.player.maxLives = CONFIG.STARTING_LIVES;
+
+    // Keep the game loop stopped until the first wave starts.
+    // (UI expects `running === false` at this point.)
+    this.running = false;
+    this.paused = false;
     
     // Create proxy getter for towers array (for backwards compatibility with renderer)
     Object.defineProperty(this, 'towers', {
@@ -131,31 +138,11 @@ class GameCore {
   }
 
   /**
-   * Game start handler
+   * Game start handler - called when starting first wave
    */
   onGameStart(data = {}) {
-    console.log('[GameCore] onGameStart called');
-    this.running = true;
-    this.paused = false;
-    this.gameOver = false;
-    this.lastTick = performance.now();
-    
     // Close menu if open
     this.modules.menu.isOpen = false;
-    
-    // Generate NEW map for this game
-    this.modules.map.generateMap();
-    
-    // Start game loop
-    this.gameLoop();
-    
-    // Start first wave after short delay
-    setTimeout(() => {
-      if (this.running && !this.paused) {
-        console.log('[GameCore] Starting first wave');
-        this.eventBus.emit('wave:start');
-      }
-    }, 1000);
   }
 
   /**
@@ -184,18 +171,36 @@ class GameCore {
   }
 
   /**
-   * Start game (from external call - e.g. Start Wave button)
+   * Start game loop (legacy / external callers)
    */
   start() {
-    console.log('[GameCore] start() called, running:', this.running);
-    if (this.running) {
-      // Already running, start next wave
-      this.eventBus.emit('wave:start');
-      return;
+    if (this.gameOver) return;
+
+    if (!this.running) {
+      this.running = true;
+      this.paused = false;
+      this.lastTick = performance.now();
+      this.eventBus.emit(GameEvents.GAME_START, this.getState());
+      this.gameLoop();
     }
-    
-    // First start - emit GAME_START which triggers onGameStart
-    this.eventBus.emit(GameEvents.GAME_START, {});
+  }
+
+  /**
+   * Start next wave (called from "Start Wave" button)
+   */
+  startWave() {
+    if (this.gameOver) return;
+
+    // First wave click should start the main loop.
+    if (!this.running) {
+      this.running = true;
+      this.paused = false;
+      this.lastTick = performance.now();
+      this.eventBus.emit(GameEvents.GAME_START, this.getState());
+      this.gameLoop();
+    }
+
+    this.eventBus.emit('wave:start');
   }
 
   /**
@@ -262,9 +267,7 @@ class GameCore {
    * Main game loop
    */
   gameLoop() {
-    if (!this.running || this.paused) {
-      return;
-    }
+    if (!this.running || this.paused) return;
     
     const now = performance.now();
     const deltaTime = (now - this.lastTick) / 1000; // Convert to seconds
@@ -320,32 +323,26 @@ class GameCore {
    * Place a tower at grid position
    */
   placeTower(gridX, gridY, towerType = 'fire') {
-    console.log('[game-core] placeTower called:', gridX, gridY, towerType);
-    
     // Check if position is valid
     if (!this.modules.map.isBuildable(gridX, gridY)) {
-      console.log('[game-core] Cannot build here - not buildable');
       this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Cannot build here!' });
       return false;
     }
     
     // Check if tower already exists
     if (this.modules.towers.getTowerAt(gridX, gridY)) {
-      console.log('[game-core] Tower already exists');
       this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Tower already exists!' });
       return false;
     }
     
     // Check cost
     const cost = TOWER_TYPES[towerType]?.baseCost || 100;
-    console.log('[game-core] Tower cost:', cost, 'canAfford:', this.modules.economy.canAfford(cost));
     if (!this.modules.economy.canAfford(cost)) {
       this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Not enough gold!' });
       return false;
     }
     
     // Build tower via event
-    console.log('[game-core] Emitting tower:build-request');
     this.eventBus.emit('tower:build-request', { type: towerType, gridX, gridY });
     return true;
   }
@@ -369,13 +366,6 @@ class GameCore {
    */
   selectTower(towerId) {
     this.eventBus.emit('tower:select', towerId);
-  }
-
-  /**
-   * Start next wave
-   */
-  startWave() {
-    this.eventBus.emit('wave:start');
   }
 
   /**
@@ -438,15 +428,16 @@ class GameCore {
       // Economy
       gold: economyData.gold,
       
-      // Energy
-      energy: energyData.currentEnergy,
+      // Energy (getRenderData returns {energy, maxEnergy, percent})
+      energy: energyData.energy,
       maxEnergy: energyData.maxEnergy,
-      energyRegen: energyData.energyRegen,
+      energyRegen: this.modules.energy.regenRate,
       
       // Player
       lives: playerData.lives,
       maxLives: playerData.maxLives,
-      wave: playerData.wave,
+      // Wave comes from enemies module, not player
+      wave: enemiesData.currentWave || 0,
       
       // Menu
       menu: menuData,

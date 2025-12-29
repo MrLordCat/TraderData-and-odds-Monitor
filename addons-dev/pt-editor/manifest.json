@@ -1,0 +1,18 @@
+{
+  "id": "pt-editor",
+  "name": "Power Towers Editor",
+  "version": "1.0.0",
+  "description": "Balance editor for Power Towers TD - edit waves, enemies, towers and economy",
+  "author": "oddsMoni",
+  "main": "index.js",
+  "sidebarModules": [
+    {
+      "path": "modules/editor-panel/index.js",
+      "id": "editor-panel",
+      "name": "PT Editor"
+    }
+  ],
+  "dependencies": {
+    "power-towers": ">=0.1.0"
+  }
+}
