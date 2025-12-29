@@ -57,7 +57,9 @@ class GameController {
       overlayTitle: container.querySelector('#overlay-title'),
       overlayMessage: container.querySelector('#overlay-message'),
       overlayBtn: container.querySelector('#overlay-btn'),
+      buildToolbar: container.querySelector('#build-toolbar'),
       towerSelect: container.querySelector('#tower-select'),
+      towerItems: container.querySelectorAll('.tower-item'),
       towerInfo: container.querySelector('#tower-info'),
       towerName: container.querySelector('#tower-name'),
       towerTier: container.querySelector('#tower-tier'),
@@ -65,9 +67,17 @@ class GameController {
       towerRng: container.querySelector('#tower-rng'),
       towerSpd: container.querySelector('#tower-spd'),
       btnStart: container.querySelector('#btn-start'),
-      btnTower: container.querySelector('#btn-tower'),
       btnUpgrade: container.querySelector('#btn-upgrade'),
       btnSell: container.querySelector('#btn-sell')
+    };
+    
+    // Tower costs for UI
+    this.towerCosts = {
+      fire: 100,
+      ice: 80,
+      lightning: 150,
+      nature: 60,
+      dark: 200
     };
     
     // Setup navigation
@@ -172,8 +182,39 @@ class GameController {
     }
     this.renderer = null;
     this.placingTower = false;
-    this.selectedPath = 'fire';
+    this.selectedPath = null;
+    
+    // Reset tower item UI
+    if (this.elements.towerItems) {
+      this.elements.towerItems.forEach(item => {
+        item.classList.remove('placing', 'selected', 'disabled');
+      });
+    }
+    
     if (this.elements.btnStart) this.elements.btnStart.textContent = '▶ Start Wave';
+  }
+  
+  /**
+   * Update tower affordability based on current gold
+   */
+  updateTowerAffordability() {
+    if (!this.game) return;
+    
+    const gold = this.game.getState().gold || 0;
+    
+    this.elements.towerItems.forEach(item => {
+      const path = item.dataset.path;
+      const cost = this.towerCosts[path] || 100;
+      const canAfford = gold >= cost;
+      
+      item.classList.toggle('disabled', !canAfford);
+      
+      // Update price color
+      const priceEl = item.querySelector('.tower-price');
+      if (priceEl) {
+        priceEl.style.color = canAfford ? '#ffd700' : '#fc8181';
+      }
+    });
   }
   
   /**
@@ -255,13 +296,13 @@ class GameController {
       // Update buttons
       if (this.game.gameOver) {
         this.elements.btnStart.textContent = '▶ Start';
-        this.elements.btnTower.disabled = true;
+        this.exitPlacementMode();
       } else if (this.game.running && !this.game.paused) {
         this.elements.btnStart.textContent = '⏸ Pause';
-        this.elements.btnTower.disabled = this.game.economy.gold < 50;
+        this.updateTowerAffordability();
       } else if (this.game.paused) {
         this.elements.btnStart.textContent = '▶ Resume';
-        this.elements.btnTower.disabled = true;
+        this.updateTowerAffordability();
       }
     } else {
       this.showScreen(this.currentScreen);
@@ -275,26 +316,24 @@ class GameController {
     const el = this.elements;
     
     el.btnStart.addEventListener('click', () => this.toggleGame());
-    el.btnTower.addEventListener('click', () => this.togglePlacementMode());
     el.overlayBtn.addEventListener('click', () => this.restartGame());
     el.btnUpgrade.addEventListener('click', () => this.upgradeSelectedTower());
     el.btnSell.addEventListener('click', () => this.sellSelectedTower());
     
-    // Tower path selection
-    el.towerSelect.querySelectorAll('.tower-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        el.towerSelect.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-        this.selectedPath = btn.dataset.path;
+    // Tower selection - click to enter build mode
+    el.towerItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const path = item.dataset.path;
+        if (item.classList.contains('disabled')) return;
+        
+        // Toggle: if already placing this tower, cancel; otherwise select it
+        if (this.placingTower && this.selectedPath === path) {
+          this.exitPlacementMode();
+        } else {
+          this.enterPlacementMode(path);
+        }
       });
     });
-    
-    // Select fire by default
-    const fireBtn = el.towerSelect.querySelector('[data-path="fire"]');
-    if (fireBtn) {
-      fireBtn.classList.add('selected');
-      this.selectedPath = 'fire';
-    }
     
     // Canvas events
     this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
@@ -347,8 +386,9 @@ class GameController {
     });
     
     this.game.on(this.GameEvents.TOWER_PLACED, () => {
-      this.placingTower = false;
-      this.elements.btnTower.classList.remove('active');
+      // Stay in placement mode for quick building
+      // Player can click again to place more towers
+      this.updateTowerAffordability();
     });
     
     this.game.on(this.GameEvents.TOWER_SELECTED, (tower) => {
@@ -357,13 +397,13 @@ class GameController {
     
     this.game.on(this.GameEvents.WAVE_COMPLETE, () => {
       this.elements.btnStart.textContent = '▶ Start Wave';
-      this.elements.btnTower.disabled = false;
+      this.updateTowerAffordability();
     });
     
     this.game.on(this.GameEvents.GAME_OVER, (data) => {
       this.showOverlay('Game Over!', `Reached Wave ${data.wave}`, 'Try Again');
       this.elements.btnStart.disabled = true;
-      this.elements.btnTower.disabled = true;
+      this.exitPlacementMode();
     });
   }
 
@@ -381,7 +421,6 @@ class GameController {
     if (!this.game.running) {
       this.game.start();
       this.elements.btnStart.textContent = '⏸ Pause';
-      this.elements.btnTower.disabled = true;
     } else if (this.game.paused) {
       this.game.resume();
       this.elements.btnStart.textContent = '⏸ Pause';
@@ -411,18 +450,41 @@ class GameController {
     
     this.elements.btnStart.disabled = false;
     this.elements.btnStart.textContent = '▶ Start Wave';
-    this.elements.btnTower.disabled = true;
+    this.exitPlacementMode();
   }
 
   /**
-   * Toggle tower placement mode
+   * Enter tower placement mode for specific path
    */
-  togglePlacementMode() {
-    this.placingTower = !this.placingTower;
-    this.elements.btnTower.classList.toggle('active', this.placingTower);
-    if (this.placingTower && this.game.selectedTower) {
+  enterPlacementMode(path) {
+    this.placingTower = true;
+    this.selectedPath = path;
+    
+    // Update UI - remove placing from all, add to selected
+    this.elements.towerItems.forEach(item => {
+      item.classList.remove('placing', 'selected');
+      if (item.dataset.path === path) {
+        item.classList.add('placing');
+      }
+    });
+    
+    // Deselect tower if any
+    if (this.game && this.game.selectedTower) {
       this.game.selectTower(null);
     }
+  }
+  
+  /**
+   * Exit tower placement mode
+   */
+  exitPlacementMode() {
+    this.placingTower = false;
+    this.selectedPath = null;
+    
+    // Update UI
+    this.elements.towerItems.forEach(item => {
+      item.classList.remove('placing');
+    });
   }
 
   /**
@@ -439,9 +501,9 @@ class GameController {
     const gridX = Math.floor(worldPos.x / this.CONFIG.GRID_SIZE);
     const gridY = Math.floor(worldPos.y / this.CONFIG.GRID_SIZE);
     
-    if (this.placingTower) {
-      const pathIndex = this.TOWER_PATHS.findIndex(p => p.id === this.selectedPath);
-      this.game.placeTower(gridX, gridY, pathIndex >= 0 ? pathIndex : 0);
+    if (this.placingTower && this.selectedPath) {
+      // Place tower with selected path type
+      this.game.placeTower(gridX, gridY, this.selectedPath);
     } else {
       // Find tower at grid position
       const tower = this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY);
@@ -486,12 +548,8 @@ class GameController {
     if (!this.camera) return;
     e.preventDefault();
     
-    const rect = this.canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    this.camera.zoomBy(zoomFactor, mouseX, mouseY);
+    this.camera.zoomBy(zoomFactor);
     this.renderGame();
   }
 
@@ -500,7 +558,7 @@ class GameController {
    */
   showTowerInfo(tower) {
     const el = this.elements;
-    const pathInfo = this.TOWER_PATHS[tower.pathIndex];
+    const pathInfo = this.TOWER_PATHS[tower.path] || this.TOWER_PATHS[tower.pathIndex];
     
     el.towerName.textContent = pathInfo ? pathInfo.name : 'Tower';
     el.towerTier.textContent = `Tier ${tower.tier}`;
@@ -553,6 +611,9 @@ class GameController {
     el.lives.classList.toggle('warning', state.lives > 5 && state.lives <= 10);
     el.energy.textContent = state.energy.current;
     el.wave.textContent = state.wave.wave;
+    
+    // Update tower affordability
+    this.updateTowerAffordability();
   }
 
   /**

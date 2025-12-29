@@ -164,6 +164,7 @@ class Camera {
   /**
    * Set zoom level with bounds checking
    * Prevents zooming out beyond map boundaries - viewport always filled with map
+   * Zoom is centered on the viewport center (not cursor position)
    */
   setZoom(newZoom, centerX = null, centerY = null) {
     const oldZoom = this.zoom;
@@ -174,28 +175,39 @@ class Camera {
     const minZoomY = this.viewportHeight / this.mapHeight;
     const minZoom = Math.max(minZoomX, minZoomY); // Must fill viewport in both dimensions
     
-    this.zoom = Math.max(minZoom, Math.min(2.0, newZoom));
+    const clampedZoom = Math.max(minZoom, Math.min(2.0, newZoom));
     
-    // If center point provided, keep that point stationary
-    if (centerX !== null && centerY !== null) {
-      // Convert screen center to world before zoom
-      const worldBefore = this.screenToWorld(centerX, centerY);
-      
-      // After zoom change, adjust camera so same world point is under cursor
-      this.x = worldBefore.x - centerX / this.zoom;
-      this.y = worldBefore.y - centerY / this.zoom;
-      this.targetX = this.x;
-      this.targetY = this.y;
+    // If zoom didn't change, nothing to do
+    if (clampedZoom === oldZoom) {
+      return;
     }
+    
+    // Always zoom relative to viewport center for consistent UX
+    // Calculate the world point at viewport center BEFORE zoom change
+    const viewportCenterX = this.viewportWidth / 2;
+    const viewportCenterY = this.viewportHeight / 2;
+    
+    // World point currently at viewport center (using old zoom)
+    const worldCenterX = this.x + viewportCenterX / oldZoom;
+    const worldCenterY = this.y + viewportCenterY / oldZoom;
+    
+    // Apply new zoom
+    this.zoom = clampedZoom;
+    
+    // Adjust camera so the same world point stays at viewport center
+    this.x = worldCenterX - viewportCenterX / this.zoom;
+    this.y = worldCenterY - viewportCenterY / this.zoom;
+    this.targetX = this.x;
+    this.targetY = this.y;
     
     this.clampPosition();
   }
 
   /**
-   * Zoom in/out by factor
+   * Zoom in/out by factor (always centered on viewport)
    */
-  zoomBy(factor, centerX = null, centerY = null) {
-    this.setZoom(this.zoom * factor, centerX, centerY);
+  zoomBy(factor) {
+    this.setZoom(this.zoom * factor);
   }
 
   /**

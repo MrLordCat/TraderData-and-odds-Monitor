@@ -141,18 +141,36 @@ function getGameStyles() {
     .overlay-content h3 { margin: 0 0 10px; font-size: 28px; color: #fff; }
     .overlay-content p { margin: 0 0 20px; color: #a0aec0; font-size: 16px; }
     
-    .tower-select {
-      display: flex; justify-content: center; gap: 10px;
+    .build-toolbar {
       padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; flex-shrink: 0;
     }
-    .tower-btn {
-      width: 52px; height: 52px;
-      border: 2px solid transparent; border-radius: 10px;
-      background: rgba(255,255,255,0.1);
-      font-size: 24px; cursor: pointer; transition: all 0.2s;
+    .toolbar-section { display: flex; justify-content: center; }
+    .tower-select {
+      display: flex; justify-content: center; gap: 8px;
     }
-    .tower-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.1); }
-    .tower-btn.selected { border-color: #48bb78; background: rgba(72,187,120,0.2); }
+    .tower-item {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .tower-item:hover { transform: scale(1.05); }
+    .tower-item.selected .tower-btn { border-color: #48bb78; background: rgba(72,187,120,0.3); box-shadow: 0 0 10px rgba(72,187,120,0.4); }
+    .tower-item.placing .tower-btn { border-color: #ecc94b; background: rgba(236,201,75,0.3); animation: pulse-build 0.8s infinite; }
+    .tower-item.disabled { opacity: 0.4; pointer-events: none; }
+    .tower-btn {
+      width: 48px; height: 48px;
+      border: 2px solid rgba(255,255,255,0.2); border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      font-size: 22px; cursor: pointer; transition: all 0.2s;
+    }
+    .tower-btn:hover { background: rgba(255,255,255,0.2); }
+    .tower-price {
+      font-size: 11px; color: #ffd700; font-weight: 600;
+    }
+    .tower-item.disabled .tower-price { color: #fc8181; }
+    @keyframes pulse-build {
+      0%, 100% { box-shadow: 0 0 5px rgba(236,201,75,0.4); }
+      50% { box-shadow: 0 0 15px rgba(236,201,75,0.7); }
+    }
     
     .game-controls { display: flex; gap: 10px; flex-shrink: 0; }
     .game-btn {

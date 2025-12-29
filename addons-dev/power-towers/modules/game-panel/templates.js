@@ -122,17 +122,35 @@ function getGameTemplate() {
           </div>
         </div>
         
-        <div class="tower-select" id="tower-select">
-          <button class="tower-btn" data-path="fire" title="Fire">🔥</button>
-          <button class="tower-btn" data-path="ice" title="Ice">❄️</button>
-          <button class="tower-btn" data-path="lightning" title="Lightning">⚡</button>
-          <button class="tower-btn" data-path="nature" title="Nature">🌿</button>
-          <button class="tower-btn" data-path="dark" title="Dark">💀</button>
+        <div class="build-toolbar" id="build-toolbar">
+          <div class="toolbar-section towers-section">
+            <div class="tower-select" id="tower-select">
+              <div class="tower-item" data-path="fire" title="Fire Tower">
+                <button class="tower-btn">🔥</button>
+                <span class="tower-price">100g</span>
+              </div>
+              <div class="tower-item" data-path="ice" title="Ice Tower">
+                <button class="tower-btn">❄️</button>
+                <span class="tower-price">80g</span>
+              </div>
+              <div class="tower-item" data-path="lightning" title="Lightning Tower">
+                <button class="tower-btn">⚡</button>
+                <span class="tower-price">150g</span>
+              </div>
+              <div class="tower-item" data-path="nature" title="Nature Tower">
+                <button class="tower-btn">🌿</button>
+                <span class="tower-price">60g</span>
+              </div>
+              <div class="tower-item" data-path="dark" title="Dark Tower">
+                <button class="tower-btn">💀</button>
+                <span class="tower-price">200g</span>
+              </div>
+            </div>
+          </div>
         </div>
         
         <div class="game-controls">
           <button id="btn-start" class="game-btn primary">▶ Start Wave</button>
-          <button id="btn-tower" class="game-btn" disabled>🗼 Tower (50g)</button>
         </div>
         
         <div class="tower-info" id="tower-info" style="display: none;">
@@ -153,7 +171,7 @@ function getGameTemplate() {
         
         <div class="game-footer">
           <button class="back-btn small" data-screen="menu">☰ Menu</button>
-          <p class="hint">Select tower, click to place</p>
+          <p class="hint">Click tower icon to build</p>
         </div>
       </div>
     </div>
