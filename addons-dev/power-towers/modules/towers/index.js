@@ -125,8 +125,10 @@ class TowersModule {
    * Handle tower build request
    */
   handleBuildRequest({ type, gridX, gridY }) {
+    console.log('[towers] handleBuildRequest:', type, gridX, gridY);
     const towerDef = TOWER_TYPES[type];
     if (!towerDef) {
+      console.log('[towers] Invalid tower type:', type);
       this.eventBus.emit('tower:build-failed', { reason: 'Invalid tower type' });
       return;
     }
@@ -134,10 +136,12 @@ class TowersModule {
     // Check if position is valid (via MapModule event)
     // For now, just create the tower
     const tower = this.createTower(type, gridX, gridY);
+    console.log('[towers] Created tower:', tower);
     
     if (tower) {
       this.eventBus.emit('economy:spend', towerDef.baseCost);
       this.eventBus.emit('tower:built', { tower });
+      this.eventBus.emit(GameEvents.TOWER_PLACED, { tower });
     }
   }
 

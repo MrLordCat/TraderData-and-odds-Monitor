@@ -519,9 +519,12 @@ class GameController {
     const gridX = Math.floor(worldPos.x / this.CONFIG.GRID_SIZE);
     const gridY = Math.floor(worldPos.y / this.CONFIG.GRID_SIZE);
     
+    console.log('[game-controller] Canvas click at grid:', gridX, gridY, 'placingTower:', this.placingTower, 'selectedPath:', this.selectedPath);
+    
     if (this.placingTower && this.selectedPath) {
       // Place tower with selected path type
-      this.game.placeTower(gridX, gridY, this.selectedPath);
+      const result = this.game.placeTower(gridX, gridY, this.selectedPath);
+      console.log('[game-controller] placeTower result:', result);
     } else {
       // Find tower at grid position
       const tower = this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY);

@@ -89,6 +89,12 @@ class GameCore {
     for (const [name, module] of Object.entries(this.modules)) {
       module.init();
     }
+    
+    // Create proxy getter for towers array (for backwards compatibility)
+    Object.defineProperty(this, 'towers', {
+      get: () => this.modules.towers.getTowersArray(),
+      configurable: true
+    });
   }
 
   /**
@@ -326,27 +332,33 @@ class GameCore {
    * Place a tower at grid position
    */
   placeTower(gridX, gridY, towerType = 'fire') {
+    console.log('[game-core] placeTower called:', gridX, gridY, towerType, 'modular:', this.useModularArchitecture);
+    
     if (this.useModularArchitecture) {
       // Check if position is valid
       if (!this.modules.map.isBuildable(gridX, gridY)) {
+        console.log('[game-core] Cannot build here - not buildable');
         this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Cannot build here!' });
         return false;
       }
       
       // Check if tower already exists
       if (this.modules.towers.getTowerAt(gridX, gridY)) {
+        console.log('[game-core] Tower already exists');
         this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Tower already exists!' });
         return false;
       }
       
       // Check cost
       const cost = TOWER_TYPES[towerType]?.baseCost || 100;
+      console.log('[game-core] Tower cost:', cost, 'canAfford:', this.modules.economy.canAfford(cost));
       if (!this.modules.economy.canAfford(cost)) {
         this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Not enough gold!' });
         return false;
       }
       
       // Build tower via event
+      console.log('[game-core] Emitting tower:build-request');
       this.eventBus.emit('tower:build-request', { type: towerType, gridX, gridY });
       return true;
     } else {
