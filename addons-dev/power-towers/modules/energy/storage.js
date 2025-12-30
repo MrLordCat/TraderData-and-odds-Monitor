@@ -236,6 +236,7 @@ class PowerConsumer extends PowerNode {
 
   /**
    * Consume power and update powered state
+   * Consumer doesn't consume energy for itself - it just transfers to tower
    */
   update(dt) {
     // Transfer stored energy to tower
@@ -248,26 +249,20 @@ class PowerConsumer extends PowerNode {
       }
     }
     
-    const needed = this.consumption * dt;
-    
-    if (this.stored >= needed) {
-      this.stored -= needed;
-      this.powered = true;
-      this.powerLevel = 1.0;
-    } else if (this.stored > 0) {
-      // Partial power
-      this.powerLevel = this.stored / needed;
-      this.stored = 0;
-      this.powered = true;
-    } else {
-      this.powered = false;
-      this.powerLevel = 0;
-    }
-
-    // Update tower power level for visual feedback
+    // Update powered state based on tower's current energy
     if (this.towerRef) {
+      const towerEnergy = this.towerRef.currentEnergy || 0;
+      const towerMax = this.towerRef.maxEnergy || 100;
+      
+      this.powered = towerEnergy > 0;
+      this.powerLevel = towerMax > 0 ? towerEnergy / towerMax : 0;
+      
+      // Update tower power level for visual feedback
       this.towerRef.powerLevel = this.powerLevel;
       this.towerRef.powered = this.powered;
+    } else {
+      this.powered = this.stored > 0;
+      this.powerLevel = this.capacity > 0 ? this.stored / this.capacity : 0;
     }
   }
 

@@ -54,10 +54,8 @@ class TowerPowerAdapter {
     // Link consumer to this adapter
     this.consumer.adapter = this;
     
-    // Override consumer's tower callback
-    this.consumer.setTower({
-      setPowerLevel: (level) => this.onPowerLevelChanged(level)
-    });
+    // Set consumer to reference the real tower for energy transfer
+    this.consumer.setTower(tower);
     
     // Register with network
     this.powerNetwork.registerNode(this.consumer);
@@ -131,10 +129,20 @@ class TowerPowerAdapter {
   }
 
   /**
-   * Update - check power status
+   * Update - check power status from consumer/tower
    */
   update(dt) {
     this.consumer.update(dt);
+    
+    // Get power level from tower's current energy
+    const towerEnergy = this.tower.currentEnergy || 0;
+    const towerMax = this.tower.maxEnergy || 100;
+    this.powerLevel = towerMax > 0 ? towerEnergy / towerMax : 0;
+    this.powered = towerEnergy > 0;
+    
+    // Update tower power state
+    this.tower.powered = this.powered;
+    this.tower.powerLevel = this.powerLevel;
   }
 
   /**

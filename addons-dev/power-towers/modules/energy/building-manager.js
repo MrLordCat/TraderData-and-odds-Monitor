@@ -337,19 +337,35 @@ class EnergyBuildingManager {
     const fromBuilding = this.buildings.get(fromBuildingId);
     if (!fromBuilding || !tower) return false;
     
-    // Check if tower already has a consumer node
-    const consumerId = `tower-${tower.id}`;
-    let consumer = this.network.nodes.get(consumerId);
+    // Check if tower has a power adapter with consumer already
+    let consumer = null;
+    let consumerId = null;
     
-    if (!consumer) {
-      // Create consumer for tower with custom ID
-      const consumption = tower.energyCost || 5;
-      consumer = this.createConsumerForTower(tower, consumption, consumerId);
+    if (tower.powerAdapter && tower.powerAdapter.consumer) {
+      // Use existing consumer from power adapter
+      consumer = tower.powerAdapter.consumer;
+      consumerId = consumer.id;
       
-      // Store reference
+      // Make sure consumer references the real tower for energy transfer
+      consumer.setTower(tower);
       tower.powerConsumer = consumer;
       
-      console.log(`[EnergyManager] Created consumer ${consumerId} for tower ${tower.id}`);
+      console.log(`[EnergyManager] Using existing adapter consumer ${consumerId} for tower ${tower.id}`);
+    } else {
+      // Fallback: check for consumer by tower ID
+      consumerId = `tower-${tower.id}`;
+      consumer = this.network.nodes.get(consumerId);
+      
+      if (!consumer) {
+        // Create consumer for tower with custom ID
+        const consumption = tower.energyCost || 5;
+        consumer = this.createConsumerForTower(tower, consumption, consumerId);
+        
+        // Store reference
+        tower.powerConsumer = consumer;
+        
+        console.log(`[EnergyManager] Created consumer ${consumerId} for tower ${tower.id}`);
+      }
     }
     
     // Connect building to tower's consumer
