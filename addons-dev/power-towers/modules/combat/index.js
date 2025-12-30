@@ -93,7 +93,15 @@ class CombatModule {
   /**
    * Handle tower attack
    */
-  handleTowerAttack({ towerId, towerType, targetId, damage, isCrit, position, targetPosition }) {
+  handleTowerAttack({ 
+    towerId, towerType, targetId, damage, isCrit, position, targetPosition,
+    // AoE params
+    splashRadius, splashDmgFalloff,
+    // Chain params  
+    chainCount, chainDmgFalloff,
+    // Attack type
+    attackTypeId
+  }) {
     // Create projectile
     const projectileDef = PROJECTILE_TYPES[towerType] || PROJECTILE_TYPES.fire;
     
@@ -101,6 +109,7 @@ class CombatModule {
       id: this.nextProjectileId++,
       towerId,
       towerType,
+      attackTypeId,
       targetId,
       damage,
       isCrit: isCrit || false,
@@ -113,6 +122,12 @@ class CombatModule {
       size: projectileDef.size,
       chain: projectileDef.chain,
       trail: projectileDef.trail,
+      // AoE (siege)
+      splashRadius: splashRadius || 0,
+      splashDmgFalloff: splashDmgFalloff || 0.5,
+      // Chain (lightning)
+      chainCount: chainCount || 0,
+      chainDmgFalloff: chainDmgFalloff || 0.5,
       // Trail history
       trailPoints: projectileDef.trail ? [{ x: position.x, y: position.y }] : []
     };
@@ -228,7 +243,7 @@ class CombatModule {
    * Projectile hit
    */
   projectileHit(projectile, enemies) {
-    // Apply damage
+    // Apply damage to main target
     this.eventBus.emit('enemy:damage', {
       enemyId: projectile.targetId,
       damage: projectile.damage,
@@ -247,8 +262,53 @@ class CombatModule {
       size: projectile.size * 2
     });
     
-    // Tower-specific effects
-    if (projectile.towerType === 'fire') {
+    // =========================================
+    // SPLASH DAMAGE (Siege attack type)
+    // =========================================
+    if (projectile.splashRadius > 0) {
+      // Find enemies near impact point
+      this.eventBus.emit('enemies:get-nearby', {
+        x: projectile.targetX,
+        y: projectile.targetY,
+        radius: projectile.splashRadius,
+        excludeId: projectile.targetId, // Main target already damaged
+        maxCount: 20, // No limit for AoE
+        callback: (nearbyEnemies) => {
+          for (const enemy of nearbyEnemies) {
+            // Calculate distance for falloff
+            const dx = enemy.x - projectile.targetX;
+            const dy = enemy.y - projectile.targetY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Damage falloff based on distance (closer = more damage)
+            const falloffRatio = 1 - (distance / projectile.splashRadius) * projectile.splashDmgFalloff;
+            const splashDamage = projectile.damage * Math.max(0.2, falloffRatio);
+            
+            this.eventBus.emit('enemy:damage', {
+              enemyId: enemy.id,
+              damage: splashDamage,
+              isCrit: false, // No crit on splash
+              towerId: projectile.towerId,
+              effects: []
+            });
+          }
+        }
+      });
+      
+      // Visual splash effect
+      this.addEffect({
+        type: 'explosion',
+        x: projectile.targetX,
+        y: projectile.targetY,
+        duration: 0.4,
+        radius: projectile.splashRadius,
+        color: '#ff6600',
+        isSplash: true
+      });
+    }
+    
+    // Tower-specific effects (fire without splash)
+    else if (projectile.towerType === 'fire') {
       this.addEffect({
         type: 'explosion',
         x: projectile.targetX,

@@ -19,7 +19,8 @@ const {
   drawRangeIndicator, 
   drawEnemies, 
   drawProjectiles,
-  drawDamageNumbers
+  drawDamageNumbers,
+  drawEffects
 } = require('./render-entities');
 const { 
   drawHoverIndicator, 
@@ -83,6 +84,7 @@ class GameRenderer {
     drawTowers(this.ctx, data.towers, data.selectedTower, this.camera);
     drawEnemies(this.ctx, data.enemies, this.camera, this.frameCount);
     drawProjectiles(this.ctx, data.projectiles, this.camera);
+    drawEffects(this.ctx, data.effects || [], this.camera);
     drawDamageNumbers(this.ctx, data.damageNumbers || [], this.camera);
     drawHoverIndicator(this.ctx, this.hoverGridX, this.hoverGridY, this.canPlaceHover, this.camera);
     

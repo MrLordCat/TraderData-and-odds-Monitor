@@ -147,6 +147,7 @@ function getGameTemplate() {
               <div class="stat-row"><span>⚡ SPD</span><b id="tooltip-spd">1.0</b></div>
               <div class="stat-row"><span>🎯 CRIT</span><b id="tooltip-crit">5%</b></div>
               <div class="stat-row"><span>💥 CDMG</span><b id="tooltip-critdmg">150%</b></div>
+              <div class="stat-row" id="tooltip-splash-row" style="display:none;"><span>💣 SPLASH</span><b id="tooltip-splash">60</b></div>
               <div class="stat-row"><span>❤️ HP</span><b id="tooltip-hp">100/100</b></div>
               <div class="stat-row"><span>🔋 Energy</span><b id="tooltip-energy">50</b></div>
             </div>

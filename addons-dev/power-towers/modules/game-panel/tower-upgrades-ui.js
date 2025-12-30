@@ -3,17 +3,62 @@
  * Handles the stat upgrade panel in tower tooltip
  */
 
-const { STAT_UPGRADES, calculateUpgradeCost } = require('../../core/tower-upgrade-list');
+const { STAT_UPGRADES, calculateUpgradeCost, isUpgradeAvailable } = require('../../core/tower-upgrade-list');
 
-// Which upgrades to show in tooltip (subset for quick access)
-const TOOLTIP_UPGRADES = [
+// Base upgrades shown for all towers
+const BASE_UPGRADES = [
   'damage',
   'attackSpeed', 
   'range',
   'critChance',
-  'critDamage',
-  'health'
+  'critDamage'
 ];
+
+// Attack type specific upgrades
+const ATTACK_TYPE_UPGRADES = {
+  siege: ['splashRadius'],
+  magic: ['powerScaling'],
+  piercing: ['critChance', 'critDamage'], // Bonus crit focus
+  normal: ['attackSpeed'] // Bonus speed focus
+};
+
+// Element path specific upgrades
+const ELEMENT_UPGRADES = {
+  lightning: ['chainCount']
+};
+
+/**
+ * Get upgrades to show for a specific tower
+ * @param {Object} tower - Tower instance
+ * @returns {string[]} Array of upgrade IDs
+ */
+function getUpgradesForTower(tower) {
+  const upgrades = [...BASE_UPGRADES];
+  
+  // Add attack type specific upgrades
+  if (tower.attackTypeId && ATTACK_TYPE_UPGRADES[tower.attackTypeId]) {
+    for (const upgradeId of ATTACK_TYPE_UPGRADES[tower.attackTypeId]) {
+      if (!upgrades.includes(upgradeId)) {
+        upgrades.push(upgradeId);
+      }
+    }
+  }
+  
+  // Add element path specific upgrades
+  if (tower.elementPath && ELEMENT_UPGRADES[tower.elementPath]) {
+    for (const upgradeId of ELEMENT_UPGRADES[tower.elementPath]) {
+      if (!upgrades.includes(upgradeId)) {
+        upgrades.push(upgradeId);
+      }
+    }
+  }
+  
+  // Filter to only upgrades that are available for this tower
+  return upgrades.filter(id => {
+    const upgrade = STAT_UPGRADES[id];
+    return upgrade && isUpgradeAvailable(upgrade, tower);
+  });
+}
 
 /**
  * Mixin for tower upgrades UI functionality
@@ -85,7 +130,10 @@ function TowerUpgradesUIMixin(Base) {
       
       el.upgradesGrid.innerHTML = '';
       
-      TOOLTIP_UPGRADES.forEach(upgradeId => {
+      // Get dynamic list of upgrades for this tower
+      const upgradeIds = getUpgradesForTower(tower);
+      
+      upgradeIds.forEach(upgradeId => {
         const upgrade = STAT_UPGRADES[upgradeId];
         if (!upgrade) return;
         
@@ -141,6 +189,12 @@ function TowerUpgradesUIMixin(Base) {
           return `+${(value * 100).toFixed(0)}% crit dmg`;
         case 'baseFireRate':
           return `+${value.toFixed(2)} atk/s`;
+        case 'splashRadius':
+          return `+${value}px AoE`;
+        case 'powerScaling':
+          return `+${(value * 100).toFixed(0)}% power dmg`;
+        case 'chainCount':
+          return `+${value} chain target`;
         default:
           return `+${value} per lvl`;
       }

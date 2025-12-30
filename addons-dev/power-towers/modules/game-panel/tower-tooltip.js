@@ -138,6 +138,16 @@ function TowerTooltipMixin(Base) {
       if (el.tooltipCrit) el.tooltipCrit.textContent = `${Math.round(critChance * 100)}%`;
       if (el.tooltipCritdmg) el.tooltipCritdmg.textContent = `${Math.round(critDmg * 100)}%`;
       
+      // Splash radius (for Siege attack type)
+      if (el.tooltipSplashRow && el.tooltipSplash) {
+        if (tower.splashRadius && tower.splashRadius > 0) {
+          el.tooltipSplashRow.style.display = '';
+          el.tooltipSplash.textContent = Math.floor(tower.splashRadius);
+        } else {
+          el.tooltipSplashRow.style.display = 'none';
+        }
+      }
+      
       if (el.tooltipHp) {
         el.tooltipHp.textContent = `${Math.floor(tower.currentHp || 0)}/${Math.floor(tower.maxHp || 100)}`;
       }

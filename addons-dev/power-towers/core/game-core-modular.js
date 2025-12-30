@@ -454,6 +454,7 @@ class GameCore {
       // Enemies & Combat
       enemies: enemiesData.enemies || [],
       projectiles: combatData.projectiles || [],
+      effects: combatData.effects || [],
       damageNumbers: this.modules.damageNumbers.getRenderData(),
       
       // Economy

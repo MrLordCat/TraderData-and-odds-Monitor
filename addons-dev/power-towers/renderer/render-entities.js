@@ -264,6 +264,98 @@ function drawDamageNumber(ctx, num, camera) {
   ctx.restore();
 }
 
+/**
+ * Draw all visual effects (explosions, lightning bolts, etc.)
+ */
+function drawEffects(ctx, effects, camera) {
+  for (const effect of effects) {
+    drawEffect(ctx, effect, camera);
+  }
+}
+
+/**
+ * Draw single visual effect
+ */
+function drawEffect(ctx, effect, camera) {
+  const zoom = camera ? camera.zoom : 1;
+  const progress = effect.elapsed / effect.duration;
+  const alpha = 1 - progress; // Fade out over time
+  
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  
+  switch (effect.type) {
+    case 'explosion':
+      // Draw expanding explosion circle
+      const expandedRadius = effect.radius * (0.5 + progress * 0.5);
+      
+      // Outer glow
+      const gradient = ctx.createRadialGradient(
+        effect.x, effect.y, 0,
+        effect.x, effect.y, expandedRadius
+      );
+      gradient.addColorStop(0, effect.color || '#ff6600');
+      gradient.addColorStop(0.5, effect.isSplash ? '#ff9900' : '#ff3300');
+      gradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, expandedRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Inner bright core
+      if (progress < 0.3) {
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = alpha * (1 - progress / 0.3);
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+      
+    case 'lightning-bolt':
+      // Draw jagged lightning line
+      ctx.strokeStyle = effect.color || '#ffd700';
+      ctx.lineWidth = (3 / zoom) * (1 - progress * 0.5);
+      ctx.lineCap = 'round';
+      
+      ctx.beginPath();
+      ctx.moveTo(effect.startX, effect.startY);
+      
+      // Create zigzag pattern
+      const dx = effect.endX - effect.startX;
+      const dy = effect.endY - effect.startY;
+      const segments = 5;
+      
+      for (let i = 1; i < segments; i++) {
+        const t = i / segments;
+        const offset = (Math.random() - 0.5) * 15 / zoom;
+        ctx.lineTo(
+          effect.startX + dx * t + offset,
+          effect.startY + dy * t + offset
+        );
+      }
+      ctx.lineTo(effect.endX, effect.endY);
+      ctx.stroke();
+      
+      // Glow effect
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.lineWidth = (8 / zoom) * (1 - progress * 0.5);
+      ctx.stroke();
+      break;
+      
+    case 'impact':
+      // Small impact burst
+      ctx.fillStyle = effect.color || '#fff';
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.size * (1 + progress), 0, Math.PI * 2);
+      ctx.fill();
+      break;
+  }
+  
+  ctx.restore();
+}
+
 module.exports = {
   drawTowers,
   drawTower,
@@ -274,5 +366,7 @@ module.exports = {
   drawProjectiles,
   drawProjectile,
   drawDamageNumbers,
-  drawDamageNumber
+  drawDamageNumber,
+  drawEffects,
+  drawEffect
 };

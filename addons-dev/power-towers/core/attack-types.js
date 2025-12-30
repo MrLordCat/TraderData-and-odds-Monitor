@@ -92,7 +92,7 @@ const ATTACK_TYPES = {
     energyStorageMod: 0.8, // Less storage (power hungry)
     
     // AoE / Splash
-    splashRadius: 40,      // 40px splash radius
+    splashRadius: 60,      // 60px splash radius
     splashDmgFalloff: 0.5, // 50% damage at edge
     
     // Special mechanics
