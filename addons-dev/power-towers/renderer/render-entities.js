@@ -356,6 +356,148 @@ function drawEffect(ctx, effect, camera) {
   ctx.restore();
 }
 
+/**
+ * Draw energy buildings
+ */
+function drawEnergyBuildings(ctx, buildings, camera) {
+  if (!buildings || buildings.length === 0) return;
+  
+  const GRID_SIZE = CONFIG.GRID_SIZE;
+  const zoom = camera ? camera.zoom : 1;
+  
+  for (const building of buildings) {
+    // Skip if not visible
+    if (camera && !camera.isVisible(
+      building.worldX - GRID_SIZE, building.worldY - GRID_SIZE,
+      GRID_SIZE * 2, GRID_SIZE * 2
+    )) continue;
+    
+    const x = building.worldX;
+    const y = building.worldY;
+    const size = GRID_SIZE * 0.8;
+    
+    // Background circle with category color
+    ctx.fillStyle = building.categoryColor || '#4a5568';
+    ctx.beginPath();
+    ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 2 / zoom;
+    ctx.stroke();
+    
+    // Icon (emoji)
+    if (building.icon) {
+      ctx.font = `${Math.round(size * 0.6)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(building.icon, x, y);
+    }
+    
+    // Energy bar for generators
+    if (building.energy !== undefined && building.maxEnergy > 0) {
+      const barWidth = size;
+      const barHeight = 4 / zoom;
+      const barX = x - barWidth / 2;
+      const barY = y + size / 2 + 4 / zoom;
+      const fillWidth = (building.energy / building.maxEnergy) * barWidth;
+      
+      // Background
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(barX, barY, barWidth, barHeight);
+      
+      // Fill
+      ctx.fillStyle = building.nodeType === 'generator' ? '#4ade80' : '#60a5fa';
+      ctx.fillRect(barX, barY, fillWidth, barHeight);
+    }
+  }
+}
+
+/**
+ * Draw energy connections between buildings
+ */
+function drawEnergyConnections(ctx, buildings, connections, camera) {
+  if (!connections || connections.length === 0) return;
+  
+  const zoom = camera ? camera.zoom : 1;
+  
+  ctx.save();
+  ctx.lineWidth = 2 / zoom;
+  ctx.lineCap = 'round';
+  
+  for (const conn of connections) {
+    // Connection has { from: {x,y}, to: {x,y}, active }
+    const fromX = conn.from?.x || 0;
+    const fromY = conn.from?.y || 0;
+    const toX = conn.to?.x || 0;
+    const toY = conn.to?.y || 0;
+    
+    if (fromX === 0 && fromY === 0) continue;
+    if (toX === 0 && toY === 0) continue;
+    
+    // Draw connection line
+    const gradient = ctx.createLinearGradient(fromX, fromY, toX, toY);
+    gradient.addColorStop(0, conn.active ? 'rgba(74, 222, 128, 0.7)' : 'rgba(100, 100, 100, 0.4)');
+    gradient.addColorStop(1, conn.active ? 'rgba(96, 165, 250, 0.7)' : 'rgba(100, 100, 100, 0.4)');
+    
+    ctx.strokeStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    
+    // Draw energy flow particles (animated) - only when active
+    if (conn.active) {
+      const time = Date.now() / 1000;
+      const flowPos = (time % 1); // 0-1 position along line
+      const px = fromX + (toX - fromX) * flowPos;
+      const py = fromY + (toY - fromY) * flowPos;
+      
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(px, py, 3 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  
+  ctx.restore();
+}
+
+/**
+ * Draw connection range indicator for an energy building
+ */
+function drawConnectionRange(ctx, building, camera) {
+  if (!building) return;
+  
+  const GRID_SIZE = CONFIG.GRID_SIZE;
+  const zoom = camera ? camera.zoom : 1;
+  
+  const x = building.worldX;
+  const y = building.worldY;
+  // Use getEffectiveRange if available, fallback to range property
+  const rangeInCells = building.getEffectiveRange?.() || building.range || 4;
+  const range = rangeInCells * GRID_SIZE; // Range in pixels
+  
+  // Draw range circle
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, range, 0, Math.PI * 2);
+  
+  // Pulsing effect
+  const pulse = Math.sin(Date.now() / 200) * 0.15 + 0.35;
+  ctx.fillStyle = `rgba(96, 165, 250, ${pulse * 0.3})`;
+  ctx.fill();
+  
+  // Border
+  ctx.strokeStyle = `rgba(96, 165, 250, ${pulse + 0.3})`;
+  ctx.lineWidth = 2 / zoom;
+  ctx.setLineDash([8 / zoom, 4 / zoom]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 module.exports = {
   drawTowers,
   drawTower,
@@ -368,5 +510,8 @@ module.exports = {
   drawDamageNumbers,
   drawDamageNumber,
   drawEffects,
-  drawEffect
+  drawEffect,
+  drawEnergyBuildings,
+  drawEnergyConnections,
+  drawConnectionRange
 };

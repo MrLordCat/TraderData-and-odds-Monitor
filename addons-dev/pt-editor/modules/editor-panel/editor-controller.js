@@ -9,8 +9,8 @@ class EditorController {
   constructor() {
     this.container = null;
     this.config = null;
-    this.enemyTypes = null;
     this.towerPaths = null;
+    this.energyBuildings = null;
     this.hasChanges = false;
   }
 
@@ -20,15 +20,26 @@ class EditorController {
     this.setupTabs();
     this.setupActions();
     this.populateFields();
+    this.showPath();
   }
 
   loadData() {
     this.config = FileManager.readConfig();
-    this.enemyTypes = FileManager.readEnemyTypes();
-    this.towerPaths = FileManager.readTowerTypes();
+    this.towerPaths = FileManager.readTowerPaths();
+    this.energyBuildings = FileManager.readEnergyBuildings();
     
     if (!this.config) {
       this.setStatus('Failed to load config - check Power Towers path', 'error');
+    } else {
+      this.setStatus('Loaded successfully', 'success');
+    }
+  }
+
+  showPath() {
+    const pathEl = this.container.querySelector('.editor-path');
+    if (pathEl) {
+      pathEl.textContent = `Path: ${FileManager.getPTPath()}`;
+      pathEl.title = FileManager.getPTPath();
     }
   }
 
@@ -63,53 +74,68 @@ class EditorController {
   populateFields() {
     if (!this.config) return;
     
-    // Populate config inputs
+    // Populate simple config inputs
     this.container.querySelectorAll('[data-config]').forEach(input => {
       const key = input.dataset.config;
       if (this.config[key] !== undefined) {
         input.value = this.config[key];
         input.addEventListener('change', () => {
-          this.config[key] = parseFloat(input.value);
+          const val = input.type === 'number' ? parseFloat(input.value) : input.value;
+          this.config[key] = val;
           this.markChanged();
         });
       }
     });
     
-    // Populate enemies
+    // Populate enemies from CONFIG.ENEMY_TYPES
     this.renderEnemyList();
     
-    // Populate towers
+    // Populate tower paths
     this.renderTowerPaths();
+    
+    // Populate energy buildings
+    this.renderEnergyBuildings();
   }
 
   renderEnemyList() {
     const list = this.container.querySelector('.enemy-list');
-    if (!list || !this.enemyTypes) return;
+    if (!list || !this.config?.ENEMY_TYPES) return;
     
-    list.innerHTML = Object.entries(this.enemyTypes).map(([type, data]) => `
+    const enemyTypes = this.config.ENEMY_TYPES;
+    
+    list.innerHTML = Object.entries(enemyTypes).map(([type, data]) => `
       <div class="enemy-card" data-enemy="${type}">
         <div class="enemy-card-header">
-          <span class="enemy-emoji">${data.emoji}</span>
+          <span class="enemy-emoji">${data.emoji || '👾'}</span>
           <span class="enemy-name">${data.name}</span>
           <span class="enemy-type">${type}</span>
         </div>
         <div class="enemy-stats">
-          <div class="field-group">
-            <label>Health</label>
-            <input type="number" data-enemy-stat="baseHealth" value="${data.baseHealth}" min="1">
-          </div>
-          <div class="field-group">
-            <label>Speed</label>
-            <input type="number" data-enemy-stat="baseSpeed" value="${data.baseSpeed}" min="1">
-          </div>
-          <div class="field-group">
-            <label>Reward</label>
-            <input type="number" data-enemy-stat="reward" value="${data.reward}" min="0">
-          </div>
-          <div class="field-group color-field">
-            <label>Color</label>
-            <input type="color" data-enemy-stat="color" value="${data.color}">
-            <input type="text" data-enemy-stat="color-text" value="${data.color}">
+          <div class="fields-grid">
+            <div class="field-group">
+              <label>Health</label>
+              <input type="number" data-enemy-stat="baseHealth" value="${data.baseHealth}" min="1">
+            </div>
+            <div class="field-group">
+              <label>Speed</label>
+              <input type="number" data-enemy-stat="baseSpeed" value="${data.baseSpeed}" min="1">
+            </div>
+            <div class="field-group">
+              <label>Reward 💰</label>
+              <input type="number" data-enemy-stat="reward" value="${data.reward}" min="0">
+            </div>
+            <div class="field-group">
+              <label>XP ⭐</label>
+              <input type="number" data-enemy-stat="xp" value="${data.xp || 1}" min="1">
+            </div>
+            <div class="field-group color-field">
+              <label>Color</label>
+              <input type="color" data-enemy-stat="color" value="${data.color}">
+            </div>
+            <div class="field-group">
+              <label>Emoji</label>
+              <input type="text" data-enemy-stat="emoji" value="${data.emoji || '👾'}" maxlength="4">
+            </div>
           </div>
         </div>
       </div>
@@ -121,23 +147,21 @@ class EditorController {
       card.querySelectorAll('[data-enemy-stat]').forEach(input => {
         const stat = input.dataset.enemyStat;
         
+        input.addEventListener('change', () => {
+          if (stat === 'emoji' || stat === 'name') {
+            this.config.ENEMY_TYPES[type][stat] = input.value;
+          } else if (stat === 'color') {
+            this.config.ENEMY_TYPES[type].color = input.value;
+          } else {
+            this.config.ENEMY_TYPES[type][stat] = parseFloat(input.value);
+          }
+          this.markChanged();
+        });
+        
+        // Sync color picker with text input
         if (stat === 'color') {
           input.addEventListener('input', () => {
-            this.enemyTypes[type].color = input.value;
-            card.querySelector('[data-enemy-stat="color-text"]').value = input.value;
-            this.markChanged();
-          });
-        } else if (stat === 'color-text') {
-          input.addEventListener('change', () => {
-            if (/^#[0-9A-Fa-f]{6}$/.test(input.value)) {
-              this.enemyTypes[type].color = input.value;
-              card.querySelector('[data-enemy-stat="color"]').value = input.value;
-              this.markChanged();
-            }
-          });
-        } else {
-          input.addEventListener('change', () => {
-            this.enemyTypes[type][stat] = parseFloat(input.value);
+            this.config.ENEMY_TYPES[type].color = input.value;
             this.markChanged();
           });
         }
@@ -157,37 +181,33 @@ class EditorController {
           <span class="tower-path-toggle">▼</span>
         </div>
         <div class="tower-path-content">
-          ${pathData.tiers.map((tier, idx) => `
+          ${pathData.tiers ? pathData.tiers.map((tier, idx) => `
             <div class="tier-card" data-tier="${idx}">
               <div class="tier-header">
-                Tier ${tier.tier}: ${tier.name}
+                Tier ${tier.tier || idx + 1}: ${tier.name || ''}
               </div>
               <div class="tier-stats">
-                <div class="field-group">
-                  <label>Damage</label>
-                  <input type="number" data-tier-stat="damage" value="${tier.damage}" min="1">
+                <div class="fields-grid">
+                  <div class="field-group">
+                    <label>Damage</label>
+                    <input type="number" data-tier-stat="damage" value="${tier.damage || 0}" min="0">
+                  </div>
+                  <div class="field-group">
+                    <label>Range</label>
+                    <input type="number" data-tier-stat="range" value="${tier.range || 0}" min="0">
+                  </div>
+                  <div class="field-group">
+                    <label>Fire Rate</label>
+                    <input type="number" data-tier-stat="fireRate" value="${tier.fireRate || 1}" min="0.1" step="0.1">
+                  </div>
+                  <div class="field-group">
+                    <label>Energy</label>
+                    <input type="number" data-tier-stat="energyCost" value="${tier.energyCost || 0}" min="0">
+                  </div>
                 </div>
-                <div class="field-group">
-                  <label>Range</label>
-                  <input type="number" data-tier-stat="range" value="${tier.range}" min="10">
-                </div>
-                <div class="field-group">
-                  <label>Fire Rate</label>
-                  <input type="number" data-tier-stat="fireRate" value="${tier.fireRate}" min="0.1" step="0.1">
-                </div>
-                <div class="field-group">
-                  <label>Energy Cost</label>
-                  <input type="number" data-tier-stat="energyCost" value="${tier.energyCost}" min="0">
-                </div>
-                ${this.renderOptionalTierStat(tier, 'splashRadius', 'Splash Radius')}
-                ${this.renderOptionalTierStat(tier, 'slowPercent', 'Slow %', 0, 1, 0.1)}
-                ${this.renderOptionalTierStat(tier, 'slowDuration', 'Slow Duration')}
-                ${this.renderOptionalTierStat(tier, 'burnDamage', 'Burn DMG')}
-                ${this.renderOptionalTierStat(tier, 'burnDuration', 'Burn Duration')}
-                ${this.renderOptionalTierStat(tier, 'chainCount', 'Chain Count')}
               </div>
             </div>
-          `).join('')}
+          `).join('') : '<p class="no-data">No tiers defined</p>'}
         </div>
       </div>
     `).join('');
@@ -210,28 +230,81 @@ class EditorController {
         tierCard.querySelectorAll('[data-tier-stat]').forEach(input => {
           const stat = input.dataset.tierStat;
           input.addEventListener('change', () => {
-            this.towerPaths[pathKey].tiers[tierIdx][stat] = parseFloat(input.value);
-            this.markChanged();
+            if (this.towerPaths[pathKey]?.tiers?.[tierIdx]) {
+              this.towerPaths[pathKey].tiers[tierIdx][stat] = parseFloat(input.value);
+              this.markChanged();
+            }
           });
         });
       });
     });
   }
 
-  renderOptionalTierStat(tier, stat, label, min = 0, max = null, step = 1) {
-    if (tier[stat] === undefined) return '';
-    const maxAttr = max !== null ? `max="${max}"` : '';
-    return `
-      <div class="field-group">
-        <label>${label}</label>
-        <input type="number" data-tier-stat="${stat}" value="${tier[stat]}" min="${min}" ${maxAttr} step="${step}">
+  renderEnergyBuildings() {
+    const list = this.container.querySelector('.energy-buildings-list');
+    if (!list || !this.energyBuildings) return;
+    
+    list.innerHTML = Object.entries(this.energyBuildings).map(([id, bld]) => `
+      <div class="energy-card" data-building="${id}">
+        <div class="energy-card-header">
+          <span class="energy-icon">${bld.icon || '⚡'}</span>
+          <span class="energy-name">${bld.name}</span>
+          <span class="energy-category">${bld.category}</span>
+        </div>
+        <div class="energy-stats">
+          <div class="fields-grid">
+            <div class="field-group">
+              <label>Cost 💰</label>
+              <input type="number" data-energy-stat="cost" value="${bld.cost}" min="0">
+            </div>
+            ${bld.stats ? `
+              <div class="field-group">
+                <label>Generation</label>
+                <input type="number" data-energy-stat="stats.generation" value="${bld.stats.generation || 0}" min="0">
+              </div>
+              <div class="field-group">
+                <label>Output Rate</label>
+                <input type="number" data-energy-stat="stats.outputRate" value="${bld.stats.outputRate || 0}" min="0">
+              </div>
+              <div class="field-group">
+                <label>Capacity</label>
+                <input type="number" data-energy-stat="stats.capacity" value="${bld.stats.capacity || 0}" min="0">
+              </div>
+              <div class="field-group">
+                <label>Range (cells)</label>
+                <input type="number" data-energy-stat="stats.range" value="${bld.stats.range || 4}" min="1">
+              </div>
+            ` : ''}
+          </div>
+        </div>
       </div>
-    `;
+    `).join('');
+    
+    // Add listeners
+    list.querySelectorAll('.energy-card').forEach(card => {
+      const id = card.dataset.building;
+      card.querySelectorAll('[data-energy-stat]').forEach(input => {
+        const statPath = input.dataset.energyStat;
+        
+        input.addEventListener('change', () => {
+          const val = parseFloat(input.value);
+          if (statPath.startsWith('stats.')) {
+            const stat = statPath.split('.')[1];
+            if (this.energyBuildings[id].stats) {
+              this.energyBuildings[id].stats[stat] = val;
+            }
+          } else {
+            this.energyBuildings[id][statPath] = val;
+          }
+          this.markChanged();
+        });
+      });
+    });
   }
 
   markChanged() {
     this.hasChanges = true;
-    this.setStatus('Unsaved changes', '');
+    this.setStatus('Unsaved changes •', 'warning');
   }
 
   saveChanges() {
@@ -240,19 +313,19 @@ class EditorController {
         FileManager.writeConfig(this.config);
       }
       
-      if (this.enemyTypes) {
-        FileManager.writeEnemyTypes(this.enemyTypes);
-      }
-      
       if (this.towerPaths) {
         FileManager.writeTowerPaths(this.towerPaths);
       }
       
+      if (this.energyBuildings) {
+        FileManager.writeEnergyBuildings(this.energyBuildings);
+      }
+      
       this.hasChanges = false;
-      this.setStatus('Saved successfully! Restart game to apply.', 'success');
+      this.setStatus('✓ Saved! Restart game to apply.', 'success');
     } catch (e) {
       console.error('[pt-editor] Save failed:', e);
-      this.setStatus('Save failed: ' + e.message, 'error');
+      this.setStatus('✗ Save failed: ' + e.message, 'error');
     }
   }
 

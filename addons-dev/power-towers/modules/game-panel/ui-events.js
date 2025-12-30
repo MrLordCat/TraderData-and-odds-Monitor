@@ -34,6 +34,50 @@ function UIEventsMixin(Base) {
         });
       }
       
+      // Energy tooltip close button
+      if (el.energyTooltipClose) {
+        el.energyTooltipClose.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.hideEnergyBuildingInfo();
+        });
+      }
+      
+      // Energy tooltip sell button
+      if (el.energyBtnSell) {
+        el.energyBtnSell.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.sellSelectedEnergyBuilding();
+        });
+      }
+      
+      // Energy tooltip connect button
+      if (el.energyBtnConnect) {
+        el.energyBtnConnect.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.startEnergyConnectionMode();
+        });
+      }
+      
+      // Energy tooltip upgrade button (toggle upgrades panel)
+      if (el.energyBtnUpgrade) {
+        el.energyBtnUpgrade.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggleEnergyUpgradesPanel();
+        });
+      }
+      
+      // Energy upgrade stat buttons
+      if (el.energyUpgradeBtns) {
+        el.energyUpgradeBtns.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (btn.classList.contains('disabled')) return;
+            const stat = btn.dataset.stat;
+            this.upgradeEnergyBuildingStat(stat);
+          });
+        });
+      }
+      
       // Tooltip upgrade button
       if (el.btnUpgrade) {
         el.btnUpgrade.addEventListener('click', (e) => {

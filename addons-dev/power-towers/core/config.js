@@ -42,6 +42,9 @@ const CONFIG = {
   ENEMY_HP_MULTIPLIER: 1.1,      // x1.1 HP per wave
   ENEMY_SPEED_MULTIPLIER: 1.02,  // x1.02 speed per wave
   
+  // XP Scaling
+  XP_MULTIPLIER: 2.0,            // global XP multiplier (1.0 = normal, 2.0 = double XP)
+  
   // Enemy Types - base stats and rewards
   ENEMY_TYPES: {
     basic: {
@@ -50,6 +53,7 @@ const CONFIG = {
       baseHealth: 20,
       baseSpeed: 40,
       reward: 10,        // gold reward
+      xp: 1,             // tower XP for kill
       color: '#ff6b6b'
     },
     fast: {
@@ -58,6 +62,7 @@ const CONFIG = {
       baseHealth: 20,
       baseSpeed: 80,
       reward: 15,
+      xp: 2,
       color: '#4ecdc4'
     },
     tank: {
@@ -66,6 +71,7 @@ const CONFIG = {
       baseHealth: 100,
       baseSpeed: 25,
       reward: 30,
+      xp: 3,
       color: '#a55eea'
     },
     swarm: {
@@ -74,6 +80,7 @@ const CONFIG = {
       baseHealth: 15,
       baseSpeed: 60,
       reward: 5,
+      xp: 1,
       color: '#26de81'
     },
     boss: {
@@ -82,6 +89,7 @@ const CONFIG = {
       baseHealth: 1000,
       baseSpeed: 20,
       reward: 200,
+      xp: 10,
       color: '#eb3b5a'
     }
   },

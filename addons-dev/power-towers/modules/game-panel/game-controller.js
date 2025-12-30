@@ -113,7 +113,30 @@ class GameControllerBase {
       btnSell: container.querySelector('#btn-sell'),
       // Stat upgrades section
       tooltipUpgradesSection: container.querySelector('#tooltip-upgrades-section'),
-      upgradesGrid: container.querySelector('#upgrades-grid')
+      upgradesGrid: container.querySelector('#upgrades-grid'),
+      // Energy building tooltip
+      energyTooltip: container.querySelector('#energy-tooltip'),
+      energyTooltipIcon: container.querySelector('#energy-tooltip-icon'),
+      energyTooltipName: container.querySelector('#energy-tooltip-name'),
+      energyTooltipLevel: container.querySelector('#energy-tooltip-level'),
+      energyTooltipType: container.querySelector('#energy-tooltip-type'),
+      energyTooltipConnections: container.querySelector('#energy-tooltip-connections'),
+      energyTooltipStored: container.querySelector('#energy-tooltip-stored'),
+      energyTooltipOutput: container.querySelector('#energy-tooltip-output'),
+      energyTooltipRange: container.querySelector('#energy-tooltip-range'),
+      energyTooltipGenRow: container.querySelector('#energy-tooltip-gen-row'),
+      energyTooltipGen: container.querySelector('#energy-tooltip-gen'),
+      energyTooltipEffRow: container.querySelector('#energy-tooltip-eff-row'),
+      energyTooltipEff: container.querySelector('#energy-tooltip-eff'),
+      energyTooltipClose: container.querySelector('#energy-tooltip-close'),
+      energyXpBarFill: container.querySelector('#energy-xp-bar-fill'),
+      energyXpBarText: container.querySelector('#energy-xp-bar-text'),
+      energyUpgradesSection: container.querySelector('#energy-upgrades-section'),
+      energyUpgradesGrid: container.querySelector('#energy-upgrades-grid'),
+      energyBtnConnect: container.querySelector('#energy-btn-connect'),
+      energyBtnUpgrade: container.querySelector('#energy-btn-upgrade'),
+      energyBtnSell: container.querySelector('#energy-btn-sell'),
+      energyUpgradeBtns: container.querySelectorAll('#energy-upgrades-grid .upgrade-stat-btn')
     };
     
     // Setup navigation
@@ -706,7 +729,16 @@ class GameControllerBase {
   renderGame() {
     if (!this.game || !this.renderer) return;
     if (this.camera) this.camera.update();
-    this.renderer.render(this.game.getRenderData());
+    
+    // Get render data and add controller state
+    const renderData = this.game.getRenderData();
+    
+    // Add connection mode state for range visualization
+    if (this.isConnectingEnergy && this.connectingFromBuilding) {
+      renderData.connectingFromBuilding = this.connectingFromBuilding;
+    }
+    
+    this.renderer.render(renderData);
   }
 
   /**
@@ -751,6 +783,421 @@ class GameControllerBase {
     if (this.game) {
       this.game.stop();
     }
+  }
+
+  // =============================================
+  // Energy Building Tooltip
+  // =============================================
+  
+  /**
+   * Show energy building info tooltip
+   */
+  showEnergyBuildingInfo(building) {
+    const el = this.elements;
+    if (!el.energyTooltip || !this.camera) return;
+    
+    this.selectedEnergyBuilding = building;
+    
+    // Update icon
+    const { BUILDING_ICONS } = require('../../modules/energy/building-defs');
+    if (el.energyTooltipIcon) {
+      el.energyTooltipIcon.textContent = BUILDING_ICONS[building.type] || '⚡';
+    }
+    
+    // Update name
+    if (el.energyTooltipName) {
+      const names = {
+        'base-generator': 'Basic Generator',
+        'bio-generator': 'Bio Generator',
+        'wind-generator': 'Wind Turbine',
+        'solar-generator': 'Solar Panel',
+        'water-generator': 'Hydro Generator',
+        'battery': 'Battery',
+        'power-transfer': 'Relay'
+      };
+      el.energyTooltipName.textContent = names[building.type] || building.type;
+    }
+    
+    // Update level with XP progress
+    const xpProgress = building.getXpProgress?.() || { current: 0, needed: 10, percent: 0 };
+    if (el.energyTooltipLevel) {
+      el.energyTooltipLevel.textContent = `Lvl ${building.level || 1}`;
+      el.energyTooltipLevel.title = `XP: ${xpProgress.current}/${xpProgress.needed} (${Math.floor(xpProgress.percent)}%)`;
+    }
+    
+    // Update XP bar
+    if (el.energyXpBarFill) {
+      el.energyXpBarFill.style.width = `${Math.min(100, xpProgress.percent)}%`;
+    }
+    if (el.energyXpBarText) {
+      el.energyXpBarText.textContent = `${xpProgress.current}/${xpProgress.needed} XP`;
+    }
+    
+    // Update type with XP info
+    if (el.energyTooltipType) {
+      const typeNames = {
+        'generator': '⚡ Generator',
+        'storage': '🔋 Storage',
+        'transfer': '📡 Relay'
+      };
+      const xp = building.xp || 0;
+      el.energyTooltipType.textContent = `${typeNames[building.nodeType] || building.nodeType} • ${xp} XP`;
+    }
+    
+    // Update connections count
+    if (el.energyTooltipConnections) {
+      const energyModule = this.game.getModule('energy');
+      const connections = energyModule?.getConnectionsCount?.(building.id) || 0;
+      el.energyTooltipConnections.textContent = `${connections} links`;
+    }
+    
+    // Update stored energy
+    if (el.energyTooltipStored) {
+      const stored = Math.floor(building.stored || 0);
+      const capacity = Math.floor(building.getEffectiveCapacity?.() || building.capacity || 100);
+      el.energyTooltipStored.textContent = `${stored}/${capacity}`;
+    }
+    
+    // Update output rate
+    if (el.energyTooltipOutput) {
+      const outputRate = building.getEffectiveOutputRate?.() || building.outputRate || 0;
+      el.energyTooltipOutput.textContent = `${outputRate.toFixed(1)}/s`;
+    }
+    
+    // Update range (in grid cells)
+    if (el.energyTooltipRange) {
+      const range = building.getEffectiveRange?.() || building.range || 0;
+      el.energyTooltipRange.textContent = `${range} cells`;
+    }
+    
+    // Generation (for generators only)
+    if (el.energyTooltipGenRow && el.energyTooltipGen) {
+      if (building.nodeType === 'generator' && building.generation !== undefined) {
+        el.energyTooltipGenRow.style.display = '';
+        el.energyTooltipGen.textContent = `${building.generation?.toFixed(1) || 0}/s`;
+      } else {
+        el.energyTooltipGenRow.style.display = 'none';
+      }
+    }
+    
+    // Efficiency (for generators only)
+    if (el.energyTooltipEffRow && el.energyTooltipEff) {
+      const state = building.getState?.() || {};
+      if (state.efficiency !== undefined) {
+        el.energyTooltipEffRow.style.display = '';
+        el.energyTooltipEff.textContent = `${Math.round(state.efficiency * 100)}%`;
+      } else {
+        el.energyTooltipEffRow.style.display = 'none';
+      }
+    }
+    
+    // Position tooltip near the building
+    const screenPos = this.camera.worldToScreen(building.worldX, building.worldY);
+    const tooltipRect = el.energyTooltip.getBoundingClientRect();
+    const containerRect = this.canvasContainer.getBoundingClientRect();
+    
+    let left = screenPos.x + 30;
+    let top = screenPos.y - 50;
+    
+    // Keep within bounds
+    if (left + 200 > containerRect.width) {
+      left = screenPos.x - 220;
+    }
+    if (top < 10) top = 10;
+    if (top + 200 > containerRect.height) {
+      top = containerRect.height - 210;
+    }
+    
+    el.energyTooltip.style.left = `${left}px`;
+    el.energyTooltip.style.top = `${top}px`;
+    el.energyTooltip.classList.add('visible');
+    
+    this.energyTooltipBuildingPosition = { x: building.gridX, y: building.gridY };
+  }
+  
+  /**
+   * Hide energy building tooltip
+   */
+  hideEnergyBuildingInfo() {
+    const el = this.elements;
+    if (el.energyTooltip) {
+      el.energyTooltip.classList.remove('visible');
+    }
+    this.selectedEnergyBuilding = null;
+    this.energyTooltipBuildingPosition = null;
+  }
+  
+  /**
+   * Sell selected energy building
+   */
+  sellSelectedEnergyBuilding() {
+    if (!this.selectedEnergyBuilding || !this.game) return;
+    
+    const building = this.selectedEnergyBuilding;
+    const energyModule = this.game.getModule('energy');
+    const economy = this.game.getModule('economy');
+    
+    if (energyModule && economy) {
+      // Get sell price (50% of cost)
+      const { ENERGY_BUILDINGS } = require('../../modules/energy/building-defs');
+      const def = ENERGY_BUILDINGS[building.type];
+      const sellPrice = Math.floor((def?.cost || 50) * 0.5);
+      
+      // Remove building
+      energyModule.removeBuilding(building.id);
+      
+      // Add gold
+      economy.addGold(sellPrice);
+      
+      // Hide tooltip
+      this.hideEnergyBuildingInfo();
+      
+      // Update UI
+      this.updateUI(this.game.getState());
+      this.renderGame();
+    }
+  }
+  
+  /**
+   * Toggle energy upgrades panel
+   */
+  toggleEnergyUpgradesPanel() {
+    const el = this.elements;
+    if (!el.energyUpgradesSection) return;
+    
+    const isHidden = el.energyUpgradesSection.style.display === 'none';
+    el.energyUpgradesSection.style.display = isHidden ? 'block' : 'none';
+    
+    if (el.energyBtnUpgrade) {
+      el.energyBtnUpgrade.classList.toggle('active', isHidden);
+    }
+    
+    if (isHidden && this.selectedEnergyBuilding) {
+      this.updateEnergyUpgradesCosts();
+    }
+  }
+  
+  /**
+   * Update energy upgrades costs display
+   */
+  updateEnergyUpgradesCosts() {
+    if (!this.selectedEnergyBuilding || !this.game) return;
+    
+    const building = this.selectedEnergyBuilding;
+    const gold = this.game.getState().gold || 0;
+    const el = this.elements;
+    
+    // Base upgrade costs (increase with level)
+    const baseCosts = {
+      capacity: 20,
+      outputRate: 25,
+      range: 30
+    };
+    
+    const maxLevel = 5;
+    const upgrades = building.upgrades || { capacity: 0, outputRate: 0, range: 0 };
+    
+    Object.keys(baseCosts).forEach(stat => {
+      const level = upgrades[stat] || 0;
+      const cost = Math.floor(baseCosts[stat] * Math.pow(1.5, level));
+      const canAfford = gold >= cost;
+      const atMax = level >= maxLevel;
+      
+      // Update cost display with level indicator
+      const costEl = el.energyUpgradesGrid?.querySelector(`[data-stat="${stat}"] .stat-cost`);
+      if (costEl) {
+        costEl.textContent = atMax ? 'MAX' : `Lv${level + 1} ${cost}g`;
+        costEl.style.color = atMax ? '#a0aec0' : (canAfford ? '#ffd700' : '#fc8181');
+      }
+      
+      // Update button state
+      const btn = el.energyUpgradesGrid?.querySelector(`[data-stat="${stat}"]`);
+      if (btn) {
+        btn.classList.toggle('disabled', !canAfford || atMax);
+      }
+    });
+  }
+  
+  /**
+   * Upgrade energy building stat
+   */
+  upgradeEnergyBuildingStat(stat) {
+    if (!this.selectedEnergyBuilding || !this.game) return;
+    
+    const building = this.selectedEnergyBuilding;
+    const economy = this.game.getModule('economy');
+    if (!economy) return;
+    
+    const baseCosts = {
+      capacity: 20,
+      outputRate: 25,
+      range: 30
+    };
+    
+    const upgrades = building.upgrades || { capacity: 0, outputRate: 0, range: 0 };
+    const level = upgrades[stat] || 0;
+    const cost = Math.floor(baseCosts[stat] * Math.pow(1.5, level));
+    
+    if (!economy.canAfford(cost)) return;
+    if (level >= 5) return; // Max level
+    
+    // Spend gold
+    economy.spendGold(cost);
+    
+    // Apply upgrade using PowerNode's upgrade method if available
+    if (building.upgrade) {
+      building.upgrade(stat);
+    } else {
+      // Fallback: directly modify upgrades
+      building.upgrades = building.upgrades || { capacity: 0, outputRate: 0, range: 0 };
+      building.upgrades[stat]++;
+    }
+    
+    console.log(`[GameController] Upgraded ${stat} to level ${building.upgrades[stat]}, effective range: ${building.getEffectiveRange?.()}`);
+    
+    // Update displays
+    this.showEnergyBuildingInfo(building);
+    this.updateEnergyUpgradesCosts();
+    this.updateUI(this.game.getState());
+    this.renderGame();
+  }
+  
+  /**
+   * Start energy connection mode
+   */
+  startEnergyConnectionMode() {
+    if (!this.selectedEnergyBuilding || !this.game) return;
+    
+    const energyModule = this.game.getModule('energy');
+    if (!energyModule) return;
+    
+    this.connectingFromBuilding = this.selectedEnergyBuilding;
+    this.isConnectingEnergy = true;
+    
+    // Update button appearance
+    const el = this.elements;
+    if (el.energyBtnConnect) {
+      el.energyBtnConnect.textContent = '❌ Cancel';
+      el.energyBtnConnect.classList.add('active');
+    }
+    
+    // Get effective range for message
+    const range = this.connectingFromBuilding.getEffectiveRange?.() || this.connectingFromBuilding.range || 4;
+    
+    // Show message
+    this.game.eventBus?.emit('ui:toast', { 
+      message: `Click building or tower within ${range} cells to connect`, 
+      type: 'info' 
+    });
+    
+    // Render to show range indicator
+    this.renderGame();
+  }
+  
+  /**
+   * Cancel energy connection mode
+   */
+  cancelEnergyConnectionMode() {
+    this.connectingFromBuilding = null;
+    this.isConnectingEnergy = false;
+    
+    const el = this.elements;
+    if (el.energyBtnConnect) {
+      el.energyBtnConnect.textContent = '🔗 Connect';
+      el.energyBtnConnect.classList.remove('active');
+    }
+  }
+  
+  /**
+   * Complete energy connection
+   */
+  completeEnergyConnection(targetBuilding) {
+    if (!this.connectingFromBuilding || !targetBuilding || !this.game) return;
+    
+    const energyModule = this.game.getModule('energy');
+    if (!energyModule) return;
+    
+    const from = this.connectingFromBuilding;
+    const to = targetBuilding;
+    
+    // Don't connect to self
+    if (from.id === to.id) {
+      this.cancelEnergyConnectionMode();
+      return;
+    }
+    
+    // Check range
+    const dx = from.gridX - to.gridX;
+    const dy = from.gridY - to.gridY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const maxRange = Math.max(from.range || 4, to.range || 4);
+    
+    if (distance > maxRange) {
+      this.game.eventBus?.emit('ui:toast', { 
+        message: 'Buildings too far apart!', 
+        type: 'error' 
+      });
+      this.cancelEnergyConnectionMode();
+      return;
+    }
+    
+    // Create connection via network
+    const success = energyModule.connectBuildings?.(from.id, to.id);
+    
+    if (success !== false) {
+      this.game.eventBus?.emit('ui:toast', { 
+        message: 'Connection established!', 
+        type: 'success' 
+      });
+    }
+    
+    this.cancelEnergyConnectionMode();
+    this.renderGame();
+  }
+  
+  /**
+   * Complete energy connection to a tower (tower as consumer)
+   */
+  completeEnergyConnectionToTower(tower) {
+    if (!this.connectingFromBuilding || !tower || !this.game) return;
+    
+    const energyModule = this.game.getModule('energy');
+    if (!energyModule) return;
+    
+    const from = this.connectingFromBuilding;
+    
+    // Check range
+    const dx = from.gridX - tower.gridX;
+    const dy = from.gridY - tower.gridY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const maxRange = from.range || 4;
+    
+    if (distance > maxRange) {
+      this.game.eventBus?.emit('ui:toast', { 
+        message: 'Tower too far from energy building!', 
+        type: 'error' 
+      });
+      this.cancelEnergyConnectionMode();
+      return;
+    }
+    
+    // Connect tower to energy network as consumer
+    const success = energyModule.connectTower?.(from.id, tower);
+    
+    if (success) {
+      this.game.eventBus?.emit('ui:toast', { 
+        message: `⚡ Tower connected to power!`, 
+        type: 'success' 
+      });
+    } else {
+      this.game.eventBus?.emit('ui:toast', { 
+        message: 'Failed to connect tower', 
+        type: 'error' 
+      });
+    }
+    
+    this.cancelEnergyConnectionMode();
+    this.renderGame();
   }
 }
 

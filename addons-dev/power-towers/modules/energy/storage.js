@@ -40,6 +40,18 @@ class Battery extends PowerNode {
   }
 
   /**
+   * Override receiveEnergy to track XP
+   */
+  receiveEnergy(amount) {
+    const received = super.receiveEnergy(amount);
+    // Track energy for XP (100 energy = 1 XP)
+    if (received > 0) {
+      this.addEnergyProcessed(received);
+    }
+    return received;
+  }
+
+  /**
    * Count adjacent batteries for stacking bonus
    */
   countAdjacentBatteries() {
@@ -116,11 +128,20 @@ class PowerTransfer extends PowerNode {
   }
 
   /**
-   * Override receive to apply efficiency
+   * Override receive to apply efficiency and track XP
    */
   receiveEnergy(amount) {
     const effectiveAmount = amount * this.efficiency;
-    return super.receiveEnergy(effectiveAmount);
+    const space = this.capacity - this.stored;
+    const received = Math.min(effectiveAmount, space);
+    this.stored += received;
+    
+    // Track energy for XP (100 energy = 1 XP)
+    if (received > 0) {
+      this.addEnergyProcessed(received);
+    }
+    
+    return received;
   }
 
   /**

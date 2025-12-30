@@ -12,6 +12,7 @@
 
 const { GameEvents } = require('../../core/event-bus');
 const { ATTACK_TYPES } = require('../../core/attack-types');
+const CONFIG = require('../../core/config');
 const {
   BASE_TOWER,
   ELEMENT_PATHS,
@@ -271,11 +272,11 @@ class TowersModule {
     if (tower) {
       tower.kills++;
       
-      // XP based on enemy type
-      let xpGain = 1;
-      if (enemy?.type === 'tank') xpGain = 3;
-      else if (enemy?.type === 'boss') xpGain = 10;
-      else if (enemy?.type === 'fast') xpGain = 2;
+      // XP based on enemy type (from config, default 1) × global multiplier
+      const enemyType = enemy?.type || 'basic';
+      const typeConfig = CONFIG.ENEMY_TYPES[enemyType];
+      const baseXp = typeConfig?.xp ?? 1;
+      const xpGain = Math.round(baseXp * (CONFIG.XP_MULTIPLIER || 1));
       
       tower.upgradePoints = (tower.upgradePoints || 0) + xpGain;
       

@@ -188,6 +188,67 @@ function getGameTemplate() {
               <button id="btn-sell" class="tooltip-action-btn sell">💰 Sell</button>
             </div>
           </div>
+          
+          <!-- Energy Building Tooltip (floating popup) -->
+          <div class="tower-tooltip energy-tooltip" id="energy-tooltip">
+            <div class="tooltip-header">
+              <span class="tooltip-icon" id="energy-tooltip-icon">⚡</span>
+              <div class="tooltip-title-group">
+                <span class="tooltip-name" id="energy-tooltip-name">Generator</span>
+                <span class="tooltip-level" id="energy-tooltip-level">Lvl 1</span>
+              </div>
+              <button class="tooltip-close" id="energy-tooltip-close">✕</button>
+            </div>
+            
+            <!-- XP Bar -->
+            <div class="xp-bar-container" id="energy-xp-bar-container">
+              <div class="xp-bar-bg">
+                <div class="xp-bar-fill" id="energy-xp-bar-fill"></div>
+              </div>
+              <span class="xp-bar-text" id="energy-xp-bar-text">0/10 XP</span>
+            </div>
+            
+            <div class="tooltip-type-row">
+              <span class="tooltip-attack-type" id="energy-tooltip-type">⚡ Generator</span>
+              <span class="energy-connections" id="energy-tooltip-connections">0 links</span>
+            </div>
+            
+            <div class="tooltip-stats">
+              <div class="stat-row"><span>🔋 Stored</span><b id="energy-tooltip-stored">0/100</b></div>
+              <div class="stat-row"><span>⚡ Output</span><b id="energy-tooltip-output">10/s</b></div>
+              <div class="stat-row"><span>📡 Range</span><b id="energy-tooltip-range">4</b></div>
+              <div class="stat-row" id="energy-tooltip-gen-row"><span>🔌 Gen</span><b id="energy-tooltip-gen">5/s</b></div>
+              <div class="stat-row" id="energy-tooltip-eff-row"><span>📈 Efficiency</span><b id="energy-tooltip-eff">100%</b></div>
+            </div>
+            
+            <!-- Upgrades Section -->
+            <div class="tooltip-section energy-upgrades" id="energy-upgrades-section" style="display: none;">
+              <div class="section-title">Upgrades:</div>
+              <div class="upgrades-grid" id="energy-upgrades-grid">
+                <button class="upgrade-stat-btn" data-stat="capacity" title="Increase capacity">
+                  <span class="stat-icon">🔋</span>
+                  <span class="stat-label">Cap</span>
+                  <span class="stat-cost" id="energy-upgrade-capacity-cost">20g</span>
+                </button>
+                <button class="upgrade-stat-btn" data-stat="outputRate" title="Increase output rate">
+                  <span class="stat-icon">⚡</span>
+                  <span class="stat-label">Out</span>
+                  <span class="stat-cost" id="energy-upgrade-output-cost">25g</span>
+                </button>
+                <button class="upgrade-stat-btn" data-stat="range" title="Increase connection range">
+                  <span class="stat-icon">📡</span>
+                  <span class="stat-label">Rng</span>
+                  <span class="stat-cost" id="energy-upgrade-range-cost">30g</span>
+                </button>
+              </div>
+            </div>
+            
+            <div class="tooltip-actions">
+              <button id="energy-btn-connect" class="tooltip-action-btn connect">🔗 Connect</button>
+              <button id="energy-btn-upgrade" class="tooltip-action-btn upgrade">⬆️ Upgrade</button>
+              <button id="energy-btn-sell" class="tooltip-action-btn sell">💰 Sell</button>
+            </div>
+          </div>
         </div>
         
         <div class="build-toolbar" id="build-toolbar">

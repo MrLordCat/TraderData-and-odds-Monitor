@@ -59,9 +59,11 @@ class EnergyModule {
   }
 
   /**
-   * On game start
+   * On game start - don't reset, buildings persist
    */
   onGameStart() {
+    // Don't reset buildings - they persist like towers
+    // Only reset stats counters
     this.totalGeneration = 0;
     this.totalStorage = 0;
     this.totalCapacity = 0;
@@ -101,10 +103,45 @@ class EnergyModule {
   }
 
   /**
+   * Get building at grid position
+   */
+  getBuildingAt(gridX, gridY) {
+    return this.buildingManager.getBuildingAt(gridX, gridY);
+  }
+
+  /**
+   * Remove building by ID
+   */
+  removeBuilding(id) {
+    return this.buildingManager.removeBuilding(id);
+  }
+
+  /**
+   * Connect two buildings
+   */
+  connectBuildings(fromId, toId) {
+    return this.buildingManager.connectBuildings(fromId, toId);
+  }
+
+  /**
+   * Get connections count for a building
+   */
+  getConnectionsCount(buildingId) {
+    return this.buildingManager.getConnectionsCount(buildingId);
+  }
+
+  /**
    * Create power consumer for tower
    */
   createConsumerForTower(tower, consumption) {
     return this.buildingManager.createConsumerForTower(tower, consumption);
+  }
+
+  /**
+   * Connect energy building to tower as consumer
+   */
+  connectTower(fromBuildingId, tower) {
+    return this.buildingManager.connectTower(fromBuildingId, tower);
   }
 
   /**

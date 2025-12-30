@@ -35,7 +35,13 @@ class BaseGenerator extends PowerNode {
   generate(dt) {
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;
-    this.stored += Math.min(produced, space);
+    const actualProduced = Math.min(produced, space);
+    this.stored += actualProduced;
+    
+    // Track energy for XP (100 energy = 1 XP)
+    if (actualProduced > 0) {
+      this.addEnergyProcessed(actualProduced);
+    }
   }
 
   getState() {
@@ -116,7 +122,13 @@ class BioGenerator extends PowerNode {
     
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;
-    this.stored += Math.min(produced, space);
+    const actualProduced = Math.min(produced, space);
+    this.stored += actualProduced;
+    
+    // Track energy for XP (100 energy = 1 XP)
+    if (actualProduced > 0) {
+      this.addEnergyProcessed(actualProduced);
+    }
     
     // TODO: Slowly consume trees and regrow them
   }
@@ -206,7 +218,13 @@ class WindGenerator extends PowerNode {
     
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;
-    this.stored += Math.min(produced, space);
+    const actualProduced = Math.min(produced, space);
+    this.stored += actualProduced;
+    
+    // Track energy for XP (100 energy = 1 XP)
+    if (actualProduced > 0) {
+      this.addEnergyProcessed(actualProduced);
+    }
   }
 
   getState() {
@@ -278,7 +296,13 @@ class SolarGenerator extends PowerNode {
     
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;
-    this.stored += Math.min(produced, space);
+    const actualProduced = Math.min(produced, space);
+    this.stored += actualProduced;
+    
+    // Track energy for XP (100 energy = 1 XP)
+    if (actualProduced > 0) {
+      this.addEnergyProcessed(actualProduced);
+    }
   }
 
   getState() {
@@ -350,7 +374,13 @@ class WaterGenerator extends PowerNode {
     
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;
-    this.stored += Math.min(produced, space);
+    const actualProduced = Math.min(produced, space);
+    this.stored += actualProduced;
+    
+    // Track energy for XP (100 energy = 1 XP)
+    if (actualProduced > 0) {
+      this.addEnergyProcessed(actualProduced);
+    }
   }
 
   getState() {

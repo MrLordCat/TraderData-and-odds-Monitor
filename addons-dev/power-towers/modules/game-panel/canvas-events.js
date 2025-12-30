@@ -100,15 +100,42 @@ function CanvasEventsMixin(Base) {
       } else if (this.placingEnergy) {
         // Place energy building
         this.placeEnergyBuilding(gridX, gridY);
+      } else if (this.isConnectingEnergy) {
+        // Connection mode - find target (energy building OR tower)
+        const energyModule = this.game.getModule('energy');
+        const targetBuilding = energyModule?.getBuildingAt?.(gridX, gridY);
+        
+        if (targetBuilding) {
+          this.completeEnergyConnection(targetBuilding);
+        } else {
+          // Check if clicking on a tower (towers are energy consumers)
+          const tower = this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY);
+          if (tower) {
+            this.completeEnergyConnectionToTower(tower);
+          } else {
+            // Click on empty - cancel connection
+            this.cancelEnergyConnectionMode();
+          }
+        }
       } else {
         // Find tower at grid position
         const tower = this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY);
         if (tower) {
           this.game.selectTower(tower.id);
+          this.hideEnergyBuildingInfo(); // Hide energy tooltip when selecting tower
         } else {
-          // Click on empty cell - deselect and close tooltip
-          this.game.selectTower(null);
-          this.hideTowerInfo();
+          // Check for energy building at this position
+          const energyModule = this.game.getModule('energy');
+          const energyBuilding = energyModule?.getBuildingAt?.(gridX, gridY);
+          if (energyBuilding) {
+            this.hideTowerInfo(); // Hide tower tooltip when selecting energy building
+            this.showEnergyBuildingInfo(energyBuilding);
+          } else {
+            // Click on empty cell - deselect and close tooltip
+            this.game.selectTower(null);
+            this.hideTowerInfo();
+            this.hideEnergyBuildingInfo();
+          }
         }
       }
       

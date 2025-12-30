@@ -28,7 +28,10 @@ const {
   drawEnemies, 
   drawProjectiles,
   drawDamageNumbers,
-  drawEffects
+  drawEffects,
+  drawEnergyBuildings,
+  drawEnergyConnections,
+  drawConnectionRange
 } = require('./render-entities');
 const { 
   drawHoverIndicator, 
@@ -135,6 +138,14 @@ class GameRenderer {
     
     // Game entities (always dynamic)
     drawTowers(this.ctx, data.towers, data.selectedTower, this.camera);
+    drawEnergyConnections(this.ctx, data.energyBuildings, data.energyNetwork?.connections, this.camera);
+    drawEnergyBuildings(this.ctx, data.energyBuildings, this.camera);
+    
+    // Draw connection range when in connection mode
+    if (data.connectingFromBuilding) {
+      drawConnectionRange(this.ctx, data.connectingFromBuilding, this.camera);
+    }
+    
     drawEnemies(this.ctx, data.enemies, this.camera, this.frameCount);
     drawProjectiles(this.ctx, data.projectiles, this.camera);
     drawEffects(this.ctx, data.effects || [], this.camera);

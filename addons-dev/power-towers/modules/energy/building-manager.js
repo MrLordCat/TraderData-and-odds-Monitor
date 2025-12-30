@@ -27,9 +27,6 @@ class EnergyBuildingManager {
     
     // Building placement ghost
     this.placementGhost = null;
-    
-    // Map reference
-    this.map = null;
   }
 
   init() {
@@ -37,7 +34,6 @@ class EnergyBuildingManager {
     
     // Listen for events
     this.eventBus.on(GameEvents.GAME_START, () => this.onGameStart());
-    this.eventBus.on('map:generated', (map) => this.setMap(map));
     
     // Building events
     this.eventBus.on('energy:place-building', (data) => this.placeBuilding(data));
@@ -50,13 +46,17 @@ class EnergyBuildingManager {
     this.eventBus.on('energy:cancel-connection', () => this.cancelConnection());
   }
 
-  setMap(map) {
-    this.map = map;
+  /**
+   * Get map module from game core
+   */
+  getMap() {
+    return this.gameCore?.getModule('map') || null;
   }
 
   onGameStart() {
-    this.buildings.clear();
-    this.network.reset();
+    // Don't reset - allow pre-placed buildings to persist (like towers)
+    // Buildings are only reset on full game reset, not on wave start
+    console.log('[EnergyManager] Game started, keeping', this.buildings.size, 'buildings');
   }
 
   /**
@@ -86,7 +86,7 @@ class EnergyBuildingManager {
 
     // Deduct cost
     if (economy) {
-      economy.spend(def.cost);
+      economy.spendGold(def.cost);
     }
 
     // Create building instance
@@ -101,8 +101,9 @@ class EnergyBuildingManager {
     if (!building) return null;
 
     // Set map reference for terrain-dependent generators
-    if (building.setMap && this.map) {
-      building.setMap(this.map);
+    const map = this.getMap();
+    if (building.setMap && map) {
+      building.setMap(map);
     }
 
     // Set network reference for batteries
@@ -117,8 +118,8 @@ class EnergyBuildingManager {
     this.buildings.set(building.id, building);
 
     // Mark cell as occupied
-    if (this.map) {
-      this.map.setCellOccupied(gridX, gridY, true);
+    if (map && map.setCellOccupied) {
+      map.setCellOccupied(gridX, gridY, true);
     }
 
     console.log(`[EnergyManager] Placed ${type} at (${gridX}, ${gridY})`);
@@ -162,17 +163,18 @@ class EnergyBuildingManager {
    * Check if can build at position
    */
   canBuildAt(gridX, gridY) {
-    if (!this.map) return true;
+    const map = this.getMap();
+    if (!map) return true;
     
     // Check terrain
-    const terrain = this.map.terrain[gridY]?.[gridX];
+    const terrain = map.terrain?.[gridY]?.[gridX];
     if (terrain === 'water') return false;
     
     // Check if path
-    if (this.map.isPath(gridX, gridY)) return false;
+    if (map.isPath && map.isPath(gridX, gridY)) return false;
     
     // Check if occupied
-    if (this.map.isCellOccupied(gridX, gridY)) return false;
+    if (map.isCellOccupied && map.isCellOccupied(gridX, gridY)) return false;
     
     return true;
   }
@@ -188,8 +190,9 @@ class EnergyBuildingManager {
     this.network.unregisterNode(id);
     
     // Free cell
-    if (this.map) {
-      this.map.setCellOccupied(building.gridX, building.gridY, false);
+    const map = this.getMap();
+    if (map && map.setCellOccupied) {
+      map.setCellOccupied(building.gridX, building.gridY, false);
     }
 
     this.buildings.delete(id);
@@ -278,9 +281,9 @@ class EnergyBuildingManager {
   }
 
   /**
-   * Create power consumer for a tower
+   * Create power consumer for a tower (with custom ID)
    */
-  createConsumerForTower(tower, consumption = 5) {
+  createConsumerForTower(tower, consumption = 5, customId = null) {
     const consumer = new PowerConsumer({
       gridX: tower.gridX,
       gridY: tower.gridY,
@@ -290,10 +293,77 @@ class EnergyBuildingManager {
       capacity: consumption * 4 // 4 seconds buffer
     });
     
+    // Set custom ID BEFORE registration
+    if (customId) {
+      consumer.id = customId;
+    }
+    
     consumer.setTower(tower);
     this.network.registerNode(consumer);
     
     return consumer;
+  }
+
+  /**
+   * Get building at grid position
+   */
+  getBuildingAt(gridX, gridY) {
+    for (const building of this.buildings.values()) {
+      if (building.gridX === gridX && building.gridY === gridY) {
+        return building;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Connect two buildings via network
+   */
+  connectBuildings(fromId, toId) {
+    const fromBuilding = this.buildings.get(fromId);
+    const toBuilding = this.buildings.get(toId);
+    
+    if (!fromBuilding || !toBuilding) return false;
+    
+    // Create connection in network
+    return this.network.connect(fromId, toId);
+  }
+
+  /**
+   * Connect energy building to tower
+   * Tower becomes a consumer in the network
+   */
+  connectTower(fromBuildingId, tower) {
+    const fromBuilding = this.buildings.get(fromBuildingId);
+    if (!fromBuilding || !tower) return false;
+    
+    // Check if tower already has a consumer node
+    const consumerId = `tower-${tower.id}`;
+    let consumer = this.network.nodes.get(consumerId);
+    
+    if (!consumer) {
+      // Create consumer for tower with custom ID
+      const consumption = tower.energyCost || 5;
+      consumer = this.createConsumerForTower(tower, consumption, consumerId);
+      
+      // Store reference
+      tower.powerConsumer = consumer;
+      
+      console.log(`[EnergyManager] Created consumer ${consumerId} for tower ${tower.id}`);
+    }
+    
+    // Connect building to tower's consumer
+    const success = this.network.connect(fromBuildingId, consumerId);
+    console.log(`[EnergyManager] Connect ${fromBuildingId} -> ${consumerId}: ${success}`);
+    return success;
+  }
+
+  /**
+   * Get connections count for a building
+   */
+  getConnectionsCount(buildingId) {
+    const connections = this.network.connections || [];
+    return connections.filter(c => c.from === buildingId || c.to === buildingId).length;
   }
 
   /**

@@ -77,7 +77,7 @@ class GameCore {
       combat: new CombatModule(this.eventBus, CONFIG),
       damageNumbers: new DamageNumbersModule(this.eventBus),
       economy: new EconomyModule(this.eventBus, CONFIG),
-      energy: new EnergyModule(this.eventBus, CONFIG),
+      energy: new EnergyModule(this.eventBus, CONFIG, this),  // pass gameCore reference
       player: new PlayerModule(this.eventBus, CONFIG)
     };
     
@@ -119,6 +119,15 @@ class GameCore {
       get: () => this.modules.economy,
       configurable: true
     });
+  }
+
+  /**
+   * Get module by name
+   * @param {string} name - Module name (e.g., 'towers', 'energy', 'economy')
+   * @returns {Object|null} Module instance or null if not found
+   */
+  getModule(name) {
+    return this.modules[name] || null;
   }
 
   /**
@@ -481,6 +490,8 @@ class GameCore {
       energy: energyData.energy,
       maxEnergy: energyData.maxEnergy,
       energyRegen: this.modules.energy.regenRate,
+      energyBuildings: energyData.buildings || [],
+      energyNetwork: energyData.network,
       
       // Player
       lives: playerData.lives,

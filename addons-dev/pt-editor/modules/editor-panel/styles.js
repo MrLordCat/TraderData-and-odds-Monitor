@@ -374,6 +374,121 @@ function getEditorStyles() {
 .color-field input[type="text"] {
   width: 70px;
 }
+
+/* Fields Grid - 2-column layout */
+.fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.fields-grid .field-group {
+  margin-bottom: 0;
+}
+
+/* Field hint - small description */
+.field-hint {
+  font-size: 9px;
+  color: #4a5568;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Energy Building Cards */
+.energy-card {
+  background: #16213e;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.energy-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2d3748;
+}
+
+.energy-icon {
+  font-size: 20px;
+}
+
+.energy-name {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.energy-category {
+  color: #ffc107;
+  font-size: 10px;
+  margin-left: auto;
+  background: rgba(255, 193, 7, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.energy-stats {
+  display: block;
+}
+
+/* Editor Footer */
+.editor-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: #16213e;
+  border-top: 1px solid #2d3748;
+  font-size: 10px;
+}
+
+.editor-path {
+  color: #4a5568;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.editor-status.warning {
+  color: #ffc107;
+}
+
+/* No data placeholder */
+.no-data {
+  color: #4a5568;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Section hint */
+.section-hint {
+  margin: 0;
+  font-size: 10px;
+  color: #718096;
+  font-style: italic;
+}
+
+/* Scrollbar styling */
+.editor-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.editor-content::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+.editor-content::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 3px;
+}
+
+.editor-content::-webkit-scrollbar-thumb:hover {
+  background: #718096;
+}
 `;
 }
 

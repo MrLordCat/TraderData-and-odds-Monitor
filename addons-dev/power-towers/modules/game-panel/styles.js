@@ -467,6 +467,85 @@ function getGameStyles() {
       color: #fc8181;
     }
     
+    /* Energy Tooltip specific styles */
+    .energy-tooltip .energy-connections {
+      padding: 3px 8px;
+      background: rgba(96,165,250,0.2);
+      border-radius: 4px;
+      font-size: 11px;
+      color: #60a5fa;
+    }
+    
+    /* XP Bar for energy buildings */
+    .xp-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      margin: 4px 0;
+    }
+    .xp-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .xp-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+    .xp-bar-text {
+      font-size: 10px;
+      color: #a78bfa;
+      min-width: 55px;
+      text-align: right;
+    }
+    
+    .energy-tooltip .tooltip-action-btn.connect {
+      background: rgba(96,165,250,0.2);
+      color: #60a5fa;
+    }
+    .energy-tooltip .tooltip-action-btn.connect:hover {
+      background: rgba(96,165,250,0.3);
+    }
+    .energy-tooltip .tooltip-action-btn.connect.active {
+      background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+      color: white;
+    }
+    .energy-upgrades .upgrades-grid {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .energy-upgrades .upgrade-stat-btn {
+      flex: 1;
+      min-width: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 6px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.08);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .energy-upgrades .upgrade-stat-btn:hover:not(.disabled) {
+      border-color: #48bb78;
+      background: rgba(72,187,120,0.2);
+    }
+    .energy-upgrades .upgrade-stat-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .energy-upgrades .stat-icon { font-size: 16px; }
+    .energy-upgrades .stat-label { font-size: 10px; color: #a0aec0; }
+    .energy-upgrades .stat-cost { font-size: 10px; color: #ffd700; font-weight: 600; }
+    
     .game-footer { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
     .game-footer .hint { margin: 0; font-size: 12px; color: #718096; flex: 1; text-align: right; }
   `;

@@ -16,7 +16,7 @@ function findPowerTowersPath() {
   
   // Try AppData path
   const appDataPath = process.env.APPDATA 
-    ? path.join(process.env.APPDATA, 'odds-desktop', 'addons', 'power-towers')
+    ? path.join(process.env.APPDATA, 'oddsmoni', 'addons', 'power-towers')
     : null;
   if (appDataPath && fs.existsSync(path.join(appDataPath, 'core', 'config.js'))) {
     return appDataPath;
@@ -43,78 +43,89 @@ class FileManager {
     }
   }
 
-  static readTowerTypes() {
-    const towerPath = path.join(PT_PATH, 'core', 'entities', 'tower.js');
+  static readTowerPaths() {
+    const towerPath = path.join(PT_PATH, 'core', 'entities', 'tower-paths.js');
     try {
       delete require.cache[require.resolve(towerPath)];
-      const module = require(towerPath);
-      return module.TOWER_TYPES || module.TOWER_PATHS;
+      return require(towerPath);
     } catch (e) {
-      console.error('[pt-editor] Failed to read tower types:', e);
-      return null;
+      console.error('[pt-editor] Failed to read tower paths:', e);
+      // Try modules location
+      try {
+        const altPath = path.join(PT_PATH, 'modules', 'towers', 'tower-paths.js');
+        delete require.cache[require.resolve(altPath)];
+        return require(altPath);
+      } catch (e2) {
+        console.error('[pt-editor] Failed to read tower paths (alt):', e2);
+        return null;
+      }
     }
   }
 
-  static readEnemyTypes() {
-    const enemiesPath = path.join(PT_PATH, 'modules', 'enemies', 'index.js');
+  static readEnergyBuildings() {
+    const defsPath = path.join(PT_PATH, 'modules', 'energy', 'building-defs.js');
     try {
-      const content = fs.readFileSync(enemiesPath, 'utf8');
-      const match = content.match(/const ENEMY_TYPES\s*=\s*(\{[\s\S]*?\n\});/);
-      if (match) {
-        return new Function('return ' + match[1])();
-      }
-      return null;
+      delete require.cache[require.resolve(defsPath)];
+      return require(defsPath);
     } catch (e) {
-      console.error('[pt-editor] Failed to read enemy types:', e);
+      console.error('[pt-editor] Failed to read energy buildings:', e);
       return null;
     }
   }
 
   static writeConfig(configObj) {
     const configPath = path.join(PT_PATH, 'core', 'config.js');
-    const content = `/**
+    
+    // Custom serializer for cleaner output
+    const formatValue = (val, indent = '') => {
+      if (val === null) return 'null';
+      if (typeof val === 'string') return `'${val}'`;
+      if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+      if (Array.isArray(val)) {
+        if (val.length === 0) return '[]';
+        const items = val.map(v => formatValue(v, indent + '  '));
+        return `[${items.join(', ')}]`;
+      }
+      if (typeof val === 'object') {
+        const lines = [];
+        for (const [k, v] of Object.entries(val)) {
+          lines.push(`${indent}  ${k}: ${formatValue(v, indent + '  ')}`);
+        }
+        return `{\n${lines.join(',\n')}\n${indent}}`;
+      }
+      return String(val);
+    };
+    
+    let content = `/**
  * Power Towers TD - Game Configuration
  * All game constants and tunable values
  */
 
-const CONFIG = ${JSON.stringify(configObj, null, 2)};
+const CONFIG = {\n`;
+    
+    for (const [key, value] of Object.entries(configObj)) {
+      content += `  ${key}: ${formatValue(value, '  ')},\n`;
+    }
+    
+    content += `};
 
 module.exports = CONFIG;
 `;
     fs.writeFileSync(configPath, content, 'utf8');
   }
 
-  static writeEnemyTypes(enemyTypes) {
-    const enemiesPath = path.join(PT_PATH, 'modules', 'enemies', 'index.js');
-    let content = fs.readFileSync(enemiesPath, 'utf8');
-    
-    let typesStr = 'const ENEMY_TYPES = {\n';
-    for (const [key, val] of Object.entries(enemyTypes)) {
-      typesStr += `  ${key}: {\n`;
-      typesStr += `    name: '${val.name}',\n`;
-      typesStr += `    emoji: '${val.emoji}',\n`;
-      typesStr += `    baseHealth: ${val.baseHealth},\n`;
-      typesStr += `    baseSpeed: ${val.baseSpeed},\n`;
-      typesStr += `    reward: ${val.reward},\n`;
-      typesStr += `    color: '${val.color}'\n`;
-      typesStr += `  },\n`;
-    }
-    typesStr += '};';
-    
-    content = content.replace(/const ENEMY_TYPES\s*=\s*\{[\s\S]*?\n\};/, typesStr);
-    fs.writeFileSync(enemiesPath, content, 'utf8');
-  }
-
   static writeTowerPaths(towerPaths) {
-    const towerPath = path.join(PT_PATH, 'core', 'entities', 'tower.js');
-    let content = fs.readFileSync(towerPath, 'utf8');
+    const towerPath = path.join(PT_PATH, 'core', 'entities', 'tower-paths.js');
     
     const serializeTiers = (tiers) => {
+      if (!tiers || !Array.isArray(tiers)) return '[]';
       return tiers.map(t => {
         let s = '      {\n';
         for (const [k, v] of Object.entries(t)) {
           if (typeof v === 'string') {
             s += `        ${k}: '${v}',\n`;
+          } else if (Array.isArray(v)) {
+            s += `        ${k}: ${JSON.stringify(v)},\n`;
           } else {
             s += `        ${k}: ${v},\n`;
           }
@@ -124,21 +135,64 @@ module.exports = CONFIG;
       }).join(',\n');
     };
     
-    let pathsStr = 'const TOWER_PATHS = {\n';
-    for (const [key, val] of Object.entries(towerPaths)) {
-      pathsStr += `  ${key}: {\n`;
-      pathsStr += `    name: '${val.name}',\n`;
-      pathsStr += `    icon: '${val.icon}',\n`;
-      pathsStr += `    damageType: '${val.damageType}',\n`;
-      pathsStr += `    strongVs: ${JSON.stringify(val.strongVs)},\n`;
-      pathsStr += `    weakVs: ${JSON.stringify(val.weakVs)},\n`;
-      pathsStr += `    tiers: [\n${serializeTiers(val.tiers)}\n    ]\n`;
-      pathsStr += `  },\n`;
-    }
-    pathsStr += '};';
+    let content = `/**
+ * Tower Paths - Upgrade paths for towers
+ * Each path has unique mechanics and progression
+ */
+
+const TOWER_PATHS = {\n`;
     
-    content = content.replace(/const TOWER_PATHS\s*=\s*\{[\s\S]*?\n\};/, pathsStr);
+    for (const [key, val] of Object.entries(towerPaths)) {
+      content += `  ${key}: {\n`;
+      content += `    name: '${val.name}',\n`;
+      content += `    icon: '${val.icon}',\n`;
+      if (val.damageType) content += `    damageType: '${val.damageType}',\n`;
+      if (val.strongVs) content += `    strongVs: ${JSON.stringify(val.strongVs)},\n`;
+      if (val.weakVs) content += `    weakVs: ${JSON.stringify(val.weakVs)},\n`;
+      if (val.tiers) content += `    tiers: [\n${serializeTiers(val.tiers)}\n    ]\n`;
+      content += `  },\n`;
+    }
+    
+    content += `};
+
+module.exports = TOWER_PATHS;
+`;
     fs.writeFileSync(towerPath, content, 'utf8');
+  }
+
+  static writeEnergyBuildings(buildings) {
+    const defsPath = path.join(PT_PATH, 'modules', 'energy', 'building-defs.js');
+    
+    let content = `/**
+ * Energy Building Definitions
+ * Cost, stats, and properties for each energy building type
+ */
+
+const ENERGY_BUILDINGS = {\n`;
+    
+    for (const [id, bld] of Object.entries(buildings)) {
+      content += `  '${id}': {\n`;
+      content += `    name: '${bld.name}',\n`;
+      content += `    icon: '${bld.icon}',\n`;
+      content += `    category: '${bld.category}',\n`;
+      content += `    cost: ${bld.cost},\n`;
+      if (bld.class) content += `    class: '${bld.class}',\n`;
+      if (bld.description) content += `    description: '${bld.description}',\n`;
+      if (bld.stats) {
+        content += `    stats: {\n`;
+        for (const [sk, sv] of Object.entries(bld.stats)) {
+          content += `      ${sk}: ${sv},\n`;
+        }
+        content += `    },\n`;
+      }
+      content += `  },\n`;
+    }
+    
+    content += `};
+
+module.exports = ENERGY_BUILDINGS;
+`;
+    fs.writeFileSync(defsPath, content, 'utf8');
   }
 }
 
