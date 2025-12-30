@@ -241,6 +241,11 @@ function getGameTemplate() {
                   <span class="stat-label">Rng</span>
                   <span class="stat-cost" id="energy-upgrade-range-cost">30g</span>
                 </button>
+                <button class="upgrade-stat-btn" data-stat="channels" title="Add I/O channel (Relay only)" id="energy-upgrade-channels-btn" style="display:none;">
+                  <span class="stat-icon">🔌</span>
+                  <span class="stat-label">I/O</span>
+                  <span class="stat-cost" id="energy-upgrade-channels-cost">50g</span>
+                </button>
               </div>
             </div>
             

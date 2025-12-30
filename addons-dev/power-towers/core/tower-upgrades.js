@@ -250,6 +250,11 @@ function getElementPathCost(elementId) {
 
 /**
  * Apply stat upgrade to tower
+ * 
+ * NEW SYSTEM:
+ * - Just increments upgrade level in tower.upgradeLevels
+ * - Actual % bonuses are applied in tower-stats.js recalculateTowerStats()
+ * 
  * @param {Object} tower - Tower instance
  * @param {string} statId - Stat to upgrade
  * @returns {boolean} Success
@@ -264,31 +269,19 @@ function applyStatUpgrade(tower, statId) {
   const currentLevel = tower.upgradeLevels[statId] || 0;
   tower.upgradeLevels[statId] = currentLevel + 1;
   
-  // Apply effect
+  // For additive effects that tower-stats.js doesn't handle, apply directly
   const effect = upgrade.effect;
-  const statKey = effect.stat;
-  let currentValue = tower[statKey] || 0;
-  
-  if (effect.type === 'additive') {
-    currentValue += effect.valuePerLevel;
-  } else if (effect.type === 'multiplicative') {
-    currentValue *= (1 + effect.valuePerLevel);
+  if (effect.type === 'additive' && !['critChance', 'critDamage', 'chainCount'].includes(statId)) {
+    // HP Regen is additive and not in tower-stats.js
+    if (statId === 'hpRegen') {
+      tower.hpRegen = (tower.hpRegen || 0) + effect.valuePerLevel;
+    }
   }
-  
-  // Apply caps
-  if (effect.maxValue !== undefined) {
-    currentValue = Math.min(effect.maxValue, currentValue);
-  }
-  if (effect.minValue !== undefined) {
-    currentValue = Math.max(effect.minValue, currentValue);
-  }
-  
-  tower[statKey] = currentValue;
   
   // Add upgrade points
   addUpgradePoints(tower, 'statUpgrade');
   
-  // Recalculate effective stats
+  // Recalculate effective stats - this applies all % bonuses
   if (tower.recalculateStats) {
     tower.recalculateStats();
   }

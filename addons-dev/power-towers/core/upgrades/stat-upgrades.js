@@ -1,23 +1,32 @@
 /**
  * Power Towers TD - Stat Upgrades
- * Infinite upgrades with scaling costs
+ * 
+ * NEW PERCENTAGE SYSTEM:
+ * - Each upgrade level gives a % bonus to the stat
+ * - Percentages are applied in tower-stats.js after level bonuses
+ * - Effect values now represent % per level (0.05 = 5%)
+ * 
+ * Exceptions with fixed values:
+ * - critChance: additive % (0.01 = +1%)
+ * - critDamage: additive multiplier (+0.1)
+ * - chainCount: fixed +1
  */
 
 const STAT_UPGRADES = {
   // =========================================
-  // DAMAGE
+  // DAMAGE (+5% per level)
   // =========================================
   damage: {
     id: 'damage',
     name: 'Damage',
     emoji: '⚔️',
     category: 'offense',
-    description: 'Increases base damage',
+    description: '+5% damage per level',
     
     effect: {
-      type: 'additive',
-      stat: 'baseDamage',
-      valuePerLevel: 3,
+      type: 'percentage',
+      stat: 'damage',
+      percentPerLevel: 0.05,
     },
     
     cost: {
@@ -29,19 +38,19 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // ATTACK SPEED
+  // ATTACK SPEED (+4% per level)
   // =========================================
   attackSpeed: {
     id: 'attackSpeed',
     name: 'Attack Speed',
     emoji: '⚡',
     category: 'offense',
-    description: 'Increases attacks per second',
+    description: '+4% attack speed per level',
     
     effect: {
-      type: 'additive',
-      stat: 'baseFireRate',
-      valuePerLevel: 0.08,
+      type: 'percentage',
+      stat: 'fireRate',
+      percentPerLevel: 0.04,
     },
     
     cost: {
@@ -53,19 +62,19 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // RANGE
+  // RANGE (+5% per level)
   // =========================================
   range: {
     id: 'range',
     name: 'Range',
     emoji: '🎯',
     category: 'utility',
-    description: 'Increases attack range',
+    description: '+5% range per level',
     
     effect: {
-      type: 'additive',
-      stat: 'baseRange',
-      valuePerLevel: 5,
+      type: 'percentage',
+      stat: 'range',
+      percentPerLevel: 0.05,
     },
     
     cost: {
@@ -77,19 +86,19 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // CRITICAL CHANCE
+  // CRITICAL CHANCE (+1% per level, cap 75%)
   // =========================================
   critChance: {
     id: 'critChance',
     name: 'Critical Chance',
     emoji: '🎲',
     category: 'offense',
-    description: 'Increases chance to deal critical damage',
+    description: '+1% crit chance per level',
     
     effect: {
       type: 'additive',
       stat: 'critChance',
-      valuePerLevel: 0.015,
+      valuePerLevel: 0.01,
       maxValue: 0.75,
     },
     
@@ -102,14 +111,14 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // CRITICAL DAMAGE
+  // CRITICAL DAMAGE (+10% multiplier per level)
   // =========================================
   critDamage: {
     id: 'critDamage',
     name: 'Critical Damage',
     emoji: '💥',
     category: 'offense',
-    description: 'Increases critical hit damage multiplier',
+    description: '+10% crit multiplier per level',
     
     effect: {
       type: 'additive',
@@ -126,20 +135,20 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // ENERGY EFFICIENCY
+  // ENERGY EFFICIENCY (-3% cost per level)
   // =========================================
   energyEfficiency: {
     id: 'energyEfficiency',
     name: 'Energy Efficiency',
     emoji: '💎',
     category: 'utility',
-    description: 'Reduces energy cost per attack',
+    description: '-3% energy cost per level',
     
     effect: {
-      type: 'additive',
-      stat: 'baseEnergyCost',
-      valuePerLevel: -0.15,
-      minValue: 0.2,
+      type: 'percentage',
+      stat: 'energyCost',
+      percentPerLevel: -0.03,
+      minFactor: 0.2, // Can't go below 20% of original
     },
     
     cost: {
@@ -151,19 +160,19 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // HP / FORTIFICATION
+  // HP / FORTIFICATION (+8% per level)
   // =========================================
   hp: {
     id: 'hp',
     name: 'Fortification',
     emoji: '🛡️',
     category: 'defense',
-    description: 'Increases tower health',
+    description: '+8% health per level',
     
     effect: {
-      type: 'additive',
-      stat: 'baseHp',
-      valuePerLevel: 15,
+      type: 'percentage',
+      stat: 'maxHp',
+      percentPerLevel: 0.08,
     },
     
     cost: {
@@ -175,14 +184,14 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // HP REGEN
+  // HP REGEN (+0.5 per level, fixed)
   // =========================================
   hpRegen: {
     id: 'hpRegen',
     name: 'Regeneration',
     emoji: '💚',
     category: 'defense',
-    description: 'Tower regenerates health over time',
+    description: '+0.5 HP/s per level',
     
     effect: {
       type: 'additive',
@@ -199,19 +208,19 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // ENERGY STORAGE
+  // ENERGY STORAGE (+10% per level)
   // =========================================
   energyStorage: {
     id: 'energyStorage',
     name: 'Energy Storage',
     emoji: '🔋',
     category: 'utility',
-    description: 'Increases tower energy storage capacity',
+    description: '+10% energy storage per level',
     
     effect: {
-      type: 'additive',
-      stat: 'baseEnergyStorage',
-      valuePerLevel: 10,
+      type: 'percentage',
+      stat: 'energyStorage',
+      percentPerLevel: 0.10,
     },
     
     cost: {
@@ -223,19 +232,19 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // SPLASH RADIUS (for Siege type)
+  // SPLASH RADIUS (+8% per level, Siege only)
   // =========================================
   splashRadius: {
     id: 'splashRadius',
     name: 'Blast Radius',
     emoji: '💣',
     category: 'offense',
-    description: 'Increases area of effect radius',
+    description: '+8% splash radius per level',
     
     effect: {
-      type: 'additive',
+      type: 'percentage',
       stat: 'splashRadius',
-      valuePerLevel: 5,
+      percentPerLevel: 0.08,
     },
     
     requires: {
@@ -251,14 +260,14 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // CHAIN COUNT (for Lightning element)
+  // CHAIN COUNT (+1 per level, Lightning only)
   // =========================================
   chainCount: {
     id: 'chainCount',
     name: 'Chain Targets',
     emoji: '⛓️',
     category: 'offense',
-    description: 'Attack chains to additional enemies',
+    description: '+1 chain target per level',
     
     effect: {
       type: 'additive',
@@ -280,19 +289,19 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // POWER SCALING (for Magic type)
+  // POWER SCALING (+10% per level, Magic only)
   // =========================================
   powerScaling: {
     id: 'powerScaling',
     name: 'Power Amplification',
     emoji: '✨',
     category: 'offense',
-    description: 'Increases damage bonus from power draw',
+    description: '+10% power scaling per level',
     
     effect: {
-      type: 'additive',
+      type: 'percentage',
       stat: 'powerScaling',
-      valuePerLevel: 0.1,
+      percentPerLevel: 0.10,
     },
     
     requires: {

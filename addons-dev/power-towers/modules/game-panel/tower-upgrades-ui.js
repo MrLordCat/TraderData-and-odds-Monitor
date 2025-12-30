@@ -10,6 +10,8 @@ const BASE_UPGRADES = [
   'damage',
   'attackSpeed', 
   'range',
+  'hp',
+  'energyEfficiency',
   'critChance',
   'critDamage'
 ];
@@ -173,28 +175,30 @@ function TowerUpgradesUIMixin(Base) {
     }
 
     /**
-     * Format effect text for upgrade
+     * Format effect text for upgrade (NEW PERCENTAGE SYSTEM)
      */
     formatEffectText(upgrade) {
       const effect = upgrade.effect;
-      let value = effect.valuePerLevel;
       
-      // Format based on stat type
+      // New percentage-based system
+      if (effect.type === 'percentage') {
+        const percent = Math.abs(effect.percentPerLevel * 100);
+        const sign = effect.percentPerLevel >= 0 ? '+' : '-';
+        return `${sign}${percent}% per lvl`;
+      }
+      
+      // Additive effects (crit, chain, etc.)
+      const value = effect.valuePerLevel;
+      
       switch (effect.stat) {
         case 'critChance':
-        case 'lifesteal':
-        case 'cooldownReduction':
-          return `+${(value * 100).toFixed(1)}% per lvl`;
+          return `+${(value * 100).toFixed(0)}% crit chance`;
         case 'critDmgMod':
           return `+${(value * 100).toFixed(0)}% crit dmg`;
-        case 'baseFireRate':
-          return `+${value.toFixed(2)} atk/s`;
-        case 'splashRadius':
-          return `+${value}px AoE`;
-        case 'powerScaling':
-          return `+${(value * 100).toFixed(0)}% power dmg`;
         case 'chainCount':
-          return `+${value} chain target`;
+          return `+${value} chain targets`;
+        case 'hpRegen':
+          return `+${value} HP/s`;
         default:
           return `+${value} per lvl`;
       }

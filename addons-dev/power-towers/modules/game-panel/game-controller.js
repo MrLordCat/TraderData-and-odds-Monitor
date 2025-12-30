@@ -1099,14 +1099,28 @@ class GameControllerBase {
     const baseCosts = {
       capacity: 20,
       outputRate: 25,
-      range: 30
+      range: 30,
+      channels: 50
     };
     
-    const maxLevel = 5;
-    const upgrades = building.upgrades || { capacity: 0, outputRate: 0, range: 0 };
+    const maxLevels = {
+      capacity: 5,
+      outputRate: 5,
+      range: 5,
+      channels: building.maxChannelUpgrades || 4
+    };
+    
+    const upgrades = building.upgrades || { capacity: 0, outputRate: 0, range: 0, channels: 0 };
+    
+    // Show/hide channels button for Relay only
+    const channelsBtn = el.energyUpgradesGrid?.querySelector('[data-stat="channels"]');
+    if (channelsBtn) {
+      channelsBtn.style.display = building.type === 'power-transfer' ? '' : 'none';
+    }
     
     Object.keys(baseCosts).forEach(stat => {
       const level = upgrades[stat] || 0;
+      const maxLevel = maxLevels[stat] || 5;
       const cost = Math.floor(baseCosts[stat] * Math.pow(1.5, level));
       const canAfford = gold >= cost;
       const atMax = level >= maxLevel;
@@ -1139,15 +1153,24 @@ class GameControllerBase {
     const baseCosts = {
       capacity: 20,
       outputRate: 25,
-      range: 30
+      range: 30,
+      channels: 50
     };
     
-    const upgrades = building.upgrades || { capacity: 0, outputRate: 0, range: 0 };
+    const maxLevels = {
+      capacity: 5,
+      outputRate: 5,
+      range: 5,
+      channels: building.maxChannelUpgrades || 4
+    };
+    
+    const upgrades = building.upgrades || { capacity: 0, outputRate: 0, range: 0, channels: 0 };
     const level = upgrades[stat] || 0;
+    const maxLevel = maxLevels[stat] || 5;
     const cost = Math.floor(baseCosts[stat] * Math.pow(1.5, level));
     
     if (!economy.canAfford(cost)) return;
-    if (level >= 5) return; // Max level
+    if (level >= maxLevel) return; // Max level
     
     // Spend gold
     economy.spendGold(cost);

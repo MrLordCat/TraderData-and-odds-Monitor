@@ -2,6 +2,12 @@
  * Power Towers TD - Tower Stats Calculator
  * 
  * Recalculates effective tower stats after modifiers.
+ * 
+ * NEW SYSTEM:
+ * 1. Tower level gives +1% to ALL base stats per level
+ * 2. Attack type modifiers apply to leveled base stats
+ * 3. Stat upgrades give % bonus to final values
+ * 4. Element/terrain bonuses apply last
  */
 
 const { mergeAttackTypes } = require('../../core/attack-types');
@@ -25,13 +31,61 @@ function recalculateTowerStats(tower) {
     attackType = tower.attackTypeConfig;
   }
   
-  // Apply attack type modifiers to base stats
-  tower.damage = tower.baseDamage * attackType.dmgMod;
-  tower.range = tower.baseRange * attackType.rangeMod;
-  tower.fireRate = tower.baseFireRate * attackType.atkSpdMod;
-  tower.energyCost = tower.baseEnergyCost * attackType.energyCostMod;
+  // =========================================
+  // STEP 1: Apply level bonus to base stats
+  // Each level gives +1% to base stats
+  // =========================================
+  const levelBonus = 1 + ((tower.level || 1) - 1) * 0.01; // Level 1 = 1.0, Level 10 = 1.09
   
-  // Apply TERRAIN bonuses (from biome/terrain type)
+  const leveledBaseDamage = tower.baseDamage * levelBonus;
+  const leveledBaseRange = tower.baseRange * levelBonus;
+  const leveledBaseFireRate = tower.baseFireRate * levelBonus;
+  const leveledBaseEnergyCost = tower.baseEnergyCost; // Energy cost doesn't scale with level
+  
+  // =========================================
+  // STEP 2: Apply attack type modifiers
+  // =========================================
+  let damage = leveledBaseDamage * attackType.dmgMod;
+  let range = leveledBaseRange * attackType.rangeMod;
+  let fireRate = leveledBaseFireRate * attackType.atkSpdMod;
+  let energyCost = leveledBaseEnergyCost * attackType.energyCostMod;
+  
+  // =========================================
+  // STEP 3: Apply stat upgrades as % bonus
+  // Each upgrade level gives % bonus to current value
+  // =========================================
+  const upgradeLevels = tower.upgradeLevels || {};
+  
+  // Damage: +5% per level
+  if (upgradeLevels.damage) {
+    damage *= (1 + upgradeLevels.damage * 0.05);
+  }
+  
+  // Attack Speed: +4% per level
+  if (upgradeLevels.attackSpeed) {
+    fireRate *= (1 + upgradeLevels.attackSpeed * 0.04);
+  }
+  
+  // Range: +5% per level
+  if (upgradeLevels.range) {
+    range *= (1 + upgradeLevels.range * 0.05);
+  }
+  
+  // Energy Efficiency: -3% energy cost per level (min 20% of original)
+  if (upgradeLevels.energyEfficiency) {
+    const reduction = Math.min(0.8, upgradeLevels.energyEfficiency * 0.03);
+    energyCost *= (1 - reduction);
+  }
+  
+  // Apply final values
+  tower.damage = damage;
+  tower.range = range;
+  tower.fireRate = fireRate;
+  tower.energyCost = Math.max(0.5, energyCost);
+  
+  // =========================================
+  // STEP 4: Apply TERRAIN bonuses
+  // =========================================
   if (tower.terrainDamageBonus && tower.terrainDamageBonus !== 1.0) {
     tower.damage *= tower.terrainDamageBonus;
   }
@@ -39,14 +93,25 @@ function recalculateTowerStats(tower) {
     tower.range *= tower.terrainRangeBonus;
   }
   
-  // Calculate HP
-  tower.maxHp = tower.baseHp * tower.hpMultiplier;
+  // =========================================
+  // STEP 5: Calculate HP with level bonus
+  // =========================================
+  const leveledBaseHp = tower.baseHp * levelBonus;
+  tower.maxHp = leveledBaseHp * tower.hpMultiplier;
+  
+  // HP upgrade: +8% per level
+  if (upgradeLevels.hp) {
+    tower.maxHp *= (1 + upgradeLevels.hp * 0.08);
+  }
+  
   // Keep current HP ratio when max changes
   if (tower.currentHp > tower.maxHp) {
     tower.currentHp = tower.maxHp;
   }
   
-  // Apply element bonuses (additive)
+  // =========================================
+  // STEP 6: Apply element bonuses (additive)
+  // =========================================
   if (tower.elementDmgBonus) {
     tower.damage *= (1 + tower.elementDmgBonus);
   }
@@ -57,20 +122,60 @@ function recalculateTowerStats(tower) {
     tower.fireRate *= (1 + tower.elementAtkSpdBonus);
   }
   
-  // Copy attack type properties
-  // Crit: base from attack type + upgrades
+  // =========================================
+  // STEP 7: Critical stats
+  // =========================================
   const baseCrit = attackType.critChance || tower.baseCritChance || 0.05;
   const baseCritDmg = attackType.critDmgMod || tower.baseCritDmgMod || 1.5;
-  tower.critChance = baseCrit + (tower.critChanceUpgrade || 0);
-  tower.critDmgMod = baseCritDmg + (tower.critDmgUpgrade || 0);
-  tower.splashRadius = attackType.splashRadius;
+  
+  // Crit Chance: +1% per level (additive)
+  tower.critChance = baseCrit + (upgradeLevels.critChance || 0) * 0.01;
+  tower.critChance = Math.min(0.75, tower.critChance); // Cap at 75%
+  
+  // Crit Damage: +10% per level (additive to multiplier)
+  tower.critDmgMod = baseCritDmg + (upgradeLevels.critDamage || 0) * 0.1;
+  
+  // =========================================
+  // STEP 8: Copy attack type properties & apply upgrades
+  // =========================================
+  
+  // Splash Radius: +8% per level
+  let splashRadius = attackType.splashRadius || 0;
+  if (splashRadius && upgradeLevels.splashRadius) {
+    splashRadius *= (1 + upgradeLevels.splashRadius * 0.08);
+  }
+  tower.splashRadius = splashRadius;
   tower.splashDmgFalloff = attackType.splashDmgFalloff;
-  tower.chainCount = tower.chainCount || attackType.chainCount;  // Element can override
+  
+  // Chain Count: +1 per level (additive, capped at 10)
+  let chainCount = tower.baseChainCount || attackType.chainCount || 0;
+  if (upgradeLevels.chainCount) {
+    chainCount += upgradeLevels.chainCount;
+    chainCount = Math.min(10, chainCount);
+  }
+  tower.chainCount = chainCount;
   tower.chainDmgFalloff = tower.chainDmgFalloff !== undefined ? tower.chainDmgFalloff : attackType.chainDmgFalloff;
-  tower.powerScaling = attackType.powerScaling;
+  
+  // Power Scaling: +10% per level
+  let powerScaling = attackType.powerScaling || 1.0;
+  if (upgradeLevels.powerScaling) {
+    powerScaling *= (1 + upgradeLevels.powerScaling * 0.10);
+  }
+  tower.powerScaling = powerScaling;
   tower.minPowerDraw = attackType.minPowerDraw;
   tower.maxPowerDraw = attackType.maxPowerDraw;
   tower.overdriveEfficiency = attackType.overdriveEfficiency;
+  
+  // =========================================
+  // STEP 9: Energy Storage (+10% per level)
+  // =========================================
+  if (tower.baseEnergyStorage) {
+    let energyStorage = tower.baseEnergyStorage * levelBonus;
+    if (upgradeLevels.energyStorage) {
+      energyStorage *= (1 + upgradeLevels.energyStorage * 0.10);
+    }
+    tower.energyStorage = energyStorage;
+  }
   
   // Projectile visuals
   tower.projectileColor = tower.elementColor || attackType.projectileColor;
