@@ -9,9 +9,11 @@ class EnergySystem {
   constructor(eventBus) {
     this.eventBus = eventBus;
     
-    this.current = CONFIG.STARTING_ENERGY;
-    this.max = CONFIG.MAX_ENERGY;
-    this.regenRate = CONFIG.ENERGY_REGEN;  // per tick
+    // Legacy global energy pool - not used in new modular system
+    // Energy is now per-building/tower
+    this.current = 0;
+    this.max = 0;
+    this.regenRate = 0;
     
     this.generators = [];  // future: energy generator buildings
   }
@@ -20,8 +22,8 @@ class EnergySystem {
    * Reset energy to starting values
    */
   reset() {
-    this.current = CONFIG.STARTING_ENERGY;
-    this.max = CONFIG.MAX_ENERGY;
+    this.current = 0;
+    this.max = 0;
     this.generators = [];
   }
 

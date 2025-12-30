@@ -26,9 +26,7 @@ const CONFIG = {
   // =========================================
   STARTING_GOLD: 200,
   STARTING_LIVES: 20,
-  STARTING_ENERGY: 50,
-  MAX_ENERGY: 100,
-  ENERGY_REGEN: 0,  // disabled - use energy buildings instead
+  // Energy is per-building/tower, no global energy pool
   
   // Tower Costs
   BASE_TOWER_COST: 30,
