@@ -306,8 +306,76 @@ function getGameStyles() {
       border-radius: 4px;
       font-size: 11px;
       color: #e2e8f0;
+      position: relative;
     }
     .stat-row b { color: #ffd700; }
+    
+    .stat-hoverable {
+      cursor: help;
+      transition: background 0.15s;
+    }
+    .stat-hoverable:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .stat-hoverable:hover .stat-detail-popup {
+      display: block;
+    }
+    
+    .stat-detail-popup {
+      display: none;
+      position: absolute;
+      left: 105%;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #1a1a2e;
+      border: 1px solid #4a5568;
+      border-radius: 6px;
+      padding: 8px 10px;
+      min-width: 180px;
+      z-index: 1000;
+      font-size: 11px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      white-space: nowrap;
+    }
+    .stat-detail-popup::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 6px solid transparent;
+      border-right-color: #4a5568;
+    }
+    .stat-detail-popup::after {
+      content: '';
+      position: absolute;
+      left: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 5px solid transparent;
+      border-right-color: #1a1a2e;
+    }
+    
+    .detail-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      margin-bottom: 3px;
+    }
+    .detail-line:last-child { margin-bottom: 0; }
+    .detail-label { color: #a0aec0; }
+    .detail-value { color: #48bb78; font-weight: 600; }
+    .detail-base { color: #63b3ed; }
+    .detail-level { color: #f6ad55; }
+    .detail-upgrade { color: #fc8181; }
+    .detail-final { color: #ffd700; font-weight: 700; }
+    .detail-formula {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      font-size: 10px;
+      color: #718096;
+    }
     
     .tooltip-section {
       margin-bottom: 10px;
