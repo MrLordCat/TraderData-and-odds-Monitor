@@ -149,6 +149,18 @@ function TowerTooltipMixin(Base) {
     }
 
     /**
+     * Update only energy display (called on every tick for real-time update)
+     */
+    updateTooltipEnergy(tower) {
+      const el = this.elements;
+      if (!el.tooltipEnergy) return;
+      
+      const current = Math.floor(tower.currentEnergy || 0);
+      const max = Math.floor(tower.maxEnergy || 100);
+      el.tooltipEnergy.textContent = `${current}/${max}`;
+    }
+
+    /**
      * Position tooltip near the selected tower
      */
     positionTooltipNearTower(tower) {

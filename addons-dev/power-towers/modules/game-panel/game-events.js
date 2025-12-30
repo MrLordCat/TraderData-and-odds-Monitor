@@ -19,6 +19,11 @@ function GameEventsMixin(Base) {
       this.game.on(this.GameEvents.GAME_TICK, () => {
         this.renderGame();
         this.updateUI(this.game.getState());
+        
+        // Update tooltip energy display in real-time if visible
+        if (this.game.selectedTower && this.elements.towerTooltip?.classList.contains('visible')) {
+          this.updateTooltipEnergy(this.game.selectedTower);
+        }
       });
       
       this.game.on(this.GameEvents.STATE_CHANGE, (state) => {
