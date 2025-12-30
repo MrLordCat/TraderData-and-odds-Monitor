@@ -146,7 +146,7 @@ class BioGenerator extends PowerNode {
 }
 
 // ============================================
-// WIND GENERATOR (Needs mountains)
+// WIND GENERATOR (Works everywhere, biome affects range)
 // ============================================
 class WindGenerator extends PowerNode {
   constructor(options = {}) {
@@ -162,17 +162,32 @@ class WindGenerator extends PowerNode {
       range: 5
     });
     
-    this.baseGeneration = options.baseGeneration || 12;
-    this.generation = 0;
-    this.mountainRadius = 2;
-    this.mountainsFound = 0;
-    this.maxMountains = 9; // 3x3 area
+    // Base generation range (min-max)
+    this.baseMin = 5;
+    this.baseMax = 30;
     
-    // Instability - power fluctuates
-    this.instabilityFactor = 0.3; // 30% variance
-    this.currentMultiplier = 1.0;
-    this.fluctuationTimer = 0;
-    this.fluctuationInterval = 2; // Change every 2 seconds
+    // Biome modifiers to range (added to base)
+    this.biomeModifiers = {
+      mountains: { minBonus: 5, maxBonus: 10 },   // 10-40
+      hills: { minBonus: 3, maxBonus: 5 },        // 8-35
+      plains: { minBonus: 0, maxBonus: 0 },       // 5-30 (base)
+      grassland: { minBonus: 0, maxBonus: 0 },    // 5-30
+      desert: { minBonus: 2, maxBonus: 5 },       // 7-35 (open area)
+      forest: { minBonus: -4, maxBonus: -10 },    // 1-20 (trees block wind)
+      swamp: { minBonus: -3, maxBonus: -8 },      // 2-22
+      tundra: { minBonus: 3, maxBonus: 8 },       // 8-38 (cold winds)
+      default: { minBonus: 0, maxBonus: 0 }
+    };
+    
+    // Current generation state
+    this.generation = 0;
+    this.currentTarget = 15;  // Target value we're moving towards
+    this.currentBiome = 'default';
+    
+    // Smooth fluctuation
+    this.fluctuationSpeed = 3;      // How fast value changes per second
+    this.targetChangeTimer = 0;
+    this.targetChangeInterval = 3;  // Pick new target every 3 seconds
     
     this.mapRef = null;
   }
@@ -181,63 +196,85 @@ class WindGenerator extends PowerNode {
     this.mapRef = map;
   }
 
-  countMountains() {
-    if (!this.mapRef) return 0;
+  /**
+   * Get current biome at generator position
+   */
+  getCurrentBiome() {
+    if (!this.mapRef) return 'default';
     
-    let count = 0;
-    const terrain = this.mapRef.terrain;
-    if (!terrain) return 0;
+    const biomes = this.mapRef.biomes;
+    if (!biomes || !biomes[this.gridY]) return 'default';
     
-    for (let dy = -this.mountainRadius; dy <= this.mountainRadius; dy++) {
-      for (let dx = -this.mountainRadius; dx <= this.mountainRadius; dx++) {
-        const x = this.gridX + dx;
-        const y = this.gridY + dy;
-        
-        if (x >= 0 && x < this.mapRef.width && y >= 0 && y < this.mapRef.height) {
-          // Hill terrain = mountain
-          if (terrain[y]?.[x] === 'hill') {
-            count++;
-          }
-        }
-      }
-    }
-    return Math.min(count, this.maxMountains);
+    return biomes[this.gridY][this.gridX] || 'default';
+  }
+
+  /**
+   * Get generation range for current biome
+   */
+  getGenerationRange() {
+    const biome = this.getCurrentBiome();
+    const modifier = this.biomeModifiers[biome] || this.biomeModifiers.default;
+    
+    const min = Math.max(0, this.baseMin + modifier.minBonus);
+    const max = Math.max(min + 1, this.baseMax + modifier.maxBonus);
+    
+    return { min, max, biome };
   }
 
   generate(dt) {
-    this.mountainsFound = this.countMountains();
-    const efficiency = this.mountainsFound / this.maxMountains;
+    // Get current biome and range
+    const range = this.getGenerationRange();
+    this.currentBiome = range.biome;
     
-    // Update fluctuation
-    this.fluctuationTimer += dt;
-    if (this.fluctuationTimer >= this.fluctuationInterval) {
-      this.fluctuationTimer = 0;
-      // Random multiplier between (1 - instability) and (1 + instability)
-      this.currentMultiplier = 1 + (Math.random() * 2 - 1) * this.instabilityFactor;
+    // Update target periodically
+    this.targetChangeTimer += dt;
+    if (this.targetChangeTimer >= this.targetChangeInterval) {
+      this.targetChangeTimer = 0;
+      // Pick new random target within range
+      this.currentTarget = range.min + Math.random() * (range.max - range.min);
+      // Randomize next interval (2-5 seconds)
+      this.targetChangeInterval = 2 + Math.random() * 3;
     }
     
-    this.generation = this.baseGeneration * efficiency * this.currentMultiplier;
+    // Clamp target to current range (in case biome changed)
+    this.currentTarget = Math.max(range.min, Math.min(range.max, this.currentTarget));
     
+    // Smoothly move generation towards target
+    const diff = this.currentTarget - this.generation;
+    const maxChange = this.fluctuationSpeed * dt;
+    
+    if (Math.abs(diff) <= maxChange) {
+      this.generation = this.currentTarget;
+    } else {
+      this.generation += Math.sign(diff) * maxChange;
+    }
+    
+    // Produce energy
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;
     const actualProduced = Math.min(produced, space);
     this.stored += actualProduced;
     
-    // Track energy for XP (100 energy = 1 XP)
+    // Track energy for XP
     if (actualProduced > 0) {
       this.addEnergyProcessed(actualProduced);
     }
   }
 
   getState() {
+    const range = this.getGenerationRange();
+    // Calculate efficiency as position within range (0-100%)
+    const rangeSize = range.max - range.min;
+    const efficiency = rangeSize > 0 ? (this.generation - range.min) / rangeSize : 1;
+    
     return {
       ...super.getState(),
       generation: this.generation,
-      efficiency: this.mountainsFound / this.maxMountains,
-      mountainsFound: this.mountainsFound,
-      maxMountains: this.maxMountains,
-      instability: this.instabilityFactor,
-      currentMultiplier: this.currentMultiplier
+      efficiency: Math.max(0, Math.min(1, efficiency)),
+      currentBiome: this.currentBiome,
+      generationMin: range.min,
+      generationMax: range.max,
+      currentTarget: this.currentTarget
     };
   }
 }

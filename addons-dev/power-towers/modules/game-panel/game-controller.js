@@ -893,22 +893,27 @@ class GameControllerBase {
       }
     }
     
-    // Special stats row (trees for Bio, mountains for Wind, water for Hydro)
+    // Special stats row (trees for Bio, biome/range for Wind, water for Hydro, biome for Solar)
     if (el.energyTooltipSpecialRow && el.energyTooltipSpecial) {
       const state = building.getState?.() || {};
       let specialText = null;
       let specialLabel = '';
       
       if (state.treesUsed !== undefined) {
+        // Bio Generator - trees
         specialLabel = '🌳 Trees';
         specialText = `${state.treesUsed}/${building.maxTrees || 12}`;
-      } else if (state.mountainsFound !== undefined) {
-        specialLabel = '⛰️ Mountains';
-        specialText = `${state.mountainsFound}/${building.maxMountains || 9}`;
+      } else if (state.generationMin !== undefined && state.generationMax !== undefined) {
+        // Wind Generator - biome and range
+        specialLabel = '🌬️ Range';
+        const biomeName = state.currentBiome || 'default';
+        specialText = `${state.generationMin.toFixed(0)}-${state.generationMax.toFixed(0)} (${biomeName})`;
       } else if (state.waterTiles !== undefined) {
+        // Hydro Generator - water tiles
         specialLabel = '💧 Water';
         specialText = `${state.waterTiles}/${building.maxWaterTiles || 9}`;
-      } else if (state.currentBiome !== undefined) {
+      } else if (state.currentBiome !== undefined && building.biomeEfficiency) {
+        // Solar Generator - biome efficiency
         specialLabel = '🌍 Biome';
         const effPct = building.biomeEfficiency?.[state.currentBiome] || 1;
         specialText = `${state.currentBiome} (${Math.round(effPct * 100)}%)`;
@@ -975,18 +980,23 @@ class GameControllerBase {
       }
     }
     
-    // Update special stats (trees, water, etc)
+    // Update special stats (trees, wind range, water, biome)
     if (el.energyTooltipSpecial) {
       const state = building.getState?.() || {};
       let specialText = null;
       
       if (state.treesUsed !== undefined) {
+        // Bio Generator
         specialText = `${state.treesUsed}/${building.maxTrees || 12}`;
-      } else if (state.mountainsFound !== undefined) {
-        specialText = `${state.mountainsFound}/${building.maxMountains || 9}`;
+      } else if (state.generationMin !== undefined && state.generationMax !== undefined) {
+        // Wind Generator - show range and biome
+        const biomeName = state.currentBiome || 'default';
+        specialText = `${state.generationMin.toFixed(0)}-${state.generationMax.toFixed(0)} (${biomeName})`;
       } else if (state.waterTiles !== undefined) {
+        // Hydro Generator
         specialText = `${state.waterTiles}/${building.maxWaterTiles || 9}`;
-      } else if (state.currentBiome !== undefined) {
+      } else if (state.currentBiome !== undefined && building.biomeEfficiency) {
+        // Solar Generator
         const effPct = building.biomeEfficiency?.[state.currentBiome] || 1;
         specialText = `${state.currentBiome} (${Math.round(effPct * 100)}%)`;
       }
@@ -1239,10 +1249,15 @@ class GameControllerBase {
       return;
     }
     
-    // Create connection via network
-    const success = energyModule.connectBuildings?.(from.id, to.id);
+    // Create connection via network (or disconnect if already connected)
+    const result = energyModule.connectBuildings?.(from.id, to.id);
     
-    if (success !== false) {
+    if (result === 'disconnected') {
+      this.game.eventBus?.emit('ui:toast', { 
+        message: 'Connection removed', 
+        type: 'info' 
+      });
+    } else if (result !== false) {
       this.game.eventBus?.emit('ui:toast', { 
         message: 'Connection established!', 
         type: 'success' 
@@ -1279,10 +1294,15 @@ class GameControllerBase {
       return;
     }
     
-    // Connect tower to energy network as consumer
-    const success = energyModule.connectTower?.(from.id, tower);
+    // Connect tower to energy network as consumer (or disconnect if already connected)
+    const result = energyModule.connectTower?.(from.id, tower);
     
-    if (success) {
+    if (result === 'disconnected') {
+      this.game.eventBus?.emit('ui:toast', { 
+        message: `⚡ Tower disconnected from power`, 
+        type: 'info' 
+      });
+    } else if (result) {
       this.game.eventBus?.emit('ui:toast', { 
         message: `⚡ Tower connected to power!`, 
         type: 'success' 

@@ -67,10 +67,14 @@ class PowerNetwork {
       return false;
     }
 
-    // Check if already connected
-    if (this.connections.some(c => c.from === fromId && c.to === toId)) {
-      console.warn('[PowerNetwork] Already connected');
-      return false;
+    // Check if already connected - toggle disconnect
+    const existingIdx = this.connections.findIndex(c => c.from === fromId && c.to === toId);
+    if (existingIdx >= 0) {
+      // Already connected - disconnect (toggle)
+      this.connections.splice(existingIdx, 1);
+      console.log(`[PowerNetwork] Disconnected (toggle): ${fromId} → ${toId}`);
+      this.eventBus.emit('power:disconnected', { from: fromId, to: toId });
+      return 'disconnected';
     }
 
     // Check channel availability
