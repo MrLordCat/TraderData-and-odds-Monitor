@@ -244,7 +244,12 @@ class EditorController {
     const list = this.container.querySelector('.energy-buildings-list');
     if (!list || !this.energyBuildings) return;
     
-    list.innerHTML = Object.entries(this.energyBuildings).map(([id, bld]) => `
+    list.innerHTML = Object.entries(this.energyBuildings).map(([id, bld]) => {
+      const stats = bld.stats || {};
+      const isGenerator = bld.category === 'generator';
+      const isStorage = bld.category === 'storage';
+      
+      return `
       <div class="energy-card" data-building="${id}">
         <div class="energy-card-header">
           <span class="energy-icon">${bld.icon || '⚡'}</span>
@@ -255,30 +260,48 @@ class EditorController {
           <div class="fields-grid">
             <div class="field-group">
               <label>Cost 💰</label>
-              <input type="number" data-energy-stat="cost" value="${bld.cost}" min="0">
+              <input type="number" data-energy-stat="cost" value="${bld.cost || 0}" min="0">
             </div>
-            ${bld.stats ? `
+            ${isGenerator && stats.generation !== undefined ? `
               <div class="field-group">
-                <label>Generation</label>
-                <input type="number" data-energy-stat="stats.generation" value="${bld.stats.generation || 0}" min="0">
+                <label>Generation ⚡</label>
+                <input type="number" data-energy-stat="stats.generation" value="${stats.generation}" min="0">
               </div>
+            ` : ''}
+            ${isGenerator && stats.baseGeneration !== undefined ? `
+              <div class="field-group">
+                <label>Base Gen ⚡</label>
+                <input type="number" data-energy-stat="stats.baseGeneration" value="${stats.baseGeneration}" min="0">
+              </div>
+            ` : ''}
+            ${stats.outputRate !== undefined ? `
               <div class="field-group">
                 <label>Output Rate</label>
-                <input type="number" data-energy-stat="stats.outputRate" value="${bld.stats.outputRate || 0}" min="0">
+                <input type="number" data-energy-stat="stats.outputRate" value="${stats.outputRate}" min="0">
               </div>
+            ` : ''}
+            ${stats.capacity !== undefined ? `
               <div class="field-group">
                 <label>Capacity</label>
-                <input type="number" data-energy-stat="stats.capacity" value="${bld.stats.capacity || 0}" min="0">
+                <input type="number" data-energy-stat="stats.capacity" value="${stats.capacity}" min="0">
               </div>
+            ` : ''}
+            ${stats.range !== undefined ? `
               <div class="field-group">
-                <label>Range (cells)</label>
-                <input type="number" data-energy-stat="stats.range" value="${bld.stats.range || 4}" min="1">
+                <label>Range</label>
+                <input type="number" data-energy-stat="stats.range" value="${stats.range}" min="1">
+              </div>
+            ` : ''}
+            ${isStorage && stats.inputRate !== undefined ? `
+              <div class="field-group">
+                <label>Input Rate</label>
+                <input type="number" data-energy-stat="stats.inputRate" value="${stats.inputRate}" min="0">
               </div>
             ` : ''}
           </div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
     
     // Add listeners
     list.querySelectorAll('.energy-card').forEach(card => {

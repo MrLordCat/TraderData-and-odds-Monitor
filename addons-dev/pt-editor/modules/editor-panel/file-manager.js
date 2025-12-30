@@ -6,17 +6,45 @@
 const path = require('path');
 const fs = require('fs');
 
+// Determine if we're in dev mode by checking for addons-dev folder
+function isDevMode() {
+  // Check if addons-dev exists relative to app path
+  const possiblePaths = [
+    // From electron app
+    path.join(process.cwd(), 'addons-dev', 'power-towers'),
+    // From package path
+    path.join(__dirname, '..', '..', '..', '..', '..', 'addons-dev', 'power-towers'),
+    // Direct workspace path
+    'C:\\Users\\Chris\\Documents\\GitHub\\TraderData-and-odds-Monitor\\addons-dev\\power-towers'
+  ];
+  
+  for (const p of possiblePaths) {
+    if (fs.existsSync(path.join(p, 'core', 'config.js'))) {
+      console.log('[pt-editor] Found dev mode path:', p);
+      return p;
+    }
+  }
+  return null;
+}
+
 // Find Power Towers addon path dynamically
 function findPowerTowersPath() {
-  // Method 1: Sibling folder (addons-dev/power-towers)
+  // Priority 1: Dev mode (addons-dev folder)
+  const devPath = isDevMode();
+  if (devPath) {
+    console.log('[pt-editor] Using DEV path:', devPath);
+    return devPath;
+  }
+  
+  // Priority 2: Sibling folder in AppData (addons/power-towers)
   const siblingPath = path.join(__dirname, '..', '..', '..', 'power-towers');
   console.log('[pt-editor] Checking sibling path:', siblingPath);
   if (fs.existsSync(path.join(siblingPath, 'core', 'config.js'))) {
-    console.log('[pt-editor] Found at sibling path');
+    console.log('[pt-editor] Found at sibling path (AppData)');
     return siblingPath;
   }
   
-  // Method 2: AppData path (installed addon)
+  // Priority 3: AppData path explicit
   const appDataPath = process.env.APPDATA 
     ? path.join(process.env.APPDATA, 'oddsmoni', 'addons', 'power-towers')
     : null;
@@ -24,16 +52,6 @@ function findPowerTowersPath() {
   if (appDataPath && fs.existsSync(path.join(appDataPath, 'core', 'config.js'))) {
     console.log('[pt-editor] Found at AppData path');
     return appDataPath;
-  }
-  
-  // Method 3: Try from workspace root (development mode)
-  // __dirname = addons-dev/pt-editor/modules/editor-panel
-  // workspace = 4 levels up
-  const workspacePath = path.join(__dirname, '..', '..', '..', '..', 'addons-dev', 'power-towers');
-  console.log('[pt-editor] Checking workspace path:', workspacePath);
-  if (fs.existsSync(path.join(workspacePath, 'core', 'config.js'))) {
-    console.log('[pt-editor] Found at workspace path');
-    return workspacePath;
   }
   
   console.warn('[pt-editor] Power Towers not found! Defaulting to sibling path');
