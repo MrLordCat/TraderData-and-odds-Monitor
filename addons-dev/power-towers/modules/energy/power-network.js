@@ -156,20 +156,33 @@ class PowerNetwork {
     }
 
     // 2. Process energy transfer through connections
-    for (const conn of this.connections) {
-      const from = this.nodes.get(conn.from);
-      const to = this.nodes.get(conn.to);
-      
-      if (!from || !to) continue;
+    // Sort connections: generators first, then transfers, then consumers
+    // This ensures energy flows through the chain properly
+    const sortedConnections = [...this.connections].sort((a, b) => {
+      const fromA = this.nodes.get(a.from);
+      const fromB = this.nodes.get(b.from);
+      const orderA = fromA?.nodeType === 'generator' ? 0 : fromA?.nodeType === 'transfer' ? 1 : 2;
+      const orderB = fromB?.nodeType === 'generator' ? 0 : fromB?.nodeType === 'transfer' ? 1 : 2;
+      return orderA - orderB;
+    });
+    
+    // Process connections multiple times for multi-hop chains
+    for (let pass = 0; pass < 3; pass++) {
+      for (const conn of sortedConnections) {
+        const from = this.nodes.get(conn.from);
+        const to = this.nodes.get(conn.to);
+        
+        if (!from || !to) continue;
 
-      // Calculate how much can be transferred
-      const available = Math.min(from.getAvailableOutput(dt), from.stored);
-      const canReceive = to.getAvailableInput(dt);
-      const transfer = Math.min(available, canReceive);
+        // Calculate how much can be transferred
+        const available = Math.min(from.getAvailableOutput(dt), from.stored);
+        const canReceive = to.getAvailableInput(dt);
+        const transfer = Math.min(available, canReceive);
 
-      if (transfer > 0) {
-        from.stored -= transfer;
-        to.receiveEnergy(transfer);
+        if (transfer > 0) {
+          from.stored -= transfer;
+          to.receiveEnergy(transfer);
+        }
       }
     }
 

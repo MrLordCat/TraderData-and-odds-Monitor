@@ -114,9 +114,9 @@ class PowerTransfer extends PowerNode {
       nodeType: 'transfer',
       inputChannels: 2,        // Multiple inputs!
       outputChannels: 2,       // Multiple outputs!
-      inputRate: 30,
-      outputRate: 30,
-      capacity: 50,            // Small buffer
+      inputRate: 50,           // Fast input
+      outputRate: 50,          // Fast output - matches description
+      capacity: 100,           // Bigger buffer for smooth flow
       range: 6                 // Longer range
     });
     
