@@ -6,34 +6,59 @@
 const path = require('path');
 const fs = require('fs');
 
-// Find Power Towers addon path
+// Find Power Towers addon path dynamically
 function findPowerTowersPath() {
-  // Try sibling folder (same addons directory)
+  // Method 1: Sibling folder (addons-dev/power-towers)
   const siblingPath = path.join(__dirname, '..', '..', '..', 'power-towers');
+  console.log('[pt-editor] Checking sibling path:', siblingPath);
   if (fs.existsSync(path.join(siblingPath, 'core', 'config.js'))) {
+    console.log('[pt-editor] Found at sibling path');
     return siblingPath;
   }
   
-  // Try AppData path
+  // Method 2: AppData path (installed addon)
   const appDataPath = process.env.APPDATA 
     ? path.join(process.env.APPDATA, 'oddsmoni', 'addons', 'power-towers')
     : null;
+  console.log('[pt-editor] Checking AppData path:', appDataPath);
   if (appDataPath && fs.existsSync(path.join(appDataPath, 'core', 'config.js'))) {
+    console.log('[pt-editor] Found at AppData path');
     return appDataPath;
   }
   
+  // Method 3: Try from workspace root (development mode)
+  // __dirname = addons-dev/pt-editor/modules/editor-panel
+  // workspace = 4 levels up
+  const workspacePath = path.join(__dirname, '..', '..', '..', '..', 'addons-dev', 'power-towers');
+  console.log('[pt-editor] Checking workspace path:', workspacePath);
+  if (fs.existsSync(path.join(workspacePath, 'core', 'config.js'))) {
+    console.log('[pt-editor] Found at workspace path');
+    return workspacePath;
+  }
+  
+  console.warn('[pt-editor] Power Towers not found! Defaulting to sibling path');
   return siblingPath;
 }
 
-const PT_PATH = findPowerTowersPath();
+// Cached path - recalculate on each getPTPath call to handle detach/attach
+let cachedPath = null;
 
 class FileManager {
   static getPTPath() {
-    return PT_PATH;
+    if (!cachedPath) {
+      cachedPath = findPowerTowersPath();
+    }
+    return cachedPath;
+  }
+  
+  static resetPath() {
+    cachedPath = null;
   }
 
   static readConfig() {
-    const configPath = path.join(PT_PATH, 'core', 'config.js');
+    const ptPath = this.getPTPath();
+    const configPath = path.join(ptPath, 'core', 'config.js');
+    console.log('[pt-editor] Reading config from:', configPath);
     try {
       delete require.cache[require.resolve(configPath)];
       return require(configPath);
@@ -44,7 +69,8 @@ class FileManager {
   }
 
   static readTowerPaths() {
-    const towerPath = path.join(PT_PATH, 'core', 'entities', 'tower-paths.js');
+    const ptPath = this.getPTPath();
+    const towerPath = path.join(ptPath, 'core', 'entities', 'tower-paths.js');
     try {
       delete require.cache[require.resolve(towerPath)];
       return require(towerPath);
@@ -52,7 +78,7 @@ class FileManager {
       console.error('[pt-editor] Failed to read tower paths:', e);
       // Try modules location
       try {
-        const altPath = path.join(PT_PATH, 'modules', 'towers', 'tower-paths.js');
+        const altPath = path.join(ptPath, 'modules', 'towers', 'tower-paths.js');
         delete require.cache[require.resolve(altPath)];
         return require(altPath);
       } catch (e2) {
@@ -63,7 +89,8 @@ class FileManager {
   }
 
   static readEnergyBuildings() {
-    const defsPath = path.join(PT_PATH, 'modules', 'energy', 'building-defs.js');
+    const ptPath = this.getPTPath();
+    const defsPath = path.join(ptPath, 'modules', 'energy', 'building-defs.js');
     try {
       delete require.cache[require.resolve(defsPath)];
       return require(defsPath);
@@ -74,7 +101,9 @@ class FileManager {
   }
 
   static writeConfig(configObj) {
-    const configPath = path.join(PT_PATH, 'core', 'config.js');
+    const ptPath = this.getPTPath();
+    const configPath = path.join(ptPath, 'core', 'config.js');
+    console.log('[pt-editor] Writing config to:', configPath);
     
     // Custom serializer for cleaner output
     const formatValue = (val, indent = '') => {
@@ -115,7 +144,9 @@ module.exports = CONFIG;
   }
 
   static writeTowerPaths(towerPaths) {
-    const towerPath = path.join(PT_PATH, 'core', 'entities', 'tower-paths.js');
+    const ptPath = this.getPTPath();
+    const towerPath = path.join(ptPath, 'core', 'entities', 'tower-paths.js');
+    console.log('[pt-editor] Writing tower paths to:', towerPath);
     
     const serializeTiers = (tiers) => {
       if (!tiers || !Array.isArray(tiers)) return '[]';
@@ -161,7 +192,9 @@ module.exports = TOWER_PATHS;
   }
 
   static writeEnergyBuildings(buildings) {
-    const defsPath = path.join(PT_PATH, 'modules', 'energy', 'building-defs.js');
+    const ptPath = this.getPTPath();
+    const defsPath = path.join(ptPath, 'modules', 'energy', 'building-defs.js');
+    console.log('[pt-editor] Writing energy buildings to:', defsPath);
     
     let content = `/**
  * Energy Building Definitions
