@@ -15,6 +15,7 @@ const { CanvasEventsMixin } = require('./canvas-events');
 const { GameEventsMixin } = require('./game-events');
 const { UIEventsMixin } = require('./ui-events');
 const { TowerUpgradesUIMixin } = require('./tower-upgrades-ui');
+const CONFIG = require('../../core/config');
 
 /**
  * Base GameController class
@@ -48,8 +49,8 @@ class GameControllerBase {
     // Tooltip position tracking
     this.tooltipTowerPosition = null;
     
-    // Single tower cost
-    this.towerCost = 50;
+    // Single tower cost (from config)
+    this.towerCost = CONFIG.BASE_TOWER_COST;
     
     this._savedState = options.savedState || null;
   }
@@ -335,6 +336,9 @@ class GameControllerBase {
     // Always setup game events (new game instance)
     this.setupGameEvents();
     
+    // Update tower price display from config
+    this.updateTowerPriceDisplay();
+    
     // Force immediate render
     this.renderGame();
     this.updateUI(this.game.getState());
@@ -392,6 +396,21 @@ class GameControllerBase {
     if (this.game.selectedTower) {
       this.updateTooltipButtonStates(this.game.selectedTower);
     }
+  }
+
+  /**
+   * Update tower price display from config
+   */
+  updateTowerPriceDisplay() {
+    // Update all tower-price elements
+    this.elements.towerItems?.forEach(item => {
+      const priceEl = item.querySelector('.tower-price');
+      if (priceEl) {
+        priceEl.textContent = `${this.towerCost}g`;
+      }
+      // Update title tooltip too
+      item.title = `Build Tower (${this.towerCost}g)`;
+    });
   }
 
   /**
