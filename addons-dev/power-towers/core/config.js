@@ -42,6 +42,50 @@ const CONFIG = {
   ENEMY_HP_MULTIPLIER: 1.1,      // x1.1 HP per wave
   ENEMY_SPEED_MULTIPLIER: 1.02,  // x1.02 speed per wave
   
+  // Enemy Types - base stats and rewards
+  ENEMY_TYPES: {
+    basic: {
+      name: 'Minion',
+      emoji: '👾',
+      baseHealth: 20,
+      baseSpeed: 40,
+      reward: 10,        // gold reward
+      color: '#ff6b6b'
+    },
+    fast: {
+      name: 'Scout',
+      emoji: '🦎',
+      baseHealth: 20,
+      baseSpeed: 80,
+      reward: 15,
+      color: '#4ecdc4'
+    },
+    tank: {
+      name: 'Brute',
+      emoji: '🐗',
+      baseHealth: 100,
+      baseSpeed: 25,
+      reward: 30,
+      color: '#a55eea'
+    },
+    swarm: {
+      name: 'Swarmling',
+      emoji: '🐜',
+      baseHealth: 15,
+      baseSpeed: 60,
+      reward: 5,
+      color: '#26de81'
+    },
+    boss: {
+      name: 'Boss',
+      emoji: '👹',
+      baseHealth: 1000,
+      baseSpeed: 20,
+      reward: 200,
+      color: '#eb3b5a'
+    }
+  },
+  
   // Legacy enemy stats (for core/entities/enemy.js)
   ENEMY_BASE_HP: 30,
   ENEMY_HP_PER_WAVE: 10,

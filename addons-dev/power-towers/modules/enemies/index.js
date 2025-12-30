@@ -6,50 +6,10 @@
  */
 
 const { GameEvents } = require('../../core/event-bus');
+const CONFIG = require('../../core/config');
 
-// Enemy type definitions
-const ENEMY_TYPES = {
-  basic: {
-    name: 'Minion',
-    emoji: '👾',
-    baseHealth: 20,
-    baseSpeed: 40,   // pixels per second
-    reward: 10,
-    color: '#ff6b6b'
-  },
-  fast: {
-    name: 'Scout',
-    emoji: '🦎',
-    baseHealth: 20,
-    baseSpeed: 80,
-    reward: 15,
-    color: '#4ecdc4'
-  },
-  tank: {
-    name: 'Brute',
-    emoji: '🐗',
-    baseHealth: 100,
-    baseSpeed: 25,
-    reward: 30,
-    color: '#a55eea'
-  },
-  swarm: {
-    name: 'Swarmling',
-    emoji: '🐜',
-    baseHealth: 15,
-    baseSpeed: 60,
-    reward: 5,
-    color: '#26de81'
-  },
-  boss: {
-    name: 'Boss',
-    emoji: '👹',
-    baseHealth: 1000,
-    baseSpeed: 20,
-    reward: 200,
-    color: '#eb3b5a'
-  }
-};
+// Get enemy types from config (single source of truth)
+const ENEMY_TYPES = CONFIG.ENEMY_TYPES;
 
 class EnemiesModule {
   /**
