@@ -275,4 +275,4 @@ function TowerUpgradesUIMixin(Base) {
   };
 }
 
-module.exports = { TowerUpgradesUIMixin, TOOLTIP_UPGRADES };
+module.exports = { TowerUpgradesUIMixin };
