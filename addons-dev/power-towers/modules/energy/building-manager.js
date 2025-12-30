@@ -1,0 +1,341 @@
+/**
+ * Power Towers TD - Energy Building Manager
+ * 
+ * Handles placement, connection UI, and management of energy buildings
+ */
+
+const { GameEvents } = require('../../core/event-bus');
+const { PowerNetwork } = require('./power-network');
+const { BaseGenerator, BioGenerator, WindGenerator, SolarGenerator, WaterGenerator } = require('./generators');
+const { Battery, PowerTransfer, PowerConsumer } = require('./storage');
+const { ENERGY_BUILDINGS, CATEGORY_COLORS, BUILDING_ICONS } = require('./building-defs');
+
+class EnergyBuildingManager {
+  constructor(eventBus, gameCore) {
+    this.eventBus = eventBus;
+    this.gameCore = gameCore;
+    
+    // Power network
+    this.network = new PowerNetwork(eventBus);
+    
+    // All placed energy buildings
+    this.buildings = new Map(); // id -> building instance
+    
+    // Connection mode state
+    this.connectionMode = false;
+    this.selectedNode = null;
+    
+    // Building placement ghost
+    this.placementGhost = null;
+    
+    // Map reference
+    this.map = null;
+  }
+
+  init() {
+    this.network.init();
+    
+    // Listen for events
+    this.eventBus.on(GameEvents.GAME_START, () => this.onGameStart());
+    this.eventBus.on('map:generated', (map) => this.setMap(map));
+    
+    // Building events
+    this.eventBus.on('energy:place-building', (data) => this.placeBuilding(data));
+    this.eventBus.on('energy:remove-building', (id) => this.removeBuilding(id));
+    this.eventBus.on('energy:select-building', (id) => this.selectBuilding(id));
+    
+    // Connection events
+    this.eventBus.on('energy:start-connection', (nodeId) => this.startConnection(nodeId));
+    this.eventBus.on('energy:end-connection', (nodeId) => this.endConnection(nodeId));
+    this.eventBus.on('energy:cancel-connection', () => this.cancelConnection());
+  }
+
+  setMap(map) {
+    this.map = map;
+  }
+
+  onGameStart() {
+    this.buildings.clear();
+    this.network.reset();
+  }
+
+  /**
+   * Place a new energy building
+   */
+  placeBuilding(data) {
+    const { type, gridX, gridY, worldX, worldY } = data;
+    const def = ENERGY_BUILDINGS[type];
+    
+    if (!def) {
+      console.warn(`[EnergyManager] Unknown building type: ${type}`);
+      return null;
+    }
+
+    // Check if can afford
+    const economy = this.gameCore.getModule('economy');
+    if (economy && !economy.canAfford(def.cost)) {
+      this.eventBus.emit('ui:toast', { message: 'Not enough gold!', type: 'error' });
+      return null;
+    }
+
+    // Check if cell is buildable
+    if (!this.canBuildAt(gridX, gridY)) {
+      this.eventBus.emit('ui:toast', { message: 'Cannot build here!', type: 'error' });
+      return null;
+    }
+
+    // Deduct cost
+    if (economy) {
+      economy.spend(def.cost);
+    }
+
+    // Create building instance
+    const building = this.createBuildingInstance(type, {
+      gridX,
+      gridY,
+      worldX,
+      worldY,
+      ...def.stats
+    });
+
+    if (!building) return null;
+
+    // Set map reference for terrain-dependent generators
+    if (building.setMap && this.map) {
+      building.setMap(this.map);
+    }
+
+    // Set network reference for batteries
+    if (building.setNetwork) {
+      building.setNetwork(this.network);
+    }
+
+    // Register with network
+    this.network.registerNode(building);
+    
+    // Store building
+    this.buildings.set(building.id, building);
+
+    // Mark cell as occupied
+    if (this.map) {
+      this.map.setCellOccupied(gridX, gridY, true);
+    }
+
+    console.log(`[EnergyManager] Placed ${type} at (${gridX}, ${gridY})`);
+    
+    this.eventBus.emit('energy:building-placed', {
+      building,
+      type,
+      gridX,
+      gridY
+    });
+
+    return building;
+  }
+
+  /**
+   * Create building instance by type
+   */
+  createBuildingInstance(type, options) {
+    switch (type) {
+      case 'base-generator':
+        return new BaseGenerator(options);
+      case 'bio-generator':
+        return new BioGenerator(options);
+      case 'wind-generator':
+        return new WindGenerator(options);
+      case 'solar-generator':
+        return new SolarGenerator(options);
+      case 'water-generator':
+        return new WaterGenerator(options);
+      case 'battery':
+        return new Battery(options);
+      case 'power-transfer':
+        return new PowerTransfer(options);
+      default:
+        console.warn(`[EnergyManager] Unknown building type: ${type}`);
+        return null;
+    }
+  }
+
+  /**
+   * Check if can build at position
+   */
+  canBuildAt(gridX, gridY) {
+    if (!this.map) return true;
+    
+    // Check terrain
+    const terrain = this.map.terrain[gridY]?.[gridX];
+    if (terrain === 'water') return false;
+    
+    // Check if path
+    if (this.map.isPath(gridX, gridY)) return false;
+    
+    // Check if occupied
+    if (this.map.isCellOccupied(gridX, gridY)) return false;
+    
+    return true;
+  }
+
+  /**
+   * Remove a building
+   */
+  removeBuilding(id) {
+    const building = this.buildings.get(id);
+    if (!building) return false;
+
+    // Unregister from network
+    this.network.unregisterNode(id);
+    
+    // Free cell
+    if (this.map) {
+      this.map.setCellOccupied(building.gridX, building.gridY, false);
+    }
+
+    this.buildings.delete(id);
+    
+    this.eventBus.emit('energy:building-removed', { id, building });
+    
+    return true;
+  }
+
+  /**
+   * Select a building (show info/connections)
+   */
+  selectBuilding(id) {
+    const building = this.buildings.get(id);
+    if (!building) return;
+
+    this.selectedNode = building;
+    
+    // Get connection options
+    const connections = this.network.getAvailableConnections(id);
+    
+    this.eventBus.emit('energy:building-selected', {
+      building: building.getState(),
+      connections
+    });
+  }
+
+  /**
+   * Start connection mode from a node
+   */
+  startConnection(nodeId) {
+    const node = this.network.nodes.get(nodeId);
+    if (!node) return;
+
+    this.connectionMode = true;
+    this.selectedNode = node;
+    
+    // Get valid targets
+    const available = this.network.getAvailableConnections(nodeId);
+    
+    this.eventBus.emit('energy:connection-mode', {
+      active: true,
+      source: nodeId,
+      availableTargets: available.outputs
+    });
+  }
+
+  /**
+   * End connection to a target node
+   */
+  endConnection(targetId) {
+    if (!this.connectionMode || !this.selectedNode) return;
+
+    const success = this.network.connect(this.selectedNode.id, targetId);
+    
+    if (success) {
+      this.eventBus.emit('ui:toast', { message: 'Connected!', type: 'success' });
+    } else {
+      this.eventBus.emit('ui:toast', { message: 'Connection failed!', type: 'error' });
+    }
+
+    this.cancelConnection();
+  }
+
+  /**
+   * Cancel connection mode
+   */
+  cancelConnection() {
+    this.connectionMode = false;
+    this.selectedNode = null;
+    
+    this.eventBus.emit('energy:connection-mode', { active: false });
+  }
+
+  /**
+   * Update all buildings
+   */
+  update(deltaTime) {
+    // Update network (handles energy flow)
+    this.network.update(deltaTime);
+    
+    // Update individual buildings
+    for (const building of this.buildings.values()) {
+      building.update?.(deltaTime);
+    }
+  }
+
+  /**
+   * Create power consumer for a tower
+   */
+  createConsumerForTower(tower, consumption = 5) {
+    const consumer = new PowerConsumer({
+      gridX: tower.gridX,
+      gridY: tower.gridY,
+      worldX: tower.x,
+      worldY: tower.y,
+      consumption,
+      capacity: consumption * 4 // 4 seconds buffer
+    });
+    
+    consumer.setTower(tower);
+    this.network.registerNode(consumer);
+    
+    return consumer;
+  }
+
+  /**
+   * Get all building definitions
+   */
+  getBuildingDefinitions() {
+    return ENERGY_BUILDINGS;
+  }
+
+  /**
+   * Get render data for visualization
+   */
+  getRenderData() {
+    const buildings = [];
+    
+    for (const building of this.buildings.values()) {
+      buildings.push({
+        ...building.getRenderData(),
+        icon: BUILDING_ICONS[building.type],
+        categoryColor: CATEGORY_COLORS[building.nodeType]
+      });
+    }
+
+    return {
+      buildings,
+      network: this.network.getRenderData(),
+      connectionMode: this.connectionMode,
+      selectedNode: this.selectedNode?.id
+    };
+  }
+
+  reset() {
+    this.buildings.clear();
+    this.network.reset();
+    this.connectionMode = false;
+    this.selectedNode = null;
+  }
+
+  destroy() {
+    this.reset();
+    this.network.destroy();
+  }
+}
+
+module.exports = { EnergyBuildingManager };

@@ -91,6 +91,7 @@ class MapGenerator {
   /**
    * Generate static spiral path from edge to center
    * Replaces procedural path generation for reliability
+   * Only 2 loops for cleaner gameplay
    */
   _generateSpiralPath() {
     this.waypoints = [];
@@ -98,75 +99,65 @@ class MapGenerator {
     
     const centerX = Math.floor(this.width / 2);
     const centerY = Math.floor(this.height / 2);
-    const margin = 3; // Distance from edge
+    const gridSize = this.gridSize;
     
-    // Spiral waypoints (world coordinates)
-    // Start from top-left, spiral clockwise inward to center
-    const spiralPoints = [];
+    const points = [];
+    const margin = 4;
+    const shrink = 10; // Сужение на каждом повороте
     
-    // Calculate spiral layers
+    // Starting bounds
     let left = margin;
     let right = this.width - margin - 1;
     let top = margin;
     let bottom = this.height - margin - 1;
     
-    // Entry point (top-left corner, coming from top edge)
-    const entryX = left;
-    const entryY = 0; // Start from edge
-    spiralPoints.push({ x: entryX, y: entryY });
-    spiralPoints.push({ x: entryX, y: top }); // Enter map
+    // Entry - top left
+    points.push({ x: left, y: -1 });  // Spawn outside
+    points.push({ x: left, y: top }); // Enter map
     
-    // Spiral inward
-    while (left < right && top < bottom) {
-      // Go down along left edge
-      spiralPoints.push({ x: left, y: bottom });
-      
-      // Go right along bottom edge
-      spiralPoints.push({ x: right, y: bottom });
-      
-      // Go up along right edge
-      spiralPoints.push({ x: right, y: top });
-      
-      // Shrink bounds for next layer
-      left += 6;  // Gap between spiral layers
-      right -= 6;
-      top += 6;
-      bottom -= 6;
-      
-      // Go left along top edge (to start next layer)
-      if (left < right && top < bottom) {
-        spiralPoints.push({ x: left, y: top });
-      }
-    }
+    // Loop 1 - outer
+    points.push({ x: left, y: bottom });         // Down
+    left += shrink;
+    points.push({ x: right, y: bottom });        // Right
+    bottom -= shrink;
+    points.push({ x: right, y: top });           // Up
+    right -= shrink;
+    points.push({ x: left, y: top });            // Left (turn in)
+    top += shrink;
     
-    // Final point - center (base)
-    spiralPoints.push({ x: centerX, y: centerY });
+    // Loop 2 - inner
+    points.push({ x: left, y: bottom });         // Down
+    left += shrink;
+    points.push({ x: right, y: bottom });        // Right
+    bottom -= shrink;
+    points.push({ x: right, y: top });           // Up
     
-    // Convert grid points to world coordinates for waypoints
-    const gridSize = this.gridSize;
-    this.waypoints = spiralPoints.map(p => ({
+    // Final - to center
+    points.push({ x: centerX, y: top });         // Horizontal to center
+    points.push({ x: centerX, y: centerY });     // Down to base
+    
+    // Convert to world coordinates
+    this.waypoints = points.map(p => ({
       x: p.x * gridSize + gridSize / 2,
       y: p.y * gridSize + gridSize / 2
     }));
     
-    // Generate path cells from waypoints
-    for (let i = 0; i < spiralPoints.length - 1; i++) {
-      const from = spiralPoints[i];
-      const to = spiralPoints[i + 1];
-      
+    // Generate path cells
+    for (let i = 0; i < points.length - 1; i++) {
+      const from = points[i];
+      const to = points[i + 1];
       const cells = this._getLineCells(from.x, from.y, to.x, to.y);
       for (const cell of cells) {
-        // Avoid duplicates
         if (!this.pathCells.some(c => c.x === cell.x && c.y === cell.y)) {
           this.pathCells.push(cell);
         }
       }
     }
     
-    // Update spawn and base points
+    // Set spawn and base
     this.spawnPoint = {
-      gridX: spiralPoints[0].x,
-      gridY: spiralPoints[0].y,
+      gridX: points[0].x,
+      gridY: points[0].y,
       worldX: this.waypoints[0].x,
       worldY: this.waypoints[0].y
     };
@@ -178,7 +169,7 @@ class MapGenerator {
       worldY: centerY * gridSize + gridSize / 2
     };
     
-    console.log(`[MapGenerator] Spiral path: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
+    console.log(`[MapGenerator] Spiral: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
   }
   
   /**

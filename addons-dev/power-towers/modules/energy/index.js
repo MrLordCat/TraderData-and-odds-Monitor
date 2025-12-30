@@ -1,113 +1,110 @@
 /**
  * Power Towers TD - Energy Module
  * 
- * Manages energy system for tower abilities and special attacks.
+ * Complete energy system with:
+ * - Generators (Base, Bio, Wind, Solar, Water)
+ * - Storage (Battery with stacking & decay)
+ * - Transfer (Multi-channel relay)
+ * - Power Network (connections & energy flow)
  */
 
 const { GameEvents } = require('../../core/event-bus');
+const { PowerNetwork } = require('./power-network');
+const { EnergyBuildingManager } = require('./building-manager');
+const { ENERGY_BUILDINGS } = require('./building-defs');
 
 class EnergyModule {
   /**
    * @param {EventBus} eventBus - Event system
    * @param {object} config - Game configuration
+   * @param {object} gameCore - Reference to game core
    */
-  constructor(eventBus, config) {
+  constructor(eventBus, config, gameCore) {
     this.eventBus = eventBus;
     this.config = config;
+    this.gameCore = gameCore;
     
-    // Energy state
-    this.energy = 0;
-    this.maxEnergy = 100;
-    this.regenRate = 2; // per second
+    // Building manager handles placement & network
+    this.buildingManager = new EnergyBuildingManager(eventBus, gameCore);
+    
+    // Global energy stats (for UI)
+    this.totalGeneration = 0;
+    this.totalStorage = 0;
+    this.totalCapacity = 0;
   }
 
   /**
    * Initialize module
    */
   init() {
+    this.buildingManager.init();
+    
+    // Listen for network state updates
+    this.eventBus.on('power:network-state', (state) => this.onNetworkState(state));
     this.eventBus.on(GameEvents.GAME_START, () => this.onGameStart());
-    this.eventBus.on('energy:spend', (amount) => this.spendEnergy(amount));
-    this.eventBus.on('energy:gain', (amount) => this.gainEnergy(amount));
-    this.eventBus.on('enemy:killed', () => this.onEnemyKilled());
   }
 
   /**
-   * Update - passive regen
+   * Set map reference
+   */
+  setMap(map) {
+    this.buildingManager.setMap(map);
+  }
+
+  /**
+   * Update
    */
   update(deltaTime) {
-    if (this.energy < this.maxEnergy) {
-      this.energy = Math.min(this.maxEnergy, this.energy + this.regenRate * deltaTime);
-      this.emitUpdate();
-    }
-  }
-
-  /**
-   * Reset
-   */
-  reset() {
-    this.energy = 0;
-    this.maxEnergy = 100;
-    this.regenRate = 2;
-  }
-
-  /**
-   * Cleanup
-   */
-  destroy() {
-    this.reset();
+    this.buildingManager.update(deltaTime);
   }
 
   /**
    * On game start
    */
   onGameStart() {
-    this.energy = 50; // Start with half energy
-    this.emitUpdate();
+    this.totalGeneration = 0;
+    this.totalStorage = 0;
+    this.totalCapacity = 0;
   }
 
   /**
-   * Spend energy
+   * On network state update
    */
-  spendEnergy(amount) {
-    if (this.energy >= amount) {
-      this.energy -= amount;
-      this.emitUpdate();
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Gain energy
-   */
-  gainEnergy(amount) {
-    this.energy = Math.min(this.maxEnergy, this.energy + amount);
-    this.emitUpdate();
-  }
-
-  /**
-   * On enemy killed - small energy gain
-   */
-  onEnemyKilled() {
-    this.gainEnergy(1);
-  }
-
-  /**
-   * Emit update
-   */
-  emitUpdate() {
-    this.eventBus.emit('energy:updated', {
-      energy: this.energy,
-      maxEnergy: this.maxEnergy,
-      percent: (this.energy / this.maxEnergy) * 100
+  onNetworkState(state) {
+    this.totalGeneration = state.totalGeneration;
+    this.totalStorage = state.totalStorage;
+    this.totalCapacity = state.totalCapacity;
+    
+    // Emit for UI
+    this.eventBus.emit('energy:stats-updated', {
+      generation: this.totalGeneration,
+      storage: this.totalStorage,
+      capacity: this.totalCapacity,
+      connections: state.connections
     });
   }
 
   /**
-   * Check if can afford
+   * Place an energy building
    */
-  canAfford(amount) {
-    return this.energy >= amount;
+  placeBuilding(type, gridX, gridY, worldX, worldY) {
+    return this.buildingManager.placeBuilding({
+      type, gridX, gridY, worldX, worldY
+    });
+  }
+
+  /**
+   * Get building definitions
+   */
+  getBuildingDefinitions() {
+    return ENERGY_BUILDINGS;
+  }
+
+  /**
+   * Create power consumer for tower
+   */
+  createConsumerForTower(tower, consumption) {
+    return this.buildingManager.createConsumerForTower(tower, consumption);
   }
 
   /**
@@ -115,11 +112,37 @@ class EnergyModule {
    */
   getRenderData() {
     return {
-      energy: this.energy,
-      maxEnergy: this.maxEnergy,
-      percent: (this.energy / this.maxEnergy) * 100
+      ...this.buildingManager.getRenderData(),
+      totalGeneration: this.totalGeneration,
+      totalStorage: this.totalStorage,
+      totalCapacity: this.totalCapacity
     };
+  }
+
+  /**
+   * Reset
+   */
+  reset() {
+    this.buildingManager.reset();
+    this.totalGeneration = 0;
+    this.totalStorage = 0;
+    this.totalCapacity = 0;
+  }
+
+  /**
+   * Cleanup
+   */
+  destroy() {
+    this.buildingManager.destroy();
+    this.reset();
   }
 }
 
-module.exports = { EnergyModule };
+// Re-export components
+module.exports = { 
+  EnergyModule,
+  PowerNetwork,
+  EnergyBuildingManager,
+  ENERGY_BUILDINGS
+};
+
