@@ -34,11 +34,15 @@ const CONFIG = {
   
   // Wave System
   WAVE_DELAY_MS: 3000,        // delay between waves
-  SPAWN_INTERVAL_MS: 800,     // delay between enemy spawns
-  ENEMIES_BASE_COUNT: 5,
-  ENEMIES_PER_WAVE: 2,
+  SPAWN_INTERVAL_MS: 800,     // delay between enemy spawns (legacy)
   
-  // Enemy Base Stats
+  // Enemy Scaling (multiplicative per wave)
+  // HP: baseHealth * (HP_MULTIPLIER ^ (wave-1))
+  // Speed: baseSpeed * (SPEED_MULTIPLIER ^ (wave-1))
+  ENEMY_HP_MULTIPLIER: 1.1,      // x1.1 HP per wave
+  ENEMY_SPEED_MULTIPLIER: 1.02,  // x1.02 speed per wave
+  
+  // Legacy enemy stats (for core/entities/enemy.js)
   ENEMY_BASE_HP: 30,
   ENEMY_HP_PER_WAVE: 10,
   ENEMY_BASE_SPEED: 0.6,

@@ -267,9 +267,13 @@ class EnemiesModule {
     const enemyDef = ENEMY_TYPES[type];
     if (!enemyDef || this.waypoints.length === 0) return;
 
-    // Difficulty scaling
-    const healthMultiplier = 1 + (this.currentWave - 1) * 0.15;
-    const speedMultiplier = 1 + (this.currentWave - 1) * 0.02;
+    // Difficulty scaling - multiplicative per wave (from config)
+    // HP: baseHealth * (multiplier ^ (wave-1))
+    // Speed: baseSpeed * (multiplier ^ (wave-1))
+    const hpMult = this.config.ENEMY_HP_MULTIPLIER || 1.1;
+    const spdMult = this.config.ENEMY_SPEED_MULTIPLIER || 1.02;
+    const healthMultiplier = Math.pow(hpMult, this.currentWave - 1);
+    const speedMultiplier = Math.pow(spdMult, this.currentWave - 1);
 
     const spawnPoint = this.waypoints[0];
     
