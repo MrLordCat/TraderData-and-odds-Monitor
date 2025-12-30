@@ -58,8 +58,11 @@ function recalculateTowerStats(tower) {
   }
   
   // Copy attack type properties
-  tower.critChance = attackType.critChance;
-  tower.critDmgMod = attackType.critDmgMod;
+  // Crit: base from attack type + upgrades
+  const baseCrit = attackType.critChance || tower.baseCritChance || 0.05;
+  const baseCritDmg = attackType.critDmgMod || tower.baseCritDmgMod || 1.5;
+  tower.critChance = baseCrit + (tower.critChanceUpgrade || 0);
+  tower.critDmgMod = baseCritDmg + (tower.critDmgUpgrade || 0);
   tower.splashRadius = attackType.splashRadius;
   tower.splashDmgFalloff = attackType.splashDmgFalloff;
   tower.chainCount = tower.chainCount || attackType.chainCount;  // Element can override

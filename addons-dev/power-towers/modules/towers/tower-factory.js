@@ -67,7 +67,11 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     fireRate: baseStats.fireRate,
     energyCost: baseStats.energyCost,
     
-    // Crit stats
+    // Crit stats (base + upgrades)
+    baseCritChance: baseStats.critChance,
+    baseCritDmgMod: baseStats.critDmgMod,
+    critChanceUpgrade: 0,   // from stat upgrades
+    critDmgUpgrade: 0,      // from stat upgrades
     critChance: baseStats.critChance,
     critDmgMod: baseStats.critDmgMod,
     
@@ -177,11 +181,11 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
           break;
         case 'critChance':
           const maxCrit = effect.maxValue || 0.75;
-          this.critChance = Math.min(this.critChance + value, maxCrit);
+          this.critChanceUpgrade = Math.min((this.critChanceUpgrade || 0) + value, maxCrit);
           break;
         case 'critDmgMod':
           const maxCritDmg = effect.maxValue || 5.0;
-          this.critDmgMod = Math.min(this.critDmgMod + value, maxCritDmg);
+          this.critDmgUpgrade = Math.min((this.critDmgUpgrade || 0) + value, maxCritDmg);
           break;
         case 'maxHp':
           this.maxHp += value;
