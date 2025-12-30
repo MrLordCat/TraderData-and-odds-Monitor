@@ -42,6 +42,12 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     maxHp: baseStats.hp * baseStats.hpMultiplier,
     isDestroyed: false,
     
+    // Tower Energy
+    maxEnergy: 100,
+    currentEnergy: 100,
+    energyRegen: 20,       // per second
+    energyCostPerShot: 5,  // energy cost per attack
+    
     // =========================================
     // ATTACK TYPE
     // =========================================

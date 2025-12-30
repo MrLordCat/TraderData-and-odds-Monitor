@@ -142,8 +142,9 @@ function TowerTooltipMixin(Base) {
         el.tooltipHp.textContent = `${Math.floor(tower.currentHp || 0)}/${Math.floor(tower.maxHp || 100)}`;
       }
       if (el.tooltipEnergy) {
-        const energyStorage = tower.energyStorage || 50;
-        el.tooltipEnergy.textContent = Math.floor(energyStorage);
+        const current = Math.floor(tower.currentEnergy || 0);
+        const max = Math.floor(tower.maxEnergy || 100);
+        el.tooltipEnergy.textContent = `${current}/${max}`;
       }
     }
 

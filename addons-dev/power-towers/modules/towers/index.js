@@ -208,6 +208,14 @@ class TowersModule {
   // =========================================
 
   updateTower(tower, deltaTime, enemies) {
+    // Regenerate energy
+    if (tower.currentEnergy < tower.maxEnergy) {
+      tower.currentEnergy = Math.min(
+        tower.maxEnergy,
+        tower.currentEnergy + tower.energyRegen * deltaTime
+      );
+    }
+    
     // Reduce cooldown
     if (tower.attackCooldown > 0) {
       tower.attackCooldown -= deltaTime;
@@ -225,8 +233,8 @@ class TowersModule {
       tower.rotation = Math.atan2(dy, dx);
     }
 
-    // Attack if target and ready
-    if (tower.target && tower.attackCooldown <= 0) {
+    // Attack if target, ready, and has enough energy
+    if (tower.target && tower.attackCooldown <= 0 && tower.currentEnergy >= tower.energyCostPerShot) {
       performAttack(tower, this.eventBus);
     }
   }

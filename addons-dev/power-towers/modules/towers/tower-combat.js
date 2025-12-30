@@ -100,6 +100,9 @@ function findTarget(tower, enemies) {
 function performAttack(tower, eventBus) {
   if (!tower.target) return;
 
+  // Deduct energy cost
+  tower.currentEnergy -= tower.energyCostPerShot;
+
   // Set cooldown (convert fireRate to seconds)
   tower.attackCooldown = 1 / tower.fireRate;
 
