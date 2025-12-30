@@ -340,9 +340,10 @@ class EditorController {
         FileManager.writeTowerPaths(this.towerPaths);
       }
       
-      if (this.energyBuildings) {
-        FileManager.writeEnergyBuildings(this.energyBuildings);
-      }
+      // Energy buildings have complex structure - read-only for now
+      // if (this.energyBuildings) {
+      //   FileManager.writeEnergyBuildings(this.energyBuildings);
+      // }
       
       this.hasChanges = false;
       this.setStatus('✓ Saved! Restart game to apply.', 'success');

@@ -111,7 +111,9 @@ class FileManager {
     const defsPath = path.join(ptPath, 'modules', 'energy', 'building-defs.js');
     try {
       delete require.cache[require.resolve(defsPath)];
-      return require(defsPath);
+      const module = require(defsPath);
+      // Module exports { ENERGY_BUILDINGS, UPGRADE_COST_MULTIPLIER, ... }
+      return module.ENERGY_BUILDINGS || module;
     } catch (e) {
       console.error('[pt-editor] Failed to read energy buildings:', e);
       return null;
