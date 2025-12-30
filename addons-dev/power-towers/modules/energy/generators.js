@@ -96,6 +96,7 @@ class BioGenerator extends PowerNode {
     
     let count = 0;
     const biomes = this.mapRef.biomes;
+    if (!biomes) return 0;
     
     for (let dy = -this.treeRadius; dy <= this.treeRadius; dy++) {
       for (let dx = -this.treeRadius; dx <= this.treeRadius; dx++) {
@@ -185,6 +186,7 @@ class WindGenerator extends PowerNode {
     
     let count = 0;
     const terrain = this.mapRef.terrain;
+    if (!terrain) return 0;
     
     for (let dy = -this.mountainRadius; dy <= this.mountainRadius; dy++) {
       for (let dx = -this.mountainRadius; dx <= this.mountainRadius; dx++) {
@@ -282,6 +284,7 @@ class SolarGenerator extends PowerNode {
     if (!this.mapRef) return 'grass';
     
     const biomes = this.mapRef.biomes;
+    if (!biomes) return 'grass';
     if (biomes[this.gridY]?.[this.gridX]) {
       return biomes[this.gridY][this.gridX];
     }
@@ -350,6 +353,7 @@ class WaterGenerator extends PowerNode {
     
     let count = 0;
     const terrain = this.mapRef.terrain;
+    if (!terrain) return 0;
     
     for (let dy = -this.waterRadius; dy <= this.waterRadius; dy++) {
       for (let dx = -this.waterRadius; dx <= this.waterRadius; dx++) {

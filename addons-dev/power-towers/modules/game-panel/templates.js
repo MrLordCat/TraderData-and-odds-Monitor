@@ -217,8 +217,9 @@ function getGameTemplate() {
               <div class="stat-row"><span>🔋 Stored</span><b id="energy-tooltip-stored">0/100</b></div>
               <div class="stat-row"><span>⚡ Output</span><b id="energy-tooltip-output">10/s</b></div>
               <div class="stat-row"><span>📡 Range</span><b id="energy-tooltip-range">4</b></div>
-              <div class="stat-row" id="energy-tooltip-gen-row"><span>🔌 Gen</span><b id="energy-tooltip-gen">5/s</b></div>
-              <div class="stat-row" id="energy-tooltip-eff-row"><span>📈 Efficiency</span><b id="energy-tooltip-eff">100%</b></div>
+              <div class="stat-row" id="energy-tooltip-gen-row"><span class="stat-label">🔌 Gen</span><b id="energy-tooltip-gen">5/s</b></div>
+              <div class="stat-row" id="energy-tooltip-eff-row"><span class="stat-label">📈 Efficiency</span><b id="energy-tooltip-eff">100%</b></div>
+              <div class="stat-row" id="energy-tooltip-special-row" style="display:none;"><span class="stat-label">🌳 Trees</span><b id="energy-tooltip-special">0/12</b></div>
             </div>
             
             <!-- Upgrades Section -->

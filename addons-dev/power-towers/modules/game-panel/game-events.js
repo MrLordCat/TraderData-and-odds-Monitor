@@ -24,6 +24,11 @@ function GameEventsMixin(Base) {
         if (this.game.selectedTower && this.elements.towerTooltip?.classList.contains('visible')) {
           this.updateTooltipEnergy(this.game.selectedTower);
         }
+        
+        // Update energy building tooltip in real-time if visible
+        if (this.selectedEnergyBuilding && this.elements.energyTooltip?.classList.contains('visible')) {
+          this.updateEnergyTooltipRealtime(this.selectedEnergyBuilding);
+        }
       });
       
       this.game.on(this.GameEvents.STATE_CHANGE, (state) => {

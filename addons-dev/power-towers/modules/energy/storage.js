@@ -214,9 +214,40 @@ class PowerConsumer extends PowerNode {
   }
 
   /**
+   * Receive energy and transfer to tower
+   */
+  receiveEnergy(amount) {
+    const space = this.capacity - this.stored;
+    const received = Math.min(amount, space);
+    this.stored += received;
+    
+    // Transfer to tower's currentEnergy
+    if (this.towerRef && received > 0) {
+      const towerSpace = (this.towerRef.maxEnergy || 100) - (this.towerRef.currentEnergy || 0);
+      const toTower = Math.min(this.stored, towerSpace);
+      if (toTower > 0) {
+        this.towerRef.currentEnergy = (this.towerRef.currentEnergy || 0) + toTower;
+        this.stored -= toTower;
+      }
+    }
+    
+    return received;
+  }
+
+  /**
    * Consume power and update powered state
    */
   update(dt) {
+    // Transfer stored energy to tower
+    if (this.towerRef && this.stored > 0) {
+      const towerSpace = (this.towerRef.maxEnergy || 100) - (this.towerRef.currentEnergy || 0);
+      const toTower = Math.min(this.stored, towerSpace);
+      if (toTower > 0) {
+        this.towerRef.currentEnergy = (this.towerRef.currentEnergy || 0) + toTower;
+        this.stored -= toTower;
+      }
+    }
+    
     const needed = this.consumption * dt;
     
     if (this.stored >= needed) {
@@ -233,9 +264,10 @@ class PowerConsumer extends PowerNode {
       this.powerLevel = 0;
     }
 
-    // Notify tower of power state
+    // Update tower power level for visual feedback
     if (this.towerRef) {
-      this.towerRef.setPowerLevel(this.powerLevel);
+      this.towerRef.powerLevel = this.powerLevel;
+      this.towerRef.powered = this.powered;
     }
   }
 

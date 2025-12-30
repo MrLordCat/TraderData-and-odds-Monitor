@@ -128,6 +128,8 @@ class GameControllerBase {
       energyTooltipGen: container.querySelector('#energy-tooltip-gen'),
       energyTooltipEffRow: container.querySelector('#energy-tooltip-eff-row'),
       energyTooltipEff: container.querySelector('#energy-tooltip-eff'),
+      energyTooltipSpecialRow: container.querySelector('#energy-tooltip-special-row'),
+      energyTooltipSpecial: container.querySelector('#energy-tooltip-special'),
       energyTooltipClose: container.querySelector('#energy-tooltip-close'),
       energyXpBarFill: container.querySelector('#energy-xp-bar-fill'),
       energyXpBarText: container.querySelector('#energy-xp-bar-text'),
@@ -891,6 +893,36 @@ class GameControllerBase {
       }
     }
     
+    // Special stats row (trees for Bio, mountains for Wind, water for Hydro)
+    if (el.energyTooltipSpecialRow && el.energyTooltipSpecial) {
+      const state = building.getState?.() || {};
+      let specialText = null;
+      let specialLabel = '';
+      
+      if (state.treesUsed !== undefined) {
+        specialLabel = '🌳 Trees';
+        specialText = `${state.treesUsed}/${building.maxTrees || 12}`;
+      } else if (state.mountainsFound !== undefined) {
+        specialLabel = '⛰️ Mountains';
+        specialText = `${state.mountainsFound}/${building.maxMountains || 9}`;
+      } else if (state.waterTiles !== undefined) {
+        specialLabel = '💧 Water';
+        specialText = `${state.waterTiles}/${building.maxWaterTiles || 9}`;
+      } else if (state.currentBiome !== undefined) {
+        specialLabel = '🌍 Biome';
+        const effPct = building.biomeEfficiency?.[state.currentBiome] || 1;
+        specialText = `${state.currentBiome} (${Math.round(effPct * 100)}%)`;
+      }
+      
+      if (specialText) {
+        el.energyTooltipSpecialRow.style.display = '';
+        el.energyTooltipSpecialRow.querySelector('.stat-label').textContent = specialLabel;
+        el.energyTooltipSpecial.textContent = specialText;
+      } else {
+        el.energyTooltipSpecialRow.style.display = 'none';
+      }
+    }
+    
     // Position tooltip near the building
     const screenPos = this.camera.worldToScreen(building.worldX, building.worldY);
     const tooltipRect = el.energyTooltip.getBoundingClientRect();
@@ -913,6 +945,72 @@ class GameControllerBase {
     el.energyTooltip.classList.add('visible');
     
     this.energyTooltipBuildingPosition = { x: building.gridX, y: building.gridY };
+  }
+  
+  /**
+   * Update energy building tooltip values in real-time (called every tick)
+   */
+  updateEnergyTooltipRealtime(building) {
+    if (!building) return;
+    
+    const el = this.elements;
+    
+    // Update stored energy
+    if (el.energyTooltipStored) {
+      const stored = Math.floor(building.stored || 0);
+      const capacity = Math.floor(building.getEffectiveCapacity?.() || building.capacity || 100);
+      el.energyTooltipStored.textContent = `${stored}/${capacity}`;
+    }
+    
+    // Update generation (for generators)
+    if (el.energyTooltipGen && building.nodeType === 'generator' && building.generation !== undefined) {
+      el.energyTooltipGen.textContent = `${building.generation?.toFixed(1) || 0}/s`;
+    }
+    
+    // Update efficiency
+    if (el.energyTooltipEff) {
+      const state = building.getState?.() || {};
+      if (state.efficiency !== undefined) {
+        el.energyTooltipEff.textContent = `${Math.round(state.efficiency * 100)}%`;
+      }
+    }
+    
+    // Update special stats (trees, water, etc)
+    if (el.energyTooltipSpecial) {
+      const state = building.getState?.() || {};
+      let specialText = null;
+      
+      if (state.treesUsed !== undefined) {
+        specialText = `${state.treesUsed}/${building.maxTrees || 12}`;
+      } else if (state.mountainsFound !== undefined) {
+        specialText = `${state.mountainsFound}/${building.maxMountains || 9}`;
+      } else if (state.waterTiles !== undefined) {
+        specialText = `${state.waterTiles}/${building.maxWaterTiles || 9}`;
+      } else if (state.currentBiome !== undefined) {
+        const effPct = building.biomeEfficiency?.[state.currentBiome] || 1;
+        specialText = `${state.currentBiome} (${Math.round(effPct * 100)}%)`;
+      }
+      
+      if (specialText) {
+        el.energyTooltipSpecial.textContent = specialText;
+      }
+    }
+    
+    // Update XP bar
+    const xpProgress = building.getXpProgress?.() || { current: 0, needed: 10, percent: 0 };
+    if (el.energyXpBarFill) {
+      el.energyXpBarFill.style.width = `${Math.min(100, xpProgress.percent)}%`;
+    }
+    if (el.energyXpBarText) {
+      el.energyXpBarText.textContent = `${xpProgress.current}/${xpProgress.needed} XP`;
+    }
+    
+    // Update connections count (might change if tower destroyed)
+    if (el.energyTooltipConnections) {
+      const energyModule = this.game.getModule('energy');
+      const connections = energyModule?.getConnectionsCount?.(building.id) || 0;
+      el.energyTooltipConnections.textContent = `${connections} links`;
+    }
   }
   
   /**

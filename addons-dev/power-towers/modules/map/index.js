@@ -124,6 +124,13 @@ class MapModule {
   }
 
   /**
+   * Getter for biomes (alias for biomeMap for compatibility with generators)
+   */
+  get biomes() {
+    return this.biomeMap;
+  }
+
+  /**
    * Initialize module - subscribe to events
    */
   init() {
