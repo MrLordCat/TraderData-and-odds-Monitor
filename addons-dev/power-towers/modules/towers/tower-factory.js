@@ -107,6 +107,8 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     // =========================================
     // UPGRADE TRACKING
     // =========================================
+    level: 1,              // Tower level (from upgrade points)
+    upgradePoints: 0,      // Total upgrade points earned
     upgradeLevels: {},     // { damage: 2, range: 1, ... }
     elementPath: null,     // 'fire', 'ice', etc.
     elementTier: 0,        // 0-3

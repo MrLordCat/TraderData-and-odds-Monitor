@@ -47,7 +47,8 @@ function recalculateTowerStats(tower) {
   // STEP 1: Apply level bonus to base stats
   // Each level gives +1% to base stats
   // =========================================
-  const levelBonus = 1 + ((tower.level || 1) - 1) * 0.01; // Level 1 = 1.0, Level 10 = 1.09
+  const level = tower.level || 1;
+  const levelBonus = 1 + (level - 1) * 0.01; // Level 1 = 1.0, Level 10 = 1.09
   
   const leveledBaseDamage = tower.baseDamage * levelBonus;
   const leveledBaseRange = tower.baseRange * levelBonus;

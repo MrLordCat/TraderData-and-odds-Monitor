@@ -280,11 +280,18 @@ class TowersModule {
       
       tower.upgradePoints = (tower.upgradePoints || 0) + xpGain;
       
-      // Check for level up (every 10 XP = 1 level)
-      const newLevel = Math.floor(1 + (tower.upgradePoints / 10));
+      // Check for level up using tower's calculateLevel method
+      const newLevel = tower.calculateLevel ? tower.calculateLevel() : Math.floor(1 + (tower.upgradePoints / 10));
       if (newLevel > (tower.level || 1)) {
+        const oldLevel = tower.level || 1;
         tower.level = newLevel;
-        this.eventBus.emit('tower:level-up', { tower, newLevel });
+        
+        // Recalculate stats with new level bonus
+        if (tower.recalculateStats) {
+          tower.recalculateStats();
+        }
+        
+        this.eventBus.emit('tower:level-up', { tower, oldLevel, newLevel });
       }
       
       // Emit update for tooltip refresh
