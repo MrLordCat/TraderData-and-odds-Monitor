@@ -28,7 +28,7 @@ const CONFIG = {
   STARTING_LIVES: 20,
   STARTING_ENERGY: 50,
   MAX_ENERGY: 100,
-  ENERGY_REGEN: 0.5,  // per tick
+  ENERGY_REGEN: 0,  // disabled - use energy buildings instead
   
   // Tower Costs
   BASE_TOWER_COST: 30,

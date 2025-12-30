@@ -67,6 +67,8 @@ function CanvasEventsMixin(Base) {
         if (this.placingEnergy) {
           this.exitEnergyPlacementMode();
         }
+        // Close tooltip on right click
+        this.hideTowerInfo();
       });
     }
 
@@ -104,7 +106,9 @@ function CanvasEventsMixin(Base) {
         if (tower) {
           this.game.selectTower(tower.id);
         } else {
+          // Click on empty cell - deselect and close tooltip
           this.game.selectTower(null);
+          this.hideTowerInfo();
         }
       }
       

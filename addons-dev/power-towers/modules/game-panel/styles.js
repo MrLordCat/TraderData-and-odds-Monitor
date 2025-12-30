@@ -143,7 +143,7 @@ function getGameStyles() {
     
     .build-toolbar {
       padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; flex-shrink: 0;
-      display: flex; flex-direction: column; gap: 8px;
+      display: flex; flex-direction: row; gap: 12px; flex-wrap: wrap; align-items: center;
     }
     .toolbar-section { 
       display: flex; 
