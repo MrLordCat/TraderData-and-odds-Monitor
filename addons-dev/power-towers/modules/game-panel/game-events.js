@@ -46,6 +46,15 @@ function GameEventsMixin(Base) {
         this.updateTowerAffordability();
       });
       
+      // Listen for gold changes to update upgrade prices dynamically
+      this.game.on('economy:updated', () => {
+        const tower = this.game?.selectedTower;
+        if (tower && this.elements.tooltipUpgradesSection?.style.display !== 'none') {
+          this.populateUpgradesGrid(tower);
+        }
+        this.updateTowerAffordability();
+      });
+      
       // Tower level up notification
       this.game.on('tower:level-up', (data) => {
         console.log(`Tower leveled up to ${data.newLevel}!`);

@@ -169,22 +169,17 @@ function TowerUpgradesUIMixin(Base) {
       // Spend gold
       economy.spendGold(cost);
       
-      // Apply upgrade to tower
+      // Apply upgrade to tower (no XP from stat upgrades)
       tower.applyStatUpgrade(upgradeId, upgrade);
       
-      // Add upgrade points for leveling
-      tower.upgradePoints = (tower.upgradePoints || 0) + 3;
-      
-      // Check for level up (every 10 points = 1 level roughly)
-      const newLevel = Math.floor(1 + (tower.upgradePoints / 10));
-      if (newLevel > (tower.level || 1)) {
-        tower.level = newLevel;
-      }
-      
-      // Refresh UI
+      // Refresh upgrades grid with new prices (panel stays open)
       this.populateUpgradesGrid(tower);
-      this.showTowerInfo(tower); // Refresh tooltip stats
-      this.updateUI(this.game.getState()); // Refresh gold display
+      
+      // Refresh tooltip stats without closing panel
+      this.refreshTooltipData(tower);
+      
+      // Refresh gold display
+      this.updateUI(this.game.getState());
     }
 
     /**

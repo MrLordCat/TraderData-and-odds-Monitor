@@ -18,7 +18,8 @@ const {
   drawTowers, 
   drawRangeIndicator, 
   drawEnemies, 
-  drawProjectiles 
+  drawProjectiles,
+  drawDamageNumbers
 } = require('./render-entities');
 const { 
   drawHoverIndicator, 
@@ -82,6 +83,7 @@ class GameRenderer {
     drawTowers(this.ctx, data.towers, data.selectedTower, this.camera);
     drawEnemies(this.ctx, data.enemies, this.camera, this.frameCount);
     drawProjectiles(this.ctx, data.projectiles, this.camera);
+    drawDamageNumbers(this.ctx, data.damageNumbers || [], this.camera);
     drawHoverIndicator(this.ctx, this.hoverGridX, this.hoverGridY, this.canPlaceHover, this.camera);
     
     // Draw range indicator for selected tower

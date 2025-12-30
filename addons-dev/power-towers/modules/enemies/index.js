@@ -394,7 +394,7 @@ class EnemiesModule {
   /**
    * Damage an enemy
    */
-  damageEnemy({ enemyId, damage, towerId, effects }) {
+  damageEnemy({ enemyId, damage, towerId, effects, isCrit }) {
     const enemy = this.enemies.find(e => e.id === enemyId);
     if (!enemy) {
       console.warn(`[EnemiesModule] damageEnemy: enemy ${enemyId} not found! Current enemies:`, 
@@ -426,6 +426,7 @@ class EnemiesModule {
     this.eventBus.emit('enemy:damaged', { 
       enemy, 
       damage, 
+      isCrit: isCrit || false,
       remaining: enemy.health 
     });
   }

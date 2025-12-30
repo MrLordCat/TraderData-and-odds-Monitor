@@ -94,6 +94,8 @@ class GameControllerBase {
       tooltipDmg: container.querySelector('#tooltip-dmg'),
       tooltipRng: container.querySelector('#tooltip-rng'),
       tooltipSpd: container.querySelector('#tooltip-spd'),
+      tooltipCrit: container.querySelector('#tooltip-crit'),
+      tooltipCritdmg: container.querySelector('#tooltip-critdmg'),
       tooltipHp: container.querySelector('#tooltip-hp'),
       tooltipEnergy: container.querySelector('#tooltip-energy'),
       tooltipClose: container.querySelector('#tooltip-close'),

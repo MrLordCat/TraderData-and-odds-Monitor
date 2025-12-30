@@ -223,6 +223,47 @@ function drawProjectile(ctx, proj, camera) {
   ctx.globalAlpha = 1;
 }
 
+/**
+ * Draw all damage numbers
+ */
+function drawDamageNumbers(ctx, damageNumbers, camera) {
+  for (const num of damageNumbers) {
+    drawDamageNumber(ctx, num, camera);
+  }
+}
+
+/**
+ * Draw single damage number
+ */
+function drawDamageNumber(ctx, num, camera) {
+  const zoom = camera ? camera.zoom : 1;
+  
+  ctx.save();
+  
+  // Set alpha for fade effect
+  ctx.globalAlpha = num.alpha;
+  
+  // Font size adjusted for zoom and scale animation
+  const fontSize = (num.fontSize * num.scale) / zoom;
+  ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  
+  // Text content
+  const text = num.isCrit ? `${num.value}!` : String(num.value);
+  
+  // Draw outline for better visibility
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.lineWidth = 3 / zoom;
+  ctx.strokeText(text, num.x, num.y);
+  
+  // Draw text
+  ctx.fillStyle = num.color;
+  ctx.fillText(text, num.x, num.y);
+  
+  ctx.restore();
+}
+
 module.exports = {
   drawTowers,
   drawTower,
@@ -231,5 +272,7 @@ module.exports = {
   drawEnemy,
   drawHealthBar,
   drawProjectiles,
-  drawProjectile
+  drawProjectile,
+  drawDamageNumbers,
+  drawDamageNumber
 };

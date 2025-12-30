@@ -131,6 +131,13 @@ function TowerTooltipMixin(Base) {
       if (el.tooltipDmg) el.tooltipDmg.textContent = Math.floor(tower.damage || 0);
       if (el.tooltipRng) el.tooltipRng.textContent = Math.floor(tower.range || 0);
       if (el.tooltipSpd) el.tooltipSpd.textContent = (tower.fireRate || 1).toFixed(1);
+      
+      // Crit stats
+      const critChance = tower.attackTypeConfig?.baseCritChance || tower.critChance || 0.05;
+      const critDmg = tower.attackTypeConfig?.baseCritDmg || tower.critDmgMod || 1.5;
+      if (el.tooltipCrit) el.tooltipCrit.textContent = `${Math.round(critChance * 100)}%`;
+      if (el.tooltipCritdmg) el.tooltipCritdmg.textContent = `${Math.round(critDmg * 100)}%`;
+      
       if (el.tooltipHp) {
         el.tooltipHp.textContent = `${Math.floor(tower.currentHp || 0)}/${Math.floor(tower.maxHp || 100)}`;
       }
@@ -246,13 +253,34 @@ function TowerTooltipMixin(Base) {
       const el = this.elements;
       if (!el.tooltipLevelProgress || !el.tooltipLevelText) return;
       
-      const currentLevel = tower.level || 1;
       const currentPoints = tower.upgradePoints || 0;
       
-      // Level thresholds: [10, 25, 50, 80, 120, 170, 230, 300, 380, 470]
+      // Level thresholds - XP needed to REACH each level
+      // Level 1: 0 XP, Level 2: 10 XP, Level 3: 25 XP, etc.
       const POINTS_PER_LEVEL = [0, 10, 25, 50, 80, 120, 170, 230, 300, 380, 470];
       const EXTRA_POINTS_PER_LEVEL = 100;
       
+      // Calculate current level from XP
+      let currentLevel = 1;
+      for (let i = 1; i < POINTS_PER_LEVEL.length; i++) {
+        if (currentPoints >= POINTS_PER_LEVEL[i]) {
+          currentLevel = i + 1;
+        } else {
+          break;
+        }
+      }
+      // Beyond defined levels
+      if (currentPoints >= POINTS_PER_LEVEL[POINTS_PER_LEVEL.length - 1]) {
+        const extraPoints = currentPoints - POINTS_PER_LEVEL[POINTS_PER_LEVEL.length - 1];
+        currentLevel = POINTS_PER_LEVEL.length + Math.floor(extraPoints / EXTRA_POINTS_PER_LEVEL);
+      }
+      
+      // Update tower level if different
+      if (tower.level !== currentLevel) {
+        tower.level = currentLevel;
+      }
+      
+      // Calculate progress to next level
       let pointsForCurrentLevel = 0;
       let pointsForNextLevel = 10;
       
@@ -267,7 +295,7 @@ function TowerTooltipMixin(Base) {
       
       const progressInLevel = currentPoints - pointsForCurrentLevel;
       const pointsNeeded = pointsForNextLevel - pointsForCurrentLevel;
-      const percent = Math.min(100, (progressInLevel / pointsNeeded) * 100);
+      const percent = Math.min(100, Math.max(0, (progressInLevel / pointsNeeded) * 100));
       
       el.tooltipLevelProgress.style.width = `${percent}%`;
       el.tooltipLevelText.textContent = `${progressInLevel}/${pointsNeeded} XP`;

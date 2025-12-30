@@ -93,7 +93,7 @@ class CombatModule {
   /**
    * Handle tower attack
    */
-  handleTowerAttack({ towerId, towerType, targetId, damage, position, targetPosition }) {
+  handleTowerAttack({ towerId, towerType, targetId, damage, isCrit, position, targetPosition }) {
     // Create projectile
     const projectileDef = PROJECTILE_TYPES[towerType] || PROJECTILE_TYPES.fire;
     
@@ -103,6 +103,7 @@ class CombatModule {
       towerType,
       targetId,
       damage,
+      isCrit: isCrit || false,
       x: position.x,
       y: position.y,
       targetX: targetPosition.x,
@@ -175,6 +176,7 @@ class CombatModule {
     this.eventBus.emit('enemy:damage', {
       enemyId: projectile.targetId,
       damage: projectile.damage,
+      isCrit: projectile.isCrit,
       towerId: projectile.towerId,
       effects: this.getEffectsForType(projectile.towerType)
     });
@@ -230,6 +232,7 @@ class CombatModule {
     this.eventBus.emit('enemy:damage', {
       enemyId: projectile.targetId,
       damage: projectile.damage,
+      isCrit: projectile.isCrit,
       towerId: projectile.towerId,
       effects: this.getEffectsForType(projectile.towerType)
     });
