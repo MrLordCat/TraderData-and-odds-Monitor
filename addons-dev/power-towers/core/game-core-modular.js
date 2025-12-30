@@ -323,8 +323,11 @@ class GameCore {
     // Update modules in order
     this.modules.menu.update(deltaTime);
     
+    // Always update energy system (buildings work before wave starts)
+    this.modules.energy.update(deltaTime);
+    
     if (this.modules.menu.isOpen) {
-      // Don't update game while menu is open
+      // Don't update combat while menu is open, but energy flows
       return;
     }
     
@@ -338,7 +341,6 @@ class GameCore {
       }
     }
     
-    this.modules.energy.update(deltaTime);
     this.modules.enemies.update(deltaTime);
     
     // Get enemies for towers
