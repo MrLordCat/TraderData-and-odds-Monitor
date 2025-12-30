@@ -441,6 +441,8 @@ class GameCore {
       // Map data
       terrain: mapData.terrain,
       terrainTypes: mapData.terrainTypes,
+      biomeMap: mapData.biomeMap,
+      biomeTypes: mapData.biomeTypes,
       waypoints: mapData.waypoints,
       pathCells: mapData.pathCells,
       energyNodes: mapData.energyNodes,

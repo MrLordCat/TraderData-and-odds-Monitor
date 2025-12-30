@@ -24,15 +24,15 @@ const CONFIG = {
   // =========================================
   // Game Balance
   // =========================================
-  STARTING_GOLD: 100,
+  STARTING_GOLD: 200,
   STARTING_LIVES: 20,
   STARTING_ENERGY: 50,
   MAX_ENERGY: 100,
   ENERGY_REGEN: 0.5,  // per tick
   
   // Tower Costs
-  BASE_TOWER_COST: 50,
-  UPGRADE_COST_MULTIPLIER: 2,
+  BASE_TOWER_COST: 30,
+  UPGRADE_COST_MULTIPLIER: 1.5,
   
   // Wave System
   WAVE_DELAY_MS: 3000,        // delay between waves

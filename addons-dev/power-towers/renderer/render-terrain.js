@@ -1,15 +1,172 @@
 /**
  * Power Towers TD - Terrain Rendering
  * 
- * Handles terrain, grid, path, and special elements rendering.
+ * Handles terrain, grid, path, biomes and special elements rendering.
+ * 
+ * NEW: Biome system - biomes are drawn as base layer, terrain overlays on top
  */
 
 const CONFIG = require('../core/config');
 
 /**
- * Draw terrain layer
+ * Draw biome layer (base layer before terrain)
+ * Biomes provide visual variety and modifiers for buildings
  */
-function drawTerrain(ctx, terrain, terrainTypes, camera, frameCount) {
+function drawBiomes(ctx, biomeMap, biomeTypes, camera, frameCount) {
+  if (!biomeMap || !biomeTypes) return;
+  
+  const gridSize = CONFIG.GRID_SIZE;
+  
+  // Only draw visible area for performance
+  const visibleArea = camera ? camera.getVisibleArea() : 
+    { x: 0, y: 0, width: CONFIG.MAP_WIDTH, height: CONFIG.MAP_HEIGHT };
+  
+  const startGridX = Math.floor(visibleArea.x / gridSize);
+  const startGridY = Math.floor(visibleArea.y / gridSize);
+  const endGridX = Math.ceil((visibleArea.x + visibleArea.width) / gridSize);
+  const endGridY = Math.ceil((visibleArea.y + visibleArea.height) / gridSize);
+  
+  for (let gy = startGridY; gy <= endGridY; gy++) {
+    if (!biomeMap[gy]) continue;
+    for (let gx = startGridX; gx <= endGridX; gx++) {
+      const biomeId = biomeMap[gy][gx];
+      if (!biomeId) continue;
+      
+      const biomeDef = biomeTypes[biomeId];
+      if (!biomeDef) continue;
+      
+      const x = gx * gridSize;
+      const y = gy * gridSize;
+      
+      // Choose color variant for visual variety
+      let color = biomeDef.color;
+      if (biomeDef.colorVariants && biomeDef.colorVariants.length > 0) {
+        // Use cell position for consistent variation
+        const variantIndex = (gx * 7 + gy * 11) % (biomeDef.colorVariants.length + 1);
+        if (variantIndex > 0) {
+          color = biomeDef.colorVariants[variantIndex - 1];
+        }
+      }
+      
+      // Draw biome cell
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, gridSize, gridSize);
+      
+      // Add biome decorations
+      drawBiomeDecoration(ctx, biomeId, biomeDef, x, y, gridSize, frameCount);
+    }
+  }
+}
+
+/**
+ * Draw biome-specific decorations
+ */
+function drawBiomeDecoration(ctx, biomeId, biomeDef, x, y, size, frameCount) {
+  const centerX = x + size / 2;
+  const centerY = y + size / 2;
+  
+  switch (biomeId) {
+    case 'forest':
+      // Draw random trees
+      const treeHash = (Math.floor(x) * 31 + Math.floor(y) * 17) % 100;
+      if (treeHash < 40) { // 40% chance for decoration
+        ctx.fillStyle = 'rgba(34, 85, 34, 0.7)';
+        const treeX = x + (treeHash % 3 + 1) * size / 4;
+        const treeY = y + ((treeHash * 7) % 3 + 1) * size / 4;
+        ctx.beginPath();
+        ctx.arc(treeX, treeY, size * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+        // Trunk
+        ctx.fillStyle = 'rgba(101, 67, 33, 0.5)';
+        ctx.fillRect(treeX - 2, treeY + size * 0.08, 4, size * 0.15);
+      }
+      break;
+      
+    case 'water':
+      // Animated waves
+      const waveOffset = Math.sin(frameCount * 0.03 + x * 0.1 + y * 0.1) * 2;
+      ctx.strokeStyle = 'rgba(100, 180, 220, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, centerY + waveOffset);
+      ctx.quadraticCurveTo(centerX, centerY - 3 + waveOffset, x + size - 4, centerY + waveOffset);
+      ctx.stroke();
+      break;
+      
+    case 'desert':
+      // Sand dunes pattern
+      const duneHash = (Math.floor(x) * 13 + Math.floor(y) * 23) % 100;
+      if (duneHash < 25) {
+        ctx.fillStyle = 'rgba(205, 175, 125, 0.4)';
+        ctx.beginPath();
+        ctx.moveTo(x + size * 0.2, y + size * 0.7);
+        ctx.quadraticCurveTo(centerX, y + size * 0.4, x + size * 0.8, y + size * 0.7);
+        ctx.fill();
+      }
+      break;
+      
+    case 'mountains':
+      // Rock pattern
+      const rockHash = (Math.floor(x) * 17 + Math.floor(y) * 29) % 100;
+      if (rockHash < 30) {
+        ctx.fillStyle = 'rgba(70, 70, 80, 0.5)';
+        const rockX = x + (rockHash % 4) * size / 5 + size * 0.1;
+        const rockY = y + ((rockHash * 3) % 4) * size / 5 + size * 0.1;
+        ctx.beginPath();
+        ctx.moveTo(rockX, rockY + size * 0.2);
+        ctx.lineTo(rockX + size * 0.15, rockY);
+        ctx.lineTo(rockX + size * 0.3, rockY + size * 0.2);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+      
+    case 'plains':
+      // Grass tufts
+      const grassHash = (Math.floor(x) * 41 + Math.floor(y) * 37) % 100;
+      if (grassHash < 15) {
+        ctx.strokeStyle = 'rgba(100, 150, 80, 0.5)';
+        ctx.lineWidth = 1;
+        const grassX = x + (grassHash % 5 + 1) * size / 6;
+        const grassY = y + size * 0.6;
+        for (let i = 0; i < 3; i++) {
+          const sway = Math.sin(frameCount * 0.02 + x + i) * 1.5;
+          ctx.beginPath();
+          ctx.moveTo(grassX + i * 3, grassY + size * 0.3);
+          ctx.quadraticCurveTo(grassX + i * 3 + sway, grassY, grassX + i * 3, grassY - size * 0.15);
+          ctx.stroke();
+        }
+      }
+      break;
+      
+    case 'burned':
+      // Ash and charred remains
+      ctx.fillStyle = 'rgba(30, 30, 30, 0.3)';
+      const ashHash = (Math.floor(x) * 11 + Math.floor(y) * 19) % 100;
+      if (ashHash < 40) {
+        ctx.beginPath();
+        ctx.arc(x + size * 0.3 + ashHash % 20, y + size * 0.5, size * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Smoke wisps (animated)
+      const smokeY = Math.sin(frameCount * 0.05 + x) * 3;
+      ctx.fillStyle = 'rgba(100, 100, 100, 0.15)';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY - size * 0.2 + smokeY, size * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+  }
+}
+
+/**
+ * Draw terrain layer (overlays on biomes)
+ */
+function drawTerrain(ctx, terrain, terrainTypes, camera, frameCount, biomeMap, biomeTypes) {
+  // First draw biomes as base layer
+  if (biomeMap && biomeTypes) {
+    drawBiomes(ctx, biomeMap, biomeTypes, camera, frameCount);
+  }
+  
   if (!terrain || !terrainTypes) return;
   
   const gridSize = CONFIG.GRID_SIZE;
@@ -23,13 +180,13 @@ function drawTerrain(ctx, terrain, terrainTypes, camera, frameCount) {
   const endGridX = Math.ceil((visibleArea.x + visibleArea.width) / gridSize);
   const endGridY = Math.ceil((visibleArea.y + visibleArea.height) / gridSize);
   
-  // Draw base terrain (skip grass - that's the background)
+  // Draw special terrain (skip grass - biome provides that)
   for (let gy = startGridY; gy <= endGridY; gy++) {
     if (!terrain[gy]) continue;
     for (let gx = startGridX; gx <= endGridX; gx++) {
       const terrainType = terrain[gy][gx];
       
-      // Skip grass (background) and path (drawn separately)
+      // Skip grass (biome provides base) and path (drawn separately)
       if (!terrainType || terrainType === 'grass' || terrainType === 'path') continue;
       
       const terrainDef = terrainTypes[terrainType];
@@ -38,9 +195,11 @@ function drawTerrain(ctx, terrain, terrainTypes, camera, frameCount) {
       const x = gx * gridSize;
       const y = gy * gridSize;
       
-      // Draw terrain cell
+      // Draw terrain cell with semi-transparency to blend with biome
       ctx.fillStyle = terrainDef.color;
+      ctx.globalAlpha = 0.8;
       ctx.fillRect(x, y, gridSize, gridSize);
+      ctx.globalAlpha = 1;
       
       // Add terrain decorations
       drawTerrainDecoration(ctx, terrainType, x, y, gridSize);
@@ -286,6 +445,8 @@ function drawBase(ctx, waypoints, camera) {
 }
 
 module.exports = {
+  drawBiomes,
+  drawBiomeDecoration,
   drawTerrain,
   drawTerrainDecoration,
   drawSpecialElements,

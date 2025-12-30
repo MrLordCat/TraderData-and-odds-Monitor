@@ -76,7 +76,8 @@ class GameRenderer {
     }
     
     // Draw layers in order (all in world coordinates)
-    drawTerrain(this.ctx, data.terrain, data.terrainTypes, this.camera, this.frameCount);
+    // Terrain now includes biome base layer
+    drawTerrain(this.ctx, data.terrain, data.terrainTypes, this.camera, this.frameCount, data.biomeMap, data.biomeTypes);
     drawGrid(this.ctx, this.camera);
     drawPath(this.ctx, data.waypoints, data.pathCells, this.camera);
     drawSpecialElements(this.ctx, data.energyNodes, data.resourceVeins, data.terrainTypes, this.frameCount);

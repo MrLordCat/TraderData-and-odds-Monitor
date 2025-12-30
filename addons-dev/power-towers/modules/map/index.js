@@ -1,12 +1,22 @@
 /**
  * Power Towers TD - Map Module
  * 
- * Manages map state, terrain, and path for enemies.
- * Handles procedural generation and terrain effects.
+ * Manages map state, terrain, biomes, and path for enemies.
+ * Handles procedural generation and terrain/biome effects.
+ * 
+ * NEW: Biome system with modifiers and border effects
  */
 
 const { GameEvents } = require('../../core/event-bus');
 const { MapGenerator, GENERATOR_CONFIG } = require('./map-generator');
+const { BiomeGenerator, BIOME_GEN_CONFIG } = require('./biome-generator');
+const { 
+  BIOME_TYPES, 
+  getBiome, 
+  getBorderEffect, 
+  calculateCellModifiers,
+  isBiomeBuildable 
+} = require('../../core/biomes');
 
 /**
  * Terrain type definitions with effects
@@ -87,6 +97,10 @@ class MapModule {
     // Terrain data (2D array of terrain types)
     this.terrain = [];
     
+    // Biome data (NEW)
+    this.biomeGenerator = new BiomeGenerator(this.width, this.height);
+    this.biomeMap = [];       // 2D array of biome IDs
+    
     // Path data
     this.waypoints = [];      // Absolute pixel coordinates
     this.pathCells = [];      // Grid cells occupied by path
@@ -119,10 +133,15 @@ class MapModule {
   }
 
   /**
-   * Update (not much to do for map each frame)
+   * Update (forest regeneration, etc.)
    */
   update(deltaTime) {
-    // Map is mostly static, terrain effects handled elsewhere
+    // Update forest regeneration
+    const regrown = this.biomeGenerator.updateForestRegeneration(deltaTime * 60); // Convert to ticks
+    
+    if (regrown.length > 0) {
+      this.eventBus.emit('map:forest-regrown', { cells: regrown });
+    }
   }
 
   /**
@@ -130,6 +149,7 @@ class MapModule {
    */
   reset() {
     this.terrain = [];
+    this.biomeMap = [];
     this.waypoints = [];
     this.pathCells = [];
     this.energyNodes = [];
@@ -138,6 +158,9 @@ class MapModule {
     this.spawnPoint = null;
     this.basePoint = null;
     this.currentSeed = null;
+    
+    // Reset biome generator
+    this.biomeGenerator = new BiomeGenerator(this.width, this.height);
   }
 
   /**
@@ -152,12 +175,12 @@ class MapModule {
    * @param {number} seed - Optional seed for reproducible generation
    */
   generateMap(seed = null) {
-    console.log('[MapModule] Generating new map...');
+    console.log('[MapModule] Generating new map with biomes...');
     
-    // Generate map
+    // Generate base map (path, terrain features)
     const mapData = this.generator.generate(seed);
     
-    // Store data
+    // Store terrain data
     this.terrain = mapData.terrain;
     this.waypoints = mapData.waypoints;
     this.pathCells = mapData.pathCells;
@@ -167,7 +190,15 @@ class MapModule {
     this.resourceVeins = mapData.resourceVeins;
     this.currentSeed = seed || Date.now();
     
-    // Calculate buildable cells
+    // Generate biomes (NEW)
+    const pathCellSet = new Set(this.pathCells.map(c => `${c.x},${c.y}`));
+    this.biomeMap = this.biomeGenerator.generate(
+      this.generator.noise, 
+      this.generator.rng,
+      pathCellSet
+    );
+    
+    // Calculate buildable cells (now considers biomes too)
     this.calculateBuildableCells();
     
     // Emit event
@@ -180,24 +211,31 @@ class MapModule {
       basePoint: this.basePoint,
       energyNodes: this.energyNodes,
       resourceVeins: this.resourceVeins,
+      biomeMap: this.biomeMap,
       seed: this.currentSeed
     });
     
-    console.log(`[MapModule] Map generated: ${this.pathCells.length} path cells, seed: ${this.currentSeed}`);
+    console.log(`[MapModule] Map generated: ${this.pathCells.length} path cells, biomes enabled, seed: ${this.currentSeed}`);
   }
 
   /**
-   * Calculate buildable cells
+   * Calculate buildable cells (considering both terrain and biome)
    */
   calculateBuildableCells() {
     this.buildableCells = [];
     
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
+        // Check terrain
         const terrain = this.terrain[y][x];
         const terrainDef = TERRAIN_TYPES[terrain];
+        const terrainBuildable = terrainDef && terrainDef.buildable;
         
-        if (terrainDef && terrainDef.buildable) {
+        // Check biome
+        const biomeBuildable = this.biomeGenerator.isCellBuildable(x, y);
+        
+        // Cell is buildable if both terrain and biome allow it
+        if (terrainBuildable && biomeBuildable) {
           this.buildableCells.push({ x, y });
         }
       }
@@ -205,15 +243,20 @@ class MapModule {
   }
 
   /**
-   * Check if a cell is buildable
+   * Check if a cell is buildable (terrain + biome)
    */
   isBuildable(gridX, gridY) {
     if (gridX < 0 || gridX >= this.width || gridY < 0 || gridY >= this.height) {
       return false;
     }
+    
+    // Check terrain
     const terrain = this.terrain[gridY][gridX];
     const terrainDef = TERRAIN_TYPES[terrain];
-    return terrainDef && terrainDef.buildable;
+    if (!terrainDef || !terrainDef.buildable) return false;
+    
+    // Check biome
+    return this.biomeGenerator.isCellBuildable(gridX, gridY);
   }
 
   /**
@@ -240,23 +283,112 @@ class MapModule {
     const terrain = this.getTerrainAt(gridX, gridY);
     return terrain ? TERRAIN_TYPES[terrain] : null;
   }
+  
+  // =========================================
+  // BIOME API (NEW)
+  // =========================================
+  
+  /**
+   * Get biome at grid position
+   * @param {number} gridX 
+   * @param {number} gridY 
+   * @returns {string|null} Biome ID
+   */
+  getBiomeAt(gridX, gridY) {
+    return this.biomeGenerator.getBiomeAt(gridX, gridY);
+  }
+  
+  /**
+   * Get biome configuration at grid position
+   * @param {number} gridX 
+   * @param {number} gridY 
+   * @returns {object|null} Biome config from BIOME_TYPES
+   */
+  getBiomeConfigAt(gridX, gridY) {
+    const biomeId = this.getBiomeAt(gridX, gridY);
+    return biomeId ? getBiome(biomeId) : null;
+  }
+  
+  /**
+   * Get border info for a cell (nearby different biomes)
+   * @param {number} gridX 
+   * @param {number} gridY 
+   * @returns {object|null} { baseBiome, nearbyBiomes: Set, isBorder: bool }
+   */
+  getBorderInfo(gridX, gridY) {
+    return this.biomeGenerator.getBorderInfo(gridX, gridY);
+  }
+  
+  /**
+   * Get all modifiers for a cell (biome + border effects combined)
+   * Use this for building placement and tower stats
+   * @param {number} gridX 
+   * @param {number} gridY 
+   * @returns {object} Combined modifier object
+   */
+  getCellModifiers(gridX, gridY) {
+    const biomeId = this.getBiomeAt(gridX, gridY);
+    if (!biomeId) return {};
+    
+    const borderInfo = this.getBorderInfo(gridX, gridY);
+    const nearbyBiomes = borderInfo ? Array.from(borderInfo.nearbyBiomes) : [];
+    
+    return calculateCellModifiers(biomeId, nearbyBiomes);
+  }
+  
+  /**
+   * Burn forest at position (for bio-generator)
+   * @param {number} gridX 
+   * @param {number} gridY 
+   * @returns {number} Energy gained (0 if not forest)
+   */
+  burnForest(gridX, gridY) {
+    const energy = this.biomeGenerator.burnForest(gridX, gridY);
+    
+    if (energy > 0) {
+      // Update biome map reference
+      this.biomeMap = this.biomeGenerator.biomeMap;
+      
+      // Emit event
+      this.eventBus.emit('map:forest-burned', { 
+        x: gridX, 
+        y: gridY, 
+        energyGained: energy 
+      });
+    }
+    
+    return energy;
+  }
 
   /**
    * Get terrain bonus for a tower at position
+   * NOW includes biome modifiers!
    */
   getTerrainBonus(gridX, gridY) {
     const terrainDef = this.getTerrainDefAt(gridX, gridY);
     
-    if (!terrainDef) {
-      return { rangeBonus: 1.0, damageBonus: 1.0, energyBonus: 0, goldBonus: 0 };
+    // Start with terrain bonuses
+    const bonus = {
+      rangeBonus: terrainDef?.rangeBonus || 1.0,
+      damageBonus: terrainDef?.damageBonus || 1.0,
+      energyBonus: terrainDef?.energyBonus || 0,
+      goldBonus: terrainDef?.goldBonus || 0
+    };
+    
+    // Apply biome modifiers
+    const biomeModifiers = this.getCellModifiers(gridX, gridY);
+    
+    if (biomeModifiers.towerRange) {
+      bonus.rangeBonus *= biomeModifiers.towerRange;
+    }
+    if (biomeModifiers.towerDamage) {
+      bonus.damageBonus *= biomeModifiers.towerDamage;
+    }
+    if (biomeModifiers.energyProduction) {
+      bonus.energyBonus += (biomeModifiers.energyProduction - 1); // Convert multiplier to bonus
     }
     
-    return {
-      rangeBonus: terrainDef.rangeBonus || 1.0,
-      damageBonus: terrainDef.damageBonus || 1.0,
-      energyBonus: terrainDef.energyBonus || 0,
-      goldBonus: terrainDef.goldBonus || 0
-    };
+    return bonus;
   }
 
   /**
@@ -268,6 +400,8 @@ class MapModule {
       height: this.height,
       terrain: this.terrain,
       terrainTypes: TERRAIN_TYPES,
+      biomeMap: this.biomeMap,
+      biomeTypes: BIOME_TYPES,
       waypoints: this.waypoints,
       pathCells: this.pathCells,
       spawnPoint: this.spawnPoint,
