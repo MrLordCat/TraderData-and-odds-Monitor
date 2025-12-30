@@ -23,12 +23,12 @@ class BaseGenerator extends PowerNode {
       inputChannels: 0,        // Generators don't receive power
       outputChannels: 1,
       inputRate: 0,
-      outputRate: 15,
-      capacity: 50,
+      outputRate: 20,          // Increased from 15
+      capacity: 100,           // Increased from 50
       range: 4
     });
     
-    this.generation = options.generation || 5; // Power per second
+    this.generation = options.generation || 15; // Increased from 5
     this.baseGeneration = this.generation;
   }
 

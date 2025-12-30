@@ -154,8 +154,9 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     
     /**
      * Apply a stat upgrade
-     * @param {string} upgradeId - Upgrade ID
-     * @param {Object} upgradeConfig - Upgrade config with effect data
+     * NEW SYSTEM: Just increment upgradeLevels, tower-stats.js handles % bonuses
+     * @param {string} upgradeId - Upgrade ID (e.g., 'damage', 'range')
+     * @param {Object} upgradeConfig - Upgrade config (unused, kept for compatibility)
      * @returns {boolean} Success
      */
     applyStatUpgrade(upgradeId, upgradeConfig) {
@@ -165,68 +166,46 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
       }
       this.upgradeLevels[upgradeId]++;
       
-      const effect = upgradeConfig.effect;
-      const value = effect.valuePerLevel;
-      
-      // Apply upgrade based on stat type
-      switch (effect.stat) {
-        case 'baseDamage':
-          this.baseDamage += value;
-          break;
-        case 'baseFireRate':
-          this.baseFireRate += value;
-          break;
-        case 'baseRange':
-          this.baseRange += value;
-          break;
-        case 'critChance':
-          const maxCrit = effect.maxValue || 0.75;
-          this.critChanceUpgrade = Math.min((this.critChanceUpgrade || 0) + value, maxCrit);
-          break;
-        case 'critDmgMod':
-          const maxCritDmg = effect.maxValue || 5.0;
-          this.critDmgUpgrade = Math.min((this.critDmgUpgrade || 0) + value, maxCritDmg);
-          break;
-        case 'maxHp':
-          this.maxHp += value;
-          this.currentHp = Math.min(this.currentHp + value, this.maxHp);
-          break;
-        case 'energyStorage':
-          this.energyStorage = (this.energyStorage || 50) + value;
-          break;
-        case 'energyRegen':
-          this.energyRegen = (this.energyRegen || 1) + value;
-          break;
-        case 'armor':
-          this.armor = (this.armor || 0) + value;
-          break;
-        case 'lifesteal':
-          const maxLifesteal = effect.maxValue || 0.5;
-          this.lifesteal = Math.min((this.lifesteal || 0) + value, maxLifesteal);
-          break;
-        case 'cooldownReduction':
-          const maxCdr = effect.maxValue || 0.5;
-          this.cooldownReduction = Math.min((this.cooldownReduction || 0) + value, maxCdr);
-          break;
-        case 'multishot':
-          const maxMs = effect.maxValue || 5;
-          this.multishot = Math.min((this.multishot || 1) + value, maxMs);
-          break;
-        case 'splashRadius':
-          const maxAoe = effect.maxValue || 100;
-          this.splashRadius = Math.min((this.splashRadius || 0) + value, maxAoe);
-          break;
-        default:
-          console.warn(`Unknown stat: ${effect.stat}`);
-          return false;
+      // HP Regen is additive (not percentage based)
+      if (upgradeId === 'hpRegen' && upgradeConfig?.effect?.valuePerLevel) {
+        this.hpRegen = (this.hpRegen || 0) + upgradeConfig.effect.valuePerLevel;
       }
       
-      // Recalculate effective stats
+      // Add upgrade points for level calculation
+      this.upgradePoints = (this.upgradePoints || 0) + 1;
+      
+      // Check for level up
+      const newLevel = this.calculateLevel();
+      if (newLevel > (this.level || 1)) {
+        this.level = newLevel;
+      }
+      
+      // Recalculate effective stats with new upgradeLevels
       if (this.recalculateStats) {
         this.recalculateStats();
       }
       
       return true;
+    },
+    
+    /**
+     * Calculate tower level from upgrade points
+     */
+    calculateLevel() {
+      const points = this.upgradePoints || 0;
+      const pointsPerLevel = [0, 3, 8, 15, 25, 40, 60, 85, 115, 150];
+      
+      for (let i = pointsPerLevel.length - 1; i >= 0; i--) {
+        if (points >= pointsPerLevel[i]) {
+          if (i === pointsPerLevel.length - 1) {
+            const extraPoints = points - pointsPerLevel[i];
+            const extraLevels = Math.floor(extraPoints / 40);
+            return i + 1 + extraLevels;
+          }
+          return i + 1;
+        }
+      }
+      return 1;
     }
   };
   

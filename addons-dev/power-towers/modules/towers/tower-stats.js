@@ -31,6 +31,18 @@ function recalculateTowerStats(tower) {
     attackType = tower.attackTypeConfig;
   }
   
+  // Fallback if no attack type config
+  if (!attackType) {
+    attackType = {
+      dmgMod: 1,
+      rangeMod: 1,
+      atkSpdMod: 1,
+      energyCostMod: 1,
+      critChance: 0.05,
+      critDmgMod: 1.5
+    };
+  }
+  
   // =========================================
   // STEP 1: Apply level bonus to base stats
   // Each level gives +1% to base stats
