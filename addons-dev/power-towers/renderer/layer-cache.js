@@ -149,6 +149,7 @@ class LayerCache {
     // Check if camera moved - if so, need to redraw static layer
     if (this._cameraChanged(camera)) {
       this.dirty.static = true;
+      this.dirty.path = true;  // Path also needs redraw on camera move!
       this._updateCameraTracking(camera);
     }
     
