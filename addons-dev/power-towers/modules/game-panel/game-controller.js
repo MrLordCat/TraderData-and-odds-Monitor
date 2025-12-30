@@ -185,13 +185,19 @@ class GameControllerBase {
         const screen = btn.dataset.screen;
         this.showScreen(screen);
         if (screen === 'game') {
-          if (!this.game) {
-            this.initializeGame();
-          }
-          // Close menu module so game updates run
-          if (this.game && this.game.modules && this.game.modules.menu) {
-            this.game.modules.menu.isOpen = false;
-          }
+          // Delay init to let screen become visible first
+          requestAnimationFrame(() => {
+            if (!this.game) {
+              this.initializeGame();
+            } else {
+              // Game exists, just force resize
+              this.resizeCanvas();
+            }
+            // Close menu module so game updates run
+            if (this.game && this.game.modules && this.game.modules.menu) {
+              this.game.modules.menu.isOpen = false;
+            }
+          });
         }
       });
     });
@@ -293,19 +299,19 @@ class GameControllerBase {
       const rect = this.canvasContainer.getBoundingClientRect();
       const width = Math.floor(rect.width);
       const height = Math.floor(rect.height);
+      console.log(`[GameController] Container rect: ${width}x${height}`);
       if (width > 200 && height > 200) {
         this.canvas.width = width;
         this.canvas.height = height;
       }
     }
     
-    // Initialize camera
-    this.camera = new this.Camera(
-      this.canvas.width,
-      this.canvas.height,
-      this.CONFIG.MAP_WIDTH * this.CONFIG.GRID_SIZE,
-      this.CONFIG.MAP_HEIGHT * this.CONFIG.GRID_SIZE
-    );
+    console.log(`[GameController] Canvas size: ${this.canvas.width}x${this.canvas.height}`);
+    
+    // Initialize camera (no constructor params - use setViewportSize)
+    this.camera = new this.Camera();
+    this.camera.setViewportSize(this.canvas.width, this.canvas.height);
+    console.log(`[GameController] Camera viewport: ${this.camera.viewportWidth}x${this.camera.viewportHeight}, zoom: ${this.camera.zoom}`);
     
     // Initialize renderer (pass canvas, not ctx)
     this.renderer = new this.GameRenderer(this.canvas, this.camera);
@@ -330,6 +336,12 @@ class GameControllerBase {
     // Force immediate render
     this.renderGame();
     this.updateUI(this.game.getState());
+    
+    // Schedule another resize/render after a brief delay to catch late layout
+    setTimeout(() => {
+      this.resizeCanvas();
+      this.renderGame();
+    }, 100);
   }
   
   /**
