@@ -43,7 +43,7 @@ const BIOME_TYPES = {
     modifiers: {
       energyProduction: 0.8,   // -20% base energy (trees block wind/sun)
       buildCost: 1.0,          // Normal cost
-      towerRange: 0.9,         // -10% range (obstructed)
+      towerRange: 0.9,         // -10% range (trees obstruct view)
       towerDamage: 1.0,
     },
     
@@ -137,28 +137,33 @@ const BIOME_TYPES = {
   },
 
   // =========================================
-  // MOUNTAINS - Mostly non-buildable, minerals
+  // MOUNTAINS - High ground, range bonus
   // =========================================
   mountains: {
     id: 'mountains',
     name: 'Mountains',
     emoji: '⛰️',
-    description: 'Rocky terrain with mineral deposits',
+    description: 'High ground with excellent visibility for towers',
     
     color: '#8b8b8b',
     colorVariants: ['#7a7a7a', '#9c9c9c', '#6e6e6e'],
     
-    buildable: false,         // Cannot build (mostly)
-    walkable: false,          // Enemies cannot pass
+    buildable: true,          // Can build towers on mountains
+    walkable: false,          // Enemies cannot pass (path goes around)
     
     canRegenerate: false,
     burnable: false,
     
     modifiers: {
+      energyProduction: 0.9,   // -10% (harder to maintain)
+      buildCost: 1.2,          // +20% cost (difficult terrain)
+      towerRange: 1.2,         // +20% range (high ground advantage)
+      towerDamage: 1.0,
       miningEfficiency: 1.5,   // +50% if mining buildings added
+      windEfficiency: 1.3,     // +30% wind (altitude)
     },
     
-    pathSpeedMod: 0,           // Impassable
+    pathSpeedMod: 0,           // Impassable for enemies
   },
 
   // =========================================
