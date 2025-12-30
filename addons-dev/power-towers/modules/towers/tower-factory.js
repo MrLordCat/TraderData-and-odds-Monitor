@@ -45,7 +45,7 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     // Tower Energy
     maxEnergy: 100,
     currentEnergy: 100,
-    energyRegen: 20,       // per second
+    energyRegen: 0,        // disabled - use energy buildings
     energyCostPerShot: 5,  // energy cost per attack
     
     // =========================================

@@ -86,6 +86,9 @@ class GameCore {
       module.init();
     }
     
+    // Connect modules that need cross-references
+    this.modules.towers.setMapModule(this.modules.map);
+    
     // Generate initial map (for menu preview)
     this.modules.map.generateMap();
     

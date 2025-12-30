@@ -31,6 +31,14 @@ function recalculateTowerStats(tower) {
   tower.fireRate = tower.baseFireRate * attackType.atkSpdMod;
   tower.energyCost = tower.baseEnergyCost * attackType.energyCostMod;
   
+  // Apply TERRAIN bonuses (from biome/terrain type)
+  if (tower.terrainDamageBonus && tower.terrainDamageBonus !== 1.0) {
+    tower.damage *= tower.terrainDamageBonus;
+  }
+  if (tower.terrainRangeBonus && tower.terrainRangeBonus !== 1.0) {
+    tower.range *= tower.terrainRangeBonus;
+  }
+  
   // Calculate HP
   tower.maxHp = tower.baseHp * tower.hpMultiplier;
   // Keep current HP ratio when max changes

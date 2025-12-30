@@ -40,11 +40,21 @@ class TowersModule {
     // Selected tower for UI
     this.selectedTowerId = null;
     
+    // Reference to map module (for terrain bonuses)
+    this.mapModule = null;
+    
     // Create upgrade handlers with context
     this.upgradeHandlers = createUpgradeHandlers({
       towers: this.towers,
       eventBus: this.eventBus
     });
+  }
+
+  /**
+   * Set reference to map module (for terrain bonuses)
+   */
+  setMapModule(mapModule) {
+    this.mapModule = mapModule;
   }
 
   /**
@@ -150,8 +160,25 @@ class TowersModule {
       this.nextTowerId++
     );
     
+    // Apply terrain bonuses
+    if (this.mapModule) {
+      const terrainBonus = this.mapModule.getTerrainBonus(gridX, gridY);
+      tower.terrainRangeBonus = terrainBonus.rangeBonus || 1.0;
+      tower.terrainDamageBonus = terrainBonus.damageBonus || 1.0;
+      tower.terrainEnergyBonus = terrainBonus.energyBonus || 0;
+      tower.terrainGoldBonus = terrainBonus.goldBonus || 0;
+    } else {
+      tower.terrainRangeBonus = 1.0;
+      tower.terrainDamageBonus = 1.0;
+      tower.terrainEnergyBonus = 0;
+      tower.terrainGoldBonus = 0;
+    }
+    
     // Bind recalculate method
     tower.recalculateStats = () => recalculateTowerStats(tower);
+    
+    // Apply terrain bonuses to stats
+    tower.recalculateStats();
     
     this.towers.set(tower.id, tower);
     return tower;
@@ -208,13 +235,8 @@ class TowersModule {
   // =========================================
 
   updateTower(tower, deltaTime, enemies) {
-    // Regenerate energy
-    if (tower.currentEnergy < tower.maxEnergy) {
-      tower.currentEnergy = Math.min(
-        tower.maxEnergy,
-        tower.currentEnergy + tower.energyRegen * deltaTime
-      );
-    }
+    // Energy is now provided by energy buildings, not passive regen
+    // Tower can only attack if it has energy
     
     // Reduce cooldown
     if (tower.attackCooldown > 0) {
