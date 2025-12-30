@@ -192,11 +192,47 @@ function getGameTemplate() {
         
         <div class="build-toolbar" id="build-toolbar">
           <div class="toolbar-section towers-section">
+            <div class="section-label">Towers:</div>
             <div class="tower-select" id="tower-select">
               <!-- Single tower type -->
               <div class="tower-item" data-tower="base" title="Build Tower (50g)">
                 <button class="tower-btn">🏗️</button>
                 <span class="tower-price">50g</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Energy Buildings Section -->
+          <div class="toolbar-section energy-section">
+            <div class="section-label">Power:</div>
+            <div class="energy-select" id="energy-select">
+              <div class="energy-item" data-building="base-generator" title="Basic Generator - Stable power (50g)">
+                <button class="energy-btn">⚡</button>
+                <span class="energy-price">50g</span>
+              </div>
+              <div class="energy-item" data-building="bio-generator" title="Bio Generator - Uses trees (80g)">
+                <button class="energy-btn">🌳</button>
+                <span class="energy-price">80g</span>
+              </div>
+              <div class="energy-item" data-building="wind-generator" title="Wind Turbine - Needs mountains (100g)">
+                <button class="energy-btn">💨</button>
+                <span class="energy-price">100g</span>
+              </div>
+              <div class="energy-item" data-building="solar-generator" title="Solar Panel - Biome efficiency (90g)">
+                <button class="energy-btn">☀️</button>
+                <span class="energy-price">90g</span>
+              </div>
+              <div class="energy-item" data-building="water-generator" title="Hydro Generator - Needs water (95g)">
+                <button class="energy-btn">💧</button>
+                <span class="energy-price">95g</span>
+              </div>
+              <div class="energy-item" data-building="battery" title="Battery - Energy storage (60g)">
+                <button class="energy-btn">🔋</button>
+                <span class="energy-price">60g</span>
+              </div>
+              <div class="energy-item" data-building="power-transfer" title="Power Relay - Multi-channel (75g)">
+                <button class="energy-btn">🔌</button>
+                <span class="energy-price">75g</span>
               </div>
             </div>
           </div>

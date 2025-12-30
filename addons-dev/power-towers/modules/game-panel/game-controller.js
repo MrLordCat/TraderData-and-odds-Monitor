@@ -43,6 +43,8 @@ class GameControllerBase {
     this.resizeObserver = null;
     
     this.placingTower = false;
+    this.placingEnergy = false;
+    this.placingEnergyType = null;
     this.selectedPath = 'fire';
     this.currentScreen = 'menu';
     
@@ -397,6 +399,9 @@ class GameControllerBase {
       }
     });
     
+    // Update energy building affordability
+    this.updateEnergyAffordability();
+    
     // Update tooltip buttons if tower is selected
     if (this.game.selectedTower) {
       this.updateTooltipButtonStates(this.game.selectedTower);
@@ -462,6 +467,109 @@ class GameControllerBase {
       this.renderer.clearHover();
       this.renderGame();
     }
+  }
+  
+  /**
+   * Enter energy building placement mode
+   */
+  enterEnergyPlacementMode(buildingType) {
+    this.placingEnergy = true;
+    this.placingEnergyType = buildingType;
+    
+    // Update UI - highlight selected energy building
+    const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
+    energyItems.forEach(item => {
+      if (item.dataset.building === buildingType) {
+        item.classList.add('placing');
+      } else {
+        item.classList.remove('placing');
+      }
+    });
+    
+    // Deselect tower if any
+    if (this.game && this.game.selectedTower) {
+      this.game.selectTower(null);
+    }
+    
+    this.renderGame();
+  }
+  
+  /**
+   * Exit energy building placement mode
+   */
+  exitEnergyPlacementMode() {
+    this.placingEnergy = false;
+    this.placingEnergyType = null;
+    
+    // Update UI
+    const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
+    energyItems.forEach(item => {
+      item.classList.remove('placing');
+    });
+    
+    if (this.renderer) {
+      this.renderer.clearHover();
+      this.renderGame();
+    }
+  }
+  
+  /**
+   * Place energy building at position
+   */
+  placeEnergyBuilding(gridX, gridY) {
+    if (!this.game || !this.placingEnergy || !this.placingEnergyType) return;
+    
+    const energyModule = this.game.getModule('energy');
+    if (!energyModule) {
+      console.warn('[GameController] Energy module not found');
+      return;
+    }
+    
+    // Convert grid to world coordinates
+    const worldX = gridX * this.CONFIG.GRID_SIZE + this.CONFIG.GRID_SIZE / 2;
+    const worldY = gridY * this.CONFIG.GRID_SIZE + this.CONFIG.GRID_SIZE / 2;
+    
+    // Try to place building
+    const building = energyModule.placeBuilding(
+      this.placingEnergyType,
+      gridX, gridY,
+      worldX, worldY
+    );
+    
+    if (building) {
+      console.log(`[GameController] Placed ${this.placingEnergyType} at (${gridX}, ${gridY})`);
+      this.updateUI(this.game.getState());
+      this.updateEnergyAffordability();
+      this.renderGame();
+    }
+  }
+  
+  /**
+   * Update energy building affordability
+   */
+  updateEnergyAffordability() {
+    if (!this.game) return;
+    
+    const gold = this.game.getState().gold || 0;
+    const energyModule = this.game.getModule('energy');
+    if (!energyModule) return;
+    
+    const defs = energyModule.getBuildingDefinitions();
+    
+    const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
+    energyItems.forEach(item => {
+      const buildingType = item.dataset.building;
+      const def = defs[buildingType];
+      const cost = def?.cost || 999;
+      const canAfford = gold >= cost;
+      
+      item.classList.toggle('disabled', !canAfford);
+      
+      const priceEl = item.querySelector('.energy-price');
+      if (priceEl) {
+        priceEl.style.color = canAfford ? '#ffd700' : '#fc8181';
+      }
+    });
   }
   
   /**

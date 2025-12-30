@@ -64,6 +64,9 @@ function CanvasEventsMixin(Base) {
         if (this.placingTower) {
           this.exitPlacementMode();
         }
+        if (this.placingEnergy) {
+          this.exitEnergyPlacementMode();
+        }
       });
     }
 
@@ -92,6 +95,9 @@ function CanvasEventsMixin(Base) {
         } catch (err) {
           console.error('[game-controller] placeTower error:', err);
         }
+      } else if (this.placingEnergy) {
+        // Place energy building
+        this.placeEnergyBuilding(gridX, gridY);
       } else {
         // Find tower at grid position
         const tower = this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY);
@@ -108,7 +114,7 @@ function CanvasEventsMixin(Base) {
 
     /**
      * Handle canvas mouse move
-     * Shows placement preview (ghost tower)
+     * Shows placement preview (ghost tower/building)
      */
     handleCanvasMove(e) {
       if (!this.game || !this.renderer || !this.camera) return;
@@ -126,9 +132,44 @@ function CanvasEventsMixin(Base) {
         this.renderer.setHover(gridX, gridY, canPlace);
         // Must render for placement preview (ghost) to show
         this.renderGame();
+      } else if (this.placingEnergy) {
+        // Check if can place energy building
+        const canPlace = this.canPlaceEnergyAt(gridX, gridY);
+        this.renderer.setHover(gridX, gridY, canPlace, this.placingEnergyType);
+        this.renderGame();
       } else {
         this.renderer.clearHover();
       }
+    }
+    
+    /**
+     * Check if energy building can be placed at position
+     */
+    canPlaceEnergyAt(gridX, gridY) {
+      if (!this.game) return false;
+      
+      const map = this.game.map;
+      if (!map) return true;
+      
+      // Check terrain
+      const terrain = map.terrain?.[gridY]?.[gridX];
+      if (terrain === 'water') return false;
+      
+      // Check if path
+      if (map.isPath?.(gridX, gridY)) return false;
+      
+      // Check if occupied by tower
+      if (this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY)) return false;
+      
+      // Check if occupied by energy building
+      const energyModule = this.game.getModule?.('energy');
+      if (energyModule?.buildingManager?.buildings) {
+        for (const building of energyModule.buildingManager.buildings.values()) {
+          if (building.gridX === gridX && building.gridY === gridY) return false;
+        }
+      }
+      
+      return true;
     }
 
     /**

@@ -155,40 +155,45 @@ function getGameStyles() {
       color: #a0aec0;
       min-width: 70px;
     }
-    .tower-select, .attack-type-select, .element-select {
-      display: flex; justify-content: center; gap: 8px;
+    .tower-select, .attack-type-select, .element-select, .energy-select {
+      display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
     }
-    .tower-item, .attack-type-item, .element-item {
+    .tower-item, .attack-type-item, .element-item, .energy-item {
       display: flex; flex-direction: column; align-items: center; gap: 4px;
       cursor: pointer; transition: all 0.2s;
     }
-    .tower-item:hover, .attack-type-item:hover, .element-item:hover { transform: scale(1.05); }
+    .tower-item:hover, .attack-type-item:hover, .element-item:hover, .energy-item:hover { transform: scale(1.05); }
     .tower-item.selected .tower-btn,
     .attack-type-item.selected .type-btn,
-    .element-item.selected .element-btn { 
+    .element-item.selected .element-btn,
+    .energy-item.selected .energy-btn { 
       border-color: #48bb78; 
       background: rgba(72,187,120,0.3); 
       box-shadow: 0 0 10px rgba(72,187,120,0.4); 
     }
-    .tower-item.placing .tower-btn { border-color: #ecc94b; background: rgba(236,201,75,0.3); animation: pulse-build 0.8s infinite; }
-    .tower-item.disabled, .attack-type-item.disabled, .element-item.disabled { opacity: 0.4; pointer-events: none; }
-    .tower-btn, .type-btn, .element-btn {
+    .tower-item.placing .tower-btn,
+    .energy-item.placing .energy-btn { border-color: #ecc94b; background: rgba(236,201,75,0.3); animation: pulse-build 0.8s infinite; }
+    .tower-item.disabled, .attack-type-item.disabled, .element-item.disabled, .energy-item.disabled { opacity: 0.4; pointer-events: none; }
+    .tower-btn, .type-btn, .element-btn, .energy-btn {
       width: 42px; height: 42px;
       border: 2px solid rgba(255,255,255,0.2); border-radius: 10px;
       background: rgba(255,255,255,0.1);
       font-size: 20px; transition: all 0.2s;
       pointer-events: none; /* Let parent handle clicks */
     }
+    .energy-btn { border-color: rgba(255,193,7,0.4); background: rgba(255,193,7,0.1); }
     .tower-item:hover .tower-btn,
     .attack-type-item:hover .type-btn,
-    .element-item:hover .element-btn { background: rgba(255,255,255,0.2); }
-    .tower-price, .type-price, .element-price {
+    .element-item:hover .element-btn,
+    .energy-item:hover .energy-btn { background: rgba(255,255,255,0.2); }
+    .tower-price, .type-price, .element-price, .energy-price {
       font-size: 10px; color: #ffd700; font-weight: 600;
       pointer-events: none; /* Let parent handle clicks */
     }
     .tower-item.disabled .tower-price,
     .attack-type-item.disabled .type-price,
-    .element-item.disabled .element-price { color: #fc8181; }
+    .element-item.disabled .element-price,
+    .energy-item.disabled .energy-price { color: #fc8181; }
     @keyframes pulse-build {
       0%, 100% { box-shadow: 0 0 5px rgba(236,201,75,0.4); }
       50% { box-shadow: 0 0 15px rgba(236,201,75,0.7); }

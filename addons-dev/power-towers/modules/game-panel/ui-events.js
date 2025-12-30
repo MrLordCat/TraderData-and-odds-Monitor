@@ -19,6 +19,7 @@ function UIEventsMixin(Base) {
       el.towerItems = this.screens.game?.querySelectorAll('.tower-item') || [];
       el.attackTypeItems = this.screens.game?.querySelectorAll('.attack-type-item') || [];
       el.elementItems = this.screens.game?.querySelectorAll('.element-item') || [];
+      el.energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
       el.tooltipTypeBtns = el.towerTooltip?.querySelectorAll('.tooltip-type-btn') || [];
       el.tooltipElementBtns = el.towerTooltip?.querySelectorAll('.tooltip-element-btn') || [];
       
@@ -75,10 +76,32 @@ function UIEventsMixin(Base) {
           e.stopPropagation();
           if (item.classList.contains('disabled')) return;
           
+          // Exit energy placing if active
+          this.exitEnergyPlacementMode();
+          
           if (this.placingTower) {
             this.exitPlacementMode();
           } else {
             this.enterPlacementMode();
+          }
+        });
+      });
+      
+      // Energy building buttons
+      el.energyItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (item.classList.contains('disabled')) return;
+          
+          const buildingType = item.dataset.building;
+          
+          // Exit tower placing if active
+          this.exitPlacementMode();
+          
+          if (this.placingEnergy && this.placingEnergyType === buildingType) {
+            this.exitEnergyPlacementMode();
+          } else {
+            this.enterEnergyPlacementMode(buildingType);
           }
         });
       });
