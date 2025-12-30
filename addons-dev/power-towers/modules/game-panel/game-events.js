@@ -28,7 +28,7 @@ function GameEventsMixin(Base) {
       
       this.game.on(this.GameEvents.STATE_CHANGE, (state) => {
         this.updateUI(state);
-        this.renderGame();
+        // Don't call renderGame() - GAME_TICK already renders every frame
       });
       
       this.game.on(this.GameEvents.TOWER_PLACED, () => {

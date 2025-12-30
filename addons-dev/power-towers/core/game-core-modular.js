@@ -278,12 +278,24 @@ class GameCore {
 
   /**
    * Main game loop
+   * OPTIMIZED: Capped at 60 FPS for consistent performance
    */
   gameLoop() {
     if (!this.running || this.paused) return;
     
     const now = performance.now();
-    const deltaTime = (now - this.lastTick) / 1000; // Convert to seconds
+    const elapsed = now - this.lastTick;
+    
+    // Cap at 60 FPS (16.67ms per frame)
+    const TARGET_FRAME_TIME = 1000 / 60;
+    
+    if (elapsed < TARGET_FRAME_TIME) {
+      // Not enough time passed, schedule next check
+      this.animationId = requestAnimationFrame(() => this.gameLoop());
+      return;
+    }
+    
+    const deltaTime = elapsed / 1000; // Convert to seconds
     
     this.update(deltaTime);
     this.eventBus.emit(GameEvents.GAME_TICK, { deltaTime, state: this.getState() });

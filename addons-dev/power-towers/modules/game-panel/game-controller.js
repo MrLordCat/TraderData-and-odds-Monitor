@@ -375,15 +375,20 @@ class GameControllerBase {
 
   /**
    * Update tower affordability based on current gold
+   * OPTIMIZED: Only updates if gold threshold changed
    */
   updateTowerAffordability() {
     if (!this.game) return;
     
     const gold = this.game.getState().gold || 0;
+    const canAfford = gold >= this.towerCost;
+    
+    // Skip if affordability hasn't changed
+    if (this._lastCanAfford === canAfford) return;
+    this._lastCanAfford = canAfford;
     
     // Update base tower affordability
     this.elements.towerItems.forEach(item => {
-      const canAfford = gold >= this.towerCost;
       item.classList.toggle('disabled', !canAfford);
       
       const priceEl = item.querySelector('.tower-price');
@@ -530,36 +535,60 @@ class GameControllerBase {
 
   /**
    * Update UI from game state
+   * OPTIMIZED: Only updates DOM if values changed
    */
   updateUI(state) {
     const el = this.elements;
     if (!el.gold) return;
     
-    el.gold.textContent = state.gold;
-    el.lives.textContent = state.lives;
-    el.lives.classList.toggle('danger', state.lives <= 5);
-    el.lives.classList.toggle('warning', state.lives > 5 && state.lives <= 10);
-    el.energy.textContent = Math.floor(state.energy?.energy || 0);
+    // Cache previous values to avoid unnecessary DOM updates
+    if (!this._lastUIState) this._lastUIState = {};
+    const last = this._lastUIState;
     
-    // Show wave with timer for next wave (always shows after first wave started)
+    // Gold
+    if (last.gold !== state.gold) {
+      el.gold.textContent = state.gold;
+      last.gold = state.gold;
+    }
+    
+    // Lives
+    if (last.lives !== state.lives) {
+      el.lives.textContent = state.lives;
+      el.lives.classList.toggle('danger', state.lives <= 5);
+      el.lives.classList.toggle('warning', state.lives > 5 && state.lives <= 10);
+      last.lives = state.lives;
+    }
+    
+    // Energy
+    const energyVal = Math.floor(state.energy?.energy || 0);
+    if (last.energy !== energyVal) {
+      el.energy.textContent = energyVal;
+      last.energy = energyVal;
+    }
+    
+    // Wave with timer
+    let waveText;
     if (state.firstWaveStarted) {
       const nextWaveIn = Math.ceil(state.nextWaveIn || 0);
-      el.wave.textContent = `${state.wave || 0} (${nextWaveIn}s)`;
+      waveText = `${state.wave || 0} (${nextWaveIn}s)`;
     } else {
-      el.wave.textContent = state.wave || 0;
+      waveText = String(state.wave || 0);
+    }
+    if (last.waveText !== waveText) {
+      el.wave.textContent = waveText;
+      last.waveText = waveText;
     }
     
     // Update start button text based on game state
     if (state.firstWaveStarted) {
-      // After first wave started, button is only pause/resume
-      if (state.paused) {
-        el.btnStart.textContent = '▶ Resume';
-      } else {
-        el.btnStart.textContent = '⏸ Pause';
+      const btnText = state.paused ? '▶ Resume' : '⏸ Pause';
+      if (last.btnText !== btnText) {
+        el.btnStart.textContent = btnText;
+        last.btnText = btnText;
       }
     }
     
-    // Update tower affordability
+    // Update tower affordability (has its own optimization)
     this.updateTowerAffordability();
   }
 

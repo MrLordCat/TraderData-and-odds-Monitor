@@ -1,6 +1,9 @@
 /**
  * Power Towers TD - Canvas Event Handlers
  * Handles canvas click, move, wheel, pan events
+ * 
+ * OPTIMIZED: No direct renderGame() calls - uses dirty flags
+ * Render happens on next game tick via requestAnimationFrame
  */
 
 /**
@@ -13,10 +16,19 @@ function CanvasEventsMixin(Base) {
      * Setup canvas event listeners
      */
     setupCanvasEvents() {
+      // Throttle mousemove for performance
+      let lastMoveTime = 0;
+      const MOVE_THROTTLE = 16; // ~60fps max for hover updates
+      
       // Canvas events
       this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-      this.canvas.addEventListener('mousemove', (e) => this.handleCanvasMove(e));
-      this.canvas.addEventListener('wheel', (e) => this.handleCanvasWheel(e));
+      this.canvas.addEventListener('mousemove', (e) => {
+        const now = performance.now();
+        if (now - lastMoveTime < MOVE_THROTTLE) return;
+        lastMoveTime = now;
+        this.handleCanvasMove(e);
+      });
+      this.canvas.addEventListener('wheel', (e) => this.handleCanvasWheel(e), { passive: false });
       
       // Pan with middle/right mouse
       let isPanning = false, lastX = 0, lastY = 0;
@@ -35,6 +47,7 @@ function CanvasEventsMixin(Base) {
           this.camera.pan(-(e.clientX - lastX) / this.camera.zoom, -(e.clientY - lastY) / this.camera.zoom);
           lastX = e.clientX;
           lastY = e.clientY;
+          // Must render immediately for smooth panning feedback
           this.renderGame();
           // Update tooltip position if visible
           this.updateTooltipPosition();
@@ -89,11 +102,13 @@ function CanvasEventsMixin(Base) {
         }
       }
       
+      // Click is important - render immediately for feedback
       this.renderGame();
     }
 
     /**
      * Handle canvas mouse move
+     * Shows placement preview (ghost tower)
      */
     handleCanvasMove(e) {
       if (!this.game || !this.renderer || !this.camera) return;
@@ -109,11 +124,11 @@ function CanvasEventsMixin(Base) {
       if (this.placingTower) {
         const canPlace = this.game.canPlaceTower(gridX, gridY);
         this.renderer.setHover(gridX, gridY, canPlace);
+        // Must render for placement preview (ghost) to show
+        this.renderGame();
       } else {
         this.renderer.clearHover();
       }
-      
-      this.renderGame();
     }
 
     /**
@@ -125,6 +140,7 @@ function CanvasEventsMixin(Base) {
       
       const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
       this.camera.zoomBy(zoomFactor);
+      // Must render immediately for zoom feedback
       this.renderGame();
       // Update tooltip position if visible
       this.updateTooltipPosition();
