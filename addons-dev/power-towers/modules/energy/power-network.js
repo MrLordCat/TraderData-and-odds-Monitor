@@ -179,8 +179,15 @@ class PowerNetwork {
         node.applyDecay(dt);
       }
     }
+    
+    // 4. Update consumers (transfer stored energy to towers)
+    for (const node of this.nodes.values()) {
+      if (node.nodeType === 'consumer') {
+        node.update?.(dt);
+      }
+    }
 
-    // 4. Emit network state
+    // 5. Emit network state
     this.emitNetworkState();
   }
 
