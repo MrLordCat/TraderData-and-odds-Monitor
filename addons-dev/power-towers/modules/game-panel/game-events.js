@@ -63,6 +63,7 @@ function GameEventsMixin(Base) {
           this.populateUpgradesGrid(tower);
         }
         this.updateTowerAffordability();
+        this.updateEnergyAffordability();
       });
       
       // Tower level up notification
