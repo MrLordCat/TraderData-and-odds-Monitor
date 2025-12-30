@@ -3,6 +3,8 @@
  * Manages floating tooltip display for tower info
  */
 
+const { TOWER_LEVEL_CONFIG, calculateTowerLevel } = require('../../core/tower-upgrades');
+
 const ATTACK_TYPE_EMOJIS = {
   base: '⚪',
   siege: '💥',
@@ -201,6 +203,7 @@ function TowerTooltipMixin(Base) {
       }
       
       // ============ SPLASH ============
+      // Note: Splash does NOT get level bonus, only upgrade bonus
       if (el.tooltipSplashRow && el.tooltipSplash) {
         if (tower.splashRadius && tower.splashRadius > 0) {
           el.tooltipSplashRow.style.display = '';
@@ -208,7 +211,14 @@ function TowerTooltipMixin(Base) {
           const detailSplash = document.getElementById('detail-splash');
           if (detailSplash) {
             const baseSplash = attackType.splashRadius || 0;
-            detailSplash.innerHTML = this.buildDetailPopup('SPLASH', baseSplash, level, 1, upgrades.splashRadius, tower.splashRadius, false, 0.08);
+            const splashUpgLv = upgrades.splashRadius || 0;
+            const splashUpgBonus = splashUpgLv * 0.08;
+            detailSplash.innerHTML = `
+              <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${Math.floor(baseSplash)}</span></div>
+              <div class="detail-line"><span class="detail-label">Upgrades Lv.${splashUpgLv} (+${(splashUpgBonus * 100).toFixed(0)}%):</span><span class="detail-upgrade">${Math.floor(baseSplash * (1 + splashUpgBonus))}</span></div>
+              <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.floor(tower.splashRadius)}</span></div>
+              <div class="detail-formula">Base × Upg% (no level bonus)</div>
+            `;
           }
         } else {
           el.tooltipSplashRow.style.display = 'none';
@@ -390,48 +400,31 @@ function TowerTooltipMixin(Base) {
 
     /**
      * Update level progress bar display
+     * Uses unified TOWER_LEVEL_CONFIG from core/tower-upgrades.js
      */
     updateLevelProgress(tower) {
       const el = this.elements;
       if (!el.tooltipLevelProgress || !el.tooltipLevelText) return;
       
       const currentPoints = tower.upgradePoints || 0;
+      const config = TOWER_LEVEL_CONFIG;
+      const POINTS_PER_LEVEL = config.pointsPerLevel;
+      const EXTRA_POINTS_PER_LEVEL = config.extraPointsPerLevel;
       
-      // Level thresholds - XP needed to REACH each level
-      // Level 1: 0 XP, Level 2: 10 XP, Level 3: 25 XP, etc.
-      const POINTS_PER_LEVEL = [0, 10, 25, 50, 80, 120, 170, 230, 300, 380, 470];
-      const EXTRA_POINTS_PER_LEVEL = 100;
-      
-      // Calculate current level from XP
-      let currentLevel = 1;
-      for (let i = 1; i < POINTS_PER_LEVEL.length; i++) {
-        if (currentPoints >= POINTS_PER_LEVEL[i]) {
-          currentLevel = i + 1;
-        } else {
-          break;
-        }
-      }
-      // Beyond defined levels
-      if (currentPoints >= POINTS_PER_LEVEL[POINTS_PER_LEVEL.length - 1]) {
-        const extraPoints = currentPoints - POINTS_PER_LEVEL[POINTS_PER_LEVEL.length - 1];
-        currentLevel = POINTS_PER_LEVEL.length + Math.floor(extraPoints / EXTRA_POINTS_PER_LEVEL);
-      }
-      
-      // Update tower level if different
-      if (tower.level !== currentLevel) {
-        tower.level = currentLevel;
-      }
+      // Use the unified calculateTowerLevel function
+      const currentLevel = tower.level || calculateTowerLevel(tower);
       
       // Calculate progress to next level
       let pointsForCurrentLevel = 0;
-      let pointsForNextLevel = 10;
+      let pointsForNextLevel = POINTS_PER_LEVEL[1] || 3;
       
-      if (currentLevel <= POINTS_PER_LEVEL.length - 1) {
+      if (currentLevel <= POINTS_PER_LEVEL.length) {
         pointsForCurrentLevel = POINTS_PER_LEVEL[currentLevel - 1] || 0;
         pointsForNextLevel = POINTS_PER_LEVEL[currentLevel] || (pointsForCurrentLevel + EXTRA_POINTS_PER_LEVEL);
       } else {
         // Beyond defined levels
-        pointsForCurrentLevel = POINTS_PER_LEVEL[POINTS_PER_LEVEL.length - 1] + (currentLevel - POINTS_PER_LEVEL.length) * EXTRA_POINTS_PER_LEVEL;
+        const lastDefined = POINTS_PER_LEVEL.length;
+        pointsForCurrentLevel = POINTS_PER_LEVEL[lastDefined - 1] + (currentLevel - lastDefined) * EXTRA_POINTS_PER_LEVEL;
         pointsForNextLevel = pointsForCurrentLevel + EXTRA_POINTS_PER_LEVEL;
       }
       

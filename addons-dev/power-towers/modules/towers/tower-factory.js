@@ -5,7 +5,7 @@
  */
 
 const { getAttackType } = require('../../core/attack-types');
-const { BASE_TOWER } = require('../../core/tower-upgrades');
+const { BASE_TOWER, calculateTowerLevel } = require('../../core/tower-upgrades');
 
 /**
  * Create a new BASE tower instance
@@ -176,8 +176,8 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
       // Add upgrade points for level calculation
       this.upgradePoints = (this.upgradePoints || 0) + 1;
       
-      // Check for level up
-      const newLevel = this.calculateLevel();
+      // Check for level up using centralized function
+      const newLevel = calculateTowerLevel(this);
       if (newLevel > (this.level || 1)) {
         this.level = newLevel;
       }
@@ -191,23 +191,10 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     },
     
     /**
-     * Calculate tower level from upgrade points
+     * Calculate tower level from upgrade points (wrapper)
      */
     calculateLevel() {
-      const points = this.upgradePoints || 0;
-      const pointsPerLevel = [0, 3, 8, 15, 25, 40, 60, 85, 115, 150];
-      
-      for (let i = pointsPerLevel.length - 1; i >= 0; i--) {
-        if (points >= pointsPerLevel[i]) {
-          if (i === pointsPerLevel.length - 1) {
-            const extraPoints = points - pointsPerLevel[i];
-            const extraLevels = Math.floor(extraPoints / 40);
-            return i + 1 + extraLevels;
-          }
-          return i + 1;
-        }
-      }
-      return 1;
+      return calculateTowerLevel(this);
     }
   };
   
