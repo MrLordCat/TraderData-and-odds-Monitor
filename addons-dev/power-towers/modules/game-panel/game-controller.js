@@ -217,11 +217,17 @@ class GameControllerBase {
    * Reset game state
    */
   resetGame() {
+    // Cleanup game
     if (this.game) {
       if (this.game.running && !this.game.paused) this.game.pause();
+      this.game.destroy();
       this.game = null;
     }
+    
+    // Cleanup renderer
     this.renderer = null;
+    
+    // Reset placement state
     this.placingTower = false;
     this.selectedPath = null;
     
@@ -232,7 +238,13 @@ class GameControllerBase {
       });
     }
     
+    // Hide tooltip if visible
+    this.hideTowerInfo();
+    
     if (this.elements.btnStart) this.elements.btnStart.textContent = '▶ Start Wave';
+    
+    // Mark that we need to re-setup UI events on next game init
+    this._needsUIEventSetup = true;
   }
   
   /**
@@ -262,12 +274,29 @@ class GameControllerBase {
       return;
     }
     
+    // Cleanup any existing game first
+    if (this.game) {
+      this.game.destroy();
+      this.game = null;
+    }
+    
     this.game = new this.GameCore();
     
     const ctx = this.canvas?.getContext('2d');
     if (!ctx) {
       console.error('[GameController] No canvas context');
       return;
+    }
+    
+    // Force canvas size update from container
+    if (this.canvasContainer) {
+      const rect = this.canvasContainer.getBoundingClientRect();
+      const width = Math.floor(rect.width);
+      const height = Math.floor(rect.height);
+      if (width > 200 && height > 200) {
+        this.canvas.width = width;
+        this.canvas.height = height;
+      }
     }
     
     // Initialize camera
@@ -288,8 +317,17 @@ class GameControllerBase {
       this.camera.centerOn(basePos.x, basePos.y);
     }
     
-    this.setupEventListeners();
+    // Only setup UI events if needed (first time or after reset)
+    if (!this._uiEventsSetup || this._needsUIEventSetup) {
+      this.setupEventListeners();
+      this._uiEventsSetup = true;
+      this._needsUIEventSetup = false;
+    }
+    
+    // Always setup game events (new game instance)
     this.setupGameEvents();
+    
+    // Force immediate render
     this.renderGame();
     this.updateUI(this.game.getState());
   }

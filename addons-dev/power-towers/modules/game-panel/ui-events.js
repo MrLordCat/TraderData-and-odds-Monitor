@@ -139,7 +139,20 @@ function UIEventsMixin(Base) {
      */
     restartGame() {
       this.hideOverlay();
+      
+      // Cleanup existing game
+      if (this.game) {
+        this.game.destroy();
+        this.game = null;
+      }
+      
+      // Create new game
       this.game = new this.GameCore();
+      
+      // Re-create renderer with current canvas size
+      if (this.canvas && this.camera) {
+        this.renderer = new this.GameRenderer(this.canvas, this.camera);
+      }
       
       // Center on base (last waypoint)
       const waypoints = this.game.waypoints;
