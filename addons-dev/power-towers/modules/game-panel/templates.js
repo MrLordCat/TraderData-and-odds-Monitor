@@ -120,30 +120,130 @@ function getGameTemplate() {
               <button id="overlay-btn" class="game-btn primary">Restart</button>
             </div>
           </div>
+          
+          <!-- Tower Tooltip (floating popup) -->
+          <div class="tower-tooltip" id="tower-tooltip">
+            <div class="tooltip-header">
+              <span class="tooltip-icon" id="tooltip-icon">🏗️</span>
+              <div class="tooltip-title-group">
+                <span class="tooltip-name" id="tooltip-name">Tower</span>
+                <span class="tooltip-level" id="tooltip-level">Lvl 1</span>
+                <div class="level-progress-bar">
+                  <div class="level-progress-fill" id="tooltip-level-progress"></div>
+                </div>
+                <span class="level-progress-text" id="tooltip-level-text">0/10 XP</span>
+              </div>
+              <button class="tooltip-close" id="tooltip-close">✕</button>
+            </div>
+            
+            <div class="tooltip-type-row">
+              <span class="tooltip-attack-type" id="tooltip-attack-type">⚪ Base</span>
+              <span class="tooltip-element" id="tooltip-element"></span>
+            </div>
+            
+            <div class="tooltip-stats">
+              <div class="stat-row"><span>⚔️ DMG</span><b id="tooltip-dmg">10</b></div>
+              <div class="stat-row"><span>📏 RNG</span><b id="tooltip-rng">60</b></div>
+              <div class="stat-row"><span>⚡ SPD</span><b id="tooltip-spd">1.0</b></div>
+              <div class="stat-row"><span>❤️ HP</span><b id="tooltip-hp">100/100</b></div>
+              <div class="stat-row"><span>🔋 Energy</span><b id="tooltip-energy">50</b></div>
+            </div>
+            
+            <!-- Attack Type Selection -->
+            <div class="tooltip-section" id="tooltip-attack-section" style="display: none;">
+              <div class="section-title">Select Attack Type:</div>
+              <div class="tooltip-buttons">
+                <button class="tooltip-type-btn" data-type="siege" data-cost="75" title="Siege - AoE (75g)">💥<span class="btn-cost">75g</span></button>
+                <button class="tooltip-type-btn" data-type="normal" data-cost="50" title="Normal - Fast (50g)">🎯<span class="btn-cost">50g</span></button>
+                <button class="tooltip-type-btn" data-type="magic" data-cost="100" title="Magic - Power (100g)">✨<span class="btn-cost">100g</span></button>
+                <button class="tooltip-type-btn" data-type="piercing" data-cost="60" title="Piercing - Crit (60g)">🗡️<span class="btn-cost">60g</span></button>
+              </div>
+            </div>
+            
+            <!-- Element Selection -->
+            <div class="tooltip-section" id="tooltip-element-section" style="display: none;">
+              <div class="section-title">Select Element:</div>
+              <div class="tooltip-buttons">
+                <button class="tooltip-element-btn" data-element="fire" data-cost="100" title="Fire (100g)">🔥<span class="btn-cost">100g</span></button>
+                <button class="tooltip-element-btn" data-element="ice" data-cost="100" title="Ice (100g)">❄️<span class="btn-cost">100g</span></button>
+                <button class="tooltip-element-btn" data-element="lightning" data-cost="120" title="Lightning (120g)">⚡<span class="btn-cost">120g</span></button>
+                <button class="tooltip-element-btn" data-element="nature" data-cost="100" title="Nature (100g)">🌿<span class="btn-cost">100g</span></button>
+                <button class="tooltip-element-btn" data-element="dark" data-cost="150" title="Dark (150g)">💀<span class="btn-cost">150g</span></button>
+              </div>
+            </div>
+            
+            <!-- Stat Upgrades Section -->
+            <div class="tooltip-section tooltip-upgrades" id="tooltip-upgrades-section" style="display: none;">
+              <div class="section-title">Stat Upgrades:</div>
+              <div class="upgrades-grid" id="upgrades-grid">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+            
+            <div class="tooltip-actions">
+              <button id="btn-upgrade" class="tooltip-action-btn upgrade">⬆️ Upgrade</button>
+              <button id="btn-sell" class="tooltip-action-btn sell">💰 Sell</button>
+            </div>
+          </div>
         </div>
         
         <div class="build-toolbar" id="build-toolbar">
           <div class="toolbar-section towers-section">
             <div class="tower-select" id="tower-select">
-              <div class="tower-item" data-path="fire" title="Fire Tower">
-                <button class="tower-btn">🔥</button>
-                <span class="tower-price">100g</span>
+              <!-- Single tower type -->
+              <div class="tower-item" data-tower="base" title="Build Tower (50g)">
+                <button class="tower-btn">🏗️</button>
+                <span class="tower-price">50g</span>
               </div>
-              <div class="tower-item" data-path="ice" title="Ice Tower">
-                <button class="tower-btn">❄️</button>
-                <span class="tower-price">80g</span>
+            </div>
+          </div>
+          
+          <!-- Attack Type Selection (shows after tower is selected) -->
+          <div class="toolbar-section attack-type-section" id="attack-type-section" style="display: none;">
+            <div class="section-label">Attack Type:</div>
+            <div class="attack-type-select" id="attack-type-select">
+              <div class="attack-type-item" data-type="siege" title="Siege - AoE damage, slower">
+                <button class="type-btn">💥</button>
+                <span class="type-price">75g</span>
               </div>
-              <div class="tower-item" data-path="lightning" title="Lightning Tower">
-                <button class="tower-btn">⚡</button>
-                <span class="tower-price">150g</span>
+              <div class="attack-type-item" data-type="normal" title="Normal - Fast attacks">
+                <button class="type-btn">🎯</button>
+                <span class="type-price">50g</span>
               </div>
-              <div class="tower-item" data-path="nature" title="Nature Tower">
-                <button class="tower-btn">🌿</button>
-                <span class="tower-price">60g</span>
+              <div class="attack-type-item" data-type="magic" title="Magic - Power scaling">
+                <button class="type-btn">✨</button>
+                <span class="type-price">100g</span>
               </div>
-              <div class="tower-item" data-path="dark" title="Dark Tower">
-                <button class="tower-btn">💀</button>
-                <span class="tower-price">200g</span>
+              <div class="attack-type-item" data-type="piercing" title="Piercing - High crit">
+                <button class="type-btn">🗡️</button>
+                <span class="type-price">60g</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Element Path Selection -->
+          <div class="toolbar-section element-section" id="element-section" style="display: none;">
+            <div class="section-label">Element:</div>
+            <div class="element-select" id="element-select">
+              <div class="element-item" data-element="fire" title="Fire - Burn DoT">
+                <button class="element-btn">🔥</button>
+                <span class="element-price">100g</span>
+              </div>
+              <div class="element-item" data-element="ice" title="Ice - Slow enemies">
+                <button class="element-btn">❄️</button>
+                <span class="element-price">100g</span>
+              </div>
+              <div class="element-item" data-element="lightning" title="Lightning - Chain attacks">
+                <button class="element-btn">⚡</button>
+                <span class="element-price">120g</span>
+              </div>
+              <div class="element-item" data-element="nature" title="Nature - Poison + Life">
+                <button class="element-btn">🌿</button>
+                <span class="element-price">100g</span>
+              </div>
+              <div class="element-item" data-element="dark" title="Dark - True damage">
+                <button class="element-btn">💀</button>
+                <span class="element-price">150g</span>
               </div>
             </div>
           </div>
@@ -151,22 +251,6 @@ function getGameTemplate() {
         
         <div class="game-controls">
           <button id="btn-start" class="game-btn primary">▶ Start Wave</button>
-        </div>
-        
-        <div class="tower-info" id="tower-info" style="display: none;">
-          <div class="tower-info-header">
-            <span id="tower-name">Tower</span>
-            <span id="tower-tier">Tier 0</span>
-          </div>
-          <div class="tower-info-stats">
-            <span>DMG: <b id="tower-dmg">10</b></span>
-            <span>RNG: <b id="tower-rng">60</b></span>
-            <span>SPD: <b id="tower-spd">1.0</b></span>
-          </div>
-          <div class="tower-info-actions">
-            <button id="btn-upgrade" class="game-btn small">⬆️ Upgrade</button>
-            <button id="btn-sell" class="game-btn small danger">💰 Sell</button>
-          </div>
         </div>
         
         <div class="game-footer">

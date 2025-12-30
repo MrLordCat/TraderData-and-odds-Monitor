@@ -113,7 +113,8 @@ class MapModule {
    * Initialize module - subscribe to events
    */
   init() {
-    this.eventBus.on(GameEvents.GAME_START, () => this.generateMap());
+    // Don't regenerate map on GAME_START - it's already generated in GameCore.initModules()
+    // Only regenerate when explicitly requested
     this.eventBus.on('map:regenerate', (data) => this.generateMap(data?.seed));
   }
 

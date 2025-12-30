@@ -1,9 +1,25 @@
 /**
  * Power Towers TD - Game Controller
  * Handles game logic, canvas, events for detached mode
+ * 
+ * Modular architecture using mixins:
+ * - TowerTooltipMixin: Tooltip display and positioning
+ * - TowerUpgradesUIMixin: Stat upgrades panel in tooltip
+ * - CanvasEventsMixin: Canvas click/move/wheel/pan
+ * - GameEventsMixin: Game event subscriptions
+ * - UIEventsMixin: Button and toolbar interactions
  */
 
-class GameController {
+const { TowerTooltipMixin } = require('./tower-tooltip');
+const { CanvasEventsMixin } = require('./canvas-events');
+const { GameEventsMixin } = require('./game-events');
+const { UIEventsMixin } = require('./ui-events');
+const { TowerUpgradesUIMixin } = require('./tower-upgrades-ui');
+
+/**
+ * Base GameController class
+ */
+class GameControllerBase {
   constructor(options = {}) {
     // Game modules (loaded externally)
     this.GameCore = options.GameCore;
@@ -28,6 +44,12 @@ class GameController {
     this.placingTower = false;
     this.selectedPath = 'fire';
     this.currentScreen = 'menu';
+    
+    // Tooltip position tracking
+    this.tooltipTowerPosition = null;
+    
+    // Single tower cost
+    this.towerCost = 50;
     
     this._savedState = options.savedState || null;
   }
@@ -60,24 +82,31 @@ class GameController {
       buildToolbar: container.querySelector('#build-toolbar'),
       towerSelect: container.querySelector('#tower-select'),
       towerItems: container.querySelectorAll('.tower-item'),
-      towerInfo: container.querySelector('#tower-info'),
-      towerName: container.querySelector('#tower-name'),
-      towerTier: container.querySelector('#tower-tier'),
-      towerDmg: container.querySelector('#tower-dmg'),
-      towerRng: container.querySelector('#tower-rng'),
-      towerSpd: container.querySelector('#tower-spd'),
+      // Tower tooltip
+      towerTooltip: container.querySelector('#tower-tooltip'),
+      tooltipIcon: container.querySelector('#tooltip-icon'),
+      tooltipName: container.querySelector('#tooltip-name'),
+      tooltipLevel: container.querySelector('#tooltip-level'),
+      tooltipLevelProgress: container.querySelector('#tooltip-level-progress'),
+      tooltipLevelText: container.querySelector('#tooltip-level-text'),
+      tooltipAttackType: container.querySelector('#tooltip-attack-type'),
+      tooltipElement: container.querySelector('#tooltip-element'),
+      tooltipDmg: container.querySelector('#tooltip-dmg'),
+      tooltipRng: container.querySelector('#tooltip-rng'),
+      tooltipSpd: container.querySelector('#tooltip-spd'),
+      tooltipHp: container.querySelector('#tooltip-hp'),
+      tooltipEnergy: container.querySelector('#tooltip-energy'),
+      tooltipClose: container.querySelector('#tooltip-close'),
+      tooltipAttackSection: container.querySelector('#tooltip-attack-section'),
+      tooltipElementSection: container.querySelector('#tooltip-element-section'),
+      tooltipTypeBtns: container.querySelectorAll('.tooltip-type-btn'),
+      tooltipElementBtns: container.querySelectorAll('.tooltip-element-btn'),
       btnStart: container.querySelector('#btn-start'),
       btnUpgrade: container.querySelector('#btn-upgrade'),
-      btnSell: container.querySelector('#btn-sell')
-    };
-    
-    // Tower costs for UI
-    this.towerCosts = {
-      fire: 100,
-      ice: 80,
-      lightning: 150,
-      nature: 60,
-      dark: 200
+      btnSell: container.querySelector('#btn-sell'),
+      // Stat upgrades section
+      tooltipUpgradesSection: container.querySelector('#tooltip-upgrades-section'),
+      upgradesGrid: container.querySelector('#upgrades-grid')
     };
     
     // Setup navigation
@@ -110,7 +139,7 @@ class GameController {
   }
   
   /**
-   * Resize canvas to fit container (uses full available space)
+   * Resize canvas to fit container
    */
   resizeCanvas() {
     if (!this.canvas || !this.canvasContainer) return;
@@ -138,12 +167,10 @@ class GameController {
   
   /**
    * Get serialized state for save
-   * Note: Full game serialization not yet implemented
    */
   getSerializedState() {
     return { 
-      currentScreen: this.currentScreen,
-      // Game state serialization would go here when implemented
+      currentScreen: this.currentScreen
     };
   }
   
@@ -207,63 +234,50 @@ class GameController {
   }
   
   /**
-   * Update tower affordability based on current gold
-   */
-  updateTowerAffordability() {
-    if (!this.game) return;
-    
-    const gold = this.game.getState().gold || 0;
-    
-    this.elements.towerItems.forEach(item => {
-      const path = item.dataset.path;
-      const cost = this.towerCosts[path] || 100;
-      const canAfford = gold >= cost;
-      
-      item.classList.toggle('disabled', !canAfford);
-      
-      // Update price color
-      const priceEl = item.querySelector('.tower-price');
-      if (priceEl) {
-        priceEl.style.color = canAfford ? '#ffd700' : '#fc8181';
-      }
-    });
-  }
-  
-  /**
    * Show screen by ID
    */
   showScreen(screenId) {
-    this.currentScreen = screenId;
-    Object.entries(this.screens).forEach(([id, el]) => {
-      if (el) el.style.display = id === screenId ? 'flex' : 'none';
+    Object.values(this.screens).forEach(screen => {
+      if (screen) {
+        screen.classList.remove('active');
+        screen.style.display = 'none';
+      }
     });
-    if (screenId === 'game') {
-      requestAnimationFrame(() => this.resizeCanvas());
+    
+    if (this.screens[screenId]) {
+      this.screens[screenId].classList.add('active');
+      this.screens[screenId].style.display = '';
+      this.currentScreen = screenId;
     }
   }
   
   /**
-   * Initialize new game
+   * Initialize game
    */
   initializeGame() {
     if (!this.GameCore || !this.GameRenderer || !this.Camera) {
-      this.showError('Failed to load game engine');
+      console.error('[GameController] Missing required game classes');
       return;
     }
     
-    // Initial canvas size
-    this.resizeCanvas();
-    
-    this.camera = new this.Camera();
-    this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-    
     this.game = new this.GameCore();
-    this.renderer = new this.GameRenderer(this.canvas, this.camera);
     
-    // Close menu module to allow game updates to run
-    if (this.game.modules && this.game.modules.menu) {
-      this.game.modules.menu.isOpen = false;
+    const ctx = this.canvas?.getContext('2d');
+    if (!ctx) {
+      console.error('[GameController] No canvas context');
+      return;
     }
+    
+    // Initialize camera
+    this.camera = new this.Camera(
+      this.canvas.width,
+      this.canvas.height,
+      this.CONFIG.MAP_WIDTH * this.CONFIG.GRID_SIZE,
+      this.CONFIG.MAP_HEIGHT * this.CONFIG.GRID_SIZE
+    );
+    
+    // Initialize renderer (pass canvas, not ctx)
+    this.renderer = new this.GameRenderer(this.canvas, this.camera);
     
     // Center on base (last waypoint)
     const waypoints = this.game.waypoints;
@@ -280,7 +294,6 @@ class GameController {
   
   /**
    * Restore game from saved state
-   * Note: Full game deserialization not yet implemented - just restore screen
    */
   restoreFromSavedState(state) {
     if (!state) return;
@@ -295,182 +308,56 @@ class GameController {
   }
 
   /**
-   * Setup UI event listeners
+   * Setup all event listeners
    */
   setupEventListeners() {
-    const el = this.elements;
-    
-    // Re-query tower items as they might not have been available during init
-    el.towerItems = this.screens.game?.querySelectorAll('.tower-item') || [];
-    
-    el.btnStart.addEventListener('click', () => this.toggleGame());
-    el.overlayBtn.addEventListener('click', () => this.restartGame());
-    el.btnUpgrade.addEventListener('click', () => this.upgradeSelectedTower());
-    el.btnSell.addEventListener('click', () => this.sellSelectedTower());
-    
-    // Tower selection - click to enter build mode
-    el.towerItems.forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const path = item.dataset.path;
-        if (item.classList.contains('disabled')) return;
-        
-        // Toggle: if already placing this tower, cancel; otherwise select it
-        if (this.placingTower && this.selectedPath === path) {
-          this.exitPlacementMode();
-        } else {
-          this.enterPlacementMode(path);
-        }
-      });
-    });
-    
-    // Canvas events
-    this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-    this.canvas.addEventListener('mousemove', (e) => this.handleCanvasMove(e));
-    this.canvas.addEventListener('wheel', (e) => this.handleCanvasWheel(e));
-    
-    // Pan with middle/right mouse
-    let isPanning = false, lastX = 0, lastY = 0;
-    
-    this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 1 || e.button === 2) {
-        isPanning = true;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        e.preventDefault();
-      }
-    });
-    
-    this.canvas.addEventListener('mousemove', (e) => {
-      if (isPanning && this.camera) {
-        this.camera.pan(-(e.clientX - lastX) / this.camera.zoom, -(e.clientY - lastY) / this.camera.zoom);
-        lastX = e.clientX;
-        lastY = e.clientY;
-        this.renderGame();
-      }
-    });
-    
-    window.addEventListener('mouseup', (e) => {
-      if (e.button === 1 || e.button === 2) isPanning = false;
-    });
-    
-    this.canvas.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      // Right click exits placement mode
-      if (this.placingTower) {
-        this.exitPlacementMode();
-      }
-    });
+    this.setupUIEvents();
+    this.setupCanvasEvents();
   }
 
   /**
-   * Setup game event handlers
+   * Update tower affordability based on current gold
    */
-  setupGameEvents() {
+  updateTowerAffordability() {
     if (!this.game) return;
     
-    // Render on every game tick
-    this.game.on(this.GameEvents.GAME_TICK, () => {
-      this.renderGame();
-      this.updateUI(this.game.getState());
-    });
+    const gold = this.game.getState().gold || 0;
     
-    this.game.on(this.GameEvents.STATE_CHANGE, (state) => {
-      this.updateUI(state);
-      this.renderGame();
-    });
-    
-    this.game.on(this.GameEvents.TOWER_PLACED, () => {
-      // Stay in placement mode for quick building
-      // Player can click again to place more towers
-      this.updateTowerAffordability();
-    });
-    
-    this.game.on(this.GameEvents.TOWER_SELECTED, (data) => {
-      data?.tower ? this.showTowerInfo(data.tower) : this.hideTowerInfo();
-    });
-    
-    this.game.on(this.GameEvents.WAVE_COMPLETE, () => {
-      this.elements.btnStart.textContent = '▶ Start Wave';
-      this.updateTowerAffordability();
-    });
-    
-    this.game.on(this.GameEvents.GAME_OVER, (data) => {
-      // data contains {reason, level, totalXp} - get wave from game state
-      const wave = this.game?.getState?.()?.wave || data.level || 0;
-      this.showOverlay('Game Over!', `Reached Wave ${wave}`, 'Try Again');
-      this.elements.btnStart.disabled = true;
-      this.exitPlacementMode();
-    });
-  }
-
-  /**
-   * Toggle game start/pause/resume
-   */
-  toggleGame() {
-    if (!this.game) return;
-    
-    if (this.game.gameOver) {
-      this.restartGame();
-      return;
-    }
-    
-    const waveInProgress = !!this.game?.modules?.enemies?.waveInProgress;
-
-    // If no wave is running, the button should start a wave.
-    if (!waveInProgress) {
-      this.game.startWave();
-      this.elements.btnStart.textContent = '⏸ Pause';
-      return;
-    }
-
-    // If a wave is running, the button toggles pause/resume.
-    if (this.game.paused) {
-      this.game.resume();
-      this.elements.btnStart.textContent = '⏸ Pause';
-    } else {
-      this.game.pause();
-      this.elements.btnStart.textContent = '▶ Resume';
-    }
-  }
-
-  /**
-   * Restart game
-   */
-  restartGame() {
-    this.hideOverlay();
-    this.game = new this.GameCore();
-    
-    // Center on base (last waypoint)
-    const waypoints = this.game.waypoints;
-    if (waypoints && waypoints.length > 0 && this.camera) {
-      const basePos = waypoints[waypoints.length - 1];
-      this.camera.centerOn(basePos.x, basePos.y);
-    }
-    
-    this.setupGameEvents();
-    this.renderGame();
-    this.updateUI(this.game.getState());
-    
-    this.elements.btnStart.disabled = false;
-    this.elements.btnStart.textContent = '▶ Start Wave';
-    this.exitPlacementMode();
-  }
-
-  /**
-   * Enter tower placement mode for specific path
-   */
-  enterPlacementMode(path) {
-    this.placingTower = true;
-    this.selectedPath = path;
-    
-    // Update UI - remove placing from all, add to selected
+    // Update base tower affordability
     this.elements.towerItems.forEach(item => {
-      item.classList.remove('placing', 'selected');
-      if (item.dataset.path === path) {
-        item.classList.add('placing');
+      const canAfford = gold >= this.towerCost;
+      item.classList.toggle('disabled', !canAfford);
+      
+      const priceEl = item.querySelector('.tower-price');
+      if (priceEl) {
+        priceEl.style.color = canAfford ? '#ffd700' : '#fc8181';
       }
     });
+    
+    // Update tooltip buttons if tower is selected
+    if (this.game.selectedTower) {
+      this.updateTooltipButtonStates(this.game.selectedTower);
+    }
+  }
+
+  /**
+   * Enter tower placement mode
+   */
+  enterPlacementMode() {
+    this.placingTower = true;
+    
+    // Update UI
+    this.elements.towerItems.forEach(item => {
+      item.classList.add('placing');
+    });
+    
+    // Hide attack/element sections while placing
+    if (this.elements.attackTypeSection) {
+      this.elements.attackTypeSection.style.display = 'none';
+    }
+    if (this.elements.elementSection) {
+      this.elements.elementSection.style.display = 'none';
+    }
     
     // Deselect tower if any
     if (this.game && this.game.selectedTower) {
@@ -486,7 +373,6 @@ class GameController {
    */
   exitPlacementMode() {
     this.placingTower = false;
-    this.selectedPath = null;
     
     // Update UI
     this.elements.towerItems.forEach(item => {
@@ -499,116 +385,55 @@ class GameController {
       this.renderGame();
     }
   }
-
+  
   /**
-   * Handle canvas click
+   * Set attack type for selected tower
    */
-  handleCanvasClick(e) {
-    if (!this.game || !this.camera) return;
+  setTowerAttackType(attackTypeId) {
+    if (!this.game || !this.game.selectedTower) return;
     
-    const rect = this.canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
+    const tower = this.game.selectedTower;
     
-    const worldPos = this.camera.screenToWorld(screenX, screenY);
-    const gridX = Math.floor(worldPos.x / this.CONFIG.GRID_SIZE);
-    const gridY = Math.floor(worldPos.y / this.CONFIG.GRID_SIZE);
-    
-    if (this.placingTower && this.selectedPath) {
-      // Place tower with selected path type
-      try {
-        const result = this.game.placeTower(gridX, gridY, this.selectedPath);
-        if (result) {
-          // Exit placement mode after successful build
-          this.exitPlacementMode();
-        }
-      } catch (err) {
-        console.error('[game-controller] placeTower error:', err);
-      }
-    } else {
-      // Find tower at grid position
-      const tower = this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY);
-      if (tower) {
-        this.game.selectTower(tower.id);
-      } else {
-        this.game.selectTower(null);
-      }
+    // Check if tower already has attack type
+    if (tower.attackTypeId !== 'base') {
+      console.log('Tower already has attack type');
+      return;
     }
     
-    this.renderGame();
+    // Emit event to set attack type
+    this.game.emit('tower:set-attack-type', { 
+      towerId: tower.id, 
+      attackTypeId 
+    });
+    
+    // Update UI
+    this.updateTooltipSections(tower);
+    this.updateTowerAffordability();
   }
-
+  
   /**
-   * Handle canvas mouse move
+   * Set element path for selected tower
    */
-  handleCanvasMove(e) {
-    if (!this.game || !this.renderer || !this.camera) return;
+  setTowerElement(elementId) {
+    if (!this.game || !this.game.selectedTower) return;
     
-    const rect = this.canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
+    const tower = this.game.selectedTower;
     
-    const worldPos = this.camera.screenToWorld(screenX, screenY);
-    const gridX = Math.floor(worldPos.x / this.CONFIG.GRID_SIZE);
-    const gridY = Math.floor(worldPos.y / this.CONFIG.GRID_SIZE);
-    
-    if (this.placingTower) {
-      const canPlace = this.game.canPlaceTower(gridX, gridY);
-      this.renderer.setHover(gridX, gridY, canPlace);
-    } else {
-      this.renderer.clearHover();
+    // Check if tower already has element
+    if (tower.elementPath) {
+      console.log('Tower already has element');
+      return;
     }
     
-    this.renderGame();
-  }
-
-  /**
-   * Handle canvas wheel (zoom)
-   */
-  handleCanvasWheel(e) {
-    if (!this.camera) return;
-    e.preventDefault();
+    // Emit event to set element
+    this.game.emit('tower:set-element', { 
+      towerId: tower.id, 
+      elementId 
+    });
     
-    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    this.camera.zoomBy(zoomFactor);
-    this.renderGame();
-  }
-
-  /**
-   * Show tower info panel
-   */
-  showTowerInfo(tower) {
-    const el = this.elements;
-    // TOWER_TYPES uses tower.type, not tower.path
-    const towerDef = this.towerCosts ? null : null; // towerCosts is just costs
-    
-    // Get tower type info from game if available
-    const towerTypes = this.game?.getRenderData?.()?.towerTypes || {};
-    const typeInfo = towerTypes[tower.type];
-    
-    el.towerName.textContent = typeInfo?.name || tower.type || 'Tower';
-    el.towerTier.textContent = `Level ${tower.level || 1}`;
-    el.towerDmg.textContent = Math.floor(tower.damage || 0);
-    el.towerRng.textContent = Math.floor(tower.range || 0);
-    el.towerSpd.textContent = (tower.attackSpeed || 1).toFixed(1);
-    
-    el.towerInfo.style.display = 'block';
-    
-    // Calculate upgrade cost
-    const baseCost = typeInfo?.baseCost || 100;
-    const upgradeCost = Math.floor(baseCost * (tower.level || 1) * 0.75);
-    const gold = this.game?.getState?.()?.gold || 0;
-    const canUpgrade = gold >= upgradeCost && (tower.level || 1) < 5;
-    
-    el.btnUpgrade.disabled = !canUpgrade;
-    el.btnUpgrade.textContent = (tower.level || 1) >= 5 ? 'MAX' : `⬆️ ${upgradeCost}g`;
-  }
-
-  /**
-   * Hide tower info panel
-   */
-  hideTowerInfo() {
-    this.elements.towerInfo.style.display = 'none';
+    // Update UI
+    this.updateTooltipSections(tower);
+    this.updateTowerAffordability();
   }
 
   /**
@@ -616,7 +441,8 @@ class GameController {
    */
   upgradeSelectedTower() {
     if (!this.game?.selectedTower) return;
-    this.game.upgradeTower(this.game.selectedTower.id);
+    // TODO: Open upgrade menu
+    console.log('Upgrade tower - not yet implemented');
     this.showTowerInfo(this.game.selectedTower);
   }
 
@@ -641,7 +467,24 @@ class GameController {
     el.lives.classList.toggle('danger', state.lives <= 5);
     el.lives.classList.toggle('warning', state.lives > 5 && state.lives <= 10);
     el.energy.textContent = Math.floor(state.energy?.energy || 0);
-    el.wave.textContent = state.wave || 0;
+    
+    // Show wave with timer for next wave (always shows after first wave started)
+    if (state.firstWaveStarted) {
+      const nextWaveIn = Math.ceil(state.nextWaveIn || 0);
+      el.wave.textContent = `${state.wave || 0} (${nextWaveIn}s)`;
+    } else {
+      el.wave.textContent = state.wave || 0;
+    }
+    
+    // Update start button text based on game state
+    if (state.firstWaveStarted) {
+      // After first wave started, button is only pause/resume
+      if (state.paused) {
+        el.btnStart.textContent = '▶ Resume';
+      } else {
+        el.btnStart.textContent = '⏸ Pause';
+      }
+    }
     
     // Update tower affordability
     this.updateTowerAffordability();
@@ -683,7 +526,7 @@ class GameController {
       el.overlayTitle.textContent = 'Error';
       el.overlayTitle.style.color = '#fc8181';
       el.overlayMessage.textContent = message;
-      el.overlayBtn.style.display = 'none';
+      el.overlayBtn.textContent = 'OK';
       el.overlay.style.display = 'flex';
     }
   }
@@ -694,17 +537,22 @@ class GameController {
   destroy() {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
-      this.resizeObserver = null;
     }
-    
-    if (this.game && this.game.running && !this.game.paused) {
-      this.game.pause();
+    if (this.game) {
+      this.game.stop();
     }
-    
-    this.renderer = null;
-    this.camera = null;
-    this.game = null;
   }
 }
+
+// Apply mixins in order
+const GameController = TowerTooltipMixin(
+  TowerUpgradesUIMixin(
+    CanvasEventsMixin(
+      GameEventsMixin(
+        UIEventsMixin(GameControllerBase)
+      )
+    )
+  )
+);
 
 module.exports = { GameController };

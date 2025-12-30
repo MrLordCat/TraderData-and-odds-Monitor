@@ -143,32 +143,52 @@ function getGameStyles() {
     
     .build-toolbar {
       padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px;
     }
-    .toolbar-section { display: flex; justify-content: center; }
-    .tower-select {
+    .toolbar-section { 
+      display: flex; 
+      align-items: center;
+      gap: 8px;
+    }
+    .section-label {
+      font-size: 12px;
+      color: #a0aec0;
+      min-width: 70px;
+    }
+    .tower-select, .attack-type-select, .element-select {
       display: flex; justify-content: center; gap: 8px;
     }
-    .tower-item {
+    .tower-item, .attack-type-item, .element-item {
       display: flex; flex-direction: column; align-items: center; gap: 4px;
       cursor: pointer; transition: all 0.2s;
     }
-    .tower-item:hover { transform: scale(1.05); }
-    .tower-item.selected .tower-btn { border-color: #48bb78; background: rgba(72,187,120,0.3); box-shadow: 0 0 10px rgba(72,187,120,0.4); }
+    .tower-item:hover, .attack-type-item:hover, .element-item:hover { transform: scale(1.05); }
+    .tower-item.selected .tower-btn,
+    .attack-type-item.selected .type-btn,
+    .element-item.selected .element-btn { 
+      border-color: #48bb78; 
+      background: rgba(72,187,120,0.3); 
+      box-shadow: 0 0 10px rgba(72,187,120,0.4); 
+    }
     .tower-item.placing .tower-btn { border-color: #ecc94b; background: rgba(236,201,75,0.3); animation: pulse-build 0.8s infinite; }
-    .tower-item.disabled { opacity: 0.4; pointer-events: none; }
-    .tower-btn {
-      width: 48px; height: 48px;
+    .tower-item.disabled, .attack-type-item.disabled, .element-item.disabled { opacity: 0.4; pointer-events: none; }
+    .tower-btn, .type-btn, .element-btn {
+      width: 42px; height: 42px;
       border: 2px solid rgba(255,255,255,0.2); border-radius: 10px;
       background: rgba(255,255,255,0.1);
-      font-size: 22px; transition: all 0.2s;
+      font-size: 20px; transition: all 0.2s;
       pointer-events: none; /* Let parent handle clicks */
     }
-    .tower-item:hover .tower-btn { background: rgba(255,255,255,0.2); }
-    .tower-price {
-      font-size: 11px; color: #ffd700; font-weight: 600;
+    .tower-item:hover .tower-btn,
+    .attack-type-item:hover .type-btn,
+    .element-item:hover .element-btn { background: rgba(255,255,255,0.2); }
+    .tower-price, .type-price, .element-price {
+      font-size: 10px; color: #ffd700; font-weight: 600;
       pointer-events: none; /* Let parent handle clicks */
     }
-    .tower-item.disabled .tower-price { color: #fc8181; }
+    .tower-item.disabled .tower-price,
+    .attack-type-item.disabled .type-price,
+    .element-item.disabled .element-price { color: #fc8181; }
     @keyframes pulse-build {
       0%, 100% { box-shadow: 0 0 5px rgba(236,201,75,0.4); }
       50% { box-shadow: 0 0 15px rgba(236,201,75,0.7); }
@@ -188,14 +208,259 @@ function getGameStyles() {
     .game-btn.danger { background: rgba(252,129,129,0.2); color: #fc8181; }
     .game-btn.active { background: #ecc94b; color: #1a202c; }
     
-    .tower-info {
-      padding: 12px; background: rgba(0,0,0,0.4); border-radius: 8px; flex-shrink: 0;
+    /* Tower Tooltip - Floating popup */
+    .tower-tooltip {
+      position: absolute;
+      z-index: 100;
+      min-width: 200px;
+      max-width: 280px;
+      padding: 12px;
+      background: rgba(20, 20, 35, 0.95);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+      display: none;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: opacity 0.2s, transform 0.2s;
     }
-    .tower-info-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
-    .tower-info-header span:first-child { font-weight: 600; color: #fff; font-size: 15px; }
-    .tower-info-header span:last-child { color: #a0aec0; font-size: 13px; }
-    .tower-info-stats { display: flex; gap: 16px; margin-bottom: 10px; font-size: 14px; color: #e2e8f0; }
-    .tower-info-actions { display: flex; gap: 10px; }
+    .tower-tooltip.visible {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .tooltip-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .tooltip-icon { font-size: 28px; }
+    .tooltip-title-group { flex: 1; }
+    .tooltip-name { display: block; font-weight: 600; color: #fff; font-size: 14px; }
+    .tooltip-level { font-size: 11px; color: #48bb78; font-weight: 600; }
+    .level-progress-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .level-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #48bb78, #68d391);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+    .level-progress-text {
+      font-size: 9px;
+      color: #a0aec0;
+      margin-top: 2px;
+      display: block;
+    }
+    .tooltip-close {
+      width: 24px; height: 24px;
+      border: none; border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      color: #a0aec0;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tooltip-close:hover { background: rgba(252,129,129,0.3); color: #fc8181; }
+    
+    .tooltip-type-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: #a0aec0;
+    }
+    .tooltip-attack-type, .tooltip-element {
+      padding: 3px 8px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+    }
+    
+    .tooltip-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 8px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+      font-size: 11px;
+      color: #e2e8f0;
+    }
+    .stat-row b { color: #ffd700; }
+    
+    .tooltip-section {
+      margin-bottom: 10px;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+    }
+    .section-title {
+      font-size: 11px;
+      color: #a0aec0;
+      margin-bottom: 6px;
+    }
+    .tooltip-buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .tooltip-type-btn, .tooltip-element-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 48px; height: 48px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+      gap: 2px;
+    }
+    .tooltip-type-btn .btn-cost, .tooltip-element-btn .btn-cost {
+      font-size: 9px;
+      color: #ffd700;
+    }
+    .tooltip-type-btn:hover, .tooltip-element-btn:hover {
+      transform: scale(1.05);
+      border-color: #48bb78;
+      background: rgba(72,187,120,0.2);
+    }
+    .tooltip-type-btn.active, .tooltip-element-btn.active {
+      border-color: #48bb78;
+      background: rgba(72,187,120,0.3);
+      box-shadow: 0 0 10px rgba(72,187,120,0.5);
+    }
+    .tooltip-type-btn.disabled, .tooltip-element-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    .tooltip-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .tooltip-action-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tooltip-action-btn.upgrade {
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      color: white;
+    }
+    .tooltip-action-btn.upgrade:hover { box-shadow: 0 2px 8px rgba(72, 187, 120, 0.4); }
+    .tooltip-action-btn.upgrade.active {
+      background: linear-gradient(135deg, #ecc94b 0%, #d69e2e 100%);
+      color: #1a202c;
+    }
+    .tooltip-action-btn.sell {
+      background: rgba(252,129,129,0.2);
+      color: #fc8181;
+    }
+    .tooltip-action-btn.sell:hover { background: rgba(252,129,129,0.3); }
+    .tooltip-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    /* Stat Upgrades Section */
+    .tooltip-upgrades {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .upgrades-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .upgrade-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .upgrade-row:hover {
+      background: rgba(72,187,120,0.2);
+    }
+    .upgrade-row.disabled {
+      opacity: 0.5;
+    }
+    .upgrade-row.disabled:hover {
+      background: rgba(0,0,0,0.3);
+    }
+    .upgrade-emoji {
+      font-size: 16px;
+      min-width: 24px;
+      text-align: center;
+    }
+    .upgrade-info-col {
+      flex: 1;
+      min-width: 0;
+    }
+    .upgrade-name-row {
+      font-size: 11px;
+      font-weight: 500;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .upgrade-effect {
+      font-size: 9px;
+      color: #a0aec0;
+    }
+    .upgrade-lvl {
+      font-size: 10px;
+      color: #48bb78;
+      font-weight: 600;
+      min-width: 32px;
+      text-align: center;
+    }
+    .upgrade-buy-btn {
+      padding: 4px 8px;
+      border: none;
+      border-radius: 4px;
+      background: rgba(255,215,0,0.2);
+      color: #ffd700;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 45px;
+    }
+    .upgrade-buy-btn:hover:not(:disabled) {
+      background: rgba(255,215,0,0.35);
+      transform: scale(1.05);
+    }
+    .upgrade-buy-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      color: #fc8181;
+    }
     
     .game-footer { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
     .game-footer .hint { margin: 0; font-size: 12px; color: #718096; flex: 1; text-align: right; }

@@ -175,6 +175,7 @@ class CombatModule {
     this.eventBus.emit('enemy:damage', {
       enemyId: projectile.targetId,
       damage: projectile.damage,
+      towerId: projectile.towerId,
       effects: this.getEffectsForType(projectile.towerType)
     });
     
@@ -202,6 +203,7 @@ class CombatModule {
             this.eventBus.emit('enemy:damage', {
               enemyId: enemy.id,
               damage: projectile.damage * 0.5,
+              towerId: projectile.towerId,
               effects: []
             });
             
@@ -228,6 +230,7 @@ class CombatModule {
     this.eventBus.emit('enemy:damage', {
       enemyId: projectile.targetId,
       damage: projectile.damage,
+      towerId: projectile.towerId,
       effects: this.getEffectsForType(projectile.towerType)
     });
     

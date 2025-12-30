@@ -65,14 +65,11 @@ class PlayerModule {
   }
 
   /**
-   * On game start
+   * On game start - no full reset, just emit update for UI sync
    */
   onGameStart() {
-    this.lives = this.config.STARTING_LIVES;
-    this.maxLives = this.config.STARTING_LIVES;
-    this.xp = 0;
-    this.level = 1;
-    this.xpToNextLevel = 100;
+    // Don't reset - lives already set in initModules
+    // Only emit update for UI synchronization
     this.emitUpdate();
   }
 

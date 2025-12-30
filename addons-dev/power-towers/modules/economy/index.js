@@ -60,12 +60,11 @@ class EconomyModule {
   }
 
   /**
-   * On game start
+   * On game start - no full reset, just emit update for UI sync
    */
   onGameStart() {
-    this.reset();
-    this.gold = this.config.STARTING_GOLD;
-    this.totalEarned = this.config.STARTING_GOLD;
+    // Don't reset - gold spent on towers before wave should persist
+    // Only emit update for UI synchronization
     this.emitUpdate();
   }
 

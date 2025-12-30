@@ -4,7 +4,7 @@
  * Main game orchestrator - connects independent modules via EventBus.
  * Each module handles its own domain logic and communicates through events.
  * 
- * @version 0.2.0 - Removed legacy code
+ * @version 0.3.0 - Single tower system
  */
 
 const CONFIG = require('./config');
@@ -12,13 +12,16 @@ const { EventBus, GameEvents } = require('./event-bus');
 
 // Import modules
 const { MapModule } = require('../modules/map');
-const { TowersModule, TOWER_TYPES } = require('../modules/towers');
+const { TowersModule } = require('../modules/towers');
 const { EnemiesModule, ENEMY_TYPES } = require('../modules/enemies');
 const { CombatModule } = require('../modules/combat');
 const { EconomyModule } = require('../modules/economy');
 const { EnergyModule } = require('../modules/energy');
 const { PlayerModule } = require('../modules/player');
 const { MenuModule, MENU_SCREENS } = require('../modules/menu');
+
+// Import tower config
+const { BASE_TOWER } = require('./tower-upgrades');
 
 /**
  * GameCore - Main game orchestrator
@@ -47,6 +50,11 @@ class GameCore {
     // Selection state (UI)
     this.selectedTower = null;
     this.placingTowerPath = null;
+    
+    // Auto-wave timer (15 seconds between waves)
+    this.autoWaveTimer = 0;
+    this.autoWaveInterval = 15; // seconds
+    this.firstWaveStarted = false;
 
     // Initialize modules
     this.initModules();
@@ -123,6 +131,11 @@ class GameCore {
     // Wave events
     this.eventBus.on('wave:complete', () => this.onWaveComplete());
     
+    // Tower selection sync
+    this.eventBus.on(GameEvents.TOWER_SELECTED, (data) => {
+      this.selectedTower = data?.tower || null;
+    });
+    
     // Provide nearby enemies for chain lightning
     this.eventBus.on('enemies:get-nearby', (data) => {
       const enemies = this.modules.enemies.getEnemiesArray();
@@ -149,12 +162,8 @@ class GameCore {
    * Wave complete handler
    */
   onWaveComplete() {
-    // Auto-start next wave after delay
-    setTimeout(() => {
-      if (this.running && !this.paused && !this.gameOver) {
-        this.eventBus.emit('wave:start');
-      }
-    }, 2000);
+    // Timer runs from wave START, so no reset here
+    // Wave bonus is handled by economy module
   }
 
   /**
@@ -195,6 +204,8 @@ class GameCore {
     if (!this.running) {
       this.running = true;
       this.paused = false;
+      this.firstWaveStarted = true;
+      this.autoWaveTimer = 0;
       this.lastTick = performance.now();
       this.eventBus.emit(GameEvents.GAME_START, this.getState());
       this.gameLoop();
@@ -291,6 +302,16 @@ class GameCore {
       return;
     }
     
+    // Auto-wave timer - runs from wave START, not completion
+    // New wave every 15 seconds regardless of whether current wave is finished
+    if (this.firstWaveStarted) {
+      this.autoWaveTimer += deltaTime;
+      if (this.autoWaveTimer >= this.autoWaveInterval) {
+        this.autoWaveTimer = 0;
+        this.eventBus.emit('wave:start');
+      }
+    }
+    
     this.modules.energy.update(deltaTime);
     this.modules.enemies.update(deltaTime);
     
@@ -321,8 +342,9 @@ class GameCore {
 
   /**
    * Place a tower at grid position
+   * Now only builds BASE tower - attack type selected separately
    */
-  placeTower(gridX, gridY, towerType = 'fire') {
+  placeTower(gridX, gridY) {
     // Check if position is valid
     if (!this.modules.map.isBuildable(gridX, gridY)) {
       this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Cannot build here!' });
@@ -335,15 +357,15 @@ class GameCore {
       return false;
     }
     
-    // Check cost
-    const cost = TOWER_TYPES[towerType]?.baseCost || 100;
+    // Check cost (single BASE tower cost)
+    const cost = BASE_TOWER.cost;
     if (!this.modules.economy.canAfford(cost)) {
       this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Not enough gold!' });
       return false;
     }
     
     // Build tower via event
-    this.eventBus.emit('tower:build-request', { type: towerType, gridX, gridY });
+    this.eventBus.emit('tower:build-request', { gridX, gridY });
     return true;
   }
 
@@ -384,7 +406,12 @@ class GameCore {
       waveInProgress: this.modules.enemies.waveInProgress,
       towers: this.modules.towers.getTowersArray().length,
       enemies: this.modules.enemies.getEnemiesArray().length,
-      player: this.modules.player.getRenderData()
+      player: this.modules.player.getRenderData(),
+      // Auto-wave info
+      firstWaveStarted: this.firstWaveStarted,
+      autoWaveTimer: this.autoWaveTimer,
+      autoWaveInterval: this.autoWaveInterval,
+      nextWaveIn: Math.max(0, this.autoWaveInterval - this.autoWaveTimer)
     };
   }
 
@@ -455,6 +482,13 @@ class GameCore {
   }
 
   /**
+   * Emit event
+   */
+  emit(event, data) {
+    return this.eventBus.emit(event, data);
+  }
+
+  /**
    * Cleanup
    */
   destroy() {
@@ -490,4 +524,4 @@ class GameCore {
   }
 }
 
-module.exports = { GameCore, GameEvents, TOWER_TYPES, ENEMY_TYPES, MENU_SCREENS };
+module.exports = { GameCore, GameEvents, ENEMY_TYPES, MENU_SCREENS };

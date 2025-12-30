@@ -12,7 +12,7 @@ const ENEMY_TYPES = {
   basic: {
     name: 'Minion',
     emoji: '👾',
-    baseHealth: 50,
+    baseHealth: 20,
     baseSpeed: 40,   // pixels per second
     reward: 10,
     color: '#ff6b6b'
@@ -20,7 +20,7 @@ const ENEMY_TYPES = {
   fast: {
     name: 'Scout',
     emoji: '🦎',
-    baseHealth: 30,
+    baseHealth: 20,
     baseSpeed: 80,
     reward: 15,
     color: '#4ecdc4'
@@ -28,7 +28,7 @@ const ENEMY_TYPES = {
   tank: {
     name: 'Brute',
     emoji: '🐗',
-    baseHealth: 200,
+    baseHealth: 100,
     baseSpeed: 25,
     reward: 30,
     color: '#a55eea'
@@ -167,7 +167,8 @@ class EnemiesModule {
    * Start next wave
    */
   startNextWave() {
-    if (this.waveInProgress) return;
+    // Don't block if wave is in progress - allow overlapping waves
+    // This enables the 15-second auto-wave system
     
     if (!this.waypoints || this.waypoints.length === 0) {
       console.error('[EnemiesModule] No waypoints! Cannot start wave');
@@ -177,10 +178,14 @@ class EnemiesModule {
     this.currentWave++;
     this.waveInProgress = true;
     
+    // Reset spawn timer for new wave
+    this.spawnTimer = 0;
+    
     // Generate wave composition
     const waveEnemies = this.generateWaveComposition(this.currentWave);
-    this.spawnQueue = waveEnemies;
-    this.spawnTimer = 0;
+    
+    // Add to spawn queue (don't replace - append for overlapping waves)
+    this.spawnQueue.push(...waveEnemies);
     
     this.eventBus.emit('wave:started', { 
       wave: this.currentWave, 
@@ -190,6 +195,7 @@ class EnemiesModule {
 
   /**
    * Generate enemies for a wave
+   * delay = relative time between spawns (not absolute)
    */
   generateWaveComposition(waveNum) {
     const enemies = [];
@@ -197,57 +203,60 @@ class EnemiesModule {
     // Base count scales with wave
     const baseCount = 5 + Math.floor(waveNum * 1.5);
     
-    // Add basic enemies
+    // Add basic enemies (0.5s between each)
     for (let i = 0; i < baseCount; i++) {
-      enemies.push({ type: 'basic', delay: i * 0.5 });
+      enemies.push({ type: 'basic', delay: 0.5 });
     }
     
-    // Add fast enemies (from wave 2)
+    // Add fast enemies (from wave 2, 0.3s between each)
     if (waveNum >= 2) {
       const fastCount = Math.floor(waveNum / 2);
       for (let i = 0; i < fastCount; i++) {
-        enemies.push({ type: 'fast', delay: baseCount * 0.5 + i * 0.3 });
+        enemies.push({ type: 'fast', delay: 0.3 });
       }
     }
     
-    // Add tank enemies (from wave 3)
+    // Add tank enemies (from wave 3, 1.5s between each)
     if (waveNum >= 3) {
       const tankCount = Math.floor(waveNum / 3);
       for (let i = 0; i < tankCount; i++) {
-        enemies.push({ type: 'tank', delay: baseCount * 0.5 + 3 + i * 1.5 });
+        enemies.push({ type: 'tank', delay: 1.5 });
       }
     }
     
-    // Add swarm (from wave 5)
+    // Add swarm (from wave 5, 0.15s between each)
     if (waveNum >= 5) {
       const swarmCount = waveNum;
       for (let i = 0; i < swarmCount; i++) {
-        enemies.push({ type: 'swarm', delay: i * 0.15 + 2 });
+        enemies.push({ type: 'swarm', delay: 0.15 });
       }
     }
     
-    // Boss every 10 waves
+    // Boss every 10 waves (after 2s pause)
     if (waveNum % 10 === 0) {
-      enemies.push({ type: 'boss', delay: 5 });
+      enemies.push({ type: 'boss', delay: 2.0 });
     }
     
-    // Sort by delay
-    enemies.sort((a, b) => a.delay - b.delay);
+    // Shuffle enemies for variety (but keep relative delays)
+    // Basic -> Fast -> Tank -> Swarm -> Boss order is maintained
     
     return enemies;
   }
 
   /**
-   * Process spawn queue
+   * Process spawn queue - uses relative delays between spawns
    */
   processSpawnQueue(deltaTime) {
     if (this.spawnQueue.length === 0) return;
     
     this.spawnTimer += deltaTime;
     
-    while (this.spawnQueue.length > 0 && this.spawnTimer >= this.spawnQueue[0].delay) {
+    // Only spawn one enemy at a time when delay is reached
+    if (this.spawnTimer >= this.spawnQueue[0].delay) {
       const spawn = this.spawnQueue.shift();
       this.spawnEnemy(spawn.type);
+      // Reset timer for next spawn (relative delay system)
+      this.spawnTimer = 0;
     }
   }
 
@@ -263,6 +272,14 @@ class EnemiesModule {
     const speedMultiplier = 1 + (this.currentWave - 1) * 0.02;
 
     const spawnPoint = this.waypoints[0];
+    
+    // Check for overlapping enemies at spawn point
+    const overlapping = this.enemies.filter(e => 
+      Math.abs(e.x - spawnPoint.x) < 20 && Math.abs(e.y - spawnPoint.y) < 20
+    );
+    if (overlapping.length > 0) {
+      console.log(`[EnemiesModule] Spawning enemy while ${overlapping.length} enemies near spawn point`);
+    }
     
     const enemy = {
       id: this.nextEnemyId++,
@@ -377,9 +394,18 @@ class EnemiesModule {
   /**
    * Damage an enemy
    */
-  damageEnemy({ enemyId, damage, effects }) {
+  damageEnemy({ enemyId, damage, towerId, effects }) {
     const enemy = this.enemies.find(e => e.id === enemyId);
-    if (!enemy) return;
+    if (!enemy) {
+      console.warn(`[EnemiesModule] damageEnemy: enemy ${enemyId} not found! Current enemies:`, 
+        this.enemies.map(e => e.id));
+      return;
+    }
+    
+    // Store last tower that damaged this enemy for kill credit
+    if (towerId) {
+      enemy.lastDamagedByTowerId = towerId;
+    }
 
     enemy.health -= damage;
     
@@ -408,12 +434,14 @@ class EnemiesModule {
    * Kill enemy
    */
   killEnemy(enemy, index) {
+    console.log(`[EnemiesModule] Killing enemy #${enemy.id} at (${Math.round(enemy.x)}, ${Math.round(enemy.y)}), pathProgress: ${enemy.pathProgress.toFixed(2)}`);
     this.enemies.splice(index, 1);
     this.totalKills++;
     
     this.eventBus.emit('enemy:killed', { 
       enemy, 
-      reward: enemy.reward 
+      reward: enemy.reward,
+      killerTowerId: enemy.lastDamagedByTowerId 
     });
     this.eventBus.emit('economy:gain', enemy.reward);
   }
