@@ -103,11 +103,19 @@ class GameControllerBase {
       tooltipSplash: container.querySelector('#tooltip-splash'),
       tooltipHp: container.querySelector('#tooltip-hp'),
       tooltipEnergy: container.querySelector('#tooltip-energy'),
+      tooltipPowerCost: container.querySelector('#tooltip-powercost'),
       tooltipClose: container.querySelector('#tooltip-close'),
       tooltipAttackSection: container.querySelector('#tooltip-attack-section'),
       tooltipElementSection: container.querySelector('#tooltip-element-section'),
       tooltipTypeBtns: container.querySelectorAll('.tooltip-type-btn'),
       tooltipElementBtns: container.querySelectorAll('.tooltip-element-btn'),
+      // Biome section (Tower)
+      towerBiomeSection: container.querySelector('#tower-biome-section'),
+      towerBiomeIcon: container.querySelector('#tower-biome-icon'),
+      towerBiomeName: container.querySelector('#tower-biome-name'),
+      towerBiomeBonus: container.querySelector('#tower-biome-bonus'),
+      // Stat detail popups
+      detailPowerCost: container.querySelector('#detail-powercost'),
       btnStart: container.querySelector('#btn-start'),
       btnUpgrade: container.querySelector('#btn-upgrade'),
       btnSell: container.querySelector('#btn-sell'),
@@ -131,8 +139,21 @@ class GameControllerBase {
       energyTooltipSpecialRow: container.querySelector('#energy-tooltip-special-row'),
       energyTooltipSpecial: container.querySelector('#energy-tooltip-special'),
       energyTooltipClose: container.querySelector('#energy-tooltip-close'),
-      energyXpBarFill: container.querySelector('#energy-xp-bar-fill'),
-      energyXpBarText: container.querySelector('#energy-xp-bar-text'),
+      // Energy level bar (new unified)
+      energyLevelProgress: container.querySelector('#energy-level-progress'),
+      energyLevelText: container.querySelector('#energy-level-text'),
+      // Energy Biome section
+      energyBiomeSection: container.querySelector('#energy-biome-section'),
+      energyBiomeIcon: container.querySelector('#energy-biome-icon'),
+      energyBiomeName: container.querySelector('#energy-biome-name'),
+      energyBiomeBonus: container.querySelector('#energy-biome-bonus'),
+      // Energy stat detail popups
+      energyDetailStored: container.querySelector('#energy-detail-stored'),
+      energyDetailOutput: container.querySelector('#energy-detail-output'),
+      energyDetailRange: container.querySelector('#energy-detail-range'),
+      energyDetailGen: container.querySelector('#energy-detail-gen'),
+      energyDetailEfficiency: container.querySelector('#energy-detail-efficiency'),
+      energyDetailSpecial: container.querySelector('#energy-detail-special'),
       energyUpgradesSection: container.querySelector('#energy-upgrades-section'),
       energyUpgradesGrid: container.querySelector('#energy-upgrades-grid'),
       energyBtnConnect: container.querySelector('#energy-btn-connect'),
@@ -741,6 +762,11 @@ class GameControllerBase {
     }
     
     this.renderer.render(renderData);
+    
+    // Update energy building tooltip in real-time if visible
+    if (this.selectedEnergyBuilding && this.elements.energyTooltip?.classList.contains('visible')) {
+      this.updateEnergyTooltipRealtime(this.selectedEnergyBuilding);
+    }
   }
 
   /**
@@ -827,12 +853,65 @@ class GameControllerBase {
       el.energyTooltipLevel.title = `XP: ${xpProgress.current}/${xpProgress.needed} (${Math.floor(xpProgress.percent)}%)`;
     }
     
-    // Update XP bar
-    if (el.energyXpBarFill) {
-      el.energyXpBarFill.style.width = `${Math.min(100, xpProgress.percent)}%`;
+    // Update level progress bar (new unified style)
+    if (el.energyLevelProgress) {
+      el.energyLevelProgress.style.width = `${Math.min(100, xpProgress.percent)}%`;
     }
-    if (el.energyXpBarText) {
-      el.energyXpBarText.textContent = `${xpProgress.current}/${xpProgress.needed} XP`;
+    if (el.energyLevelText) {
+      el.energyLevelText.textContent = `${xpProgress.current}/${xpProgress.needed} XP`;
+    }
+    
+    // Update Biome Section (show if building has biome modifiers)
+    if (el.energyBiomeSection) {
+      const state = building.getState?.() || {};
+      const biomeType = building.biomeType || state.currentBiome;
+      const biomeModifiers = building.biomeModifiers || {};
+      
+      if (biomeType && Object.keys(biomeModifiers).length > 0) {
+        el.energyBiomeSection.style.display = 'flex';
+        
+        // Biome icons
+        const biomeIcons = {
+          'forest': '🌲',
+          'mountains': '⛰️',
+          'desert': '🏜️',
+          'water': '🌊',
+          'swamp': '🌿',
+          'tundra': '❄️',
+          'plains': '🌾',
+          'default': '🗺️'
+        };
+        
+        if (el.energyBiomeIcon) {
+          el.energyBiomeIcon.textContent = biomeIcons[biomeType] || '🗺️';
+        }
+        if (el.energyBiomeName) {
+          el.energyBiomeName.textContent = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
+        }
+        
+        // Format bonus text (show first modifier as main bonus)
+        if (el.energyBiomeBonus) {
+          const bonusTexts = [];
+          if (biomeModifiers.generation) {
+            const pct = Math.round((biomeModifiers.generation - 1) * 100);
+            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Gen`);
+          }
+          if (biomeModifiers.efficiency) {
+            const pct = Math.round((biomeModifiers.efficiency - 1) * 100);
+            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Eff`);
+          }
+          if (biomeModifiers.capacity) {
+            const pct = Math.round((biomeModifiers.capacity - 1) * 100);
+            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Cap`);
+          }
+          
+          const bonusText = bonusTexts.join(', ') || 'No effect';
+          el.energyBiomeBonus.textContent = bonusText;
+          el.energyBiomeBonus.classList.toggle('penalty', bonusTexts.some(t => t.startsWith('-')));
+        }
+      } else {
+        el.energyBiomeSection.style.display = 'none';
+      }
     }
     
     // Update type with XP info
@@ -928,6 +1007,9 @@ class GameControllerBase {
       }
     }
     
+    // ===== Fill Detail Popups =====
+    this.updateEnergyDetailPopups(building);
+    
     // Position tooltip near the building
     const screenPos = this.camera.worldToScreen(building.worldX, building.worldY);
     const tooltipRect = el.energyTooltip.getBoundingClientRect();
@@ -953,26 +1035,194 @@ class GameControllerBase {
   }
   
   /**
+   * Update energy building detail popups with calculation info
+   */
+  updateEnergyDetailPopups(building) {
+    if (!building) return;
+    
+    const el = this.elements;
+    const level = building.level || 1;
+    const upgrades = building.upgradeLevels || {};
+    const state = building.getState?.() || {};
+    const levelBonus = 1 + (level - 1) * 0.02; // +2% per level
+    
+    // ===== Stored Energy Detail =====
+    if (el.energyDetailStored) {
+      const stored = Math.floor(building.stored || 0);
+      const baseCap = building.baseCapacity || 100;
+      const capacity = Math.floor(building.capacity || baseCap);
+      const capUpgrade = upgrades.capacity || 0;
+      
+      el.energyDetailStored.innerHTML = `
+        <div class="detail-line"><span class="detail-label">Current:</span><span class="detail-value">${stored}/${capacity}</span></div>
+        <div class="detail-line"><span class="detail-label">Base cap:</span><span class="detail-base">${baseCap}</span></div>
+        <div class="detail-line"><span class="detail-label">Level ${level} (+${((levelBonus-1)*100).toFixed(0)}%):</span><span class="detail-level">×${levelBonus.toFixed(2)}</span></div>
+        ${capUpgrade > 0 ? `<div class="detail-line"><span class="detail-label">Upgrades Lv.${capUpgrade} (+${(capUpgrade*10)}%):</span><span class="detail-upgrade">×${(1+capUpgrade*0.1).toFixed(2)}</span></div>` : ''}
+        <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${capacity}</span></div>
+        <div class="detail-formula">Base × Lvl% × Upg%</div>
+      `;
+    }
+    
+    // ===== Output Rate Detail =====
+    if (el.energyDetailOutput) {
+      const baseOutput = building.baseOutputRate || 10;
+      const output = building.outputRate || baseOutput;
+      const outputUpgrade = upgrades.outputRate || 0;
+      const afterLevel = baseOutput * levelBonus;
+      const afterUpg = afterLevel * (1 + outputUpgrade * 0.05);
+      
+      el.energyDetailOutput.innerHTML = `
+        <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${baseOutput.toFixed(1)}/s</span></div>
+        <div class="detail-line"><span class="detail-label">Level ${level} (+${((levelBonus-1)*100).toFixed(0)}%):</span><span class="detail-level">${afterLevel.toFixed(2)}/s</span></div>
+        ${outputUpgrade > 0 ? `<div class="detail-line"><span class="detail-label">Upgrades Lv.${outputUpgrade} (+${(outputUpgrade*5)}%):</span><span class="detail-upgrade">${afterUpg.toFixed(2)}/s</span></div>` : ''}
+        <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${output.toFixed(1)}/s</span></div>
+        <div class="detail-formula">Base × Lvl% × Upg%</div>
+      `;
+    }
+    
+    // ===== Range Detail =====
+    if (el.energyDetailRange) {
+      const baseRange = building.baseRange || 4;
+      const range = building.range || baseRange;
+      const rangeUpgrade = upgrades.range || 0;
+      const afterLevel = baseRange + Math.floor((level - 1) * 0.2);
+      const final = afterLevel + rangeUpgrade;
+      
+      el.energyDetailRange.innerHTML = `
+        <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${baseRange}</span></div>
+        <div class="detail-line"><span class="detail-label">Level ${level} (+${Math.floor((level - 1) * 0.2)}):</span><span class="detail-level">${afterLevel}</span></div>
+        ${rangeUpgrade > 0 ? `<div class="detail-line"><span class="detail-label">Upgrades Lv.${rangeUpgrade} (+${rangeUpgrade}):</span><span class="detail-upgrade">${final}</span></div>` : ''}
+        <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${range}</span></div>
+        <div class="detail-formula">Base + LvlBonus + Upg</div>
+      `;
+    }
+    
+    // ===== Generation Detail (for generators) =====
+    if (el.energyDetailGen && building.nodeType === 'generator') {
+      const baseGen = building.generation || 5;
+      const bioMod = state.currentBiome ? (building.biomeModifiers?.[state.currentBiome] || 1) : 1;
+      const afterLevel = baseGen * levelBonus;
+      const afterBio = afterLevel * bioMod;
+      const biomeName = state.currentBiome ? state.currentBiome.toUpperCase() : 'None';
+      
+      el.energyDetailGen.innerHTML = `
+        <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${baseGen.toFixed(1)}/s</span></div>
+        <div class="detail-line"><span class="detail-label">Level ${level} (+${((levelBonus-1)*100).toFixed(0)}%):</span><span class="detail-level">${afterLevel.toFixed(2)}/s</span></div>
+        ${bioMod !== 1 ? `<div class="detail-line"><span class="detail-label">Biome ${biomeName} (×${bioMod.toFixed(2)}):</span><span class="detail-value ${bioMod > 1 ? 'bonus' : 'penalty'}">${afterBio.toFixed(2)}/s</span></div>` : ''}
+        <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${(building.getEffectiveGeneration?.() || baseGen).toFixed(1)}/s</span></div>
+        <div class="detail-formula">Base × Lvl% × BiomeMod</div>
+      `;
+    }
+    
+    // ===== Efficiency Detail (for generators) =====
+    if (el.energyDetailEfficiency && building.nodeType === 'generator') {
+      const baseEff = state.efficiency !== undefined ? state.efficiency : 1;
+      const biomeName = state.currentBiome ? state.currentBiome.toUpperCase() : 'Default';
+      const bioBonus = state.currentBiome ? (building.biomeModifiers?.[state.currentBiome] || 1) : 1;
+      
+      el.energyDetailEfficiency.innerHTML = `
+        <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">100%</span></div>
+        <div class="detail-line"><span class="detail-label">Biome ${biomeName}:</span><span class="detail-value ${bioBonus > 1 ? 'bonus' : 'penalty'}">${Math.round(bioBonus * 100)}%</span></div>
+        <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.round(baseEff * 100)}%</span></div>
+        <div class="detail-formula">Base × BiomeBonus</div>
+      `;
+    }
+    
+    // ===== Special Stats Detail =====
+    if (el.energyDetailSpecial && el.energyTooltipSpecialRow?.style.display !== 'none') {
+      let detailHTML = '';
+      
+      if (state.treesUsed !== undefined) {
+        // Bio Generator
+        detailHTML = `
+          <div class="detail-line"><span class="detail-label">Trees nearby:</span><span class="detail-value">${state.treesUsed}</span></div>
+          <div class="detail-line"><span class="detail-label">Max capacity:</span><span class="detail-base">${building.maxTrees || 12}</span></div>
+          <div class="detail-formula">Used / Max</div>
+        `;
+      } else if (state.generationMin !== undefined) {
+        // Wind Generator
+        const baseGen = building.generation || 5;
+        detailHTML = `
+          <div class="detail-line"><span class="detail-label">Range:</span><span class="detail-value">${state.generationMin.toFixed(0)}-${state.generationMax.toFixed(0)}/s</span></div>
+          <div class="detail-line"><span class="detail-label">Biome:</span><span class="detail-base">${state.currentBiome || 'default'}</span></div>
+          <div class="detail-formula">Depends on terrain</div>
+        `;
+      } else if (state.waterTiles !== undefined) {
+        // Hydro Generator
+        detailHTML = `
+          <div class="detail-line"><span class="detail-label">Water tiles:</span><span class="detail-value">${state.waterTiles}</span></div>
+          <div class="detail-line"><span class="detail-label">Max capacity:</span><span class="detail-base">${building.maxWaterTiles || 9}</span></div>
+          <div class="detail-formula">Gen rate × tiles</div>
+        `;
+      } else if (state.currentBiome !== undefined && building.biomeEfficiency) {
+        // Solar Generator
+        const bioMod = building.biomeEfficiency?.[state.currentBiome] || 1;
+        detailHTML = `
+          <div class="detail-line"><span class="detail-label">Current biome:</span><span class="detail-base">${state.currentBiome}</span></div>
+          <div class="detail-line"><span class="detail-label">Bonus:</span><span class="detail-value ${bioMod > 1 ? 'bonus' : 'penalty'}">${Math.round((bioMod - 1) * 100)}%</span></div>
+          <div class="detail-formula">Biome efficiency</div>
+        `;
+      }
+      
+      if (detailHTML) {
+        el.energyDetailSpecial.innerHTML = detailHTML;
+      }
+    }
+  }
+  
+  /**
    * Update energy building tooltip values in real-time (called every tick)
+   * Updates all stats that might change during gameplay or upgrades
    */
   updateEnergyTooltipRealtime(building) {
     if (!building) return;
     
     const el = this.elements;
     
-    // Update stored energy
+    // ===== Update Level (if changed) =====
+    if (el.energyTooltipLevel) {
+      const levelText = `Lvl ${building.level || 1}`;
+      if (el.energyTooltipLevel.textContent !== levelText) {
+        el.energyTooltipLevel.textContent = levelText;
+      }
+    }
+    
+    // ===== Update Level Progress Bar =====
+    const xpProgress = building.getXpProgress?.() || { current: 0, needed: 10, percent: 0 };
+    if (el.energyLevelProgress) {
+      el.energyLevelProgress.style.width = `${Math.min(100, xpProgress.percent)}%`;
+    }
+    if (el.energyLevelText) {
+      el.energyLevelText.textContent = `${xpProgress.current}/${xpProgress.needed} XP`;
+    }
+    
+    // ===== Update Effective Stats (changes with level/upgrades) =====
+    // Output rate
+    if (el.energyTooltipOutput) {
+      const outputRate = building.getEffectiveOutputRate?.() || building.outputRate || 0;
+      el.energyTooltipOutput.textContent = `${outputRate.toFixed(1)}/s`;
+    }
+    
+    // Range
+    if (el.energyTooltipRange) {
+      const range = building.getEffectiveRange?.() || building.range || 0;
+      el.energyTooltipRange.textContent = `${range} cells`;
+    }
+    
+    // Capacity (stored energy + max)
     if (el.energyTooltipStored) {
       const stored = Math.floor(building.stored || 0);
       const capacity = Math.floor(building.getEffectiveCapacity?.() || building.capacity || 100);
       el.energyTooltipStored.textContent = `${stored}/${capacity}`;
     }
     
-    // Update generation (for generators)
+    // Generation (for generators)
     if (el.energyTooltipGen && building.nodeType === 'generator' && building.generation !== undefined) {
-      el.energyTooltipGen.textContent = `${building.generation?.toFixed(1) || 0}/s`;
+      const generation = building.getEffectiveGeneration?.() || building.generation || 0;
+      el.energyTooltipGen.textContent = `${generation.toFixed(1)}/s`;
     }
     
-    // Update efficiency
+    // Efficiency
     if (el.energyTooltipEff) {
       const state = building.getState?.() || {};
       if (state.efficiency !== undefined) {
@@ -980,7 +1230,7 @@ class GameControllerBase {
       }
     }
     
-    // Update special stats (trees, wind range, water, biome)
+    // ===== Update special stats (trees, wind range, water, biome) =====
     if (el.energyTooltipSpecial) {
       const state = building.getState?.() || {};
       let specialText = null;
@@ -1006,13 +1256,55 @@ class GameControllerBase {
       }
     }
     
-    // Update XP bar
-    const xpProgress = building.getXpProgress?.() || { current: 0, needed: 10, percent: 0 };
-    if (el.energyXpBarFill) {
-      el.energyXpBarFill.style.width = `${Math.min(100, xpProgress.percent)}%`;
-    }
-    if (el.energyXpBarText) {
-      el.energyXpBarText.textContent = `${xpProgress.current}/${xpProgress.needed} XP`;
+    // ===== Update Biome Section (if visible) =====
+    if (el.energyBiomeSection) {
+      const state = building.getState?.() || {};
+      const biomeType = building.biomeType || state.currentBiome;
+      const biomeModifiers = building.biomeModifiers || {};
+      
+      if (biomeType && Object.keys(biomeModifiers).length > 0) {
+        el.energyBiomeSection.style.display = 'flex';
+        
+        const biomeIcons = {
+          'forest': '🌲',
+          'mountains': '⛰️',
+          'desert': '🏜️',
+          'water': '🌊',
+          'swamp': '🌿',
+          'tundra': '❄️',
+          'plains': '🌾',
+          'default': '🗺️'
+        };
+        
+        if (el.energyBiomeIcon) {
+          el.energyBiomeIcon.textContent = biomeIcons[biomeType] || '🗺️';
+        }
+        if (el.energyBiomeName) {
+          el.energyBiomeName.textContent = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
+        }
+        
+        if (el.energyBiomeBonus) {
+          const bonusTexts = [];
+          if (biomeModifiers.generation) {
+            const pct = Math.round((biomeModifiers.generation - 1) * 100);
+            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Gen`);
+          }
+          if (biomeModifiers.efficiency) {
+            const pct = Math.round((biomeModifiers.efficiency - 1) * 100);
+            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Eff`);
+          }
+          if (biomeModifiers.capacity) {
+            const pct = Math.round((biomeModifiers.capacity - 1) * 100);
+            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Cap`);
+          }
+          
+          const bonusText = bonusTexts.join(', ') || 'No effect';
+          el.energyBiomeBonus.textContent = bonusText;
+          el.energyBiomeBonus.classList.toggle('penalty', bonusTexts.some(t => t.startsWith('-')));
+        }
+      } else {
+        el.energyBiomeSection.style.display = 'none';
+      }
     }
     
     // Update connections count (might change if tower destroyed)
@@ -1021,6 +1313,9 @@ class GameControllerBase {
       const connections = energyModule?.getConnectionsCount?.(building.id) || 0;
       el.energyTooltipConnections.textContent = `${connections} links`;
     }
+    
+    // Update detail popups with current values
+    this.updateEnergyDetailPopups(building);
   }
   
   /**

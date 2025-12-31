@@ -502,6 +502,55 @@ function drawBase(ctx, waypoints, camera) {
   ctx.stroke();
 }
 
+/**
+ * Draw enemy spawn portal (first waypoint)
+ */
+function drawSpawnPortal(ctx, waypoints, camera, time = 0) {
+  if (waypoints.length === 0) return;
+  
+  const spawn = waypoints[0];
+  const size = CONFIG.GRID_SIZE * 1.2;
+  
+  if (camera && !camera.isVisible(spawn.x - size*2, spawn.y - size*2, size*4, size*4)) return;
+  
+  // Pulsing glow effect
+  const pulse = 0.8 + Math.sin(time * 0.003) * 0.2;
+  
+  // Outer glow (red)
+  const gradient = ctx.createRadialGradient(
+    spawn.x, spawn.y, 0,
+    spawn.x, spawn.y, size * 2 * pulse
+  );
+  gradient.addColorStop(0, 'rgba(245, 101, 101, 0.6)');
+  gradient.addColorStop(0.5, 'rgba(245, 101, 101, 0.3)');
+  gradient.addColorStop(1, 'transparent');
+  
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(spawn.x, spawn.y, size * 2 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Portal ring
+  ctx.strokeStyle = '#f56565';
+  ctx.lineWidth = 3 / (camera ? camera.zoom : 1);
+  ctx.beginPath();
+  ctx.arc(spawn.x, spawn.y, size, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Inner ring
+  ctx.strokeStyle = '#fc8181';
+  ctx.lineWidth = 2 / (camera ? camera.zoom : 1);
+  ctx.beginPath();
+  ctx.arc(spawn.x, spawn.y, size * 0.6, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Center dot
+  ctx.fillStyle = '#f56565';
+  ctx.beginPath();
+  ctx.arc(spawn.x, spawn.y, size * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 module.exports = {
   drawBiomes,
   drawBiomeDecoration,
@@ -511,5 +560,6 @@ module.exports = {
   drawSpecialElements,
   drawGrid,
   drawPath,
-  drawBase
+  drawBase,
+  drawSpawnPortal
 };

@@ -315,6 +315,33 @@ const STAT_UPGRADES = {
     
     color: '#a29bfe'
   },
+
+  // =========================================
+  // POWER EFFICIENCY (-4% power hit cost per level)
+  // Reduces energy consumed per shot
+  // Max reduction: 70% (min 30% of original cost)
+  // =========================================
+  powerEfficiency: {
+    id: 'powerEfficiency',
+    name: 'Power Efficiency',
+    emoji: '⚡',
+    category: 'utility',
+    description: '-4% shot energy cost per level',
+    
+    effect: {
+      type: 'percentage',
+      stat: 'energyCostPerShot',
+      percentPerLevel: -0.04,
+      minFactor: 0.3, // Can't go below 30% of original
+    },
+    
+    cost: {
+      base: 25,
+      scaleFactor: 1.16,
+    },
+    
+    color: '#00cec9'
+  },
 };
 
 module.exports = { STAT_UPGRADES };

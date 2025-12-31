@@ -17,7 +17,7 @@ const CONFIG = {
   UPGRADE_COST_MULTIPLIER: 1.5,
   WAVE_DELAY_MS: 3000,
   SPAWN_INTERVAL_MS: 800,
-  ENEMY_HP_MULTIPLIER: 1.1,
+  ENEMY_HP_MULTIPLIER: 1.05,
   ENEMY_SPEED_MULTIPLIER: 1.02,
   XP_MULTIPLIER: 2,
   ENEMY_TYPES: {
@@ -114,33 +114,23 @@ const CONFIG = {
       danger: '#fc8181'
     }
   },
-  PATH_WAYPOINTS: [{
-      x: -0.05,
-      y: 0.5
-    }, {
-      x: 0.2,
-      y: 0.5
-    }, {
-      x: 0.2,
-      y: 0.2
-    }, {
-      x: 0.5,
-      y: 0.2
-    }, {
-      x: 0.5,
-      y: 0.8
-    }, {
-      x: 0.8,
-      y: 0.8
-    }, {
-      x: 0.8,
-      y: 0.5
-    }, {
-      x: 1.05,
-      y: 0.5
-    }],
+  
+  // Path from center to right side (shorter path, no edge paths)
+  // Enemies spawn at center and move to the base on the right
+  PATH_WAYPOINTS: [
+    { x: 0.5, y: 0.5 },    // Spawn at center
+    { x: 0.6, y: 0.5 },    // Move right
+    { x: 0.6, y: 0.35 },   // Up
+    { x: 0.75, y: 0.35 },  // Right
+    { x: 0.75, y: 0.65 },  // Down
+    { x: 0.85, y: 0.65 },  // Right
+    { x: 0.85, y: 0.5 },   // Up to base level
+    { x: 0.95, y: 0.5 }    // Exit to base
+  ],
+  
+  // Base on right side
   BASE_POSITION: {
-    x: 0.9,
+    x: 0.95,
     y: 0.5
   },
 };

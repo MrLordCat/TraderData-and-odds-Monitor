@@ -192,13 +192,13 @@ class PowerConsumer extends PowerNode {
       nodeType: 'consumer',
       inputChannels: 1,
       outputChannels: 0,       // Doesn't output
-      inputRate: options.consumption || 5,
+      inputRate: Infinity,     // No input rate limit for towers
       outputRate: 0,
-      capacity: options.capacity || 20,
+      capacity: options.capacity || options.maxEnergy || 100,
       range: 0                 // Doesn't connect to others
     });
     
-    // Power consumption per second
+    // Power consumption per second (for tracking only)
     this.consumption = options.consumption || 5;
     
     // Is the consumer powered?
@@ -211,26 +211,43 @@ class PowerConsumer extends PowerNode {
 
   setTower(tower) {
     this.towerRef = tower;
+    // Update capacity to match tower's maxEnergy
+    if (tower && tower.maxEnergy) {
+      this.capacity = tower.maxEnergy;
+    }
+  }
+
+  /**
+   * Override: Towers have NO input rate limit - can receive as much as they have space
+   */
+  getAvailableInput(dt) {
+    // For towers: only limit is available space, not input rate
+    if (this.towerRef) {
+      const towerSpace = (this.towerRef.maxEnergy || 100) - (this.towerRef.currentEnergy || 0);
+      return towerSpace;
+    }
+    // Fallback to capacity space
+    return this.capacity - this.stored;
   }
 
   /**
    * Receive energy and transfer to tower
    */
   receiveEnergy(amount) {
+    // Transfer directly to tower without intermediate storage
+    if (this.towerRef) {
+      const towerSpace = (this.towerRef.maxEnergy || 100) - (this.towerRef.currentEnergy || 0);
+      const toTower = Math.min(amount, towerSpace);
+      if (toTower > 0) {
+        this.towerRef.currentEnergy = (this.towerRef.currentEnergy || 0) + toTower;
+      }
+      return toTower;
+    }
+    
+    // Fallback: store in consumer buffer
     const space = this.capacity - this.stored;
     const received = Math.min(amount, space);
     this.stored += received;
-    
-    // Transfer to tower's currentEnergy
-    if (this.towerRef && received > 0) {
-      const towerSpace = (this.towerRef.maxEnergy || 100) - (this.towerRef.currentEnergy || 0);
-      const toTower = Math.min(this.stored, towerSpace);
-      if (toTower > 0) {
-        this.towerRef.currentEnergy = (this.towerRef.currentEnergy || 0) + toTower;
-        this.stored -= toTower;
-      }
-    }
-    
     return received;
   }
 

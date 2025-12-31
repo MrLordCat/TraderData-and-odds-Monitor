@@ -34,10 +34,11 @@ class MapGenerator {
    * @param {number} height - Map height in cells
    * @param {number} gridSize - Size of each cell in pixels
    */
-  constructor(width, height, gridSize) {
+  constructor(width, height, gridSize, config = {}) {
     this.width = width;
     this.height = height;
     this.gridSize = gridSize;
+    this.config = config;
     
     this.rng = null;
     this.noise = null;
@@ -70,8 +71,12 @@ class MapGenerator {
     // Step 2: Generate spawn and base points
     this._generateEndpoints();
     
-    // Step 3: Generate path - USE STATIC SPIRAL PATH
-    this._generateSpiralPath();
+    // Step 3: Generate path - prefer configured waypoints, fallback to spiral
+    if (this.config && Array.isArray(this.config.PATH_WAYPOINTS) && this.config.PATH_WAYPOINTS.length > 1) {
+      this._generateConfiguredPath();
+    } else {
+      this._generateSpiralPath();
+    }
     
     // Step 4: Carve path into terrain
     this._carvePath();
@@ -89,60 +94,100 @@ class MapGenerator {
   }
   
   /**
-   * Generate static spiral path from edge to center
-   * Replaces procedural path generation for reliability
-   * Only 2 loops for cleaner gameplay
+   * Generate static path (fixed layout)
+   * Uses CONFIG.PATH_WAYPOINTS/BASE_POSITION if provided, else a straight vertical center lane
    */
   _generateSpiralPath() {
     this.waypoints = [];
     this.pathCells = [];
-    
-    const centerX = Math.floor(this.width / 2);
-    const centerY = Math.floor(this.height / 2);
-    const gridSize = this.gridSize;
-    
-    const points = [];
-    const margin = 4;
-    const shrink = 10; // Сужение на каждом повороте
-    
-    // Starting bounds
-    let left = margin;
-    let right = this.width - margin - 1;
-    let top = margin;
-    let bottom = this.height - margin - 1;
-    
-    // Entry - top left
-    points.push({ x: left, y: -1 });  // Spawn outside
-    points.push({ x: left, y: top }); // Enter map
-    
-    // Loop 1 - outer
-    points.push({ x: left, y: bottom });         // Down
-    left += shrink;
-    points.push({ x: right, y: bottom });        // Right
-    bottom -= shrink;
-    points.push({ x: right, y: top });           // Up
-    right -= shrink;
-    points.push({ x: left, y: top });            // Left (turn in)
-    top += shrink;
-    
-    // Loop 2 - inner
-    points.push({ x: left, y: bottom });         // Down
-    left += shrink;
-    points.push({ x: right, y: bottom });        // Right
-    bottom -= shrink;
-    points.push({ x: right, y: top });           // Up
-    
-    // Final - to center
-    points.push({ x: centerX, y: top });         // Horizontal to center
-    points.push({ x: centerX, y: centerY });     // Down to base
-    
-    // Convert to world coordinates
+
+    // Prefer config waypoints; otherwise use fixed vertical path
+    const cfgPoints = Array.isArray(this.config?.PATH_WAYPOINTS) && this.config.PATH_WAYPOINTS.length > 1
+      ? this.config.PATH_WAYPOINTS
+      : [
+        { x: 0.5, y: -0.05 },
+        { x: 0.5, y: 0.25 },
+        { x: 0.5, y: 0.75 },
+        { x: 0.5, y: 1.05 }
+      ];
+
+    const cfgBase = this.config?.BASE_POSITION || { x: 0.5, y: 1.1 };
+
+    // Normalize points into grid cells (allow slight off-map to spawn outside)
+    const toCell = (p) => ({
+      x: Math.round(p.x * (this.width - 1)),
+      y: Math.round(p.y * (this.height - 1))
+    });
+
+    const points = cfgPoints.map(toCell);
+
     this.waypoints = points.map(p => ({
-      x: p.x * gridSize + gridSize / 2,
-      y: p.y * gridSize + gridSize / 2
+      x: p.x * this.gridSize + this.gridSize / 2,
+      y: p.y * this.gridSize + this.gridSize / 2
+    }));
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const from = points[i];
+      const to = points[i + 1];
+      const cells = this._getLineCells(from.x, from.y, to.x, to.y);
+      for (const cell of cells) {
+        if (!this.pathCells.some(c => c.x === cell.x && c.y === cell.y)) {
+          this.pathCells.push(cell);
+        }
+      }
+    }
+
+    // Spawn at first waypoint
+    this.spawnPoint = {
+      gridX: points[0].x,
+      gridY: points[0].y,
+      worldX: this.waypoints[0].x,
+      worldY: this.waypoints[0].y
+    };
+
+    // Base from config (clamped to map)
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+    const baseGridX = Math.round(clamp01(cfgBase.x) * (this.width - 1));
+    const baseGridY = Math.round(clamp01(cfgBase.y) * (this.height - 1));
+    this.basePoint = {
+      gridX: baseGridX,
+      gridY: baseGridY,
+      worldX: baseGridX * this.gridSize + this.gridSize / 2,
+      worldY: baseGridY * this.gridSize + this.gridSize / 2
+    };
+
+    console.log(`[MapGenerator] Fixed path: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
+  }
+
+  /**
+   * Generate path using normalized waypoints from config (0..1 grid space)
+   * Allows slight overshoot (<0 or >1) to spawn off-map or finish beyond base edge
+   */
+  _generateConfiguredPath() {
+    const pathPoints = this.config?.PATH_WAYPOINTS;
+    const basePos = this.config?.BASE_POSITION;
+    if (!Array.isArray(pathPoints) || pathPoints.length < 2 || !basePos) {
+      console.warn('[MapGenerator] Configured path missing or invalid, falling back to spiral');
+      return this._generateSpiralPath();
+    }
+    
+    this.waypoints = [];
+    this.pathCells = [];
+    
+    // Convert normalized points to grid cells (allow slight overflow for off-map spawn/exit)
+    const toCell = (p) => ({
+      x: Math.round(p.x * (this.width - 1)),
+      y: Math.round(p.y * (this.height - 1))
+    });
+    const points = pathPoints.map(toCell);
+    
+    // Build waypoints in world coords
+    this.waypoints = points.map(p => ({
+      x: p.x * this.gridSize + this.gridSize / 2,
+      y: p.y * this.gridSize + this.gridSize / 2
     }));
     
-    // Generate path cells
+    // Generate path cells between waypoints (no duplicates)
     for (let i = 0; i < points.length - 1; i++) {
       const from = points[i];
       const to = points[i + 1];
@@ -154,7 +199,7 @@ class MapGenerator {
       }
     }
     
-    // Set spawn and base
+    // Spawn at first waypoint
     this.spawnPoint = {
       gridX: points[0].x,
       gridY: points[0].y,
@@ -162,14 +207,18 @@ class MapGenerator {
       worldY: this.waypoints[0].y
     };
     
+    // Base at configured position (clamped to map bounds)
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+    const baseGridX = Math.round(clamp01(basePos.x) * (this.width - 1));
+    const baseGridY = Math.round(clamp01(basePos.y) * (this.height - 1));
     this.basePoint = {
-      gridX: centerX,
-      gridY: centerY,
-      worldX: centerX * gridSize + gridSize / 2,
-      worldY: centerY * gridSize + gridSize / 2
+      gridX: baseGridX,
+      gridY: baseGridY,
+      worldX: baseGridX * this.gridSize + this.gridSize / 2,
+      worldY: baseGridY * this.gridSize + this.gridSize / 2
     };
     
-    console.log(`[MapGenerator] Spiral: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
+    console.log(`[MapGenerator] Config path: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
   }
   
   /**

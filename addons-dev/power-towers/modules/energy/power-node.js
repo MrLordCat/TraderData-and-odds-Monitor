@@ -6,7 +6,11 @@
  * 
  * XP SYSTEM: Buildings gain XP from energy processed
  * - Every 100 energy = 1 XP
- * - Every 10 XP = 1 level (same as towers)
+ * - Every 10 XP = 1 level
+ * 
+ * LEVEL BONUSES: Each level gives +2% to all stats
+ * 
+ * STAT UPGRADES: Similar to towers, each upgrade gives % bonus
  */
 
 let nodeIdCounter = 0;
@@ -26,29 +30,47 @@ class PowerNode {
     this.worldX = options.worldX || 0;
     this.worldY = options.worldY || 0;
     
-    // Power properties
-    this.inputChannels = options.inputChannels ?? 1;
-    this.outputChannels = options.outputChannels ?? 1;
-    this.inputRate = options.inputRate || 10;   // Max power input per second
-    this.outputRate = options.outputRate || 10;  // Max power output per second
-    this.capacity = options.capacity || 100;     // Storage capacity
-    this.stored = options.stored || 0;           // Current stored energy
-    this.range = options.range || 5;             // Connection range (grid cells)
+    // Base Power properties (before any modifiers)
+    this.baseInputChannels = options.inputChannels ?? 1;
+    this.baseOutputChannels = options.outputChannels ?? 1;
+    this.baseInputRate = options.inputRate || 10;   // Max power input per second
+    this.baseOutputRate = options.outputRate || 10;  // Max power output per second
+    this.baseCapacity = options.capacity || 100;     // Storage capacity
+    this.baseRange = options.range || 5;             // Connection range (grid cells)
+    
+    // Effective values (calculated)
+    this.inputChannels = this.baseInputChannels;
+    this.outputChannels = this.baseOutputChannels;
+    this.inputRate = this.baseInputRate;
+    this.outputRate = this.baseOutputRate;
+    this.capacity = this.baseCapacity;
+    this.range = this.baseRange;
+    this.stored = options.stored || 0;
     
     // XP System (like towers)
     this.xp = 0;                    // Current XP
     this.totalEnergyProcessed = 0; // Total energy for XP calculation
     this.level = 1;
-    this.maxLevel = 10;            // Max level from XP
+    this.maxLevel = 20;            // Max level from XP (increased)
     
-    // Manual upgrades (separate from XP levels)
-    this.upgrades = {
+    // Stat upgrades (like towers - each gives % bonus)
+    this.upgradeLevels = {
       inputRate: 0,
       outputRate: 0,
       capacity: 0,
       range: 0,
-      channels: 0
+      channels: 0,
+      efficiency: 0,    // For generators/relays
+      generation: 0,    // For generators
+      decay: 0          // For batteries
     };
+    
+    // Biome info (set when placed)
+    this.biomeType = null;
+    this.biomeModifiers = null;
+    
+    // Initial stat calculation
+    this.recalculateStats();
   }
 
   /**
@@ -70,6 +92,10 @@ class PowerNode {
       if (newLevel > this.level) {
         const oldLevel = this.level;
         this.level = newLevel;
+        
+        // Recalculate stats on level up
+        this.recalculateStats();
+        
         return { leveledUp: true, oldLevel, newLevel, xpGained };
       }
       
@@ -92,6 +118,76 @@ class PowerNode {
       percent: (xpIntoLevel / xpNeeded) * 100
     };
   }
+  
+  /**
+   * Recalculate all effective stats based on level and upgrades
+   * Similar to tower stat calculation
+   */
+  recalculateStats() {
+    // Level bonus: +2% per level to all stats
+    const levelBonus = 1 + (this.level - 1) * 0.02;
+    
+    // Input Rate: base * level bonus * upgrade bonus (+5% per upgrade)
+    this.inputRate = this.baseInputRate * levelBonus;
+    if (this.upgradeLevels.inputRate) {
+      this.inputRate *= (1 + this.upgradeLevels.inputRate * 0.05);
+    }
+    
+    // Output Rate: base * level bonus * upgrade bonus (+5% per upgrade)
+    this.outputRate = this.baseOutputRate * levelBonus;
+    if (this.upgradeLevels.outputRate) {
+      this.outputRate *= (1 + this.upgradeLevels.outputRate * 0.05);
+    }
+    
+    // Capacity: base * level bonus * upgrade bonus (+10% per upgrade)
+    this.capacity = this.baseCapacity * levelBonus;
+    if (this.upgradeLevels.capacity) {
+      this.capacity *= (1 + this.upgradeLevels.capacity * 0.10);
+    }
+    
+    // Range: base + level bonus (flat) + upgrade bonus
+    this.range = this.baseRange + Math.floor((this.level - 1) * 0.2);
+    if (this.upgradeLevels.range) {
+      this.range += this.upgradeLevels.range;
+    }
+    
+    // Channels: base + upgrade bonus
+    this.inputChannels = this.baseInputChannels + Math.floor(this.upgradeLevels.channels / 2);
+    this.outputChannels = this.baseOutputChannels + Math.floor(this.upgradeLevels.channels / 2);
+    
+    // Apply biome modifiers if present
+    if (this.biomeModifiers) {
+      if (this.biomeModifiers.energyProduction) {
+        // Affects generators
+      }
+      if (this.biomeModifiers.buildCost) {
+        // Already applied at build time
+      }
+    }
+  }
+  
+  /**
+   * Apply a stat upgrade
+   * @param {string} upgradeId - Upgrade ID (inputRate, outputRate, etc.)
+   * @returns {boolean} Success
+   */
+  applyStatUpgrade(upgradeId) {
+    if (this.upgradeLevels[upgradeId] === undefined) {
+      return false;
+    }
+    
+    this.upgradeLevels[upgradeId]++;
+    this.recalculateStats();
+    
+    return true;
+  }
+  
+  /**
+   * Get upgrade level for a stat
+   */
+  getUpgradeLevel(upgradeId) {
+    return this.upgradeLevels[upgradeId] || 0;
+  }
 
   /**
    * Receive energy from connected source
@@ -108,7 +204,7 @@ class PowerNode {
    */
   getAvailableInput(dt) {
     const space = this.capacity - this.stored;
-    const maxInput = this.getEffectiveInputRate() * dt;
+    const maxInput = this.inputRate * dt;
     return Math.min(space, maxInput);
   }
 
@@ -116,69 +212,71 @@ class PowerNode {
    * Get available output (per dt)
    */
   getAvailableOutput(dt) {
-    const maxOutput = this.getEffectiveOutputRate() * dt;
+    const maxOutput = this.outputRate * dt;
     return Math.min(this.stored, maxOutput);
   }
 
   /**
-   * Get effective input rate (with upgrades)
+   * Get effective input rate (already calculated in recalculateStats)
    */
   getEffectiveInputRate() {
-    return this.inputRate * (1 + this.upgrades.inputRate * 0.2);
+    return this.inputRate;
   }
 
   /**
-   * Get effective output rate (with upgrades)
+   * Get effective output rate (already calculated)
    */
   getEffectiveOutputRate() {
-    return this.outputRate * (1 + this.upgrades.outputRate * 0.2);
+    return this.outputRate;
   }
 
   /**
-   * Get effective capacity (with upgrades)
+   * Get effective capacity (already calculated)
    */
   getEffectiveCapacity() {
-    return this.capacity * (1 + this.upgrades.capacity * 0.25);
+    return this.capacity;
   }
 
   /**
-   * Get effective range (with upgrades)
+   * Get effective range (already calculated)
    */
   getEffectiveRange() {
-    return this.range + this.upgrades.range * 2;
+    return this.range;
+  }
+
+  /**
+   * Get effective generation (for generators, may include biome modifiers)
+   */
+  getEffectiveGeneration() {
+    if (this.generation === undefined) return 0;
+    
+    // Base generation with biome modifiers
+    let gen = this.generation;
+    
+    // Apply biome modifiers if present
+    if (this.biomeModifiers?.generation) {
+      gen *= this.biomeModifiers.generation;
+    }
+    
+    return gen;
   }
 
   /**
    * Get effective channels
    */
   getEffectiveInputChannels() {
-    return this.inputChannels + Math.floor(this.upgrades.channels / 2);
+    return this.inputChannels;
   }
 
   getEffectiveOutputChannels() {
-    return this.outputChannels + Math.floor(this.upgrades.channels / 2);
+    return this.outputChannels;
   }
 
   /**
-   * Apply upgrade
+   * Legacy upgrade method (for compatibility)
    */
   upgrade(type) {
-    if (this.upgrades[type] !== undefined && this.level < this.maxLevel) {
-      this.upgrades[type]++;
-      this.level++;
-      
-      // Update capacity to new effective value
-      if (type === 'capacity') {
-        this.capacity = this.getEffectiveCapacity();
-      }
-      if (type === 'channels') {
-        this.inputChannels = this.getEffectiveInputChannels();
-        this.outputChannels = this.getEffectiveOutputChannels();
-      }
-      
-      return true;
-    }
-    return false;
+    return this.applyStatUpgrade(type);
   }
 
   /**
@@ -193,16 +291,19 @@ class PowerNode {
       gridX: this.gridX,
       gridY: this.gridY,
       stored: this.stored,
-      capacity: this.getEffectiveCapacity(),
-      inputRate: this.getEffectiveInputRate(),
-      outputRate: this.getEffectiveOutputRate(),
-      range: this.getEffectiveRange(),
+      capacity: this.capacity,
+      inputRate: this.inputRate,
+      outputRate: this.outputRate,
+      range: this.range,
       inputChannels: this.inputChannels,
       outputChannels: this.outputChannels,
       level: this.level,
       xp: this.xp,
       xpProgress,
-      totalEnergyProcessed: this.totalEnergyProcessed
+      totalEnergyProcessed: this.totalEnergyProcessed,
+      upgradeLevels: { ...this.upgradeLevels },
+      biomeType: this.biomeType,
+      biomeModifiers: this.biomeModifiers
     };
   }
 
@@ -215,8 +316,8 @@ class PowerNode {
       worldX: this.worldX,
       worldY: this.worldY,
       energy: this.stored,
-      maxEnergy: this.getEffectiveCapacity(),
-      fillPercent: this.stored / this.getEffectiveCapacity()
+      maxEnergy: this.capacity,
+      fillPercent: this.stored / this.capacity
     };
   }
 

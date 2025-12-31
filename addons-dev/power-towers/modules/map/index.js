@@ -117,7 +117,7 @@ class MapModule {
     this.basePoint = null;    // Player base location
     
     // Map generator
-    this.generator = new MapGenerator(this.width, this.height, config.GRID_SIZE);
+    this.generator = new MapGenerator(this.width, this.height, config.GRID_SIZE, config);
     
     // Current seed (for replay/sharing)
     this.currentSeed = null;

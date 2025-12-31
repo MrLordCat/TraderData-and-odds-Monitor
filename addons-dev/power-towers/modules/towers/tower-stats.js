@@ -190,6 +190,32 @@ function recalculateTowerStats(tower) {
     tower.energyStorage = energyStorage;
   }
   
+  // =========================================
+  // STEP 10: Power Hit Cost (NEW SYSTEM)
+  // Base formula: damage * 0.5 + level%
+  // Then apply attack type modifier and powerEfficiency upgrade
+  // =========================================
+  const powerHitCostMod = attackType.powerHitCostMod || 1.0;
+  
+  // Base cost = 50% of effective damage + 1% per tower level
+  let basePowerCost = tower.damage * 0.5;
+  const levelCostBonus = 1 + (level - 1) * 0.01; // +1% per level
+  basePowerCost *= levelCostBonus;
+  
+  // Apply attack type modifier (Siege = 1.4, Normal = 0.8, etc.)
+  basePowerCost *= powerHitCostMod;
+  
+  // Apply powerEfficiency upgrade: -4% per level (min 30% of original)
+  if (upgradeLevels.powerEfficiency) {
+    const reduction = Math.min(0.7, upgradeLevels.powerEfficiency * 0.04);
+    basePowerCost *= (1 - reduction);
+  }
+  
+  // Store both the cost per shot and the modifier for display
+  tower.energyCostPerShot = Math.max(1, Math.round(basePowerCost));
+  tower.powerHitCostMod = powerHitCostMod;
+  tower.basePowerCost = tower.damage * 0.5; // For tooltip display
+  
   // Projectile visuals
   tower.projectileColor = tower.elementColor || attackType.projectileColor;
   tower.projectileSize = attackType.projectileSize;

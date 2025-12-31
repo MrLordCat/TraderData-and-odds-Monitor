@@ -20,7 +20,8 @@ const {
   drawSpecialElements, 
   drawGrid, 
   drawPath, 
-  drawBase 
+  drawBase,
+  drawSpawnPortal
 } = require('./render-terrain');
 const { 
   drawTowers, 
@@ -135,6 +136,9 @@ class GameRenderer {
     
     // Special elements with animation (energy nodes glow)
     drawSpecialElements(this.ctx, data.energyNodes, data.resourceVeins, data.terrainTypes, this.frameCount);
+    
+    // Enemy spawn portal (animated pulsing)
+    drawSpawnPortal(this.ctx, data.waypoints, this.camera, this.frameCount * 16.67); // ~60fps -> time in ms
     
     // Game entities (always dynamic)
     drawTowers(this.ctx, data.towers, data.selectedTower, this.camera);

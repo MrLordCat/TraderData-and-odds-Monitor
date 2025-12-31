@@ -11,6 +11,7 @@
  * - critDmgMod: multiplier for critical hit damage (0 = no bonus)
  * - splashRadius: 0 = single target, >0 = AoE radius in pixels
  * - powerScaling: for Magic type - how much extra damage per power%
+ * - powerHitCostMod: multiplier for energy cost per shot (base = 50% of damage)
  */
 
 const ATTACK_TYPES = {
@@ -27,7 +28,10 @@ const ATTACK_TYPES = {
     dmgMod: 1.0,           // Base damage multiplier
     atkSpdMod: 1.0,        // Attack speed multiplier
     rangeMod: 1.0,         // Range multiplier
-    energyCostMod: 1.0,    // Energy cost multiplier
+    energyCostMod: 1.0,    // Energy cost multiplier (legacy)
+    
+    // Power Hit Cost: energy per shot = damage * 0.5 * powerHitCostMod
+    powerHitCostMod: 1.0,  // Multiplier for power cost per shot
     
     // Critical hit
     critChance: 0.05,      // 5% base crit chance
@@ -82,7 +86,10 @@ const ATTACK_TYPES = {
     dmgMod: 1.2,           // 120% base damage
     atkSpdMod: 0.5,        // 50% attack speed (slower)
     rangeMod: 1.1,         // 110% range
-    energyCostMod: 1.5,    // 150% energy cost
+    energyCostMod: 1.5,    // 150% energy cost (legacy)
+    
+    // Power Hit Cost: Siege costs 40% more energy per shot
+    powerHitCostMod: 1.4,  // 140% power cost
     
     // Critical hit
     critChance: 0.03,      // Lower crit chance
@@ -137,7 +144,10 @@ const ATTACK_TYPES = {
     dmgMod: 0.9,           // 90% base damage
     atkSpdMod: 1.5,        // 150% attack speed (faster)
     rangeMod: 1.0,         // Standard range
-    energyCostMod: 0.8,    // 80% energy cost
+    energyCostMod: 0.8,    // 80% energy cost (legacy)
+    
+    // Power Hit Cost: Normal is efficient
+    powerHitCostMod: 0.8,  // 80% power cost
     
     // Critical hit
     critChance: 0.07,      // Slightly higher crit chance
@@ -192,7 +202,10 @@ const ATTACK_TYPES = {
     dmgMod: 0.6,           // 60% base damage (before power scaling)
     atkSpdMod: 0.9,        // 90% attack speed
     rangeMod: 1.2,         // 120% range
-    energyCostMod: 0.5,    // Lower base cost, but power adds more
+    energyCostMod: 0.5,    // Lower base cost (legacy)
+    
+    // Power Hit Cost: Magic uses power differently (via powerScaling)
+    powerHitCostMod: 0.6,  // 60% base power cost (but power scaling adds more)
     
     // Critical hit
     critChance: 0.05,      // Standard crit chance
@@ -247,7 +260,10 @@ const ATTACK_TYPES = {
     dmgMod: 0.85,          // 85% base damage
     atkSpdMod: 1.1,        // 110% attack speed
     rangeMod: 0.9,         // 90% range (needs precision)
-    energyCostMod: 1.0,    // Standard energy cost
+    energyCostMod: 1.0,    // Standard energy cost (legacy)
+    
+    // Power Hit Cost: Piercing is efficient
+    powerHitCostMod: 0.9,  // 90% power cost
     
     // Critical hit - THIS IS THE KEY FEATURE
     critChance: 0.15,      // 15% crit chance

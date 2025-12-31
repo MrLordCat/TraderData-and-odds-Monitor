@@ -292,6 +292,33 @@ function getGameStyles() {
       border-radius: 4px;
     }
     
+    /* Biome Effects Section */
+    .tooltip-biome-section {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, rgba(72, 187, 120, 0.15) 0%, rgba(56, 161, 105, 0.1) 100%);
+      border: 1px solid rgba(72, 187, 120, 0.3);
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .biome-icon {
+      font-size: 14px;
+    }
+    .biome-name {
+      color: #a0aec0;
+    }
+    .biome-bonus {
+      margin-left: auto;
+      color: #48bb78;
+      font-weight: 600;
+    }
+    .biome-bonus.penalty {
+      color: #fc8181;
+    }
+    
     .tooltip-stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -365,9 +392,12 @@ function getGameStyles() {
     .detail-line:last-child { margin-bottom: 0; }
     .detail-label { color: #a0aec0; }
     .detail-value { color: #48bb78; font-weight: 600; }
+    .detail-value.penalty { color: #fc8181; }
+    .detail-value.bonus { color: #48bb78; }
     .detail-base { color: #63b3ed; }
     .detail-level { color: #f6ad55; }
     .detail-upgrade { color: #fc8181; }
+    .detail-upgrade.bonus { color: #48bb78; }
     .detail-final { color: #ffd700; font-weight: 700; }
     .detail-formula {
       margin-top: 6px;
@@ -375,6 +405,27 @@ function getGameStyles() {
       border-top: 1px solid rgba(255,255,255,0.1);
       font-size: 10px;
       color: #718096;
+    }
+    
+    /* Level bar container for energy buildings */
+    .level-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 4px 6px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+    }
+    .level-bar-container .level-progress-bar {
+      flex: 1;
+      height: 6px;
+    }
+    .level-bar-container .level-progress-text {
+      font-size: 10px;
+      color: #a0aec0;
+      min-width: 60px;
+      text-align: right;
     }
     
     .tooltip-section {

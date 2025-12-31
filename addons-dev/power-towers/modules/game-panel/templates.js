@@ -141,6 +141,13 @@ function getGameTemplate() {
               <span class="tooltip-element" id="tooltip-element"></span>
             </div>
             
+            <!-- Biome Effects Section (Tower) -->
+            <div class="tooltip-biome-section" id="tower-biome-section" style="display: none;">
+              <span class="biome-icon" id="tower-biome-icon">🌲</span>
+              <span class="biome-name" id="tower-biome-name">Forest</span>
+              <span class="biome-bonus" id="tower-biome-bonus">+10% DMG</span>
+            </div>
+            
             <div class="tooltip-stats">
               <div class="stat-row stat-hoverable" data-stat="damage"><span>⚔️ DMG</span><b id="tooltip-dmg">10</b><div class="stat-detail-popup" id="detail-dmg"></div></div>
               <div class="stat-row stat-hoverable" data-stat="range"><span>📏 RNG</span><b id="tooltip-rng">60</b><div class="stat-detail-popup" id="detail-rng"></div></div>
@@ -150,6 +157,7 @@ function getGameTemplate() {
               <div class="stat-row stat-hoverable" id="tooltip-splash-row" data-stat="splash" style="display:none;"><span>💣 SPLASH</span><b id="tooltip-splash">60</b><div class="stat-detail-popup" id="detail-splash"></div></div>
               <div class="stat-row stat-hoverable" data-stat="hp"><span>❤️ HP</span><b id="tooltip-hp">100/100</b><div class="stat-detail-popup" id="detail-hp"></div></div>
               <div class="stat-row stat-hoverable" data-stat="energy"><span>🔋 Energy</span><b id="tooltip-energy">50</b><div class="stat-detail-popup" id="detail-energy"></div></div>
+              <div class="stat-row stat-hoverable" data-stat="powercost"><span>⚡ PWR/Shot</span><b id="tooltip-powercost">5</b><div class="stat-detail-popup" id="detail-powercost"></div></div>
             </div>
             
             <!-- Attack Type Selection -->
@@ -200,12 +208,12 @@ function getGameTemplate() {
               <button class="tooltip-close" id="energy-tooltip-close">✕</button>
             </div>
             
-            <!-- XP Bar -->
-            <div class="xp-bar-container" id="energy-xp-bar-container">
-              <div class="xp-bar-bg">
-                <div class="xp-bar-fill" id="energy-xp-bar-fill"></div>
+            <!-- Level Progress Bar (like towers have) -->
+            <div class="level-bar-container" id="energy-level-bar-container">
+              <div class="level-progress-bar">
+                <div class="level-progress-fill" id="energy-level-progress"></div>
               </div>
-              <span class="xp-bar-text" id="energy-xp-bar-text">0/10 XP</span>
+              <span class="level-progress-text" id="energy-level-text">0/10 XP</span>
             </div>
             
             <div class="tooltip-type-row">
@@ -213,13 +221,50 @@ function getGameTemplate() {
               <span class="energy-connections" id="energy-tooltip-connections">0 links</span>
             </div>
             
+            <!-- Biome Effects Section -->
+            <div class="tooltip-biome-section" id="energy-biome-section" style="display: none;">
+              <span class="biome-icon" id="energy-biome-icon">🌲</span>
+              <span class="biome-name" id="energy-biome-name">Forest</span>
+              <span class="biome-bonus" id="energy-biome-bonus">+15% Gen</span>
+            </div>
+            
             <div class="tooltip-stats">
-              <div class="stat-row"><span>🔋 Stored</span><b id="energy-tooltip-stored">0/100</b></div>
-              <div class="stat-row"><span>⚡ Output</span><b id="energy-tooltip-output">10/s</b></div>
-              <div class="stat-row"><span>📡 Range</span><b id="energy-tooltip-range">4</b></div>
-              <div class="stat-row" id="energy-tooltip-gen-row"><span class="stat-label">🔌 Gen</span><b id="energy-tooltip-gen">5/s</b></div>
-              <div class="stat-row" id="energy-tooltip-eff-row"><span class="stat-label">📈 Efficiency</span><b id="energy-tooltip-eff">100%</b></div>
-              <div class="stat-row" id="energy-tooltip-special-row" style="display:none;"><span class="stat-label">🌳 Trees</span><b id="energy-tooltip-special">0/12</b></div>
+              <div class="stat-row stat-hoverable" data-stat="stored">
+                <span>🔋 Stored</span><b id="energy-tooltip-stored">0/100</b>
+                <div class="stat-detail-popup" id="energy-detail-stored">
+                  <div class="detail-line"><span class="detail-label">Current energy</span></div>
+                </div>
+              </div>
+              <div class="stat-row stat-hoverable" data-stat="output">
+                <span>⚡ Output</span><b id="energy-tooltip-output">10/s</b>
+                <div class="stat-detail-popup" id="energy-detail-output">
+                  <div class="detail-line"><span class="detail-label">Energy per second</span></div>
+                </div>
+              </div>
+              <div class="stat-row stat-hoverable" data-stat="range">
+                <span>📡 Range</span><b id="energy-tooltip-range">4</b>
+                <div class="stat-detail-popup" id="energy-detail-range">
+                  <div class="detail-line"><span class="detail-label">Grid cells</span></div>
+                </div>
+              </div>
+              <div class="stat-row stat-hoverable" id="energy-tooltip-gen-row" data-stat="gen">
+                <span class="stat-label">🔌 Gen</span><b id="energy-tooltip-gen">5/s</b>
+                <div class="stat-detail-popup" id="energy-detail-gen">
+                  <div class="detail-line"><span class="detail-label">Generation rate</span></div>
+                </div>
+              </div>
+              <div class="stat-row stat-hoverable" id="energy-tooltip-eff-row" data-stat="efficiency">
+                <span class="stat-label">📈 Efficiency</span><b id="energy-tooltip-eff">100%</b>
+                <div class="stat-detail-popup" id="energy-detail-efficiency">
+                  <div class="detail-line"><span class="detail-label">Biome bonus</span></div>
+                </div>
+              </div>
+              <div class="stat-row stat-hoverable" id="energy-tooltip-special-row" style="display:none;" data-stat="special">
+                <span class="stat-label">🌳 Trees</span><b id="energy-tooltip-special">0/12</b>
+                <div class="stat-detail-popup" id="energy-detail-special">
+                  <div class="detail-line"><span class="detail-label">Resources</span></div>
+                </div>
+              </div>
             </div>
             
             <!-- Upgrades Section -->

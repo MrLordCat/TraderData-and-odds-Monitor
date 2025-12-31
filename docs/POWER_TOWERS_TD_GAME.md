@@ -172,6 +172,255 @@ Generator (output:1) ──→ Relay (input:2, output:2) ──→ Tower
 
 ---
 
+## 🚀 Game Startup Flow
+
+### Overview
+The game follows a specific initialization sequence from sidebar launch to wave start:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. SIDEBAR (Attached Mode)                                                  │
+│    └─► "Launch Game" button → IPC 'module-detach' → Opens new window       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 2. DETACHED WINDOW                                                          │
+│    └─► GamePanelModule.onMount() → GameController.init()                   │
+│        └─► Shows Menu Screen (screen-menu)                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 3. MENU SCREEN                                                              │
+│    └─► "Start Game" button → showScreen('game') → initializeGame()         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 4. GAME SCREEN (Prep Phase)                                                 │
+│    └─► GameCore created, map generated                                     │
+│    └─► running=false, firstWaveStarted=false                               │
+│    └─► Player can build towers & energy buildings                          │
+│    └─► Energy system WORKS (update runs even before wave)                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 5. START WAVE                                                               │
+│    └─► "Start Wave" button → game.startWave()                              │
+│        ├─► running=true, firstWaveStarted=true                             │
+│        ├─► Emit GAME_START event                                           │
+│        ├─► Start gameLoop() (60 FPS)                                       │
+│        └─► Emit 'wave:start' → EnemiesModule.startNextWave()               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 6. GAME LOOP (Active)                                                       │
+│    └─► Every frame: update modules → emit GAME_TICK → render               │
+│    └─► Auto-wave: every 15 seconds emit 'wave:start'                       │
+│    └─► Button becomes Pause/Resume toggle                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Detailed Flow
+
+#### Step 1: Launch from Sidebar
+```javascript
+// modules/game-panel/index.js (Attached Mode)
+// When "Launch Game" clicked:
+ipcRenderer.invoke('module-detach', { 
+  moduleId: 'game-panel',
+  modulePath: modulePath,
+  title: 'Power Towers TD',
+  width: 800, height: 950
+});
+```
+
+#### Step 2: Window Initialization
+```javascript
+// modules/game-panel/index.js (Detached Mode)
+onMount(container) {
+  this.gameController = new GameController({ GameCore, GameRenderer, ... });
+  this.gameController.init(container);  // → shows Menu screen
+}
+```
+
+#### Step 3: Menu → Game Screen
+```javascript
+// modules/game-panel/game-controller.js
+setupScreenNavigation(container) {
+  // "Start Game" button has data-screen="game"
+  btn.addEventListener('click', () => {
+    this.showScreen('game');
+    if (!this.game) {
+      this.initializeGame();  // Create GameCore
+    }
+  });
+}
+```
+
+#### Step 4: Game Initialization (Prep Phase)
+```javascript
+// modules/game-panel/game-controller.js
+initializeGame() {
+  this.game = new this.GameCore();  // Creates all modules
+  this.camera = new this.Camera();
+  this.renderer = new this.GameRenderer(this.canvas, this.camera);
+  
+  // Center camera on base
+  const basePos = waypoints[waypoints.length - 1];
+  this.camera.centerOn(basePos.x, basePos.y);
+  
+  this.setupGameEvents();  // Subscribe to GAME_TICK, etc.
+  this.renderGame();       // Initial render
+}
+
+// core/game-core-modular.js - GameCore constructor
+initModules() {
+  this.modules = {
+    menu, map, towers, enemies, combat, 
+    damageNumbers, economy, energy, player
+  };
+  
+  // Initialize all modules
+  for (const module of Object.values(this.modules)) {
+    module.init();
+  }
+  
+  // Generate map (creates terrain, path, waypoints)
+  this.modules.map.generateMap();
+  
+  // Set starting resources
+  this.modules.economy.gold = CONFIG.STARTING_GOLD;  // 400
+  this.modules.player.lives = CONFIG.STARTING_LIVES; // 20
+  
+  // Game NOT running yet!
+  this.running = false;
+  this.firstWaveStarted = false;
+}
+```
+
+**Important:** During prep phase:
+- `running = false` — no game loop
+- `firstWaveStarted = false`
+- Energy module STILL updates (buildings work)
+- Player can build towers and energy buildings
+- Enemies do NOT spawn
+
+#### Step 5: Start Wave
+```javascript
+// modules/game-panel/ui-events.js
+toggleGame() {
+  // First click: start wave
+  if (!this.game.firstWaveStarted) {
+    this.game.startWave();
+    this.elements.btnStart.textContent = '⏸ Pause';
+    return;
+  }
+  // After: toggle pause/resume
+}
+
+// core/game-core-modular.js
+startWave() {
+  if (!this.running) {
+    this.running = true;
+    this.paused = false;
+    this.firstWaveStarted = true;
+    this.autoWaveTimer = 0;
+    this.lastTick = performance.now();
+    
+    this.eventBus.emit(GameEvents.GAME_START, this.getState());
+    this.gameLoop();  // Start the loop!
+  }
+  
+  this.eventBus.emit('wave:start');  // Trigger enemy spawning
+}
+
+// modules/enemies/index.js
+init() {
+  this.eventBus.on('wave:start', () => this.startNextWave());
+}
+
+startNextWave() {
+  this.currentWave++;
+  this.waveInProgress = true;
+  const waveEnemies = this.generateWaveComposition(this.currentWave);
+  this.spawnQueue.push(...waveEnemies);
+  this.eventBus.emit('wave:started', { wave: this.currentWave });
+}
+```
+
+#### Step 6: Game Loop
+```javascript
+// core/game-core-modular.js
+gameLoop() {
+  if (!this.running || this.paused) return;
+  
+  const deltaTime = (now - this.lastTick) / 1000;
+  
+  this.update(deltaTime);
+  this.eventBus.emit(GameEvents.GAME_TICK, { deltaTime, state });
+  
+  this.animationId = requestAnimationFrame(() => this.gameLoop());
+}
+
+update(deltaTime) {
+  // Always update energy (even during menu)
+  this.modules.energy.update(deltaTime);
+  
+  // Auto-wave timer (15 seconds)
+  if (this.firstWaveStarted) {
+    this.autoWaveTimer += deltaTime;
+    if (this.autoWaveTimer >= 15) {
+      this.autoWaveTimer = 0;
+      this.eventBus.emit('wave:start');  // Next wave!
+    }
+  }
+  
+  // Update combat modules
+  this.modules.enemies.update(deltaTime);
+  this.modules.towers.update(deltaTime, enemies);
+  this.modules.combat.update(deltaTime, enemies);
+  // ...
+}
+```
+
+### State Diagram
+
+```
+              ┌──────────────────────────────────────────┐
+              │              MENU SCREEN                 │
+              │  running=false, firstWaveStarted=false   │
+              └─────────────────┬────────────────────────┘
+                                │ "Start Game" click
+                                ▼
+              ┌──────────────────────────────────────────┐
+              │           PREP PHASE (Game Screen)       │
+              │  running=false, firstWaveStarted=false   │
+              │  - Build towers ✓                        │
+              │  - Build energy buildings ✓              │
+              │  - Energy system works ✓                 │
+              │  - Enemies do NOT spawn                  │
+              └─────────────────┬────────────────────────┘
+                                │ "Start Wave" click
+                                ▼
+              ┌──────────────────────────────────────────┐
+              │              ACTIVE GAME                 │
+              │  running=true, firstWaveStarted=true     │
+              │  - Enemies spawn                         │
+              │  - Towers attack                         │
+              │  - Auto-wave every 15s                   │
+              │  - Button = Pause/Resume                 │
+              └─────────────────┬────────────────────────┘
+                                │ Lives = 0
+                                ▼
+              ┌──────────────────────────────────────────┐
+              │              GAME OVER                   │
+              │  gameOver=true, running=false            │
+              │  - Show overlay                          │
+              │  - "Try Again" → restart                 │
+              └──────────────────────────────────────────┘
+```
+
+### Key Events During Startup
+
+| Phase | Event | Triggered By | Handlers |
+|-------|-------|--------------|----------|
+| Init | `map:generated` | MapModule.generateMap() | EnemiesModule (receives waypoints) |
+| Start Wave | `GAME_START` | GameCore.startWave() | MenuModule, TowersModule |
+| Start Wave | `wave:start` | GameCore.startWave() | EnemiesModule.startNextWave() |
+| Each Frame | `GAME_TICK` | GameCore.gameLoop() | GameController (render + UI update) |
+| Wave Spawn | `wave:started` | EnemiesModule | UI (wave counter) |
+
+---
+
 ## 🏗️ Technical Architecture (Current)
 
 ### File Structure
@@ -318,7 +567,7 @@ Camera {
 ### Game Area
 ```
 ┌─────────────────────────────────────────┐
-│  Wave: 5   💰 250   ❤️ 20   ⚡ 50/100   │  ← Stats bar
+│  Wave: 5   💰 250   ❤️ 20      │  ← Stats bar
 ├─────────────────────────────────────────┤
 │                                         │
 │         🛤️ Spiral Path                  │

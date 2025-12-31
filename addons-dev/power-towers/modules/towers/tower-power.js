@@ -42,13 +42,17 @@ class TowerPowerAdapter {
     };
     
     // Create power consumer node
+    // Use tower's maxEnergy for inputRate so it can receive energy quickly
+    const towerMaxEnergy = tower.maxEnergy || 100;
     this.consumer = new PowerConsumer({
       gridX: tower.gridX,
       gridY: tower.gridY,
       worldX: tower.x,
       worldY: tower.y,
       consumption: this.currentPowerDraw,
-      capacity: this.currentPowerDraw * 5  // 5 second buffer
+      inputRate: towerMaxEnergy,           // Can receive up to maxEnergy per second
+      maxEnergy: towerMaxEnergy,           // Fallback for PowerConsumer
+      capacity: towerMaxEnergy             // Buffer = tower's max capacity
     });
     
     // Link consumer to this adapter

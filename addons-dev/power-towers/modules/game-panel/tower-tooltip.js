@@ -129,6 +129,43 @@ function TowerTooltipMixin(Base) {
         }
       }
       
+      // Update Biome Section (show if tower has biome effects)
+      if (el.towerBiomeSection) {
+        const biomeType = tower.biomeType || tower.terrainType;
+        const terrainMod = tower.terrainBonus || 1;
+        
+        if (biomeType && terrainMod !== 1) {
+          el.towerBiomeSection.style.display = 'flex';
+          
+          // Biome icons
+          const biomeIcons = {
+            'forest': '🌲',
+            'mountains': '⛰️',
+            'desert': '🏜️',
+            'water': '🌊',
+            'swamp': '🌿',
+            'tundra': '❄️',
+            'plains': '🌾',
+            'elevated': '🏔️',
+            'default': '🗺️'
+          };
+          
+          if (el.towerBiomeIcon) {
+            el.towerBiomeIcon.textContent = biomeIcons[biomeType] || '🗺️';
+          }
+          if (el.towerBiomeName) {
+            el.towerBiomeName.textContent = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
+          }
+          if (el.towerBiomeBonus) {
+            const pct = Math.round((terrainMod - 1) * 100);
+            el.towerBiomeBonus.textContent = `${pct >= 0 ? '+' : ''}${pct}% DMG`;
+            el.towerBiomeBonus.classList.toggle('penalty', pct < 0);
+          }
+        } else {
+          el.towerBiomeSection.style.display = 'none';
+        }
+      }
+      
       // Update stats with detail popups
       this.updateStatWithDetails(tower);
     }
@@ -259,6 +296,34 @@ function TowerTooltipMixin(Base) {
           <div class="detail-line"><span class="detail-label">Cost/shot:</span><span class="detail-base">${energyCost.toFixed(1)}</span></div>
           <div class="detail-line"><span class="detail-label">Base cost:</span><span class="detail-base">${baseEnergyCost}</span></div>
           <div class="detail-line"><span class="detail-label">Efficiency Lv.${effUpgrades} (-${(effUpgrades*3)}%):</span><span class="detail-upgrade">${effUpgrades > 0 ? '-' + (effUpgrades*3) + '%' : '—'}</span></div>
+        `;
+      }
+      
+      // ============ POWER HIT COST (NEW) ============
+      // Formula: damage * 0.5 * powerHitCostMod * (1 + level%) * (1 - powerEfficiency%)
+      const energyCostPerShot = tower.energyCostPerShot || 5;
+      const powerHitCostMod = tower.powerHitCostMod || 1;
+      const basePowerCost = tower.basePowerCost || (tower.damage * 0.5);
+      const powerEffLvl = upgrades.powerEfficiency || 0;
+      
+      if (el.tooltipPowerCost) {
+        el.tooltipPowerCost.textContent = Math.round(energyCostPerShot);
+      }
+      const detailPowerCost = document.getElementById('detail-powercost');
+      if (detailPowerCost) {
+        const levelCostBonus = 1 + (level - 1) * 0.01;
+        const powerEffReduction = Math.min(0.7, powerEffLvl * 0.04);
+        
+        // Attack type names for display
+        const attackTypeName = (tower.attackTypeId || 'base').charAt(0).toUpperCase() + (tower.attackTypeId || 'base').slice(1);
+        
+        detailPowerCost.innerHTML = `
+          <div class="detail-line"><span class="detail-label">Base (50% of DMG):</span><span class="detail-base">${Math.round(basePowerCost)}</span></div>
+          <div class="detail-line"><span class="detail-label">Level ${level} (+${((levelCostBonus-1)*100).toFixed(0)}%):</span><span class="detail-level">×${levelCostBonus.toFixed(2)}</span></div>
+          <div class="detail-line"><span class="detail-label">${attackTypeName} (×${powerHitCostMod.toFixed(1)}):</span><span class="detail-value ${powerHitCostMod > 1 ? 'penalty' : 'bonus'}">${powerHitCostMod > 1 ? '+' : ''}${Math.round((powerHitCostMod-1)*100)}%</span></div>
+          ${powerEffLvl > 0 ? `<div class="detail-line"><span class="detail-label">Power Eff Lv.${powerEffLvl} (-${(powerEffReduction*100).toFixed(0)}%):</span><span class="detail-upgrade bonus">-${(powerEffReduction*100).toFixed(0)}%</span></div>` : ''}
+          <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.round(energyCostPerShot)}</span></div>
+          <div class="detail-formula">DMG×0.5×Lvl%×TypeMod×Eff%</div>
         `;
       }
     }
