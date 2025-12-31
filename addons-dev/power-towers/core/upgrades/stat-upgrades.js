@@ -135,18 +135,18 @@ const STAT_UPGRADES = {
   },
 
   // =========================================
-  // ENERGY EFFICIENCY (-3% cost per level)
+  // POWER EFFICIENCY (-3% PWR/Shot per level)
   // =========================================
-  energyEfficiency: {
-    id: 'energyEfficiency',
-    name: 'Energy Efficiency',
-    emoji: '💎',
+  powerEfficiency: {
+    id: 'powerEfficiency',
+    name: 'Power Efficiency',
+    emoji: '⚡',
     category: 'utility',
-    description: '-3% energy cost per level',
+    description: '-3% PWR/Shot per level',
     
     effect: {
       type: 'percentage',
-      stat: 'energyCost',
+      stat: 'energyCostPerShot',
       percentPerLevel: -0.03,
       minFactor: 0.2, // Can't go below 20% of original
     },
@@ -156,7 +156,7 @@ const STAT_UPGRADES = {
       scaleFactor: 1.14,
     },
     
-    color: '#00cec9'
+    color: '#f1c40f'
   },
 
   // =========================================
@@ -314,33 +314,6 @@ const STAT_UPGRADES = {
     },
     
     color: '#a29bfe'
-  },
-
-  // =========================================
-  // POWER EFFICIENCY (-4% power hit cost per level)
-  // Reduces energy consumed per shot
-  // Max reduction: 70% (min 30% of original cost)
-  // =========================================
-  powerEfficiency: {
-    id: 'powerEfficiency',
-    name: 'Power Efficiency',
-    emoji: '⚡',
-    category: 'utility',
-    description: '-4% shot energy cost per level',
-    
-    effect: {
-      type: 'percentage',
-      stat: 'energyCostPerShot',
-      percentPerLevel: -0.04,
-      minFactor: 0.3, // Can't go below 30% of original
-    },
-    
-    cost: {
-      base: 25,
-      scaleFactor: 1.16,
-    },
-    
-    color: '#00cec9'
   },
 };
 

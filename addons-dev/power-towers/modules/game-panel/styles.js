@@ -303,12 +303,12 @@ function getGameStyles() {
       border: 1px solid rgba(72, 187, 120, 0.3);
       border-radius: 6px;
       font-size: 11px;
+      position: relative;
+      cursor: pointer;
     }
-    .biome-icon {
+    .biome-icons {
       font-size: 14px;
-    }
-    .biome-name {
-      color: #a0aec0;
+      cursor: help;
     }
     .biome-bonus {
       margin-left: auto;
@@ -317,6 +317,21 @@ function getGameStyles() {
     }
     .biome-bonus.penalty {
       color: #fc8181;
+    }
+    .biome-detail-popup {
+      min-width: 160px;
+    }
+    .detail-header {
+      font-weight: 600;
+      color: #48bb78;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(72, 187, 120, 0.3);
+    }
+    .detail-separator {
+      height: 1px;
+      background: rgba(255,255,255,0.1);
+      margin: 6px 0;
     }
     
     .tooltip-stats {

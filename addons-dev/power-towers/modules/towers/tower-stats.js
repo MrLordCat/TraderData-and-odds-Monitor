@@ -84,12 +84,6 @@ function recalculateTowerStats(tower) {
     range *= (1 + upgradeLevels.range * 0.05);
   }
   
-  // Energy Efficiency: -3% energy cost per level (min 20% of original)
-  if (upgradeLevels.energyEfficiency) {
-    const reduction = Math.min(0.8, upgradeLevels.energyEfficiency * 0.03);
-    energyCost *= (1 - reduction);
-  }
-  
   // Apply final values
   tower.damage = damage;
   tower.range = range;
@@ -205,9 +199,9 @@ function recalculateTowerStats(tower) {
   // Apply attack type modifier (Siege = 1.4, Normal = 0.8, etc.)
   basePowerCost *= powerHitCostMod;
   
-  // Apply powerEfficiency upgrade: -4% per level (min 30% of original)
+  // Apply powerEfficiency upgrade: -3% per level (min 20% of original)
   if (upgradeLevels.powerEfficiency) {
-    const reduction = Math.min(0.7, upgradeLevels.powerEfficiency * 0.04);
+    const reduction = Math.min(0.8, upgradeLevels.powerEfficiency * 0.03);
     basePowerCost *= (1 - reduction);
   }
   

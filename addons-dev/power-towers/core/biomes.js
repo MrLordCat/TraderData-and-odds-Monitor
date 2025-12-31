@@ -60,8 +60,8 @@ const BIOME_TYPES = {
     emoji: '🌾',
     description: 'Open grassland with good wind exposure',
     
-    color: '#90b866',
-    colorVariants: ['#7da858', '#a3c874', '#85ad5c'],
+    color: '#a8c77a',        // Более светлый желто-зелёный (отличается от forest)
+    colorVariants: ['#b5d485', '#9bbe6f', '#c2da98'], // Светлые варианты
     
     buildable: true,
     walkable: true,
@@ -234,6 +234,15 @@ const BORDER_EFFECTS = {
     }
   },
   
+  // Plains near Forest = tree line edge
+  plains_forest: {
+    borderRange: 2,
+    description: 'Trees on the edge provide some cover',
+    modifiers: {
+      towerDamage: 1.05,      // +5% damage
+    }
+  },
+  
   // Forest near Water = humid forest
   forest_water: {
     borderRange: 2,
@@ -253,12 +262,42 @@ const BORDER_EFFECTS = {
     }
   },
   
+  // Mountains near Plains = clear line of sight
+  mountains_plains: {
+    borderRange: 2,
+    description: 'Clear view of plains below',
+    modifiers: {
+      towerRange: 1.1,        // +10% range bonus
+    }
+  },
+  
   // Desert near Mountains = canyon effect
   desert_mountains: {
     borderRange: 2,
     description: 'Canyon walls focus sunlight',
     modifiers: {
       solarEfficiency: 1.2,   // +20% solar bonus
+    }
+  },
+  
+  // Desert near Forest = oasis edge
+  desert_forest: {
+    borderRange: 2,
+    description: 'Sparse vegetation provides cover',
+    modifiers: {
+      towerDamage: 1.05,      // +5% damage (concealment)
+      towerRange: 0.95,       // -5% range (some obstruction)
+    }
+  },
+  
+  // Forest near Desert = dry forest edge  
+  forest_desert: {
+    borderRange: 2,
+    description: 'Dry wood burns better',
+    modifiers: {
+      burnValue: 1.3,         // +30% burn energy
+      towerDamage: 1.1,       // +10% damage (heat boost)
+      towerRange: 0.95,       // -5% range
     }
   },
 };
@@ -331,6 +370,7 @@ function isBiomeWalkable(biomeId) {
 /**
  * Calculate combined modifiers for a cell position
  * Includes base biome modifiers + all applicable border effects
+ * Border effects are ADDITIVE (converted from multipliers to bonuses)
  * 
  * @param {string} baseBiome - The biome at the cell
  * @param {string[]} nearbyBiomes - Array of unique biomes within border range
@@ -340,20 +380,24 @@ function calculateCellModifiers(baseBiome, nearbyBiomes) {
   const baseConfig = BIOME_TYPES[baseBiome];
   if (!baseConfig) return {};
   
-  // Start with base modifiers
+  // Start with base modifiers (as bonuses: 1.2 = +20%, 0.9 = -10%)
   const combined = { ...baseConfig.modifiers };
   
-  // Apply border effects
+  // Apply border effects - ADDITIVE
+  // Example: Mountains +20% RNG (1.2) + Forest border -10% RNG (0.9)
+  // = 1.0 + (1.2-1) + (0.9-1) = 1.0 + 0.2 - 0.1 = 1.1 (+10%)
   for (const nearbyBiome of nearbyBiomes) {
     if (nearbyBiome === baseBiome) continue;
     
     const borderEffect = getBorderEffect(baseBiome, nearbyBiome);
     if (borderEffect) {
-      // Merge modifiers (multiply for efficiency mods)
+      // Merge modifiers (ADDITIVE - convert multiplier to bonus and add)
       for (const [key, value] of Object.entries(borderEffect.modifiers)) {
         if (combined[key] !== undefined) {
-          // Multiply existing value
-          combined[key] *= value;
+          // Additive: base already has (1 + bonus1), border adds (value - 1)
+          // Result = base + (border - 1) = 1 + bonus1 + bonus2
+          const borderBonus = value - 1; // Convert 1.1 to +0.1, 0.9 to -0.1
+          combined[key] += borderBonus;
         } else {
           combined[key] = value;
         }

@@ -142,10 +142,10 @@ function getGameTemplate() {
             </div>
             
             <!-- Biome Effects Section (Tower) -->
-            <div class="tooltip-biome-section" id="tower-biome-section" style="display: none;">
-              <span class="biome-icon" id="tower-biome-icon">🌲</span>
-              <span class="biome-name" id="tower-biome-name">Forest</span>
+            <div class="tooltip-biome-section stat-hoverable" id="tower-biome-section" style="display: none;">
+              <span class="biome-icons" id="tower-biome-icons" title="">🌲</span>
               <span class="biome-bonus" id="tower-biome-bonus">+10% DMG</span>
+              <div class="stat-detail-popup biome-detail-popup" id="detail-biome"></div>
             </div>
             
             <div class="tooltip-stats">

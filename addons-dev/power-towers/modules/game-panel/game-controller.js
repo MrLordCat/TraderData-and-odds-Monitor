@@ -111,9 +111,9 @@ class GameControllerBase {
       tooltipElementBtns: container.querySelectorAll('.tooltip-element-btn'),
       // Biome section (Tower)
       towerBiomeSection: container.querySelector('#tower-biome-section'),
-      towerBiomeIcon: container.querySelector('#tower-biome-icon'),
-      towerBiomeName: container.querySelector('#tower-biome-name'),
+      towerBiomeIcons: container.querySelector('#tower-biome-icons'),
       towerBiomeBonus: container.querySelector('#tower-biome-bonus'),
+      detailBiome: container.querySelector('#detail-biome'),
       // Stat detail popups
       detailPowerCost: container.querySelector('#detail-powercost'),
       btnStart: container.querySelector('#btn-start'),
@@ -861,56 +861,65 @@ class GameControllerBase {
       el.energyLevelText.textContent = `${xpProgress.current}/${xpProgress.needed} XP`;
     }
     
-    // Update Biome Section (show if building has biome modifiers)
+    // Update Biome Section - ALWAYS show biome, show borders if present
     if (el.energyBiomeSection) {
       const state = building.getState?.() || {};
-      const biomeType = building.biomeType || state.currentBiome;
+      const biomeType = building.biomeType || state.currentBiome || 'default';
       const biomeModifiers = building.biomeModifiers || {};
+      const nearbyBiomes = building.nearbyBiomes || [];
       
-      if (biomeType && Object.keys(biomeModifiers).length > 0) {
-        el.energyBiomeSection.style.display = 'flex';
-        
-        // Biome icons
-        const biomeIcons = {
-          'forest': '🌲',
-          'mountains': '⛰️',
-          'desert': '🏜️',
-          'water': '🌊',
-          'swamp': '🌿',
-          'tundra': '❄️',
-          'plains': '🌾',
-          'default': '🗺️'
-        };
-        
-        if (el.energyBiomeIcon) {
-          el.energyBiomeIcon.textContent = biomeIcons[biomeType] || '🗺️';
-        }
-        if (el.energyBiomeName) {
-          el.energyBiomeName.textContent = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
-        }
-        
-        // Format bonus text (show first modifier as main bonus)
-        if (el.energyBiomeBonus) {
-          const bonusTexts = [];
-          if (biomeModifiers.generation) {
-            const pct = Math.round((biomeModifiers.generation - 1) * 100);
-            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Gen`);
+      // Always show biome section
+      el.energyBiomeSection.style.display = 'flex';
+      
+      // Biome icons
+      const biomeIcons = {
+        'forest': '🌲',
+        'mountains': '⛰️',
+        'desert': '🏜️',
+        'water': '🌊',
+        'swamp': '🌿',
+        'tundra': '❄️',
+        'plains': '🌾',
+        'default': '🗺️'
+      };
+      
+      if (el.energyBiomeIcon) {
+        el.energyBiomeIcon.textContent = biomeIcons[biomeType] || '🗺️';
+      }
+      if (el.energyBiomeName) {
+        // Show main biome + border biomes if any
+        let biomeText = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
+        if (nearbyBiomes.length > 0) {
+          const borderNames = nearbyBiomes
+            .filter(b => b !== biomeType)
+            .map(b => biomeIcons[b] || '')
+            .join('');
+          if (borderNames) {
+            biomeText += ` (${borderNames})`;
           }
-          if (biomeModifiers.efficiency) {
-            const pct = Math.round((biomeModifiers.efficiency - 1) * 100);
-            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Eff`);
-          }
-          if (biomeModifiers.capacity) {
-            const pct = Math.round((biomeModifiers.capacity - 1) * 100);
-            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Cap`);
-          }
-          
-          const bonusText = bonusTexts.join(', ') || 'No effect';
-          el.energyBiomeBonus.textContent = bonusText;
-          el.energyBiomeBonus.classList.toggle('penalty', bonusTexts.some(t => t.startsWith('-')));
         }
-      } else {
-        el.energyBiomeSection.style.display = 'none';
+        el.energyBiomeName.textContent = biomeText;
+      }
+      
+      // Format bonus text (show modifiers if any, otherwise 'No effect')
+      if (el.energyBiomeBonus) {
+        const bonusTexts = [];
+        if (biomeModifiers.generation) {
+          const pct = Math.round((biomeModifiers.generation - 1) * 100);
+          bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Gen`);
+        }
+        if (biomeModifiers.efficiency) {
+          const pct = Math.round((biomeModifiers.efficiency - 1) * 100);
+          bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Eff`);
+        }
+        if (biomeModifiers.capacity) {
+          const pct = Math.round((biomeModifiers.capacity - 1) * 100);
+          bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Cap`);
+        }
+        
+        const bonusText = bonusTexts.length > 0 ? bonusTexts.join(', ') : '—';
+        el.energyBiomeBonus.textContent = bonusText;
+        el.energyBiomeBonus.classList.toggle('penalty', bonusTexts.some(t => t.startsWith('-')));
       }
     }
     
@@ -1256,54 +1265,63 @@ class GameControllerBase {
       }
     }
     
-    // ===== Update Biome Section (if visible) =====
+    // ===== Update Biome Section - ALWAYS visible, show borders =====
     if (el.energyBiomeSection) {
       const state = building.getState?.() || {};
-      const biomeType = building.biomeType || state.currentBiome;
+      const biomeType = building.biomeType || state.currentBiome || 'default';
       const biomeModifiers = building.biomeModifiers || {};
+      const nearbyBiomes = building.nearbyBiomes || [];
       
-      if (biomeType && Object.keys(biomeModifiers).length > 0) {
-        el.energyBiomeSection.style.display = 'flex';
-        
-        const biomeIcons = {
-          'forest': '🌲',
-          'mountains': '⛰️',
-          'desert': '🏜️',
-          'water': '🌊',
-          'swamp': '🌿',
-          'tundra': '❄️',
-          'plains': '🌾',
-          'default': '🗺️'
-        };
-        
-        if (el.energyBiomeIcon) {
-          el.energyBiomeIcon.textContent = biomeIcons[biomeType] || '🗺️';
-        }
-        if (el.energyBiomeName) {
-          el.energyBiomeName.textContent = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
-        }
-        
-        if (el.energyBiomeBonus) {
-          const bonusTexts = [];
-          if (biomeModifiers.generation) {
-            const pct = Math.round((biomeModifiers.generation - 1) * 100);
-            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Gen`);
+      // Always show biome section
+      el.energyBiomeSection.style.display = 'flex';
+      
+      const biomeIcons = {
+        'forest': '🌲',
+        'mountains': '⛰️',
+        'desert': '🏜️',
+        'water': '🌊',
+        'swamp': '🌿',
+        'tundra': '❄️',
+        'plains': '🌾',
+        'default': '🗺️'
+      };
+      
+      if (el.energyBiomeIcon) {
+        el.energyBiomeIcon.textContent = biomeIcons[biomeType] || '🗺️';
+      }
+      if (el.energyBiomeName) {
+        // Show main biome + border biomes if any
+        let biomeText = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
+        if (nearbyBiomes.length > 0) {
+          const borderNames = nearbyBiomes
+            .filter(b => b !== biomeType)
+            .map(b => biomeIcons[b] || '')
+            .join('');
+          if (borderNames) {
+            biomeText += ` (${borderNames})`;
           }
-          if (biomeModifiers.efficiency) {
-            const pct = Math.round((biomeModifiers.efficiency - 1) * 100);
-            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Eff`);
-          }
-          if (biomeModifiers.capacity) {
-            const pct = Math.round((biomeModifiers.capacity - 1) * 100);
-            bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Cap`);
-          }
-          
-          const bonusText = bonusTexts.join(', ') || 'No effect';
-          el.energyBiomeBonus.textContent = bonusText;
-          el.energyBiomeBonus.classList.toggle('penalty', bonusTexts.some(t => t.startsWith('-')));
         }
-      } else {
-        el.energyBiomeSection.style.display = 'none';
+        el.energyBiomeName.textContent = biomeText;
+      }
+      
+      if (el.energyBiomeBonus) {
+        const bonusTexts = [];
+        if (biomeModifiers.generation) {
+          const pct = Math.round((biomeModifiers.generation - 1) * 100);
+          bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Gen`);
+        }
+        if (biomeModifiers.efficiency) {
+          const pct = Math.round((biomeModifiers.efficiency - 1) * 100);
+          bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Eff`);
+        }
+        if (biomeModifiers.capacity) {
+          const pct = Math.round((biomeModifiers.capacity - 1) * 100);
+          bonusTexts.push(`${pct >= 0 ? '+' : ''}${pct}% Cap`);
+        }
+        
+        const bonusText = bonusTexts.length > 0 ? bonusTexts.join(', ') : '—';
+        el.energyBiomeBonus.textContent = bonusText;
+        el.energyBiomeBonus.classList.toggle('penalty', bonusTexts.some(t => t.startsWith('-')));
       }
     }
     

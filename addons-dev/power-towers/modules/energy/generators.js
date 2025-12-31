@@ -90,6 +90,8 @@ class BioGenerator extends PowerNode {
 
   /**
    * Count trees around generator
+   * Checks both actual forest biome AND cells on forest borders
+   * Border cells count as 0.5 trees (edge of forest)
    */
   countTrees() {
     if (!this.mapRef) return 0;
@@ -106,14 +108,29 @@ class BioGenerator extends PowerNode {
         const y = this.gridY + dy;
         
         if (x >= 0 && x < this.mapRef.width && y >= 0 && y < this.mapRef.height) {
-          // Forest biome = trees
-          if (biomes[y]?.[x] === 'forest') {
+          const cellBiome = biomes[y]?.[x];
+          
+          // Forest biome = full tree
+          if (cellBiome === 'forest') {
             count++;
+          } else {
+            // Check if cell borders forest (partial trees at forest edge)
+            const borderInfo = this.mapRef.getBorderInfo?.(x, y);
+            if (borderInfo && borderInfo.nearbyBiomes) {
+              const nearbyArr = borderInfo.nearbyBiomes instanceof Set 
+                ? Array.from(borderInfo.nearbyBiomes)
+                : borderInfo.nearbyBiomes;
+              
+              if (nearbyArr.includes('forest')) {
+                count += 0.5; // Border cells count as half
+              }
+            }
           }
         }
       }
     }
-    return Math.min(count, this.maxTrees);
+    
+    return Math.min(Math.floor(count), this.maxTrees);
   }
 
   generate(dt) {

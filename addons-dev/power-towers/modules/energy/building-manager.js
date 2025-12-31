@@ -106,6 +106,31 @@ class EnergyBuildingManager {
       building.setMap(map);
     }
 
+    // Store biome info on building for tooltip display
+    if (map) {
+      building.biomeType = map.biomeMap?.[gridY]?.[gridX] || 'default';
+      
+      // Get border info (nearby biomes)
+      const borderInfo = map.getBorderInfo?.(gridX, gridY);
+      if (borderInfo && borderInfo.nearbyBiomes) {
+        // nearbyBiomes может быть Set или Array
+        const nearbyArr = borderInfo.nearbyBiomes instanceof Set 
+          ? Array.from(borderInfo.nearbyBiomes)
+          : (Array.isArray(borderInfo.nearbyBiomes) ? borderInfo.nearbyBiomes : []);
+        
+        if (nearbyArr.length > 0) {
+          building.nearbyBiomes = nearbyArr;
+          building.isBorder = true;
+        } else {
+          building.nearbyBiomes = [];
+          building.isBorder = false;
+        }
+      } else {
+        building.nearbyBiomes = [];
+        building.isBorder = false;
+      }
+    }
+
     // Set network reference for batteries
     if (building.setNetwork) {
       building.setNetwork(this.network);

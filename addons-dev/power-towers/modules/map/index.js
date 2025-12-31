@@ -344,6 +344,51 @@ class MapModule {
   }
   
   /**
+   * Get detailed biome breakdown for tooltip display
+   * Shows contribution of each biome to final modifiers
+   * @param {number} gridX 
+   * @param {number} gridY 
+   * @returns {object} Breakdown with individual biome contributions
+   */
+  getBiomeBreakdown(gridX, gridY) {
+    const biomeId = this.getBiomeAt(gridX, gridY);
+    if (!biomeId) return null;
+    
+    const borderInfo = this.getBorderInfo(gridX, gridY);
+    const nearbyBiomes = borderInfo ? Array.from(borderInfo.nearbyBiomes).filter(b => b !== biomeId) : [];
+    
+    const baseConfig = getBiome(biomeId);
+    if (!baseConfig) return null;
+    
+    const breakdown = {
+      base: {
+        biome: biomeId,
+        name: baseConfig.name,
+        emoji: baseConfig.emoji,
+        modifiers: { ...baseConfig.modifiers }
+      },
+      borders: []
+    };
+    
+    // Add border contributions
+    for (const nearbyBiome of nearbyBiomes) {
+      const borderEffect = getBorderEffect(biomeId, nearbyBiome);
+      const nearbyConfig = getBiome(nearbyBiome);
+      if (borderEffect && nearbyConfig) {
+        breakdown.borders.push({
+          biome: nearbyBiome,
+          name: nearbyConfig.name,
+          emoji: nearbyConfig.emoji,
+          modifiers: borderEffect.modifiers,
+          description: borderEffect.description
+        });
+      }
+    }
+    
+    return breakdown;
+  }
+  
+  /**
    * Burn forest at position (for bio-generator)
    * @param {number} gridX 
    * @param {number} gridY 

@@ -161,18 +161,40 @@ class TowersModule {
       this.nextTowerId++
     );
     
-    // Apply terrain bonuses
+    // Apply terrain bonuses and save biome info
     if (this.mapModule) {
       const terrainBonus = this.mapModule.getTerrainBonus(gridX, gridY);
       tower.terrainRangeBonus = terrainBonus.rangeBonus || 1.0;
       tower.terrainDamageBonus = terrainBonus.damageBonus || 1.0;
       tower.terrainEnergyBonus = terrainBonus.energyBonus || 0;
       tower.terrainGoldBonus = terrainBonus.goldBonus || 0;
+      
+      // Save biome info for tooltip
+      tower.biomeType = this.mapModule.getBiomeAt(gridX, gridY) || 'default';
+      tower.terrainBonus = terrainBonus.damageBonus || 1.0;
+      
+      // Get border info (nearby biomes)
+      const borderInfo = this.mapModule.getBorderInfo(gridX, gridY);
+      if (borderInfo && borderInfo.nearbyBiomes && borderInfo.nearbyBiomes.size > 0) {
+        tower.nearbyBiomes = Array.from(borderInfo.nearbyBiomes);
+        tower.isBorder = true;
+      } else {
+        tower.nearbyBiomes = [];
+        tower.isBorder = false;
+      }
+      
+      // Save detailed biome breakdown for tooltip
+      tower.biomeBreakdown = this.mapModule.getBiomeBreakdown?.(gridX, gridY) || null;
     } else {
       tower.terrainRangeBonus = 1.0;
       tower.terrainDamageBonus = 1.0;
       tower.terrainEnergyBonus = 0;
       tower.terrainGoldBonus = 0;
+      tower.biomeType = 'default';
+      tower.terrainBonus = 1.0;
+      tower.nearbyBiomes = [];
+      tower.isBorder = false;
+      tower.biomeBreakdown = null;
     }
     
     // Bind recalculate method

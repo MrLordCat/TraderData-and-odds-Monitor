@@ -406,7 +406,8 @@ class BiomeGenerator {
    * @returns {object|null} Border info or null
    */
   getBorderInfo(x, y) {
-    return this.borderCache.get(`${x},${y}`) || null;
+    const key = `${x},${y}`;
+    return this.borderCache.get(key) || null;
   }
   
   /**
