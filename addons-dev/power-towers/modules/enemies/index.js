@@ -7,6 +7,8 @@
 
 const { GameEvents } = require('../../core/event-bus');
 const CONFIG = require('../../core/config');
+const { EFFECT_TYPES } = require('../../core/element-abilities');
+const StatusEffects = require('./status-effects');
 
 // Get enemy types from config (single source of truth)
 const ENEMY_TYPES = CONFIG.ENEMY_TYPES;
@@ -263,11 +265,13 @@ class EnemiesModule {
       size: type === 'boss' ? 16 : (type === 'tank' ? 12 : (type === 'swarm' ? 6 : 10)),
       emoji: enemyDef.emoji,
       color: enemyDef.color,
-      // Status effects
+      // Status effects (new system)
+      statusEffects: [],
+      // Legacy effects (deprecated, for compatibility)
       effects: [],
       slowMultiplier: 1,
-      slowDuration: 0,
-      burnDuration: 0
+      // Freeze immunity cooldown
+      freezeImmunityTimer: 0,
     };
 
     this.enemies.push(enemy);
@@ -329,11 +333,48 @@ class EnemiesModule {
   }
 
   /**
-   * Update status effects
+   * Update status effects (new unified system)
    */
   updateEffects(enemy, deltaTime) {
-    enemy.slowMultiplier = 1;
+    // Update freeze immunity
+    if (enemy.freezeImmunityTimer > 0) {
+      enemy.freezeImmunityTimer -= deltaTime;
+    }
     
+    // Process status effects
+    const result = StatusEffects.updateStatusEffects(enemy, deltaTime);
+    
+    // Apply DoT damage and emit events for damage numbers
+    if (result.damage > 0) {
+      enemy.health -= result.damage;
+      
+      // Emit individual tick events for damage number display
+      for (const tick of result.dotTicks) {
+        this.eventBus.emit('enemy:dot-damage', {
+          enemyId: enemy.id,
+          damage: tick.damage,
+          effectType: tick.type,
+          stacks: tick.stacks,
+          x: enemy.x,
+          y: enemy.y,
+        });
+      }
+    }
+    
+    // Handle fire spread
+    for (const spread of result.spreadCandidates) {
+      this.handleFireSpread(spread);
+    }
+    
+    // Calculate effective slow from status effects
+    enemy.slowMultiplier = 1 - StatusEffects.getTotalSlowPercent(enemy);
+    
+    // If frozen/shocked, can't move
+    if (StatusEffects.isStunned(enemy)) {
+      enemy.slowMultiplier = 0;
+    }
+    
+    // === Legacy effects support (deprecated) ===
     for (let i = enemy.effects.length - 1; i >= 0; i--) {
       const effect = enemy.effects[i];
       effect.duration -= deltaTime;
@@ -343,7 +384,6 @@ class EnemiesModule {
         continue;
       }
       
-      // Apply effect
       switch (effect.type) {
         case 'slow':
           enemy.slowMultiplier = Math.min(enemy.slowMultiplier, effect.value);
@@ -354,11 +394,43 @@ class EnemiesModule {
       }
     }
   }
+  
+  /**
+   * Handle fire spreading to nearby enemies
+   */
+  handleFireSpread(spread) {
+    const nearbyEnemies = this.enemies.filter(e => {
+      if (e.id === spread.sourceId) return false;
+      const dx = e.x - spread.sourcePos.x;
+      const dy = e.y - spread.sourcePos.y;
+      return Math.sqrt(dx * dx + dy * dy) <= spread.radius;
+    });
+    
+    if (nearbyEnemies.length > 0) {
+      // Spread to random nearby enemy
+      const target = nearbyEnemies[Math.floor(Math.random() * nearbyEnemies.length)];
+      StatusEffects.applyStatusEffect(target, spread.type, spread.config, spread.sourceId);
+      
+      this.eventBus.emit('effect:fire-spread', {
+        fromX: spread.sourcePos.x,
+        fromY: spread.sourcePos.y,
+        toX: target.x,
+        toY: target.y,
+      });
+    }
+  }
 
   /**
    * Damage an enemy
+   * @param {Object} data - Damage data
+   * @param {number} data.enemyId - Target enemy ID
+   * @param {number} data.damage - Base damage
+   * @param {number} data.towerId - Source tower ID
+   * @param {Array} data.effects - Legacy effects (deprecated)
+   * @param {Object} data.elementEffects - New element effects config
+   * @param {boolean} data.isCrit - Was critical hit
    */
-  damageEnemy({ enemyId, damage, towerId, effects, isCrit }) {
+  damageEnemy({ enemyId, damage, towerId, effects, elementEffects, isCrit }) {
     const enemy = this.enemies.find(e => e.id === enemyId);
     if (!enemy) {
       console.warn(`[EnemiesModule] damageEnemy: enemy ${enemyId} not found! Current enemies:`, 
@@ -370,13 +442,19 @@ class EnemiesModule {
     if (towerId) {
       enemy.lastDamagedByTowerId = towerId;
     }
-
-    enemy.health -= damage;
     
-    // Apply effects
+    // Calculate damage with status effect modifiers (curse, weaken)
+    const { finalDamage, modifiers } = StatusEffects.calculateDamageWithEffects(enemy, damage);
+    enemy.health -= finalDamage;
+    
+    // === Apply new element effects ===
+    if (elementEffects) {
+      this.applyElementEffects(enemy, elementEffects, towerId, isCrit);
+    }
+    
+    // === Legacy effects support (deprecated) ===
     if (effects && effects.length > 0) {
       for (const effect of effects) {
-        // Check if same effect exists, refresh it
         const existing = enemy.effects.find(e => e.type === effect.type);
         if (existing) {
           existing.duration = effect.duration;
@@ -389,10 +467,118 @@ class EnemiesModule {
 
     this.eventBus.emit('enemy:damaged', { 
       enemy, 
-      damage, 
+      damage: finalDamage,
+      baseDamage: damage,
+      modifiers,
       isCrit: isCrit || false,
       remaining: enemy.health 
     });
+  }
+  
+  /**
+   * Apply element-specific effects based on tower's abilities
+   */
+  applyElementEffects(enemy, elementEffects, towerId, isCrit) {
+    const { elementPath, abilities } = elementEffects;
+    if (!abilities) return;
+    
+    switch (elementPath) {
+      case 'fire':
+        // Apply burn
+        if (abilities.burn?.enabled) {
+          StatusEffects.applyStatusEffect(enemy, EFFECT_TYPES.BURN, {
+            damage: abilities.burn.baseDamage,
+            duration: abilities.burn.baseDuration,
+            tickRate: abilities.burn.tickRate,
+            stackable: abilities.burn.stackable,
+            maxStacks: abilities.burn.maxStacks,
+            extra: {
+              spreadChance: abilities.ignite?.spreadChance || 0,
+              spreadRadius: abilities.ignite?.spreadRadius || 0,
+              spreadDamageMod: abilities.ignite?.spreadDamageMod || 0.7,
+            },
+          }, towerId);
+        }
+        break;
+        
+      case 'ice':
+        // Apply slow
+        if (abilities.slow?.enabled) {
+          StatusEffects.applyStatusEffect(enemy, EFFECT_TYPES.SLOW, {
+            value: abilities.slow.basePercent,
+            duration: abilities.slow.baseDuration,
+            stackable: abilities.slow.stackable,
+          }, towerId);
+        }
+        // Check for freeze
+        if (abilities.freeze?.enabled && enemy.freezeImmunityTimer <= 0) {
+          if (Math.random() < abilities.freeze.baseChance) {
+            StatusEffects.applyStatusEffect(enemy, EFFECT_TYPES.FREEZE, {
+              duration: abilities.freeze.baseDuration,
+            }, towerId);
+            // Set immunity cooldown
+            enemy.freezeImmunityTimer = abilities.freeze.cooldown || 5;
+            
+            this.eventBus.emit('effect:freeze', {
+              enemyId: enemy.id,
+              x: enemy.x,
+              y: enemy.y,
+              duration: abilities.freeze.baseDuration,
+            });
+          }
+        }
+        break;
+        
+      case 'lightning':
+        // Shock on crit
+        if (abilities.shock?.enabled && isCrit) {
+          StatusEffects.applyStatusEffect(enemy, EFFECT_TYPES.SHOCK, {
+            duration: abilities.shock.baseDuration,
+          }, towerId);
+          
+          this.eventBus.emit('effect:shock', {
+            enemyId: enemy.id,
+            x: enemy.x,
+            y: enemy.y,
+          });
+        }
+        break;
+        
+      case 'nature':
+        // Apply poison
+        if (abilities.poison?.enabled) {
+          StatusEffects.applyStatusEffect(enemy, EFFECT_TYPES.POISON, {
+            damage: abilities.poison.baseDamage,
+            duration: abilities.poison.baseDuration,
+            tickRate: abilities.poison.tickRate,
+            stackable: abilities.poison.stackable,
+            maxStacks: abilities.poison.maxStacks,
+          }, towerId);
+        }
+        // Apply weaken
+        if (abilities.weaken?.enabled) {
+          StatusEffects.applyStatusEffect(enemy, EFFECT_TYPES.WEAKEN, {
+            value: abilities.weaken.armorReduction,
+            duration: abilities.weaken.baseDuration,
+            stackable: abilities.weaken.stackable,
+            maxStacks: abilities.weaken.maxStacks,
+          }, towerId);
+        }
+        break;
+        
+      case 'dark':
+        // Apply curse
+        if (abilities.curse?.enabled) {
+          StatusEffects.applyStatusEffect(enemy, EFFECT_TYPES.CURSE, {
+            value: abilities.curse.damageAmplify,
+            duration: abilities.curse.baseDuration,
+            stackable: abilities.curse.stackable,
+            maxStacks: abilities.curse.maxStacks,
+          }, towerId);
+        }
+        // Drain is handled in combat module (returns energy)
+        break;
+    }
   }
 
   /**

@@ -86,6 +86,21 @@ function UIEventsMixin(Base) {
         });
       }
       
+      // Tooltip abilities button
+      if (el.btnAbilities) {
+        el.btnAbilities.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggleAbilitiesPanel();
+        });
+      }
+      
+      // Lightning charge slider
+      if (el.lightningChargeSlider) {
+        el.lightningChargeSlider.addEventListener('input', (e) => {
+          this.onLightningChargeChange(e.target.value);
+        });
+      }
+      
       // Tooltip sell button
       if (el.btnSell) {
         el.btnSell.addEventListener('click', (e) => {

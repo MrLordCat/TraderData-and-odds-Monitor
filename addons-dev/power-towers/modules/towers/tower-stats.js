@@ -153,6 +153,7 @@ function recalculateTowerStats(tower) {
   }
   tower.splashRadius = splashRadius;
   tower.splashDmgFalloff = attackType.splashDmgFalloff;
+  tower.splashCanCrit = attackType.splashCanCrit || false; // Unlockable via cards
   
   // Chain Count: +1 per level (additive, capped at 10)
   let chainCount = tower.baseChainCount || attackType.chainCount || 0;
@@ -162,6 +163,7 @@ function recalculateTowerStats(tower) {
   }
   tower.chainCount = chainCount;
   tower.chainDmgFalloff = tower.chainDmgFalloff !== undefined ? tower.chainDmgFalloff : attackType.chainDmgFalloff;
+  tower.chainCanCrit = tower.elementAbilities?.chain?.canCrit || false; // From element abilities
   
   // Power Scaling: +10% per level
   let powerScaling = attackType.powerScaling || 1.0;

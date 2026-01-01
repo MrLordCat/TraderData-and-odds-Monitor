@@ -820,7 +820,15 @@ class GameRenderer {
       }
       
       // === ENERGY BAR UNDER BUILDING ===
-      this._renderBuildingEnergyBar(cx, cy, w, h, building, glowColor, camera);
+      this._renderEnergyBar({
+        x: cx,
+        y: cy + h / 2 + 4,
+        width: Math.max(w * 0.8, 24),
+        current: building.stored || building.energy || 0,
+        max: building.capacity || building.maxEnergy || 100,
+        type: building.nodeType || 'generator',
+        showGenIcon: building.nodeType === 'generator' && building.generation > 0
+      });
       
       // Pulse glow effect
       const pulse = Math.sin(this.time * 0.004) * 0.3 + 0.5;
@@ -1009,64 +1017,98 @@ class GameRenderer {
   }
   
   /**
-   * Render energy bar under building
-   * Shows stored energy / capacity
+   * UNIFIED energy bar renderer for ALL buildings (towers, generators, storage, relay)
+   * @param {Object} opts - Options
+   * @param {number} opts.x - Center X position
+   * @param {number} opts.y - Top Y position of bar
+   * @param {number} opts.width - Bar width
+   * @param {number} opts.current - Current energy
+   * @param {number} opts.max - Max energy capacity
+   * @param {string} opts.type - Building type: 'generator', 'storage', 'relay', 'consumer'
+   * @param {boolean} [opts.showGenIcon] - Show + icon for generators
+   * @param {boolean} [opts.showEmptyWarning] - Show ! when empty (for consumers)
    */
-  _renderBuildingEnergyBar(cx, cy, w, h, building, glowColor, camera) {
-    const stored = building.stored || building.energy || 0;
-    const capacity = building.capacity || building.maxEnergy || 100;
-    const fillPct = capacity > 0 ? Math.min(1, stored / capacity) : 0;
-    const nodeType = building.nodeType || 'generator';
+  _renderEnergyBar(opts) {
+    const { x, y, width, current, max, type, showGenIcon, showEmptyWarning } = opts;
+    const camera = this.camera;
+    const fillPct = max > 0 ? Math.min(1, current / max) : 0;
     
-    // Bar dimensions
-    const barWidth = Math.max(w * 0.8, 24);
-    const barHeight = 6;
-    const barY = cy + h / 2 + 4;  // Below building
-    const barX = cx - barWidth / 2;
+    const barHeight = 5;
+    const barX = x - width / 2;
+    const barY = y;
     
     // Background (dark)
-    this.shapeRenderer.rect(barX - 1, barY - 1, barWidth + 2, barHeight + 2, 0, 0, 0, 0.7);
+    this.shapeRenderer.rect(barX - 1, barY - 1, width + 2, barHeight + 2, 0, 0, 0, 0.7);
     
     // Empty bar (dark gray)
-    this.shapeRenderer.rect(barX, barY, barWidth, barHeight, 0.15, 0.15, 0.2, 1);
+    this.shapeRenderer.rect(barX, barY, width, barHeight, 0.15, 0.15, 0.2, 1);
     
-    // Filled portion with type-based color
+    // Determine color based on type and fill level
     if (fillPct > 0) {
       let fillColor;
-      if (nodeType === 'generator') {
-        // Green for generators
-        fillColor = { r: 0.3, g: 0.9, b: 0.4 };
-      } else if (nodeType === 'storage') {
-        // Blue for storage (batteries)
-        fillColor = { r: 0.3, g: 0.7, b: 1.0 };
-      } else {
-        // Orange for transfer/relay
-        fillColor = { r: 1.0, g: 0.7, b: 0.3 };
+      let pulseCondition;
+      
+      // Type-based colors
+      switch (type) {
+        case 'generator':
+          fillColor = { r: 0.3, g: 0.9, b: 0.4 };  // Green
+          pulseCondition = fillPct >= 0.9;  // Pulse when full
+          break;
+        case 'storage':
+          fillColor = { r: 0.3, g: 0.7, b: 1.0 };  // Blue
+          pulseCondition = fillPct >= 0.9;
+          break;
+        case 'relay':
+          fillColor = { r: 1.0, g: 0.7, b: 0.3 };  // Orange
+          pulseCondition = false;
+          break;
+        case 'consumer':  // Towers
+        default:
+          // Color based on energy level for consumers
+          if (fillPct < 0.25) {
+            fillColor = { r: 1.0, g: 0.2, b: 0.2 };  // Red warning
+            pulseCondition = true;  // Pulse when low
+          } else if (fillPct < 0.5) {
+            fillColor = { r: 1.0, g: 0.6, b: 0.2 };  // Orange
+            pulseCondition = false;
+          } else {
+            fillColor = { r: 0.2, g: 0.8, b: 1.0 };  // Cyan
+            pulseCondition = false;
+          }
+          break;
       }
       
-      // Animated pulse when generating/full
-      const pulse = fillPct >= 0.9 ? Math.sin(this.time * 0.008) * 0.2 + 0.8 : 1;
+      // Animated pulse
+      const pulse = pulseCondition ? Math.sin(this.time * 0.01) * 0.25 + 0.75 : 1;
       
-      this.shapeRenderer.rect(barX, barY, barWidth * fillPct, barHeight, 
+      this.shapeRenderer.rect(barX, barY, width * fillPct, barHeight, 
         fillColor.r * pulse, fillColor.g * pulse, fillColor.b * pulse, 1);
       
-      // Glow effect for high energy
-      if (fillPct >= 0.5) {
-        this.shapeRenderer.rect(barX, barY, barWidth * fillPct, barHeight, 
-          fillColor.r, fillColor.g, fillColor.b, 0.3);
+      // Glow effect for high energy (producers)
+      if (type !== 'consumer' && fillPct >= 0.5) {
+        this.shapeRenderer.rect(barX, barY, width * fillPct, barHeight, 
+          fillColor.r, fillColor.g, fillColor.b, 0.25);
       }
     }
     
     // Border
-    this.shapeRenderer.rectOutline(barX, barY, barWidth, barHeight, 1 / camera.zoom, 0.3, 0.3, 0.3, 0.8);
+    this.shapeRenderer.rectOutline(barX, barY, width, barHeight, 1 / camera.zoom, 0.3, 0.3, 0.3, 0.8);
     
-    // Generation rate indicator (small arrow/icon for generators)
-    if (nodeType === 'generator' && building.generation > 0) {
-      // Small + symbol on the right
-      const iconX = barX + barWidth + 4;
+    // Generation rate indicator (+ icon for generators)
+    if (showGenIcon) {
+      const iconX = barX + width + 4;
       const iconY = barY + barHeight / 2;
       this.shapeRenderer.rect(iconX - 1, iconY - 3, 2, 6, 0.5, 1, 0.5, 1);
       this.shapeRenderer.rect(iconX - 3, iconY - 1, 6, 2, 0.5, 1, 0.5, 1);
+    }
+    
+    // Empty warning (! icon for consumers)
+    if (showEmptyWarning && fillPct === 0) {
+      const blink = Math.sin(this.time * 0.02) > 0;
+      if (blink) {
+        this.shapeRenderer.rect(x - 2, barY - 8, 4, 6, 1, 0.3, 0.3, 1);
+        this.shapeRenderer.rect(x - 1.5, barY - 1, 3, 2, 1, 0.3, 0.3, 1);
+      }
     }
   }
   
@@ -1174,12 +1216,24 @@ class GameRenderer {
       this.shapeRenderer.circleOutline(x, y, baseSize * 0.65 + tower.elementTier * 2, 
         1 / camera.zoom, glowColor.r, glowColor.g, glowColor.b, tierGlow * 0.5);
     }
+    
+    // === ENERGY BAR ===
+    this._renderEnergyBar({
+      x: x,
+      y: y + baseSize * 0.7,
+      width: baseSize * 1.2,
+      current: tower.currentEnergy || 0,
+      max: tower.maxEnergy || 100,
+      type: 'consumer',  // Towers are energy consumers
+      showEmptyWarning: true
+    });
   }
   
   _renderEnemies(data) {
     if (!data.enemies) return;
     
     const camera = this.camera;
+    const time = this.frameCount * 0.05; // Smooth animation time
     
     this.shapeRenderer.begin('triangles', camera);
     
@@ -1189,28 +1243,133 @@ class GameRenderer {
       const color = this._parseColor(enemy.color);
       const size = enemy.size;
       
+      // Check status effects (new system)
+      const hasBurn = this._hasStatusEffect(enemy, 'burn');
+      const hasPoison = this._hasStatusEffect(enemy, 'poison');
+      const hasSlow = this._hasStatusEffect(enemy, 'slow');
+      const hasFreeze = this._hasStatusEffect(enemy, 'freeze');
+      const hasShock = this._hasStatusEffect(enemy, 'shock');
+      const hasCurse = this._hasStatusEffect(enemy, 'curse');
+      
       // Shadow
       this.shapeRenderer.circle(enemy.x, enemy.y + size * 0.8, size * 0.8, 0, 0, 0, 0.3);
       
-      // Body
-      this.shapeRenderer.circle(enemy.x, enemy.y, size, color.r, color.g, color.b, 1);
+      // Body with status tint
+      let bodyR = color.r, bodyG = color.g, bodyB = color.b;
+      if (hasFreeze) {
+        // Frozen - blue tint
+        bodyR = bodyR * 0.5 + 0.2;
+        bodyG = bodyG * 0.5 + 0.4;
+        bodyB = 0.9;
+      } else if (hasBurn) {
+        // Burning - orange tint
+        const flicker = Math.sin(time * 6) * 0.15;
+        bodyR = Math.min(1, bodyR + 0.3 + flicker);
+        bodyG = bodyG * 0.7;
+        bodyB = bodyB * 0.5;
+      }
+      this.shapeRenderer.circle(enemy.x, enemy.y, size, bodyR, bodyG, bodyB, 1);
       
       // Border
       this.shapeRenderer.circleOutline(enemy.x, enemy.y, size, 1 / camera.zoom, 0, 0, 0, 0.4);
       
-      // Slow effect
-      if (enemy.slowDuration > 0) {
-        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 2, 2 / camera.zoom, 0.39, 0.7, 0.93, 0.8);
+      // === STATUS EFFECT VISUALS ===
+      
+      // BURN - animated fire particles around enemy
+      if (hasBurn) {
+        const burnEffect = this._getStatusEffect(enemy, 'burn');
+        const stacks = burnEffect?.stacks || 1;
+        // Multiple flame particles based on stacks
+        for (let i = 0; i < Math.min(stacks, 5); i++) {
+          const angle = (time * 3 + i * (Math.PI * 2 / stacks)) % (Math.PI * 2);
+          const flameX = enemy.x + Math.cos(angle) * (size + 3);
+          const flameY = enemy.y + Math.sin(angle) * (size + 3);
+          const flicker = Math.sin(time * 10 + i * 2) * 2;
+          // Flame core
+          this.shapeRenderer.circle(flameX, flameY - flicker, 3, 1, 0.5, 0.1, 0.9);
+          // Flame glow
+          this.shapeRenderer.circle(flameX, flameY - flicker, 5, 1, 0.3, 0, 0.3);
+        }
+        // Fire ring
+        const fireAlpha = 0.3 + Math.sin(time * 8) * 0.1;
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 2, 2 / camera.zoom, 1, 0.4, 0.1, fireAlpha);
       }
       
-      // Burn effect
-      if (enemy.burnDuration > 0) {
+      // POISON - green bubbling effect
+      if (hasPoison) {
+        const poisonEffect = this._getStatusEffect(enemy, 'poison');
+        const stacks = poisonEffect?.stacks || 1;
+        // Poison aura
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 3, 2 / camera.zoom, 0.3, 0.8, 0.2, 0.5);
+        // Bubble particles
+        for (let i = 0; i < Math.min(stacks * 2, 6); i++) {
+          const bubbleTime = (time * 2 + i * 0.5) % 3;
+          const bubbleY = enemy.y + size - bubbleTime * 8;
+          const bubbleX = enemy.x + Math.sin(time * 3 + i * 1.5) * (size * 0.5);
+          const bubbleAlpha = Math.max(0, 1 - bubbleTime / 3);
+          const bubbleSize = 2 + bubbleTime * 0.5;
+          this.shapeRenderer.circle(bubbleX, bubbleY, bubbleSize, 0.4, 0.9, 0.3, bubbleAlpha * 0.7);
+        }
+      }
+      
+      // SLOW - blue spiral
+      if (hasSlow && !hasFreeze) {
+        const slowAlpha = 0.4 + Math.sin(time * 4) * 0.1;
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 2, 2 / camera.zoom, 0.4, 0.7, 0.95, slowAlpha);
+        // Ice crystals
+        for (let i = 0; i < 3; i++) {
+          const angle = time * 2 + i * (Math.PI * 2 / 3);
+          const crystalX = enemy.x + Math.cos(angle) * (size + 4);
+          const crystalY = enemy.y + Math.sin(angle) * (size + 4);
+          this.shapeRenderer.circle(crystalX, crystalY, 2, 0.7, 0.9, 1, 0.6);
+        }
+      }
+      
+      // FREEZE - solid ice effect
+      if (hasFreeze) {
+        // Ice shell
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 1, 3 / camera.zoom, 0.6, 0.9, 1, 0.8);
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 4, 2 / camera.zoom, 0.4, 0.7, 1, 0.4);
+        // Ice crystals
+        for (let i = 0; i < 6; i++) {
+          const angle = i * (Math.PI / 3);
+          const crystalX = enemy.x + Math.cos(angle) * (size + 5);
+          const crystalY = enemy.y + Math.sin(angle) * (size + 5);
+          this.shapeRenderer.circle(crystalX, crystalY, 3, 0.8, 0.95, 1, 0.7);
+        }
+      }
+      
+      // SHOCK - electric sparks
+      if (hasShock) {
+        const sparkAlpha = 0.5 + Math.sin(time * 20) * 0.3;
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 2, 2 / camera.zoom, 1, 1, 0.3, sparkAlpha);
+        // Lightning bolts
+        for (let i = 0; i < 4; i++) {
+          const angle = (time * 15 + i * (Math.PI / 2)) % (Math.PI * 2);
+          const boltX = enemy.x + Math.cos(angle) * (size + 6);
+          const boltY = enemy.y + Math.sin(angle) * (size + 6);
+          if (Math.random() > 0.5) {
+            this.shapeRenderer.circle(boltX, boltY, 2, 1, 1, 0.5, 0.8);
+          }
+        }
+      }
+      
+      // CURSE - dark aura
+      if (hasCurse) {
+        const curseAlpha = 0.3 + Math.sin(time * 2) * 0.1;
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 4, 3 / camera.zoom, 0.4, 0.1, 0.5, curseAlpha);
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 6, 2 / camera.zoom, 0.3, 0, 0.4, curseAlpha * 0.5);
+      }
+      
+      // Fallback to legacy effects
+      if (!hasBurn && enemy.burnDuration > 0) {
         const flicker = Math.sin(this.frameCount * 0.3) * 2;
         this.shapeRenderer.circle(enemy.x + flicker, enemy.y - size - 3, 3, 0.96, 0.4, 0.4, 1);
       }
-      
-      // Poison effect
-      if (enemy.poisonDuration > 0) {
+      if (!hasSlow && enemy.slowDuration > 0) {
+        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 2, 2 / camera.zoom, 0.39, 0.7, 0.93, 0.8);
+      }
+      if (!hasPoison && enemy.poisonDuration > 0) {
         this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 3, 2 / camera.zoom, 0.2, 0.8, 0.3, 0.6);
       }
       
@@ -1228,9 +1387,46 @@ class GameRenderer {
                       hpRatio > 0.25 ? { r: 0.9, g: 0.7, b: 0.2 } :
                       { r: 0.9, g: 0.3, b: 0.3 };
       this.shapeRenderer.rect(enemy.x - barWidth/2, barY, barWidth * Math.max(0, hpRatio), barHeight, hpColor.r, hpColor.g, hpColor.b, 1);
+      
+      // Status effect icons above health bar
+      this._renderStatusIcons(enemy, barY - 8);
     }
     
     this.shapeRenderer.end();
+  }
+  
+  /**
+   * Check if enemy has a specific status effect
+   */
+  _hasStatusEffect(enemy, type) {
+    if (enemy.statusEffects && enemy.statusEffects.length > 0) {
+      return enemy.statusEffects.some(e => e.type === type);
+    }
+    // Fallback to legacy
+    if (type === 'burn') return enemy.burnDuration > 0;
+    if (type === 'slow') return enemy.slowDuration > 0;
+    if (type === 'poison') return enemy.poisonDuration > 0;
+    return false;
+  }
+  
+  /**
+   * Get status effect data
+   */
+  _getStatusEffect(enemy, type) {
+    if (enemy.statusEffects && enemy.statusEffects.length > 0) {
+      return enemy.statusEffects.find(e => e.type === type);
+    }
+    return null;
+  }
+  
+  /**
+   * Render status effect icons above enemy
+   */
+  _renderStatusIcons(enemy, y) {
+    if (!enemy.statusEffects || enemy.statusEffects.length === 0) return;
+    
+    // Icons are rendered in text overlay later
+    // This is placeholder for shape-based indicators
   }
   
   _renderProjectiles(data) {
@@ -1348,11 +1544,17 @@ class GameRenderer {
       this.textCtx.textAlign = 'center';
       this.textCtx.textBaseline = 'middle';
       
-      const text = num.isCrit ? `${num.value}!` : String(num.value);
+      // Build text with optional prefix (emoji for DoT)
+      let text;
+      if (num.type === 'dot' && num.prefix) {
+        text = `${num.prefix}${num.value}`;
+      } else {
+        text = num.isCrit ? `${num.value}!` : String(num.value);
+      }
       
       // Outline
       this.textCtx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-      this.textCtx.lineWidth = 3;
+      this.textCtx.lineWidth = num.type === 'dot' ? 2 : 3;
       this.textCtx.strokeText(text, screen.x, screen.y);
       
       // Fill

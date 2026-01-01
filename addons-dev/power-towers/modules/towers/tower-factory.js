@@ -78,8 +78,10 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     // AoE stats (from attack type)
     splashRadius: 0,
     splashDmgFalloff: 0,
+    splashCanCrit: false,   // Can splash damage crit? (unlockable via cards)
     chainCount: 0,
     chainDmgFalloff: 0,
+    chainCanCrit: false,    // Can chain damage crit? (unlockable via cards)
     
     // Magic system
     powerScaling: 0,
@@ -113,6 +115,15 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     elementPath: null,     // 'fire', 'ice', etc.
     elementTier: 0,        // 0-3
     elementEffects: {},    // Current element effects
+    
+    // Element ability upgrades (NEW)
+    abilityUpgrades: {},   // { burn_damage: 2, spread_chance: 1, ... }
+    elementAbilities: null, // Computed abilities with upgrades applied
+    
+    // Lightning charge system
+    lightningChargeEnabled: false,
+    lightningChargeTarget: 50,  // % target (0-100)
+    lightningCurrentCharge: 0,  // Current charge level
     
     // =========================================
     // STATE

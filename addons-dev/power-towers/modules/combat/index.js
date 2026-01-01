@@ -95,24 +95,32 @@ class CombatModule {
    */
   handleTowerAttack({ 
     towerId, towerType, targetId, damage, isCrit, position, targetPosition,
+    // Critical hit info for secondary damage
+    critMultiplier,
+    // Element system (NEW)
+    elementPath, elementAbilities,
     // AoE params
-    splashRadius, splashDmgFalloff,
+    splashRadius, splashDmgFalloff, splashCanCrit,
     // Chain params  
-    chainCount, chainDmgFalloff,
+    chainCount, chainDmgFalloff, chainCanCrit,
     // Attack type
     attackTypeId
   }) {
+    // Determine tower type from element path or legacy towerType
+    const effectiveTowerType = elementPath || towerType || 'fire';
+    
     // Create projectile
-    const projectileDef = PROJECTILE_TYPES[towerType] || PROJECTILE_TYPES.fire;
+    const projectileDef = PROJECTILE_TYPES[effectiveTowerType] || PROJECTILE_TYPES.fire;
     
     const projectile = {
       id: this.nextProjectileId++,
       towerId,
-      towerType,
+      towerType: effectiveTowerType,
       attackTypeId,
       targetId,
       damage,
       isCrit: isCrit || false,
+      critMultiplier: critMultiplier || 1.5, // For secondary crit calculations
       x: position.x,
       y: position.y,
       targetX: targetPosition.x,
@@ -125,9 +133,14 @@ class CombatModule {
       // AoE (siege)
       splashRadius: splashRadius || 0,
       splashDmgFalloff: splashDmgFalloff || 0.5,
+      splashCanCrit: splashCanCrit || false, // Unlockable via cards
       // Chain (lightning)
       chainCount: chainCount || 0,
       chainDmgFalloff: chainDmgFalloff || 0.5,
+      chainCanCrit: chainCanCrit || false,   // Unlockable via cards
+      // Element system (NEW)
+      elementPath: effectiveTowerType,
+      elementAbilities: elementAbilities || null,
       // Trail history
       trailPoints: projectileDef.trail ? [{ x: position.x, y: position.y }] : []
     };
@@ -135,7 +148,7 @@ class CombatModule {
     this.projectiles.push(projectile);
     
     // For lightning (instant), skip projectile travel
-    if (towerType === 'lightning') {
+    if (effectiveTowerType === 'lightning') {
       this.instantHit(projectile);
     }
   }
@@ -187,13 +200,18 @@ class CombatModule {
       this.projectiles.splice(idx, 1);
     }
     
-    // Apply damage directly
+    // Apply damage directly with element effects
     this.eventBus.emit('enemy:damage', {
       enemyId: projectile.targetId,
       damage: projectile.damage,
       isCrit: projectile.isCrit,
       towerId: projectile.towerId,
-      effects: this.getEffectsForType(projectile.towerType)
+      effects: this.getEffectsForType(projectile.towerType),
+      // NEW: Element effects
+      elementEffects: projectile.elementAbilities ? {
+        elementPath: projectile.elementPath,
+        abilities: projectile.elementAbilities,
+      } : null,
     });
     
     // Visual effect
@@ -208,26 +226,48 @@ class CombatModule {
     });
     
     // Chain lightning (hit nearby enemies)
-    if (projectile.chain) {
+    if (projectile.chain && projectile.chainCount > 0) {
+      const chainRange = projectile.elementAbilities?.chain?.chainRange || 80;
+      const chainFalloff = projectile.chainDmgFalloff || 0.5;
+      
       this.eventBus.emit('enemies:get-nearby', {
         x: projectile.targetX,
         y: projectile.targetY,
-        radius: 80,
+        radius: chainRange,
         excludeId: projectile.targetId,
-        maxCount: 2,
+        maxCount: projectile.chainCount,
         callback: (nearbyEnemies) => {
-          for (const enemy of nearbyEnemies) {
+          let currentDamage = projectile.damage;
+          
+          for (let i = 0; i < nearbyEnemies.length; i++) {
+            const enemy = nearbyEnemies[i];
+            // Apply chain damage falloff
+            const chainDamage = currentDamage * (1 - chainFalloff);
+            currentDamage = chainDamage; // Next chain uses reduced damage
+            
+            // Check if chain can crit (unlockable via cards)
+            let chainIsCrit = false;
+            if (projectile.chainCanCrit) {
+              chainIsCrit = projectile.isCrit; // Inherit crit from main attack
+            }
+            
             this.eventBus.emit('enemy:damage', {
               enemyId: enemy.id,
-              damage: projectile.damage * 0.5,
+              damage: chainDamage,
+              isCrit: chainIsCrit,
               towerId: projectile.towerId,
-              effects: []
+              effects: [],
+              // Pass element effects to chain targets too
+              elementEffects: projectile.elementAbilities ? {
+                elementPath: projectile.elementPath,
+                abilities: projectile.elementAbilities,
+              } : null,
             });
             
             this.addEffect({
               type: 'lightning-bolt',
-              startX: projectile.targetX,
-              startY: projectile.targetY,
+              startX: i === 0 ? projectile.targetX : nearbyEnemies[i-1].x,
+              startY: i === 0 ? projectile.targetY : nearbyEnemies[i-1].y,
               endX: enemy.x,
               endY: enemy.y,
               duration: 0.1,
@@ -243,13 +283,18 @@ class CombatModule {
    * Projectile hit
    */
   projectileHit(projectile, enemies) {
-    // Apply damage to main target
+    // Apply damage to main target with element effects
     this.eventBus.emit('enemy:damage', {
       enemyId: projectile.targetId,
       damage: projectile.damage,
       isCrit: projectile.isCrit,
       towerId: projectile.towerId,
-      effects: this.getEffectsForType(projectile.towerType)
+      effects: this.getEffectsForType(projectile.towerType),
+      // NEW: Element effects
+      elementEffects: projectile.elementAbilities ? {
+        elementPath: projectile.elementPath,
+        abilities: projectile.elementAbilities,
+      } : null,
     });
     
     // Impact effect
@@ -282,14 +327,32 @@ class CombatModule {
             
             // Damage falloff based on distance (closer = more damage)
             const falloffRatio = 1 - (distance / projectile.splashRadius) * projectile.splashDmgFalloff;
-            const splashDamage = projectile.damage * Math.max(0.2, falloffRatio);
+            let splashDamage = projectile.damage * Math.max(0.2, falloffRatio);
+            
+            // Check if splash can crit (unlockable via cards)
+            // If original hit was crit and splash can't crit, use base damage
+            // If splash can crit, roll a new crit for each enemy
+            let splashIsCrit = false;
+            if (projectile.splashCanCrit) {
+              // Roll new crit for splash damage (uses same crit chance as main attack)
+              // For now just inherit crit from main attack
+              splashIsCrit = projectile.isCrit;
+              if (splashIsCrit) {
+                // Already applied crit multiplier to projectile.damage, so just mark it
+              }
+            }
             
             this.eventBus.emit('enemy:damage', {
               enemyId: enemy.id,
               damage: splashDamage,
-              isCrit: false, // No crit on splash
+              isCrit: splashIsCrit, // Crit on splash if enabled
               towerId: projectile.towerId,
-              effects: []
+              effects: this.getEffectsForType(projectile.towerType),
+              // Element effects apply to splash too
+              elementEffects: projectile.elementAbilities ? {
+                elementPath: projectile.elementPath,
+                abilities: projectile.elementAbilities,
+              } : null,
             });
           }
         }

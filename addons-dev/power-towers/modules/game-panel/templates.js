@@ -191,8 +191,30 @@ function getGameTemplate() {
               </div>
             </div>
             
+            <!-- Element Ability Upgrades Section -->
+            <div class="tooltip-section tooltip-abilities" id="tooltip-abilities-section" style="display: none;">
+              <div class="section-title">✨ Element Abilities:</div>
+              <!-- Lightning Charge Slider (only for Lightning towers) -->
+              <div id="lightning-charge-section" class="lightning-charge-section" style="display: none;">
+                <div class="lightning-charge-header">
+                  <span>⚡ Charge Target:</span>
+                  <span id="lightning-charge-value">50%</span>
+                </div>
+                <input type="range" id="lightning-charge-slider" class="lightning-charge-slider" 
+                       min="0" max="100" value="50" step="5">
+                <div class="lightning-charge-info">
+                  <span>Cost: <b id="lightning-charge-cost">1.0x</b></span>
+                  <span>Damage: <b id="lightning-charge-damage">1.0x</b></span>
+                </div>
+              </div>
+              <div class="abilities-grid" id="abilities-grid">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+            
             <div class="tooltip-actions">
-              <button id="btn-upgrade" class="tooltip-action-btn upgrade">⬆️ Upgrade</button>
+              <button id="btn-upgrade" class="tooltip-action-btn upgrade">⬆️ Stats</button>
+              <button id="btn-abilities" class="tooltip-action-btn abilities" style="display: none;">✨ Abilities</button>
               <button id="btn-sell" class="tooltip-action-btn sell">💰 Sell</button>
             </div>
           </div>

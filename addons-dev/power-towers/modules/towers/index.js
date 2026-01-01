@@ -23,7 +23,7 @@ const {
 const { createTowerInstance } = require('./tower-factory');
 const { recalculateTowerStats } = require('./tower-stats');
 const { createUpgradeHandlers } = require('./tower-upgrade-handlers');
-const { isValidTarget, findTarget, performAttack } = require('./tower-combat');
+const { isValidTarget, findTarget, performAttack, updateLightningCharge } = require('./tower-combat');
 
 class TowersModule {
   /**
@@ -260,6 +260,13 @@ class TowersModule {
   updateTower(tower, deltaTime, enemies) {
     // Energy is now provided by energy buildings, not passive regen
     // Tower can only attack if it has energy
+    
+    // Update lightning charge for lightning towers
+    if (tower.elementPath === 'lightning' && tower.lightningChargeEnabled) {
+      // Charge rate based on current energy pool (simulates energy-based charging)
+      const energyInputRate = tower.currentEnergy > 0 ? Math.min(tower.currentEnergy * 2, 100) : 0;
+      updateLightningCharge(tower, deltaTime, energyInputRate);
+    }
     
     // Reduce cooldown
     if (tower.attackCooldown > 0) {

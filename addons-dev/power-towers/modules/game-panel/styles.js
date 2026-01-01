@@ -680,6 +680,159 @@ function getGameStyles() {
     .energy-upgrades .stat-label { font-size: 10px; color: #a0aec0; }
     .energy-upgrades .stat-cost { font-size: 10px; color: #ffd700; font-weight: 600; }
     
+    /* Element Ability Upgrades Section */
+    .tooltip-abilities {
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    .tooltip-action-btn.abilities {
+      background: rgba(168,85,247,0.2);
+      color: #a855f7;
+    }
+    .tooltip-action-btn.abilities:hover {
+      background: rgba(168,85,247,0.3);
+    }
+    .tooltip-action-btn.abilities.active {
+      background: linear-gradient(135deg, #a855f7 0%, #8b5cf6 100%);
+      color: white;
+    }
+    .abilities-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .no-abilities {
+      text-align: center;
+      padding: 12px;
+      color: #718096;
+      font-size: 11px;
+    }
+    .ability-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .ability-row:hover {
+      background: rgba(168,85,247,0.2);
+    }
+    .ability-row.disabled {
+      opacity: 0.5;
+    }
+    .ability-row.disabled:hover {
+      background: rgba(0,0,0,0.3);
+    }
+    .ability-row.maxed {
+      background: rgba(72,187,120,0.15);
+      border: 1px solid rgba(72,187,120,0.3);
+    }
+    .ability-emoji {
+      font-size: 16px;
+      min-width: 24px;
+      text-align: center;
+    }
+    .ability-info-col {
+      flex: 1;
+      min-width: 0;
+    }
+    .ability-name-row {
+      font-size: 11px;
+      font-weight: 500;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ability-effect {
+      font-size: 9px;
+      color: #a0aec0;
+    }
+    .ability-value {
+      font-size: 10px;
+      color: #a855f7;
+      font-weight: 600;
+      min-width: 50px;
+      text-align: center;
+    }
+    .ability-level {
+      font-size: 9px;
+      color: #718096;
+      font-weight: 400;
+    }
+    .ability-buy-btn {
+      padding: 4px 8px;
+      border: none;
+      border-radius: 4px;
+      background: rgba(168,85,247,0.2);
+      color: #a855f7;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 45px;
+    }
+    .ability-buy-btn:hover:not(:disabled) {
+      background: rgba(168,85,247,0.35);
+      transform: scale(1.05);
+    }
+    .ability-buy-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      color: #fc8181;
+    }
+    .ability-buy-btn.maxed {
+      background: rgba(72,187,120,0.2);
+      color: #48bb78;
+      cursor: default;
+    }
+    
+    /* Lightning Charge Slider */
+    .lightning-charge-section {
+      padding: 8px;
+      margin-bottom: 8px;
+      background: rgba(234,179,8,0.1);
+      border: 1px solid rgba(234,179,8,0.3);
+      border-radius: 6px;
+    }
+    .lightning-charge-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #eab308;
+      margin-bottom: 6px;
+    }
+    .lightning-charge-slider {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      background: rgba(0,0,0,0.4);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    .lightning-charge-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: linear-gradient(135deg, #eab308 0%, #facc15 100%);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .lightning-charge-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #a0aec0;
+      margin-top: 6px;
+    }
+    .lightning-charge-info b {
+      color: #eab308;
+    }
+    
     .game-footer { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
     .game-footer .hint { margin: 0; font-size: 12px; color: #718096; flex: 1; text-align: right; }
   `;

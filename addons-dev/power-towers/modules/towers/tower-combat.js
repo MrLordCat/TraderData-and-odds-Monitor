@@ -5,6 +5,7 @@
  */
 
 const { rollCritical, calculateMagicDamage } = require('../../core/attack-types');
+const { getElementAbilities, calculateLightningChargeCost, calculateLightningChargeDamage } = require('../../core/element-abilities');
 
 /**
  * Update single tower combat logic
@@ -99,15 +100,48 @@ function findTarget(tower, enemies) {
  */
 function performAttack(tower, eventBus) {
   if (!tower.target) return;
-
+  
+  const elementPath = tower.elementPath || 'none';
+  let energyCost = tower.energyCostPerShot;
+  let damageMultiplier = 1;
+  
+  // === LIGHTNING CHARGE SYSTEM ===
+  if (elementPath === 'lightning' && tower.lightningChargeEnabled) {
+    const chargeConfig = tower.elementAbilities?.charge || {
+      baseCost: 20,
+      costExponent: 2.5,
+      damageExponent: 2.0,
+    };
+    const chargeTarget = tower.lightningChargeTarget || 50; // % target
+    const currentCharge = tower.lightningCurrentCharge || 0;
+    
+    // Check if we have enough charge
+    if (currentCharge < chargeTarget) {
+      // Not enough charge, don't fire yet (handled elsewhere)
+      return;
+    }
+    
+    // Calculate cost and damage for charged shot
+    energyCost = calculateLightningChargeCost(currentCharge, chargeConfig);
+    damageMultiplier = calculateLightningChargeDamage(currentCharge, chargeConfig);
+    
+    // Reset charge after firing
+    tower.lightningCurrentCharge = 0;
+  }
+  
+  // Check energy
+  if (tower.currentEnergy < energyCost) {
+    return; // Not enough energy
+  }
+  
   // Deduct energy cost
-  tower.currentEnergy -= tower.energyCostPerShot;
+  tower.currentEnergy -= energyCost;
 
   // Set cooldown (convert fireRate to seconds)
   tower.attackCooldown = 1 / tower.fireRate;
 
   // Calculate damage
-  let finalDamage = tower.damage;
+  let finalDamage = tower.damage * damageMultiplier;
   let isCrit = false;
   let isOverdrive = false;
   let powerCost = 0;
@@ -119,7 +153,7 @@ function performAttack(tower, eventBus) {
       tower.currentPowerDraw,
       tower.attackTypeConfig
     );
-    finalDamage = magicResult.finalDamage;
+    finalDamage = magicResult.finalDamage * damageMultiplier;
     powerCost = magicResult.powerCost;
     isOverdrive = magicResult.isOverdrive;
   }
@@ -131,6 +165,9 @@ function performAttack(tower, eventBus) {
     isCrit = true;
     tower.totalCrits++;
   }
+  
+  // Get element abilities for this tower
+  const elementAbilities = tower.elementAbilities || getElementAbilities(elementPath, tower.abilityUpgrades);
 
   // Emit attack event for combat module
   eventBus.emit('combat:tower-attack', {
@@ -140,19 +177,26 @@ function performAttack(tower, eventBus) {
     // Damage info
     damage: finalDamage,
     baseDamage: tower.damage,
+    damageMultiplier,
     isCrit,
     critMultiplier: critResult.multiplier,
     
     // Attack type
     attackTypeId: tower.attackTypeId,
     
+    // Element path and abilities (NEW)
+    elementPath,
+    elementAbilities,
+    
     // AoE
     splashRadius: tower.splashRadius,
     splashDmgFalloff: tower.splashDmgFalloff,
+    splashCanCrit: tower.splashCanCrit || false,
     chainCount: tower.chainCount,
     chainDmgFalloff: tower.chainDmgFalloff,
+    chainCanCrit: tower.chainCanCrit || false,
     
-    // DoT/Debuffs
+    // DoT/Debuffs (legacy, for compatibility)
     burnDamage: tower.burnDamage,
     burnDuration: tower.burnDuration,
     poisonDamage: tower.poisonDamage,
@@ -163,11 +207,11 @@ function performAttack(tower, eventBus) {
     armorReductionDuration: tower.armorReductionDuration,
     trueDamagePercent: tower.trueDamagePercent,
     
-    // Element effects
+    // Element effects (legacy)
     elementEffects: tower.elementEffects,
     
     // Costs
-    energyCost: tower.energyCost,
+    energyCost,
     powerCost,
     isOverdrive,
     
@@ -185,9 +229,30 @@ function performAttack(tower, eventBus) {
   tower.totalDamage += finalDamage;
 }
 
+/**
+ * Update lightning charge for a tower
+ * Called every frame to accumulate charge based on energy input
+ */
+function updateLightningCharge(tower, deltaTime, energyInputRate) {
+  if (tower.elementPath !== 'lightning' || !tower.lightningChargeEnabled) return;
+  
+  const chargeTarget = tower.lightningChargeTarget || 50;
+  const currentCharge = tower.lightningCurrentCharge || 0;
+  
+  if (currentCharge >= chargeTarget) return; // Already charged
+  
+  // Charge rate based on energy input
+  // More energy = faster charging
+  const chargeRate = energyInputRate * 0.5; // 50% of energy input converts to charge
+  const newCharge = Math.min(chargeTarget, currentCharge + chargeRate * deltaTime);
+  
+  tower.lightningCurrentCharge = newCharge;
+}
+
 module.exports = { 
   updateTowerCombat, 
   isValidTarget, 
   findTarget, 
-  performAttack 
+  performAttack,
+  updateLightningCharge,
 };

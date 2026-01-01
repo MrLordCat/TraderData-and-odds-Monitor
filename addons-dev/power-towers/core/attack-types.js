@@ -43,6 +43,7 @@ const ATTACK_TYPES = {
     // AoE / Splash
     splashRadius: 0,       // No splash by default
     splashDmgFalloff: 0,   // Damage reduction per pixel from center (%)
+    splashCanCrit: false,  // Can splash damage crit? (unlockable via cards)
     
     // Special mechanics
     chainCount: 0,         // Number of chain targets
@@ -101,6 +102,7 @@ const ATTACK_TYPES = {
     // AoE / Splash
     splashRadius: 60,      // 60px splash radius
     splashDmgFalloff: 0.5, // 50% damage at edge
+    splashCanCrit: false,  // Can splash damage crit? (unlockable via cards)
     
     // Special mechanics
     chainCount: 0,

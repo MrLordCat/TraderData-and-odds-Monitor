@@ -4,6 +4,26 @@
  */
 
 const { TOWER_LEVEL_CONFIG, calculateTowerLevel } = require('../../core/tower-upgrades');
+const { calculateLightningChargeDamage, calculateLightningChargeCost, ELEMENT_ABILITIES } = require('../../core/element-abilities');
+const { 
+  getBiomeData, 
+  formatBiomeBonuses,
+  hasPenalty
+} = require('./utils/biome-helpers');
+const { 
+  formatPercent, 
+  formatNumber, 
+  formatInt, 
+  capitalize 
+} = require('./utils/format-helpers');
+const { 
+  createDetailBuilder,
+  buildStatDetail,
+  buildCritDetail
+} = require('./utils/stat-detail-builder');
+const { 
+  positionTowerTooltip 
+} = require('./utils/tooltip-position');
 
 const ATTACK_TYPE_EMOJIS = {
   base: '⚪',
@@ -59,6 +79,14 @@ function TowerTooltipMixin(Base) {
         el.btnUpgrade.classList.remove('active');
       }
       
+      // Hide abilities panel when switching towers
+      if (el.tooltipAbilitiesSection) {
+        el.tooltipAbilitiesSection.style.display = 'none';
+      }
+      if (el.btnAbilities) {
+        el.btnAbilities.classList.remove('active');
+      }
+      
       // Refresh all tooltip data
       this.refreshTooltipData(tower);
       
@@ -93,10 +121,9 @@ function TowerTooltipMixin(Base) {
       if (el.tooltipName) {
         let name = 'Base Tower';
         if (tower.attackTypeId && tower.attackTypeId !== 'base') {
-          name = tower.attackTypeId.charAt(0).toUpperCase() + tower.attackTypeId.slice(1);
+          name = capitalize(tower.attackTypeId);
           if (tower.elementPath) {
-            const elemName = tower.elementPath.charAt(0).toUpperCase() + tower.elementPath.slice(1);
-            name = `${elemName} ${name}`;
+            name = `${capitalize(tower.elementPath)} ${name}`;
           }
           name += ' Tower';
         }
@@ -114,7 +141,7 @@ function TowerTooltipMixin(Base) {
       // Update attack type display
       if (el.tooltipAttackType) {
         const attackEmoji = ATTACK_TYPE_EMOJIS[tower.attackTypeId] || '⚪';
-        const attackName = tower.attackTypeId?.charAt(0).toUpperCase() + tower.attackTypeId?.slice(1) || 'Base';
+        const attackName = capitalize(tower.attackTypeId) || 'Base';
         el.tooltipAttackType.textContent = `${attackEmoji} ${attackName}`;
       }
       
@@ -122,47 +149,29 @@ function TowerTooltipMixin(Base) {
       if (el.tooltipElement) {
         if (tower.elementPath) {
           const elemEmoji = ELEMENT_EMOJIS[tower.elementPath] || '';
-          const elemName = tower.elementPath.charAt(0).toUpperCase() + tower.elementPath.slice(1);
-          el.tooltipElement.textContent = `${elemEmoji} ${elemName}`;
+          el.tooltipElement.textContent = `${elemEmoji} ${capitalize(tower.elementPath)}`;
         } else {
           el.tooltipElement.textContent = '—';
         }
       }
       
-      // Update Biome Section - show icons only, names on hover, detailed popup
+      // Update Biome Section - using centralized biome helpers
       if (el.towerBiomeSection) {
         const biomeType = tower.biomeType || tower.terrainType || 'default';
         const dmgMod = tower.terrainDamageBonus || tower.terrainBonus || 1;
         const rngMod = tower.terrainRangeBonus || 1;
-        const nearbyBiomes = tower.nearbyBiomes || [];
         const breakdown = tower.biomeBreakdown;
         
-        // Always show biome section
         el.towerBiomeSection.style.display = 'flex';
         
-        // Biome icons and names
-        const biomeData = {
-          'forest': { icon: '🌲', name: 'Forest' },
-          'mountains': { icon: '⛰️', name: 'Mountains' },
-          'desert': { icon: '🏜️', name: 'Desert' },
-          'water': { icon: '🌊', name: 'Water' },
-          'swamp': { icon: '🌿', name: 'Swamp' },
-          'tundra': { icon: '❄️', name: 'Tundra' },
-          'plains': { icon: '🌾', name: 'Plains' },
-          'elevated': { icon: '🏔️', name: 'Elevated' },
-          'burned': { icon: '🔥', name: 'Burned' },
-          'default': { icon: '🗺️', name: 'Unknown' }
-        };
-        
-        // Build icons - show main + borders with actual effects
-        const mainBiome = biomeData[biomeType] || biomeData['default'];
+        // Build icons using helper
+        const mainBiome = getBiomeData(biomeType);
         let iconsText = mainBiome.icon;
         let titleText = mainBiome.name;
         
-        // Only show border biomes that have actual effects (from breakdown)
-        if (breakdown && breakdown.borders && breakdown.borders.length > 0) {
+        if (breakdown?.borders?.length > 0) {
           for (const border of breakdown.borders) {
-            const nbData = biomeData[border.biome] || biomeData['default'];
+            const nbData = getBiomeData(border.biome);
             iconsText += nbData.icon;
             titleText += ` + ${border.name}`;
           }
@@ -173,21 +182,13 @@ function TowerTooltipMixin(Base) {
           el.towerBiomeIcons.title = titleText;
         }
         
-        // Show all biome bonuses (DMG and RNG)
+        // Show bonuses using helper
         if (el.towerBiomeBonus) {
-          const bonuses = [];
-          if (dmgMod !== 1) {
-            const dmgPct = Math.round((dmgMod - 1) * 100);
-            bonuses.push(`${dmgPct >= 0 ? '+' : ''}${dmgPct}% DMG`);
-          }
-          if (rngMod !== 1) {
-            const rngPct = Math.round((rngMod - 1) * 100);
-            bonuses.push(`${rngPct >= 0 ? '+' : ''}${rngPct}% RNG`);
-          }
+          const bonuses = formatBiomeBonuses({ towerDamage: dmgMod, towerRange: rngMod });
           
           if (bonuses.length > 0) {
             el.towerBiomeBonus.textContent = bonuses.join(', ');
-            el.towerBiomeBonus.classList.toggle('penalty', (dmgMod < 1 || rngMod < 1));
+            el.towerBiomeBonus.classList.toggle('penalty', hasPenalty(bonuses));
           } else {
             el.towerBiomeBonus.textContent = '—';
             el.towerBiomeBonus.classList.remove('penalty');
@@ -196,7 +197,7 @@ function TowerTooltipMixin(Base) {
         
         // Build detailed biome popup
         if (el.detailBiome) {
-          el.detailBiome.innerHTML = this.buildBiomeDetailPopup(tower, biomeData);
+          el.detailBiome.innerHTML = this.buildBiomeDetailPopup(tower);
         }
       }
       
@@ -218,63 +219,92 @@ function TowerTooltipMixin(Base) {
       const dmgBiomeBonus = tower.terrainDamageBonus || tower.terrainBonus || 1;
       const rngBiomeBonus = tower.terrainRangeBonus || 1;
       
+      // Get Lightning charge multiplier if applicable
+      let lightningChargeMult = 1;
+      if (tower.elementPath === 'lightning' && tower.lightningChargeEnabled) {
+        const chargeConfig = tower.elementAbilities?.charge || ELEMENT_ABILITIES.lightning?.charge || {
+          damageExponent: 2.0,
+          costExponent: 2.5,
+          baseCost: 20
+        };
+        const chargeTarget = tower.lightningChargeTarget || 50;
+        lightningChargeMult = calculateLightningChargeDamage(chargeTarget, chargeConfig);
+      }
+      
       // ============ DAMAGE ============
       const baseDmg = tower.baseDamage || 10;
-      const leveledDmg = baseDmg * levelBonus;
-      const afterTypeDmg = leveledDmg * attackType.dmgMod;
-      const upgradeBonus = upgrades.damage ? upgrades.damage * 0.05 : 0;
-      const finalDmg = afterTypeDmg * (1 + upgradeBonus);
-      
-      if (el.tooltipDmg) el.tooltipDmg.textContent = Math.floor(tower.damage || finalDmg);
+      const effectiveDmg = lightningChargeMult > 1 ? Math.floor((tower.damage || 0) * lightningChargeMult) : (tower.damage || 0);
+      if (el.tooltipDmg) el.tooltipDmg.textContent = formatInt(effectiveDmg);
       const detailDmg = document.getElementById('detail-dmg');
       if (detailDmg) {
-        detailDmg.innerHTML = this.buildDetailPopup('DMG', baseDmg, level, attackType.dmgMod, upgrades.damage, tower.damage, false, 0.05, dmgBiomeBonus);
+        const builder = createDetailBuilder()
+          .base('Base:', formatInt(baseDmg))
+          .level(level, Math.round((levelBonus - 1) * 100), formatInt(baseDmg * levelBonus))
+          .type('Type', attackType.dmgMod, formatInt(baseDmg * levelBonus * attackType.dmgMod));
+        
+        if (upgrades.damage) {
+          const upgradePct = upgrades.damage * 5;
+          builder.upgrade(upgrades.damage, upgradePct, formatInt(tower.damage));
+        }
+        
+        if (dmgBiomeBonus !== 1) {
+          builder.biome('', dmgBiomeBonus, formatInt(tower.damage));
+        }
+        
+        // Lightning charge multiplier
+        if (lightningChargeMult > 1) {
+          const chargeTarget = tower.lightningChargeTarget || 50;
+          builder.line(`⚡ Charge ${chargeTarget}% (×${lightningChargeMult.toFixed(2)}):`, formatInt(effectiveDmg), 'detail-upgrade bonus');
+        }
+        
+        builder.final(formatInt(effectiveDmg))
+          .formula(lightningChargeMult > 1 ? 'Base×Lvl×Type×Upg×Biome×Charge' : '(Base × Lvl%) × Type × Upg%');
+        
+        detailDmg.innerHTML = builder.build();
       }
       
       // ============ RANGE ============
       const baseRng = tower.baseRange || 70;
-      if (el.tooltipRng) el.tooltipRng.textContent = Math.floor(tower.range || 0);
+      if (el.tooltipRng) el.tooltipRng.textContent = formatInt(tower.range || 0);
       const detailRng = document.getElementById('detail-rng');
       if (detailRng) {
-        detailRng.innerHTML = this.buildDetailPopup('RNG', baseRng, level, attackType.rangeMod, upgrades.range, tower.range, false, 0.05, rngBiomeBonus);
+        detailRng.innerHTML = buildStatDetail({
+          baseValue: baseRng, level, typeMod: attackType.rangeMod,
+          upgradeLevel: upgrades.range, upgradePercent: 0.05,
+          finalValue: tower.range, biomeBonus: rngBiomeBonus
+        });
       }
       
       // ============ SPEED ============
       const baseSpd = tower.baseFireRate || 1;
-      if (el.tooltipSpd) el.tooltipSpd.textContent = (tower.fireRate || 1).toFixed(1);
+      if (el.tooltipSpd) el.tooltipSpd.textContent = formatNumber(tower.fireRate || 1, 1);
       const detailSpd = document.getElementById('detail-spd');
       if (detailSpd) {
-        detailSpd.innerHTML = this.buildDetailPopup('SPD', baseSpd, level, attackType.atkSpdMod, upgrades.attackSpeed, tower.fireRate, true, 0.04);
+        detailSpd.innerHTML = buildStatDetail({
+          baseValue: baseSpd, level, typeMod: attackType.atkSpdMod,
+          upgradeLevel: upgrades.attackSpeed, upgradePercent: 0.04,
+          finalValue: tower.fireRate, isFloat: true
+        });
       }
       
       // ============ CRIT CHANCE ============
-      const baseCrit = (attackType.critChance || tower.baseCritChance || 0.05) * 100;
+      const baseCrit = attackType.critChance || tower.baseCritChance || 0.05;
       const critUpgrades = upgrades.critChance || 0;
       const finalCrit = tower.critChance || 0.05;
       if (el.tooltipCrit) el.tooltipCrit.textContent = `${Math.round(finalCrit * 100)}%`;
       const detailCrit = document.getElementById('detail-crit');
       if (detailCrit) {
-        detailCrit.innerHTML = `
-          <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${baseCrit.toFixed(0)}%</span></div>
-          <div class="detail-line"><span class="detail-label">Upgrades (+${critUpgrades}%):</span><span class="detail-upgrade">+${critUpgrades}%</span></div>
-          <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.round(finalCrit * 100)}%</span></div>
-          <div class="detail-formula">Base + Upgrades (cap 75%)</div>
-        `;
+        detailCrit.innerHTML = buildCritDetail({ baseCrit, upgradeLevel: critUpgrades, finalCrit, isCritDamage: false });
       }
       
       // ============ CRIT DAMAGE ============
-      const baseCritDmg = (attackType.critDmgMod || tower.baseCritDmgMod || 1.5) * 100;
+      const baseCritDmg = attackType.critDmgMod || tower.baseCritDmgMod || 1.5;
       const critDmgUpgrades = upgrades.critDamage || 0;
       const finalCritDmg = tower.critDmgMod || 1.5;
       if (el.tooltipCritdmg) el.tooltipCritdmg.textContent = `${Math.round(finalCritDmg * 100)}%`;
       const detailCritDmg = document.getElementById('detail-critdmg');
       if (detailCritDmg) {
-        detailCritDmg.innerHTML = `
-          <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${baseCritDmg.toFixed(0)}%</span></div>
-          <div class="detail-line"><span class="detail-label">Upgrades (+${critDmgUpgrades * 10}%):</span><span class="detail-upgrade">+${critDmgUpgrades * 10}%</span></div>
-          <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.round(finalCritDmg * 100)}%</span></div>
-          <div class="detail-formula">Base + (Lv × 10%)</div>
-        `;
+        detailCritDmg.innerHTML = buildCritDetail({ baseCrit: baseCritDmg, upgradeLevel: critDmgUpgrades, finalCrit: finalCritDmg, isCritDamage: true });
       }
       
       // ============ SPLASH ============
@@ -282,18 +312,18 @@ function TowerTooltipMixin(Base) {
       if (el.tooltipSplashRow && el.tooltipSplash) {
         if (tower.splashRadius && tower.splashRadius > 0) {
           el.tooltipSplashRow.style.display = '';
-          el.tooltipSplash.textContent = Math.floor(tower.splashRadius);
+          el.tooltipSplash.textContent = formatInt(tower.splashRadius);
           const detailSplash = document.getElementById('detail-splash');
           if (detailSplash) {
             const baseSplash = attackType.splashRadius || 0;
             const splashUpgLv = upgrades.splashRadius || 0;
-            const splashUpgBonus = splashUpgLv * 0.08;
-            detailSplash.innerHTML = `
-              <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${Math.floor(baseSplash)}</span></div>
-              <div class="detail-line"><span class="detail-label">Upgrades Lv.${splashUpgLv} (+${(splashUpgBonus * 100).toFixed(0)}%):</span><span class="detail-upgrade">${Math.floor(baseSplash * (1 + splashUpgBonus))}</span></div>
-              <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.floor(tower.splashRadius)}</span></div>
-              <div class="detail-formula">Base × Upg% (no level bonus)</div>
-            `;
+            const splashUpgPct = splashUpgLv * 8;
+            detailSplash.innerHTML = createDetailBuilder()
+              .base('Base:', formatInt(baseSplash))
+              .upgrade(splashUpgLv, splashUpgPct, formatInt(baseSplash * (1 + splashUpgLv * 0.08)))
+              .final(formatInt(tower.splashRadius))
+              .formula('Base × Upg% (no level bonus)')
+              .build();
           }
         } else {
           el.tooltipSplashRow.style.display = 'none';
@@ -304,23 +334,24 @@ function TowerTooltipMixin(Base) {
       const baseHp = tower.baseHp || 100;
       const hpMult = tower.hpMultiplier || 1;
       if (el.tooltipHp) {
-        el.tooltipHp.textContent = `${Math.floor(tower.currentHp || 0)}/${Math.floor(tower.maxHp || 100)}`;
+        el.tooltipHp.textContent = `${formatInt(tower.currentHp || 0)}/${formatInt(tower.maxHp || 100)}`;
       }
       const detailHp = document.getElementById('detail-hp');
       if (detailHp) {
-        const hpUpgradeBonus = upgrades.hp ? upgrades.hp * 0.08 : 0;
-        detailHp.innerHTML = `
-          <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${baseHp}</span></div>
-          <div class="detail-line"><span class="detail-label">HP Multi:</span><span class="detail-value">×${hpMult.toFixed(1)}</span></div>
-          <div class="detail-line"><span class="detail-label">Level ${level} (+${((levelBonus-1)*100).toFixed(0)}%):</span><span class="detail-level">×${levelBonus.toFixed(2)}</span></div>
-          <div class="detail-line"><span class="detail-label">Upgrades Lv.${upgrades.hp||0} (+${(hpUpgradeBonus*100).toFixed(0)}%):</span><span class="detail-upgrade">×${(1+hpUpgradeBonus).toFixed(2)}</span></div>
-          <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.floor(tower.maxHp)}</span></div>
-        `;
+        const hpUpgLv = upgrades.hp || 0;
+        const hpUpgPct = hpUpgLv * 8;
+        detailHp.innerHTML = createDetailBuilder()
+          .base('Base:', formatInt(baseHp))
+          .line('HP Multi:', `×${formatNumber(hpMult, 1)}`, 'detail-value')
+          .level(level, Math.round((levelBonus - 1) * 100), `×${formatNumber(levelBonus, 2)}`)
+          .upgrade(hpUpgLv, hpUpgPct, `×${formatNumber(1 + hpUpgLv * 0.08, 2)}`)
+          .final(formatInt(tower.maxHp))
+          .build();
       }
       
       // ============ ENERGY ============
-      const current = Math.floor(tower.currentEnergy || 0);
-      const max = Math.floor(tower.maxEnergy || 100);
+      const current = formatInt(tower.currentEnergy || 0);
+      const max = formatInt(tower.maxEnergy || 100);
       if (el.tooltipEnergy) {
         el.tooltipEnergy.textContent = `${current}/${max}`;
       }
@@ -328,88 +359,79 @@ function TowerTooltipMixin(Base) {
       if (detailEnergy) {
         const energyCost = tower.energyCost || 5;
         const baseEnergyCost = tower.baseEnergyCost || 5;
-        const effUpgrades = upgrades.energyEfficiency || 0;
-        detailEnergy.innerHTML = `
-          <div class="detail-line"><span class="detail-label">Current:</span><span class="detail-value">${current}/${max}</span></div>
-          <div class="detail-line"><span class="detail-label">Cost/shot:</span><span class="detail-base">${energyCost.toFixed(1)}</span></div>
-          <div class="detail-line"><span class="detail-label">Base cost:</span><span class="detail-base">${baseEnergyCost}</span></div>
-          <div class="detail-line"><span class="detail-label">Efficiency Lv.${effUpgrades} (-${(effUpgrades*3)}%):</span><span class="detail-upgrade">${effUpgrades > 0 ? '-' + (effUpgrades*3) + '%' : '—'}</span></div>
-        `;
+        const effUpgLv = upgrades.energyEfficiency || 0;
+        const builder = createDetailBuilder()
+          .line('Current:', `${current}/${max}`, 'detail-value')
+          .base('Cost/shot:', formatNumber(energyCost, 1))
+          .base('Base cost:', formatInt(baseEnergyCost));
+        if (effUpgLv > 0) {
+          builder.line(`Efficiency Lv.${effUpgLv} (-${effUpgLv * 3}%):`, `-${effUpgLv * 3}%`, 'detail-upgrade');
+        }
+        detailEnergy.innerHTML = builder.build();
       }
       
-      // ============ POWER HIT COST (NEW) ============
-      // Formula: damage * 0.5 * powerHitCostMod * (1 + level%) * (1 - powerEfficiency%)
-      const energyCostPerShot = tower.energyCostPerShot || 5;
+      // ============ POWER HIT COST ============
+      // For Lightning with charge: uses calculateLightningChargeCost
+      // For others: damage * 0.5 * powerHitCostMod * (1 + level%) * (1 - powerEfficiency%)
+      let effectivePowerCost = tower.energyCostPerShot || 5;
       const powerHitCostMod = tower.powerHitCostMod || 1;
       const basePowerCost = tower.basePowerCost || (tower.damage * 0.5);
       const powerEffLvl = upgrades.powerEfficiency || 0;
       
+      // Lightning charge cost override
+      let lightningChargeCost = 0;
+      if (tower.elementPath === 'lightning' && tower.lightningChargeEnabled && lightningChargeMult > 1) {
+        const chargeConfig = tower.elementAbilities?.charge || ELEMENT_ABILITIES.lightning?.charge || {
+          baseCost: 20,
+          costExponent: 2.5
+        };
+        const chargeTarget = tower.lightningChargeTarget || 50;
+        lightningChargeCost = calculateLightningChargeCost(chargeTarget, chargeConfig);
+        effectivePowerCost = lightningChargeCost;
+      }
+      
       if (el.tooltipPowerCost) {
-        el.tooltipPowerCost.textContent = Math.round(energyCostPerShot);
+        el.tooltipPowerCost.textContent = Math.round(effectivePowerCost);
       }
       const detailPowerCost = document.getElementById('detail-powercost');
       if (detailPowerCost) {
         const levelCostBonus = 1 + (level - 1) * 0.01;
-        const powerEffReduction = Math.min(0.8, powerEffLvl * 0.03); // 3% per level, max 80%
+        const powerEffReduction = Math.min(0.8, powerEffLvl * 0.03);
+        const attackTypeName = capitalize(tower.attackTypeId || 'base');
         
-        // Attack type names for display
-        const attackTypeName = (tower.attackTypeId || 'base').charAt(0).toUpperCase() + (tower.attackTypeId || 'base').slice(1);
-        
-        detailPowerCost.innerHTML = `
-          <div class="detail-line"><span class="detail-label">Base (50% of DMG):</span><span class="detail-base">${Math.round(basePowerCost)}</span></div>
-          <div class="detail-line"><span class="detail-label">Level ${level} (+${((levelCostBonus-1)*100).toFixed(0)}%):</span><span class="detail-level">×${levelCostBonus.toFixed(2)}</span></div>
-          <div class="detail-line"><span class="detail-label">${attackTypeName} (×${powerHitCostMod.toFixed(1)}):</span><span class="detail-value ${powerHitCostMod > 1 ? 'penalty' : 'bonus'}">${powerHitCostMod > 1 ? '+' : ''}${Math.round((powerHitCostMod-1)*100)}%</span></div>
-          ${powerEffLvl > 0 ? `<div class="detail-line"><span class="detail-label">⚡ Power Eff Lv.${powerEffLvl} (-${(powerEffReduction*100).toFixed(0)}%):</span><span class="detail-upgrade bonus">-${(powerEffReduction*100).toFixed(0)}%</span></div>` : ''}
-          <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.round(energyCostPerShot)}</span></div>
-          <div class="detail-formula">DMG×0.5×Lvl%×TypeMod×Eff%</div>
-        `;
+        if (lightningChargeCost > 0) {
+          // Lightning charge cost display
+          const chargeTarget = tower.lightningChargeTarget || 50;
+          detailPowerCost.innerHTML = createDetailBuilder()
+            .line('⚡ Charge Mode:', `${chargeTarget}%`, 'detail-value')
+            .line('Base Cost:', formatInt(20), 'detail-base')
+            .line(`Charge ${chargeTarget}%:`, formatInt(lightningChargeCost), 'detail-upgrade')
+            .final(formatInt(lightningChargeCost))
+            .formula(`Cost = Base × (1 + ${chargeTarget}%)^2.5`)
+            .build();
+        } else {
+          // Normal power cost display
+          detailPowerCost.innerHTML = `
+            <div class="detail-line"><span class="detail-label">Base (50% of DMG):</span><span class="detail-base">${Math.round(basePowerCost)}</span></div>
+            <div class="detail-line"><span class="detail-label">Level ${level} (+${((levelCostBonus-1)*100).toFixed(0)}%):</span><span class="detail-level">×${levelCostBonus.toFixed(2)}</span></div>
+            <div class="detail-line"><span class="detail-label">${attackTypeName} (×${powerHitCostMod.toFixed(1)}):</span><span class="detail-value ${powerHitCostMod > 1 ? 'penalty' : 'bonus'}">${powerHitCostMod > 1 ? '+' : ''}${Math.round((powerHitCostMod-1)*100)}%</span></div>
+            ${powerEffLvl > 0 ? `<div class="detail-line"><span class="detail-label">⚡ Power Eff Lv.${powerEffLvl} (-${(powerEffReduction*100).toFixed(0)}%):</span><span class="detail-upgrade bonus">-${(powerEffReduction*100).toFixed(0)}%</span></div>` : ''}
+            <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${Math.round(effectivePowerCost)}</span></div>
+            <div class="detail-formula">DMG×0.5×Lvl%×TypeMod×Eff%</div>
+          `;
+        }
       }
-    }
-    
-    /**
-     * Build detail popup HTML for percentage-based stats
-     */
-    buildDetailPopup(statName, baseValue, level, typeMod, upgradeLevel, finalValue, isFloat = false, upgradePercent = 0.05, biomeBonus = 1) {
-      const levelBonus = 1 + (level - 1) * 0.01;
-      const levelPercent = ((levelBonus - 1) * 100).toFixed(0);
-      const afterLevel = baseValue * levelBonus;
-      const afterType = afterLevel * typeMod;
-      const upgradeLv = upgradeLevel || 0;
-      const upgradeBonus = upgradeLv * upgradePercent;
-      const upgradePct = (upgradeBonus * 100).toFixed(0);
-      const afterUpgrade = afterType * (1 + upgradeBonus);
-      const afterBiome = afterUpgrade * biomeBonus;
-      
-      const formatVal = (v) => isFloat ? v.toFixed(2) : Math.floor(v);
-      
-      // Build biome line if there's a bonus
-      let biomeLine = '';
-      if (biomeBonus !== 1) {
-        const biomePct = Math.round((biomeBonus - 1) * 100);
-        const biomeSign = biomePct >= 0 ? '+' : '';
-        biomeLine = `<div class="detail-line"><span class="detail-label">Biome (${biomeSign}${biomePct}%):</span><span class="detail-biome">${formatVal(afterBiome)}</span></div>`;
-      }
-      
-      return `
-        <div class="detail-line"><span class="detail-label">Base:</span><span class="detail-base">${formatVal(baseValue)}</span></div>
-        <div class="detail-line"><span class="detail-label">Level ${level} (+${levelPercent}%):</span><span class="detail-level">${formatVal(afterLevel)}</span></div>
-        <div class="detail-line"><span class="detail-label">Type (×${typeMod.toFixed(2)}):</span><span class="detail-value">${formatVal(afterType)}</span></div>
-        <div class="detail-line"><span class="detail-label">Upgrades Lv.${upgradeLv} (+${upgradePct}%):</span><span class="detail-upgrade">${formatVal(afterUpgrade)}</span></div>
-        ${biomeLine}
-        <div class="detail-line"><span class="detail-label">Final:</span><span class="detail-final">${formatVal(finalValue || afterBiome)}</span></div>
-        <div class="detail-formula">(Base × Lvl%) × Type × Upg%${biomeBonus !== 1 ? ' × Biome' : ''}</div>
-      `;
     }
     
     /**
      * Build detailed biome breakdown popup
      */
-    buildBiomeDetailPopup(tower, biomeData) {
+    buildBiomeDetailPopup(tower) {
       const breakdown = tower.biomeBreakdown;
       const dmgMod = tower.terrainDamageBonus || 1;
       const rngMod = tower.terrainRangeBonus || 1;
       
-      let html = `<div class="detail-header">Biome Effects</div>`;
+      const builder = createDetailBuilder().header('Biome Effects');
       
       if (breakdown) {
         // Show base biome with its modifiers
@@ -417,17 +439,16 @@ function TowerTooltipMixin(Base) {
         const baseDmg = base.modifiers.towerDamage || 1;
         const baseRng = base.modifiers.towerRange || 1;
         
-        html += `<div class="detail-line"><span class="detail-label">${base.emoji} ${base.name}:</span></div>`;
+        builder.line(`${base.emoji} ${base.name}:`, '', 'detail-label');
+        
         if (baseDmg !== 1) {
-          const pct = Math.round((baseDmg - 1) * 100);
-          html += `<div class="detail-line" style="padding-left:12px"><span class="detail-label">DMG:</span><span class="detail-value">${pct >= 0 ? '+' : ''}${pct}%</span></div>`;
+          builder.indented('DMG:', formatPercent(baseDmg));
         }
         if (baseRng !== 1) {
-          const pct = Math.round((baseRng - 1) * 100);
-          html += `<div class="detail-line" style="padding-left:12px"><span class="detail-label">RNG:</span><span class="detail-value">${pct >= 0 ? '+' : ''}${pct}%</span></div>`;
+          builder.indented('RNG:', formatPercent(baseRng));
         }
         if (baseDmg === 1 && baseRng === 1) {
-          html += `<div class="detail-line" style="padding-left:12px;color:#718096">No modifiers</div>`;
+          builder.lines.push('<div class="detail-line" style="padding-left:12px;color:#718096">No modifiers</div>');
         }
         
         // Show border effects
@@ -435,44 +456,40 @@ function TowerTooltipMixin(Base) {
           const borderDmg = border.modifiers.towerDamage;
           const borderRng = border.modifiers.towerRange;
           
-          html += `<div class="detail-line"><span class="detail-label">${border.emoji} ${border.name}:</span></div>`;
+          builder.line(`${border.emoji} ${border.name}:`, '', 'detail-label');
+          
           if (borderDmg !== undefined && borderDmg !== 1) {
-            const pct = Math.round((borderDmg - 1) * 100);
-            html += `<div class="detail-line" style="padding-left:12px"><span class="detail-label">DMG:</span><span class="detail-value">${pct >= 0 ? '+' : ''}${pct}%</span></div>`;
+            builder.indented('DMG:', formatPercent(borderDmg));
           }
           if (borderRng !== undefined && borderRng !== 1) {
-            const pct = Math.round((borderRng - 1) * 100);
-            html += `<div class="detail-line" style="padding-left:12px"><span class="detail-label">RNG:</span><span class="detail-value">${pct >= 0 ? '+' : ''}${pct}%</span></div>`;
+            builder.indented('RNG:', formatPercent(borderRng));
           }
           if ((!borderDmg || borderDmg === 1) && (!borderRng || borderRng === 1)) {
-            html += `<div class="detail-line" style="padding-left:12px;color:#718096">No modifiers</div>`;
+            builder.lines.push('<div class="detail-line" style="padding-left:12px;color:#718096">No modifiers</div>');
           }
         }
       } else {
         // Fallback to simple view
         const biomeType = tower.biomeType || 'default';
-        const mainBiome = biomeData[biomeType] || biomeData['default'];
-        html += `<div class="detail-line"><span class="detail-label">${mainBiome.icon} ${mainBiome.name}</span></div>`;
+        const mainBiome = getBiomeData(biomeType);
+        builder.line(`${mainBiome.icon} ${mainBiome.name}`, '', 'detail-label');
       }
       
       // Final totals
-      html += `<div class="detail-separator"></div>`;
-      html += `<div class="detail-line"><span class="detail-label">Final:</span></div>`;
+      builder.separator().line('Final:', '', 'detail-label');
       
       if (dmgMod !== 1) {
-        const dmgPct = Math.round((dmgMod - 1) * 100);
-        html += `<div class="detail-line" style="padding-left:12px"><span class="detail-label">⚔️ DMG:</span><span class="detail-final">${dmgPct >= 0 ? '+' : ''}${dmgPct}%</span></div>`;
+        builder.indented('⚔️ DMG:', formatPercent(dmgMod), 'detail-final');
       }
       if (rngMod !== 1) {
-        const rngPct = Math.round((rngMod - 1) * 100);
-        html += `<div class="detail-line" style="padding-left:12px"><span class="detail-label">📏 RNG:</span><span class="detail-final">${rngPct >= 0 ? '+' : ''}${rngPct}%</span></div>`;
+        builder.indented('📏 RNG:', formatPercent(rngMod), 'detail-final');
       }
       
       if (dmgMod === 1 && rngMod === 1) {
-        html += `<div class="detail-line" style="padding-left:12px;color:#718096">No bonuses</div>`;
+        builder.lines.push('<div class="detail-line" style="padding-left:12px;color:#718096">No bonuses</div>');
       }
       
-      return html;
+      return builder.build();
     }
 
     /**
@@ -494,45 +511,14 @@ function TowerTooltipMixin(Base) {
       const el = this.elements;
       if (!el.towerTooltip || !this.camera || !this.canvas) return;
       
-      const GRID = this.CONFIG.GRID_SIZE;
-      
-      // Get tower center in world coords
-      const towerWorldX = (tower.gridX + 0.5) * GRID;
-      const towerWorldY = tower.gridY * GRID;
-      
-      // Convert to screen coords
-      const screenPos = this.camera.worldToScreen(towerWorldX, towerWorldY);
-      
-      // Get canvas and tooltip dimensions
-      const canvasRect = this.canvas.getBoundingClientRect();
-      const tooltipRect = el.towerTooltip.getBoundingClientRect();
-      const tooltipWidth = tooltipRect.width || 200;
-      const tooltipHeight = tooltipRect.height || 300;
-      
-      // Calculate position (above the tower by default)
-      let left = screenPos.x - tooltipWidth / 2;
-      let top = screenPos.y - tooltipHeight - 20; // 20px gap above tower
-      
-      // Clamp to canvas bounds
-      const padding = 10;
-      
-      // Horizontal bounds
-      if (left < padding) left = padding;
-      if (left + tooltipWidth > canvasRect.width - padding) {
-        left = canvasRect.width - tooltipWidth - padding;
-      }
-      
-      // Vertical bounds - if tooltip doesn't fit above, show below
-      if (top < padding) {
-        top = screenPos.y + GRID * this.camera.scale + 10;
-      }
-      if (top + tooltipHeight > canvasRect.height - padding) {
-        top = canvasRect.height - tooltipHeight - padding;
-      }
-      
-      // Apply position
-      el.towerTooltip.style.left = `${left}px`;
-      el.towerTooltip.style.top = `${top}px`;
+      // Use centralized positioning utility
+      positionTowerTooltip({
+        tooltip: el.towerTooltip,
+        tower,
+        camera: this.camera,
+        canvas: this.canvas,
+        gridSize: this.CONFIG.GRID_SIZE
+      });
     }
 
     /**
@@ -550,6 +536,11 @@ function TowerTooltipMixin(Base) {
       if (el.tooltipElementSection) {
         const showElement = tower.attackTypeId !== 'base' && !tower.elementPath;
         el.tooltipElementSection.style.display = showElement ? 'block' : 'none';
+      }
+      
+      // Update abilities button visibility
+      if (this.updateAbilitiesButtonVisibility) {
+        this.updateAbilitiesButtonVisibility(tower);
       }
       
       // Update button states

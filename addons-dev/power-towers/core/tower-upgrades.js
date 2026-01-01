@@ -327,6 +327,74 @@ function applyAbilityUpgrade(tower, abilityId) {
 }
 
 /**
+ * Apply element ability upgrade to tower (NEW system)
+ * @param {Object} tower - Tower instance
+ * @param {string} upgradeId - Ability upgrade ID (e.g., 'burn_damage', 'spread_chance')
+ * @returns {boolean} Success
+ */
+function applyElementAbilityUpgrade(tower, upgradeId) {
+  const elementPath = tower.elementPath;
+  if (!elementPath) return false;
+  
+  try {
+    const { ELEMENT_ABILITIES, getElementAbilities, getAbilityUpgradeCost: getElemAbilityCost } = require('./element-abilities');
+    
+    const elementConfig = ELEMENT_ABILITIES[elementPath];
+    if (!elementConfig || !elementConfig.upgrades || !elementConfig.upgrades[upgradeId]) {
+      return false;
+    }
+    
+    const upgrade = elementConfig.upgrades[upgradeId];
+    
+    // Initialize tracking
+    if (!tower.abilityUpgrades) tower.abilityUpgrades = {};
+    
+    const currentLevel = tower.abilityUpgrades[upgradeId] || 0;
+    
+    // Check max level
+    if (currentLevel >= upgrade.maxLevel) return false;
+    
+    // Increment level
+    tower.abilityUpgrades[upgradeId] = currentLevel + 1;
+    
+    // Recalculate element abilities with new upgrades
+    tower.elementAbilities = getElementAbilities(elementPath, tower.abilityUpgrades);
+    
+    // Add upgrade points
+    addUpgradePoints(tower, 'elementAbility');
+    
+    // Recalculate stats
+    if (tower.recalculateStats) {
+      tower.recalculateStats();
+    }
+    
+    return true;
+  } catch (e) {
+    console.error('Error applying element ability upgrade:', e);
+    return false;
+  }
+}
+
+/**
+ * Get element ability upgrade cost
+ * @param {Object} tower - Tower instance
+ * @param {string} upgradeId - Ability upgrade ID
+ * @returns {number} Cost
+ */
+function getElementAbilityUpgradeCost(tower, upgradeId) {
+  const elementPath = tower.elementPath;
+  if (!elementPath) return Infinity;
+  
+  try {
+    const { getAbilityUpgradeCost: getElemAbilityCost } = require('./element-abilities');
+    const currentLevel = tower.abilityUpgrades?.[upgradeId] || 0;
+    return getElemAbilityCost(elementPath, upgradeId, currentLevel);
+  } catch (e) {
+    return Infinity;
+  }
+}
+
+/**
  * Apply passive effect tier to tower
  * @param {Object} tower - Tower instance
  * @param {string} passiveId - Passive to upgrade
@@ -383,6 +451,21 @@ function applyElementPath(tower, elementId) {
     tower.elementDmgBonus = element.bonuses.dmgBonus || 0;
     tower.elementRangeBonus = element.bonuses.rangeBonus || 0;
     tower.elementAtkSpdBonus = element.bonuses.atkSpdBonus || 0;
+  }
+  
+  // Initialize element abilities (NEW)
+  try {
+    const { getElementAbilities } = require('./element-abilities');
+    tower.elementAbilities = getElementAbilities(elementId, tower.abilityUpgrades || {});
+    
+    // Enable lightning charge for lightning towers
+    if (elementId === 'lightning') {
+      tower.lightningChargeEnabled = true;
+      tower.lightningChargeTarget = 50;
+      tower.lightningCurrentCharge = 0;
+    }
+  } catch (e) {
+    console.warn('Could not load element abilities:', e);
   }
   
   // Add upgrade points
@@ -505,12 +588,14 @@ module.exports = {
   getStatUpgradeCost,
   getAbilityUpgradeCost,
   getPassiveUpgradeCost,
+  getElementAbilityUpgradeCost,  // NEW
   
   // Apply functions
   applyStatUpgrade,
   applyAbilityUpgrade,
   applyPassiveUpgrade,
   applyElementPath,
+  applyElementAbilityUpgrade,    // NEW
   
   // Info functions
   getTowerBuildSummary,
