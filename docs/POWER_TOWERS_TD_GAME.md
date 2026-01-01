@@ -1,6 +1,6 @@
 # Power Towers TD - Roguelike Tower Defense Game
 
-> Inspired by Power Towers TD custom map from Warcraft 3, evolved into a roguelike format.
+> Inspired by Power Towers TD custom map from Warcraft 3, evolved into a roguelike format with **WebGL rendering** and **unified building system**.
 
 ## 🎯 Concept
 
@@ -8,13 +8,17 @@
 A Tower Defense game with a unique **energy system mechanic** — towers require energy to operate, and the player must balance between defense and energy production using various generators.
 
 ### Roguelike Elements
-- **Procedural map generation** — spiral path with 2 loops
+- **Procedural map generation** — spiral path with 2 loops, biome system
 - **Meta-progression** — gems accumulate between runs
 - **Permanent upgrades** — upgrades persist between games
 - **Run-based gameplay** — each run has a beginning and end
 
 ### Art Style
-2D graphics with emoji-based visuals and colored shapes (no sprites yet).
+**WebGL-rendered** 2D graphics with Warcraft 3 inspired visuals:
+- Procedural terrain with biome colors and decorations
+- WC3-style towers with platforms, crystals, and turrets
+- Multi-cell energy buildings (L-shaped, 2x2)
+- Particle effects for attacks and abilities
 
 ---
 
@@ -25,28 +29,28 @@ A Tower Defense game with a unique **energy system mechanic** — towers require
 #### Technical Specifications
 | Property | Value | Notes |
 |----------|-------|-------|
-| **Map Size** | 2000×2000 px | 100×100 grid cells |
-| **Grid Cell** | 20×20 px | Tower/building placement unit |
-| **Viewport** | 400×400 px | Default canvas size |
+| **Map Size** | 2560×1920 px | 80×60 grid cells |
+| **Grid Cell** | 32×32 px | Tower/building placement unit |
+| **Visual Expansion** | 20% | Wall boundary around playable area |
 | **Path Type** | Spiral | 2 loops, tightening toward center |
 
-#### Terrain Types (Implemented)
+#### Biome System (6 types)
 ```
-Terrain Types:
-├── 🟩 grass     - Default, buildable
-├── 🛤️ path      - Enemy route, not buildable
-├── ⛰️ hill      - Range bonus +20%
-├── 🌲 forest    - Damage bonus +15%, range -10%
-├── 💧 water     - Not buildable
-├── ⚡ energy_node - Energy generation bonus
-└── 💎 resource_vein - Gold bonus on kills
+Biome Types:
+├── 🟩 Plains   - Default, balanced
+├── 🌲 Forest   - Damage +15%, green terrain
+├── 🏜️ Desert   - Range +10%, sandy terrain
+├── 💧 Water    - Not buildable, blue terrain
+├── ⛰️ Mountains - Slow enemies +20%
+└── 🔥 Burned   - Dark terrain, fire bonus
 ```
 
 #### Map Generation
 - **Spawn Point**: Edge of map (randomized)
 - **Base Point**: Center of map
 - **Path Algorithm**: Double-loop spiral from edge to center
-- **Terrain**: Noise-based distribution with biome support
+- **Terrain**: Biome-based with procedural noise
+- **20% Visual Expansion**: Visible wall/boundary around playable area
 
 ### Enemy System (Implemented)
 
@@ -110,24 +114,35 @@ Player builds **Base Towers** and upgrades them via:
 #### Architecture
 ```
 ⚡ Energy System
-├── PowerNetwork     - Manages connections
-├── PowerNode        - Base class for all energy entities
-├── Generators       - Produce energy
-├── Storage          - Battery, relay
-└── Consumers        - Towers (via adapter)
+├── PlacementManager  - Unified placement for ALL buildings
+├── PowerNetwork      - Manages connections
+├── PowerNode         - Base class for all energy entities
+├── Generators        - Produce energy
+├── Storage           - Battery, relay
+└── Consumers         - Towers (via adapter)
 ```
 
 #### Energy Buildings
 
-| Building | Icon | Cost | Generation | Notes |
-|----------|------|------|------------|-------|
-| Base Generator | ⚡ | 50g | 5/tick | Stable, no terrain requirement |
-| Bio Generator | 🌳 | 80g | 8/tick | +bonus per nearby tree |
-| Wind Turbine | 💨 | 100g | 12/tick | Needs mountains, unstable |
-| Solar Panel | ☀️ | 90g | 10/tick | Biome-dependent efficiency |
-| Water Generator | 💧 | 120g | 15/tick | Needs water, AoE bonus |
-| Battery | 🔋 | 60g | 0 | Storage: 200, decay 1%/tick |
-| Power Relay | 📡 | 40g | 0 | 2 input, 2 output channels |
+| Building | Icon | Cost | Size | Generation | Notes |
+|----------|------|------|------|------------|-------|
+| Base Generator | ⚡ | 50g | 1×1 | 5/tick | Stable, no terrain requirement |
+| Bio Generator | 🌳 | 80g | **2×2 L-shape** | 8/tick | +bonus per nearby tree |
+| Wind Turbine | 💨 | 100g | 1×1 | 12/tick | Needs mountains, unstable |
+| Solar Panel | ☀️ | 90g | 1×1 | 10/tick | Biome-dependent efficiency |
+| Water Generator | 💧 | 120g | 1×1 | 15/tick | Needs water, AoE bonus |
+| Battery | 🔋 | 60g | **2×2** | 0 | Storage: 200, decay 1%/tick |
+| Power Relay | 📡 | 40g | 1×1 | 0 | 2 input, 2 output channels |
+
+#### Multi-Cell Buildings
+```
+Bio Generator (L-shape 2x2):     Battery (2x2):
+┌───┬───┐                        ┌───┬───┐
+│ █ │   │ ← empty corner         │ █ │ █ │
+├───┼───┤                        ├───┼───┤
+│ █ │ █ │                        │ █ │ █ │
+└───┴───┘                        └───┴───┘
+```
 
 #### Power Network
 - Buildings connect via channels (range-based)
@@ -426,15 +441,18 @@ update(deltaTime) {
 ### File Structure
 ```
 addons-dev/power-towers/
-├── manifest.json              # Version: 0.1.0
+├── manifest.json              # Version: 0.2.0
 ├── index.js                   # Entry point
 │
 ├── core/                      # Core systems
-│   ├── config.js              # Constants (MAP: 2000, GRID: 20)
+│   ├── config.js              # Constants (MAP: 2560×1920, GRID: 32)
 │   ├── event-bus.js           # EventBus for modules
 │   ├── game-core-modular.js   # Main orchestrator
 │   ├── attack-types.js        # Siege/Normal/Magic/Piercing
+│   ├── biomes.js              # Biome definitions
 │   └── tower-upgrades.js      # Upgrade definitions
+│   └── systems/
+│       └── camera.js          # Camera with zoom/pan
 │
 ├── modules/                   # Feature modules
 │   ├── map/                   # Map generation
@@ -443,6 +461,9 @@ addons-dev/power-towers/
 │   │   ├── noise-generator.js # Terrain noise
 │   │   ├── seeded-random.js   # Seeded RNG
 │   │   └── generator-config.js
+│   │
+│   ├── placement/             # 🆕 Unified Placement System
+│   │   └── index.js           # PlacementManager (towers + buildings)
 │   │
 │   ├── towers/                # Tower system
 │   │   ├── index.js           # TowersModule
@@ -464,11 +485,11 @@ addons-dev/power-towers/
 │   ├── energy/                # Energy system ⚡
 │   │   ├── index.js           # EnergyModule
 │   │   ├── power-network.js   # PowerNetwork class
-│   │   ├── power-node.js      # PowerNode base class
+│   │   ├── power-node.js      # PowerNode base (with gridWidth/Height)
 │   │   ├── generators.js      # All generator types
-│   │   ├── storage.js         # Battery, PowerTransfer
-│   │   ├── building-defs.js   # Building configurations
-│   │   ├── building-manager.js # Placement & management
+│   │   ├── storage.js         # Battery (2x2), PowerTransfer
+│   │   ├── building-defs.js   # Building configs (with sizes/shapes)
+│   │   ├── building-manager.js # Uses PlacementManager
 │   │   └── upgrade-system.js  # Building upgrades
 │   │
 │   ├── player/                # Player state
@@ -481,16 +502,51 @@ addons-dev/power-towers/
 │       ├── index.js           # SidebarModule
 │       ├── templates.js       # HTML (toolbar with towers + energy)
 │       ├── styles.js          # CSS
-│       ├── game-controller.js # Main controller
-│       ├── canvas-events.js   # Mouse/keyboard handling
+│       ├── game-controller.js # Main controller (with PlacementManager)
+│       ├── canvas-events.js   # Mouse/keyboard (uses PlacementManager)
 │       ├── game-events.js     # Game event bindings
 │       ├── ui-events.js       # UI button handlers
 │       ├── tower-tooltip.js   # Tower info popup
 │       └── tower-upgrades-ui.js # Upgrade panel
 │
-└── renderer/
-    └── game-renderer.js       # Canvas renderer
+└── renderer/                  # 🆕 WebGL Rendering Engine
+    ├── game-renderer.js       # Main renderer (WC3-style graphics)
+    └── engine/                # WebGL infrastructure
+        ├── index.js           # Engine exports
+        ├── core/
+        │   ├── gl-context.js      # WebGL context wrapper
+        │   ├── shader-manager.js  # GLSL shaders
+        │   └── texture-manager.js # Texture atlas
+        ├── rendering/
+        │   ├── sprite-batch.js    # Batched sprite rendering
+        │   ├── shape-renderer.js  # Circles, rects, lines
+        │   └── particle-system.js # GPU particles
+        └── systems/
+            └── object-pool.js     # Memory optimization
 ```
+
+### Unified Placement System (PlacementManager)
+
+All building placement (towers AND energy buildings) goes through `PlacementManager`:
+
+```javascript
+PlacementManager
+├── canPlace(gridX, gridY, def)      // Universal validation
+├── canPlaceTower(gridX, gridY)      // Tower shortcut
+├── canPlaceEnergy(gridX, gridY, type) // Energy shortcut
+├── getCellsForBuilding(...)         // Calculate cells (1×1, 2×2, L-shape)
+├── getBuildingCenter(...)           // World coordinates
+├── enterPlacementMode(type, id)     // Enter placement mode
+├── exitPlacementMode()              // Exit placement mode
+├── canAffordTower()                 // Check tower cost
+└── canAffordEnergy(type)            // Check building cost
+```
+
+**Benefits:**
+- Single source of truth for all placement logic
+- L-shape calculation in one place (not duplicated)
+- Consistent collision detection for all buildings
+- Cleaner code: 80 lines → 3 lines
 
 ### Module Communication
 
@@ -549,8 +605,43 @@ Camera {
   worldToScreen(wx, wy)  // Grid → canvas coords
   centerOn(x, y)         // Move camera
   zoomBy(factor)         // Zoom in/out
+  pan(dx, dy)            // Move camera by offset
 }
 ```
+
+---
+
+## 🎨 WebGL Rendering Engine
+
+### Architecture
+```
+GameRenderer (WebGL)
+├── GLContext          - WebGL 1/2 initialization
+├── ShaderManager      - GLSL vertex/fragment shaders
+├── TextureManager     - Texture atlas management
+├── SpriteBatch        - Batched sprite rendering (10,000+ per draw)
+├── ShapeRenderer      - Circles, rects, lines, arcs
+└── ParticleSystem     - GPU-accelerated particles
+```
+
+### WC3-Style Graphics
+
+#### Towers
+- **Base platform** with element-colored glow
+- **Central crystal** matching element (Fire=red, Ice=cyan, etc.)
+- **Rotating turret** with element-specific design
+- **Range indicator** on hover/selection
+
+#### Energy Buildings
+- **Bio Generator (L-shape)**: Bio tank, leaves, rotating gear
+- **Battery (2x2)**: 4 cells with lightning bolt, charge indicator
+- **Standard buildings**: Type-specific icons with glow effects
+
+### Performance
+- **Sprite batching**: 10,000+ sprites in single draw call
+- **Object pooling**: Memory-efficient entity management
+- **Dirty flag system**: Only re-render when needed
+- **60 FPS target** with delta-time updates
 
 ---
 
@@ -611,7 +702,8 @@ Camera {
 ### ✅ Implemented
 - [x] Modular architecture with EventBus
 - [x] Map generation with spiral path
-- [x] Terrain types with bonuses
+- [x] **Biome system** (6 biome types with bonuses)
+- [x] **20% map expansion** with wall boundary
 - [x] Single tower system (Base → Attack Type → Element)
 - [x] Tower XP and level system
 - [x] 5 enemy types with wave scaling
@@ -619,9 +711,12 @@ Camera {
 - [x] Damage numbers (floating text)
 - [x] Complete energy system
   - [x] 5 generator types with terrain dependencies
-  - [x] Battery with decay
+  - [x] Battery with decay **(2×2 size)**
+  - [x] **Bio Generator (L-shaped 2×2)**
   - [x] Power relay with multi-channel
   - [x] Tower power integration
+- [x] **Unified PlacementManager** (towers + buildings)
+- [x] **Multi-cell building support** (1×1, 2×2, L-shape)
 - [x] Economy module (gold)
 - [x] Player module (lives, game over)
 - [x] Menu system with permanent upgrades
@@ -629,12 +724,17 @@ Camera {
 - [x] UI toolbar (towers + energy)
 - [x] Tower tooltip with upgrades panel
 - [x] Detachable game window
+- [x] **WebGL rendering engine**
+  - [x] Sprite batching (10,000+)
+  - [x] Shape renderer (circles, rects, lines)
+  - [x] Particle system
+  - [x] WC3-style tower graphics
+  - [x] WC3-style building graphics
 
 ### 🚧 Planned
 - [ ] Card system (every 10 waves)
 - [ ] More enemy types
 - [ ] Boss mechanics
-- [ ] Sprite graphics
 - [ ] Sound effects
 - [ ] Achievement system
 - [ ] Content pack system
@@ -647,24 +747,23 @@ Camera {
 ```javascript
 CONFIG = {
   // Map
-  MAP_WIDTH: 2000,
-  MAP_HEIGHT: 2000,
-  GRID_SIZE: 20,
+  MAP_WIDTH: 2560,      // 80 cells × 32px
+  MAP_HEIGHT: 1920,     // 60 cells × 32px
+  GRID_SIZE: 32,
+  MAP_EXPANSION: 0.2,   // 20% visual expansion
   
   // Display
-  CANVAS_WIDTH: 400,
-  CANVAS_HEIGHT: 400,
   TARGET_FPS: 60,
   
   // Game Balance
-  STARTING_GOLD: 200,
+  STARTING_GOLD: 400,
   STARTING_LIVES: 20,
   STARTING_ENERGY: 50,
   MAX_ENERGY: 100,
   ENERGY_REGEN: 0,  // disabled
   
   // Tower
-  BASE_TOWER_COST: 30,
+  BASE_TOWER_COST: 50,
   TOWER_BASE_DAMAGE: 10,
   TOWER_BASE_RANGE: 60,
   TOWER_BASE_FIRE_RATE: 1.0,
@@ -678,7 +777,23 @@ CONFIG = {
 }
 ```
 
+### Building Sizes (building-defs.js)
+```javascript
+ENERGY_BUILDINGS = {
+  'bio-generator': { 
+    gridWidth: 2, 
+    gridHeight: 2, 
+    shape: 'L'      // L-shape (3 cells)
+  },
+  'battery': { 
+    gridWidth: 2, 
+    gridHeight: 2   // Standard 2×2 (4 cells)
+  },
+  // All others: 1×1 (default)
+}
+```
+
 ---
 
-*Document updated: 30.12.2025*
-*Game Version: 0.1.0*
+*Document updated: 01.01.2026*
+*Game Version: 0.2.0*
