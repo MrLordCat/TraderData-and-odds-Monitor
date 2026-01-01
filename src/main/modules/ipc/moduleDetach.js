@@ -111,7 +111,11 @@ function registerModuleDetachIpc({ mainWindow, store, getStatsWebContentsList })
         webPreferences: {
           nodeIntegration: true,
           contextIsolation: false,
-          webSecurity: false
+          webSecurity: false,
+          // Enable WebGL for game addons
+          webgl: true,
+          experimentalFeatures: true,
+          enableBlinkFeatures: 'WebGL',
         }
       });
       

@@ -30,6 +30,7 @@ module.exports = function({ SidebarModule, registerModule }) {
     GameCore = gameCore.GameCore;
     GameEvents = require(path.join(corePath, 'event-bus.js')).GameEvents;
     
+    // Use WebGL renderer for maximum performance
     const renderer = require(path.join(rendererPath, 'game-renderer.js'));
     GameRenderer = renderer.GameRenderer;
     

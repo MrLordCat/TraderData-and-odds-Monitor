@@ -79,7 +79,8 @@ class Battery extends PowerNode {
   getEffectiveCapacity() {
     this.adjacentBatteries = this.countAdjacentBatteries();
     const stackMultiplier = 1 + (this.adjacentBatteries * this.stackBonus);
-    return this.capacity * (1 + this.upgrades.capacity * 0.25) * stackMultiplier;
+    const upgradeLevel = this.upgradeLevels?.capacity || 0;
+    return this.capacity * (1 + upgradeLevel * 0.25) * stackMultiplier;
   }
 
   /**

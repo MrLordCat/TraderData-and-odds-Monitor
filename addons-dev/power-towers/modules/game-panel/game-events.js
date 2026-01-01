@@ -15,9 +15,8 @@ function GameEventsMixin(Base) {
     setupGameEvents() {
       if (!this.game) return;
       
-      // Render on every game tick
+      // Update UI on every game tick (render is handled by independent render loop)
       this.game.on(this.GameEvents.GAME_TICK, () => {
-        this.renderGame();
         this.updateUI(this.game.getState());
         
         // Update tooltip energy display in real-time if visible

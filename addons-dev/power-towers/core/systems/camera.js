@@ -163,17 +163,21 @@ class Camera {
 
   /**
    * Set zoom level with bounds checking
-   * Prevents zooming out beyond map boundaries - viewport always filled with map
+   * Prevents zooming out beyond visual map boundaries
    * Zoom is centered on the viewport center (not cursor position)
    */
   setZoom(newZoom, centerX = null, centerY = null) {
     const oldZoom = this.zoom;
     
-    // Calculate minimum zoom to fill viewport completely
-    // This ensures map always fills the entire viewport (no empty borders)
-    const minZoomX = this.viewportWidth / this.mapWidth;
-    const minZoomY = this.viewportHeight / this.mapHeight;
-    const minZoom = Math.max(minZoomX, minZoomY); // Must fill viewport in both dimensions
+    // Calculate visual map size (buildable + padding)
+    const padding = CONFIG.VISUAL_PADDING || 0;
+    const visualWidth = this.mapWidth * (1 + padding * 2);
+    const visualHeight = this.mapHeight * (1 + padding * 2);
+    
+    // Calculate minimum zoom to fill viewport with visual map
+    const minZoomX = this.viewportWidth / visualWidth;
+    const minZoomY = this.viewportHeight / visualHeight;
+    const minZoom = Math.max(minZoomX, minZoomY);
     
     const clampedZoom = Math.max(minZoom, Math.min(2.0, newZoom));
     
@@ -211,31 +215,39 @@ class Camera {
   }
 
   /**
-   * Clamp camera position to map bounds
-   * Ensures camera never shows area outside the map
+   * Clamp camera position to visual map bounds
+   * Allows viewing outside area but prevents going too far
    */
   clampPosition() {
     const worldWidth = this.viewportWidth / this.zoom;
     const worldHeight = this.viewportHeight / this.zoom;
     
+    // Visual bounds include padding area outside walls
+    const padding = CONFIG.VISUAL_PADDING || 0;
+    const visualLeft = -this.mapWidth * padding;
+    const visualTop = -this.mapHeight * padding;
+    const visualRight = this.mapWidth * (1 + padding);
+    const visualBottom = this.mapHeight * (1 + padding);
+    const visualWidth = visualRight - visualLeft;
+    const visualHeight = visualBottom - visualTop;
+    
     // Calculate bounds - camera position is top-left corner
-    // Ensure we never see past map edges
     let maxX, maxY, minX, minY;
     
-    if (worldWidth >= this.mapWidth) {
-      // Viewport wider than map - center horizontally
-      minX = maxX = (this.mapWidth - worldWidth) / 2;
+    if (worldWidth >= visualWidth) {
+      // Viewport wider than visual map - center horizontally
+      minX = maxX = visualLeft + (visualWidth - worldWidth) / 2;
     } else {
-      minX = 0;
-      maxX = this.mapWidth - worldWidth;
+      minX = visualLeft;
+      maxX = visualRight - worldWidth;
     }
     
-    if (worldHeight >= this.mapHeight) {
-      // Viewport taller than map - center vertically
-      minY = maxY = (this.mapHeight - worldHeight) / 2;
+    if (worldHeight >= visualHeight) {
+      // Viewport taller than visual map - center vertically
+      minY = maxY = visualTop + (visualHeight - worldHeight) / 2;
     } else {
-      minY = 0;
-      maxY = this.mapHeight - worldHeight;
+      minY = visualTop;
+      maxY = visualBottom - worldHeight;
     }
     
     this.targetX = Math.max(minX, Math.min(maxX, this.targetX));

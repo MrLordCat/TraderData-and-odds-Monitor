@@ -4,7 +4,11 @@
  * 
  * OPTIMIZED: No direct renderGame() calls - uses dirty flags
  * Render happens on next game tick via requestAnimationFrame
+ * 
+ * Uses PlacementManager for unified placement logic
  */
+
+const { PlacementManager, BUILDING_TYPES } = require('../placement');
 
 /**
  * Mixin for canvas event functionality
@@ -146,6 +150,7 @@ function CanvasEventsMixin(Base) {
     /**
      * Handle canvas mouse move
      * Shows placement preview (ghost tower/building)
+     * Uses PlacementManager for unified hover data
      */
     handleCanvasMove(e) {
       if (!this.game || !this.renderer || !this.camera) return;
@@ -159,14 +164,30 @@ function CanvasEventsMixin(Base) {
       const gridY = Math.floor(worldPos.y / this.CONFIG.GRID_SIZE);
       
       if (this.placingTower) {
-        const canPlace = this.game.canPlaceTower(gridX, gridY);
-        this.renderer.setHover(gridX, gridY, canPlace);
-        // Must render for placement preview (ghost) to show
+        // Use PlacementManager if available
+        if (this.placementManager) {
+          const canPlace = this.placementManager.canPlaceTower(gridX, gridY);
+          const cells = this.placementManager.getCellsForBuilding(gridX, gridY, null);
+          this.renderer.setHover(gridX, gridY, canPlace, null, cells);
+        } else {
+          // Fallback
+          const canPlace = this.game.canPlaceTower(gridX, gridY);
+          this.renderer.setHover(gridX, gridY, canPlace);
+        }
         this.renderGame();
       } else if (this.placingEnergy) {
-        // Check if can place energy building
-        const canPlace = this.canPlaceEnergyAt(gridX, gridY);
-        this.renderer.setHover(gridX, gridY, canPlace, this.placingEnergyType);
+        // Use PlacementManager for building cells
+        if (this.placementManager) {
+          const def = this.placementManager.getCurrentDefinition() || 
+                      require('./../../modules/energy/building-defs').ENERGY_BUILDINGS[this.placingEnergyType];
+          const canPlace = this.placementManager.canPlaceEnergy(gridX, gridY, this.placingEnergyType);
+          const cells = this.placementManager.getCellsForBuilding(gridX, gridY, def);
+          this.renderer.setHover(gridX, gridY, canPlace, this.placingEnergyType, cells);
+        } else {
+          // Fallback
+          const canPlace = this.canPlaceEnergyAt(gridX, gridY);
+          this.renderer.setHover(gridX, gridY, canPlace, this.placingEnergyType);
+        }
         this.renderGame();
       } else {
         this.renderer.clearHover();
@@ -175,32 +196,23 @@ function CanvasEventsMixin(Base) {
     
     /**
      * Check if energy building can be placed at position
+     * Uses unified PlacementManager
      */
     canPlaceEnergyAt(gridX, gridY) {
-      if (!this.game) return false;
-      
-      const map = this.game.map;
-      if (!map) return true;
-      
-      // Check terrain
-      const terrain = map.terrain?.[gridY]?.[gridX];
-      if (terrain === 'water') return false;
-      
-      // Check if path
-      if (map.isPath?.(gridX, gridY)) return false;
-      
-      // Check if occupied by tower
-      if (this.game.towers.find(t => t.gridX === gridX && t.gridY === gridY)) return false;
-      
-      // Check if occupied by energy building
-      const energyModule = this.game.getModule?.('energy');
-      if (energyModule?.buildingManager?.buildings) {
-        for (const building of energyModule.buildingManager.buildings.values()) {
-          if (building.gridX === gridX && building.gridY === gridY) return false;
-        }
+      if (!this.placementManager) return false;
+      return this.placementManager.canPlaceEnergy(gridX, gridY, this.placingEnergyType);
+    }
+
+    /**
+     * Check if tower can be placed at position
+     * Uses unified PlacementManager
+     */
+    canPlaceTowerAt(gridX, gridY) {
+      if (!this.placementManager) {
+        // Fallback to game.canPlaceTower
+        return this.game?.canPlaceTower?.(gridX, gridY) ?? false;
       }
-      
-      return true;
+      return this.placementManager.canPlaceTower(gridX, gridY);
     }
 
     /**

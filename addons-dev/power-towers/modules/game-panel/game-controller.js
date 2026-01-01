@@ -15,6 +15,7 @@ const { CanvasEventsMixin } = require('./canvas-events');
 const { GameEventsMixin } = require('./game-events');
 const { UIEventsMixin } = require('./ui-events');
 const { TowerUpgradesUIMixin } = require('./tower-upgrades-ui');
+const { PlacementManager, BUILDING_TYPES } = require('../placement');
 const CONFIG = require('../../core/config');
 
 /**
@@ -41,6 +42,9 @@ class GameControllerBase {
     this.renderer = null;
     this.camera = null;
     this.resizeObserver = null;
+    
+    // Unified placement manager
+    this.placementManager = null;
     
     this.placingTower = false;
     this.placingEnergy = false;
@@ -339,9 +343,21 @@ class GameControllerBase {
     
     this.game = new this.GameCore();
     
-    const ctx = this.canvas?.getContext('2d');
-    if (!ctx) {
-      console.error('[GameController] No canvas context');
+    // Initialize unified PlacementManager
+    this.placementManager = new PlacementManager(this.game, {
+      gridSize: this.CONFIG?.GRID_SIZE || 32,
+      towerCost: this.towerCost
+    });
+    
+    // Pass PlacementManager to energy module if available
+    const energyModule = this.game.getModule?.('energy');
+    if (energyModule?.buildingManager) {
+      energyModule.buildingManager.setPlacementManager(this.placementManager);
+    }
+    
+    // Check canvas exists
+    if (!this.canvas) {
+      console.error('[GameController] No canvas element');
       return;
     }
     
@@ -364,7 +380,7 @@ class GameControllerBase {
     this.camera.setViewportSize(this.canvas.width, this.canvas.height);
     console.log(`[GameController] Camera viewport: ${this.camera.viewportWidth}x${this.camera.viewportHeight}, zoom: ${this.camera.zoom}`);
     
-    // Initialize renderer (pass canvas, not ctx)
+    // Initialize renderer (WebGL - pass canvas, not ctx)
     this.renderer = new this.GameRenderer(this.canvas, this.camera);
     
     // Center on base (last waypoint)
@@ -383,6 +399,9 @@ class GameControllerBase {
     
     // Always setup game events (new game instance)
     this.setupGameEvents();
+    
+    // Start render loop (independent of game loop for animations)
+    this.startRenderLoop();
     
     // Update tower price display from config
     this.updateTowerPriceDisplay();
@@ -488,6 +507,11 @@ class GameControllerBase {
       this.elements.elementSection.style.display = 'none';
     }
     
+    // Update PlacementManager state
+    if (this.placementManager) {
+      this.placementManager.enterPlacementMode(BUILDING_TYPES.TOWER);
+    }
+    
     // Deselect tower if any
     if (this.game && this.game.selectedTower) {
       this.game.selectTower(null);
@@ -502,6 +526,11 @@ class GameControllerBase {
    */
   exitPlacementMode() {
     this.placingTower = false;
+    
+    // Update PlacementManager state
+    if (this.placementManager) {
+      this.placementManager.exitPlacementMode();
+    }
     
     // Update UI
     this.elements.towerItems.forEach(item => {
@@ -521,6 +550,11 @@ class GameControllerBase {
   enterEnergyPlacementMode(buildingType) {
     this.placingEnergy = true;
     this.placingEnergyType = buildingType;
+    
+    // Update PlacementManager state
+    if (this.placementManager) {
+      this.placementManager.enterPlacementMode(BUILDING_TYPES.ENERGY, buildingType);
+    }
     
     // Update UI - highlight selected energy building
     const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
@@ -547,6 +581,11 @@ class GameControllerBase {
     this.placingEnergy = false;
     this.placingEnergyType = null;
     
+    // Update PlacementManager state
+    if (this.placementManager) {
+      this.placementManager.exitPlacementMode();
+    }
+    
     // Update UI
     const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
     energyItems.forEach(item => {
@@ -561,6 +600,7 @@ class GameControllerBase {
   
   /**
    * Place energy building at position
+   * Uses unified PlacementManager for position calculations
    */
   placeEnergyBuilding(gridX, gridY) {
     if (!this.game || !this.placingEnergy || !this.placingEnergyType) return;
@@ -571,15 +611,20 @@ class GameControllerBase {
       return;
     }
     
-    // Convert grid to world coordinates
-    const worldX = gridX * this.CONFIG.GRID_SIZE + this.CONFIG.GRID_SIZE / 2;
-    const worldY = gridY * this.CONFIG.GRID_SIZE + this.CONFIG.GRID_SIZE / 2;
+    // Get building definition and world coordinates from PlacementManager
+    const { ENERGY_BUILDINGS } = require('./../../modules/energy/building-defs');
+    const def = ENERGY_BUILDINGS[this.placingEnergyType];
+    
+    // Use PlacementManager for center calculation
+    const center = this.placementManager
+      ? this.placementManager.getBuildingCenter(gridX, gridY, def)
+      : this._calculateBuildingCenter(gridX, gridY, def);
     
     // Try to place building
     const building = energyModule.placeBuilding(
       this.placingEnergyType,
       gridX, gridY,
-      worldX, worldY
+      center.x, center.y
     );
     
     if (building) {
@@ -591,18 +636,60 @@ class GameControllerBase {
   }
   
   /**
+   * Calculate building center (fallback if no PlacementManager)
+   * @private
+   */
+  _calculateBuildingCenter(gridX, gridY, def) {
+    const gs = this.CONFIG.GRID_SIZE;
+    const gw = def?.gridWidth || 1;
+    const gh = def?.gridHeight || 1;
+    const shape = def?.shape || 'rect';
+    
+    if (shape === 'L' && gw === 2 && gh === 2) {
+      return {
+        x: gridX * gs + gs,
+        y: gridY * gs + gs
+      };
+    }
+    
+    return {
+      x: gridX * gs + (gw * gs) / 2,
+      y: gridY * gs + (gh * gs) / 2
+    };
+  }
+  
+  /**
    * Update energy building affordability
+   * Uses unified PlacementManager for cost checks
    */
   updateEnergyAffordability() {
     if (!this.game) return;
     
+    const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
+    
+    // Use PlacementManager if available
+    if (this.placementManager) {
+      energyItems.forEach(item => {
+        const buildingType = item.dataset.building;
+        const canAfford = this.placementManager.canAffordEnergy(buildingType);
+        
+        item.classList.toggle('disabled', !canAfford);
+        
+        const priceEl = item.querySelector('.energy-price');
+        if (priceEl) {
+          priceEl.style.color = canAfford ? '#ffd700' : '#fc8181';
+        }
+      });
+      return;
+    }
+    
+    // Fallback: get defs from energy module
     const gold = this.game.getState().gold || 0;
     const energyModule = this.game.getModule('energy');
     if (!energyModule) return;
     
     const defs = energyModule.getBuildingDefinitions();
     
-    const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
     energyItems.forEach(item => {
       const buildingType = item.dataset.building;
       const def = defs[buildingType];
@@ -744,6 +831,39 @@ class GameControllerBase {
     
     // Update tower affordability (has its own optimization)
     this.updateTowerAffordability();
+  }
+
+  /**
+   * Start independent render loop for animations
+   * Runs at 60 FPS regardless of game pause state
+   */
+  startRenderLoop() {
+    // Stop existing loop if any
+    if (this._renderLoopId) {
+      cancelAnimationFrame(this._renderLoopId);
+    }
+    
+    const loop = () => {
+      if (!this.game || !this.renderer) {
+        this._renderLoopId = null;
+        return;
+      }
+      
+      this.renderGame();
+      this._renderLoopId = requestAnimationFrame(loop);
+    };
+    
+    this._renderLoopId = requestAnimationFrame(loop);
+  }
+  
+  /**
+   * Stop render loop
+   */
+  stopRenderLoop() {
+    if (this._renderLoopId) {
+      cancelAnimationFrame(this._renderLoopId);
+      this._renderLoopId = null;
+    }
   }
 
   /**

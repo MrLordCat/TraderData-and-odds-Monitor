@@ -30,6 +30,11 @@ class PowerNode {
     this.worldX = options.worldX || 0;
     this.worldY = options.worldY || 0;
     
+    // Grid size (for multi-cell buildings)
+    this.gridWidth = options.gridWidth || 1;
+    this.gridHeight = options.gridHeight || 1;
+    this.shape = options.shape || 'rect';  // 'rect', 'L', etc.
+    
     // Base Power properties (before any modifiers)
     this.baseInputChannels = options.inputChannels ?? 1;
     this.baseOutputChannels = options.outputChannels ?? 1;
@@ -290,6 +295,9 @@ class PowerNode {
       nodeType: this.nodeType,
       gridX: this.gridX,
       gridY: this.gridY,
+      gridWidth: this.gridWidth,
+      gridHeight: this.gridHeight,
+      shape: this.shape,
       stored: this.stored,
       capacity: this.capacity,
       inputRate: this.inputRate,

@@ -4,8 +4,22 @@
  */
 
 const CONFIG = {
+  // Buildable area (where towers can be placed)
   MAP_WIDTH: 2000,
   MAP_HEIGHT: 2000,
+  
+  // Visual padding around buildable area (10% each side = 20% total expansion)
+  // Creates "outside wall" area that is visible but not buildable
+  VISUAL_PADDING: 0.1,  // 10% padding each side
+  
+  // Computed visual dimensions (buildable + padding)
+  get VISUAL_MAP_WIDTH() { return this.MAP_WIDTH * (1 + this.VISUAL_PADDING * 2); },
+  get VISUAL_MAP_HEIGHT() { return this.MAP_HEIGHT * (1 + this.VISUAL_PADDING * 2); },
+  
+  // Offset from visual origin to buildable origin
+  get BUILDABLE_OFFSET_X() { return this.MAP_WIDTH * this.VISUAL_PADDING; },
+  get BUILDABLE_OFFSET_Y() { return this.MAP_HEIGHT * this.VISUAL_PADDING; },
+  
   GRID_SIZE: 20,
   CANVAS_WIDTH: 400,
   CANVAS_HEIGHT: 400,

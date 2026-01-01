@@ -41,6 +41,9 @@ const ENERGY_BUILDINGS = {
     description: 'Uses surrounding trees. Trees slowly regrow.',
     icon: '🌳',
     category: 'generator',
+    gridWidth: 2,
+    gridHeight: 2,
+    shape: 'L',  // L-shaped building (3 cells in corner)
     
     cost: 80,
     buildTime: 0,
@@ -168,6 +171,8 @@ const ENERGY_BUILDINGS = {
     description: 'Stores energy. Stacking increases capacity.',
     icon: '🔋',
     category: 'storage',
+    gridWidth: 2,
+    gridHeight: 2,
     
     cost: 60,
     buildTime: 0,

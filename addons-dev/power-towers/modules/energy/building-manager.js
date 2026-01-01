@@ -2,6 +2,7 @@
  * Power Towers TD - Energy Building Manager
  * 
  * Handles placement, connection UI, and management of energy buildings
+ * Uses unified PlacementManager for placement validation
  */
 
 const { GameEvents } = require('../../core/event-bus');
@@ -11,9 +12,10 @@ const { Battery, PowerTransfer, PowerConsumer } = require('./storage');
 const { ENERGY_BUILDINGS, CATEGORY_COLORS, BUILDING_ICONS } = require('./building-defs');
 
 class EnergyBuildingManager {
-  constructor(eventBus, gameCore) {
+  constructor(eventBus, gameCore, placementManager = null) {
     this.eventBus = eventBus;
     this.gameCore = gameCore;
+    this.placementManager = placementManager;
     
     // Power network
     this.network = new PowerNetwork(eventBus);
@@ -27,6 +29,13 @@ class EnergyBuildingManager {
     
     // Building placement ghost
     this.placementGhost = null;
+  }
+  
+  /**
+   * Set placement manager reference
+   */
+  setPlacementManager(pm) {
+    this.placementManager = pm;
   }
 
   init() {
@@ -95,6 +104,9 @@ class EnergyBuildingManager {
       gridY,
       worldX,
       worldY,
+      gridWidth: def.gridWidth || 1,
+      gridHeight: def.gridHeight || 1,
+      shape: def.shape || 'rect',
       ...def.stats
     });
 
@@ -186,8 +198,19 @@ class EnergyBuildingManager {
 
   /**
    * Check if can build at position
+   * Uses unified PlacementManager for consistent checks
    */
-  canBuildAt(gridX, gridY) {
+  canBuildAt(gridX, gridY, buildingType = null) {
+    // Prefer PlacementManager for unified checks
+    if (this.placementManager) {
+      if (buildingType) {
+        return this.placementManager.canPlaceEnergy(gridX, gridY, buildingType);
+      }
+      // Default to 1x1 building check
+      return this.placementManager.canPlace(gridX, gridY, null);
+    }
+    
+    // Fallback: basic check if no PlacementManager
     const map = this.getMap();
     if (!map) return true;
     
