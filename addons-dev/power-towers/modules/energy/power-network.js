@@ -314,9 +314,14 @@ class PowerNetwork {
         const from = this.nodes.get(c.from);
         const to = this.nodes.get(c.to);
         return {
-          from: { x: from?.worldX || 0, y: from?.worldY || 0 },
-          to: { x: to?.worldX || 0, y: to?.worldY || 0 },
-          active: from?.stored > 0
+          fromId: c.from,
+          toId: c.to,
+          fromX: from?.worldX || 0,
+          fromY: from?.worldY || 0,
+          toX: to?.worldX || 0,
+          toY: to?.worldY || 0,
+          active: (from?.stored || 0) > 0,
+          energyFlow: from?.outputRate || 0
         };
       })
     };

@@ -702,19 +702,57 @@ class GameRenderer {
   // ============================================
   
   _renderEnergyConnections(data) {
-    if (!data.energyNetwork?.connections || !data.energyBuildings) return;
+    if (!data.energyNetwork?.connections) return;
     
     this.shapeRenderer.begin('triangles', this.camera);
     
     for (const conn of data.energyNetwork.connections) {
-      const from = data.energyBuildings.find(b => b.id === conn.from);
-      const to = data.energyBuildings.find(b => b.id === conn.to);
-      if (!from || !to) continue;
+      // Use direct coordinates from connection data
+      const fromX = conn.fromX;
+      const fromY = conn.fromY;
+      const toX = conn.toX;
+      const toY = conn.toY;
       
-      // Animated energy flow
-      const pulse = Math.sin(this.time * 0.005 + conn.from) * 0.3 + 0.7;
+      if (!fromX || !fromY || !toX || !toY) continue;
       
-      this.shapeRenderer.line(from.x, from.y, to.x, to.y, 2 / this.camera.zoom, 0.3, 0.8, 1, pulse * 0.6);
+      // Connection line color based on active state
+      const isActive = conn.active;
+      const baseColor = isActive 
+        ? { r: 0.3, g: 0.9, b: 1.0 }   // Cyan for active
+        : { r: 0.4, g: 0.4, b: 0.5 };  // Gray for inactive
+      
+      // Animated energy flow pulse
+      const pulse = Math.sin(this.time * 0.005) * 0.3 + 0.7;
+      const alpha = isActive ? pulse * 0.8 : 0.4;
+      
+      // Main connection line
+      this.shapeRenderer.line(fromX, fromY, toX, toY, 3 / this.camera.zoom, 
+        baseColor.r, baseColor.g, baseColor.b, alpha);
+      
+      // Glow outline
+      this.shapeRenderer.line(fromX, fromY, toX, toY, 5 / this.camera.zoom, 
+        baseColor.r, baseColor.g, baseColor.b, alpha * 0.3);
+      
+      // Animated energy particles along the line (if active)
+      if (isActive) {
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const particleCount = Math.max(2, Math.floor(len / 40));
+        
+        for (let i = 0; i < particleCount; i++) {
+          // Animate particles along line
+          const t = ((this.time * 0.002 + i / particleCount) % 1);
+          const px = fromX + dx * t;
+          const py = fromY + dy * t;
+          
+          this.shapeRenderer.circle(px, py, 3 / this.camera.zoom, 0.5, 1, 1, 0.9);
+        }
+      }
+      
+      // Connection endpoints
+      this.shapeRenderer.circle(fromX, fromY, 5 / this.camera.zoom, baseColor.r, baseColor.g, baseColor.b, 0.8);
+      this.shapeRenderer.circle(toX, toY, 5 / this.camera.zoom, baseColor.r, baseColor.g, baseColor.b, 0.8);
     }
     
     this.shapeRenderer.end();
@@ -780,6 +818,9 @@ class GameRenderer {
         // Standard 1x1 building
         this._renderStandardEnergyBuilding(cx, cy, gridSize, nodeType, baseColor, accentColor, glowColor, fillPct);
       }
+      
+      // === ENERGY BAR UNDER BUILDING ===
+      this._renderBuildingEnergyBar(cx, cy, w, h, building, glowColor, camera);
       
       // Pulse glow effect
       const pulse = Math.sin(this.time * 0.004) * 0.3 + 0.5;
@@ -965,6 +1006,68 @@ class GameRenderer {
     
     // Border
     this.shapeRenderer.circleOutline(cx, cy, size * 0.7, 1, 0.1, 0.1, 0.1, 0.5);
+  }
+  
+  /**
+   * Render energy bar under building
+   * Shows stored energy / capacity
+   */
+  _renderBuildingEnergyBar(cx, cy, w, h, building, glowColor, camera) {
+    const stored = building.stored || building.energy || 0;
+    const capacity = building.capacity || building.maxEnergy || 100;
+    const fillPct = capacity > 0 ? Math.min(1, stored / capacity) : 0;
+    const nodeType = building.nodeType || 'generator';
+    
+    // Bar dimensions
+    const barWidth = Math.max(w * 0.8, 24);
+    const barHeight = 6;
+    const barY = cy + h / 2 + 4;  // Below building
+    const barX = cx - barWidth / 2;
+    
+    // Background (dark)
+    this.shapeRenderer.rect(barX - 1, barY - 1, barWidth + 2, barHeight + 2, 0, 0, 0, 0.7);
+    
+    // Empty bar (dark gray)
+    this.shapeRenderer.rect(barX, barY, barWidth, barHeight, 0.15, 0.15, 0.2, 1);
+    
+    // Filled portion with type-based color
+    if (fillPct > 0) {
+      let fillColor;
+      if (nodeType === 'generator') {
+        // Green for generators
+        fillColor = { r: 0.3, g: 0.9, b: 0.4 };
+      } else if (nodeType === 'storage') {
+        // Blue for storage (batteries)
+        fillColor = { r: 0.3, g: 0.7, b: 1.0 };
+      } else {
+        // Orange for transfer/relay
+        fillColor = { r: 1.0, g: 0.7, b: 0.3 };
+      }
+      
+      // Animated pulse when generating/full
+      const pulse = fillPct >= 0.9 ? Math.sin(this.time * 0.008) * 0.2 + 0.8 : 1;
+      
+      this.shapeRenderer.rect(barX, barY, barWidth * fillPct, barHeight, 
+        fillColor.r * pulse, fillColor.g * pulse, fillColor.b * pulse, 1);
+      
+      // Glow effect for high energy
+      if (fillPct >= 0.5) {
+        this.shapeRenderer.rect(barX, barY, barWidth * fillPct, barHeight, 
+          fillColor.r, fillColor.g, fillColor.b, 0.3);
+      }
+    }
+    
+    // Border
+    this.shapeRenderer.rectOutline(barX, barY, barWidth, barHeight, 1 / camera.zoom, 0.3, 0.3, 0.3, 0.8);
+    
+    // Generation rate indicator (small arrow/icon for generators)
+    if (nodeType === 'generator' && building.generation > 0) {
+      // Small + symbol on the right
+      const iconX = barX + barWidth + 4;
+      const iconY = barY + barHeight / 2;
+      this.shapeRenderer.rect(iconX - 1, iconY - 3, 2, 6, 0.5, 1, 0.5, 1);
+      this.shapeRenderer.rect(iconX - 3, iconY - 1, 6, 2, 0.5, 1, 0.5, 1);
+    }
   }
   
   _renderTowers(data) {
