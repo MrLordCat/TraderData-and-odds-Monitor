@@ -53,8 +53,6 @@ function CanvasEventsMixin(Base) {
           lastY = e.clientY;
           // Must render immediately for smooth panning feedback
           this.renderGame();
-          // Update tooltip position if visible
-          this.updateTooltipPosition();
         }
       });
       
@@ -135,10 +133,14 @@ function CanvasEventsMixin(Base) {
             this.hideTowerInfo(); // Hide tower tooltip when selecting energy building
             this.showEnergyBuildingInfo(energyBuilding);
           } else {
-            // Click on empty cell - deselect and close tooltip
+            // Click on empty cell - deselect and reset bottom panel
             this.game.selectTower(null);
             this.hideTowerInfo();
             this.hideEnergyBuildingInfo();
+            // Explicitly reset bottom panel when clicking empty
+            if (this.hideBottomPanelSelection) {
+              this.hideBottomPanelSelection();
+            }
           }
         }
       }
@@ -226,8 +228,6 @@ function CanvasEventsMixin(Base) {
       this.camera.zoomBy(zoomFactor);
       // Must render immediately for zoom feedback
       this.renderGame();
-      // Update tooltip position if visible
-      this.updateTooltipPosition();
     }
   };
 }

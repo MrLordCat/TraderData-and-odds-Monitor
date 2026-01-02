@@ -1,6 +1,6 @@
 /**
  * Power Towers TD - Tower Upgrades UI Mixin
- * Handles the stat upgrade panel in tower tooltip
+ * Handles tower selling (upgrades moved to bottom panel)
  */
 
 const { STAT_UPGRADES, calculateUpgradeCost, isUpgradeAvailable } = require('../../core/tower-upgrade-list');
@@ -20,8 +20,8 @@ const BASE_UPGRADES = [
 const ATTACK_TYPE_UPGRADES = {
   siege: ['splashRadius'],
   magic: ['powerScaling'],
-  piercing: ['critChance', 'critDamage'], // Bonus crit focus
-  normal: ['attackSpeed'] // Bonus speed focus
+  piercing: ['critChance', 'critDamage'],
+  normal: ['attackSpeed']
 };
 
 // Element path specific upgrades
@@ -37,7 +37,6 @@ const ELEMENT_UPGRADES = {
 function getUpgradesForTower(tower) {
   const upgrades = [...BASE_UPGRADES];
   
-  // Add attack type specific upgrades
   if (tower.attackTypeId && ATTACK_TYPE_UPGRADES[tower.attackTypeId]) {
     for (const upgradeId of ATTACK_TYPE_UPGRADES[tower.attackTypeId]) {
       if (!upgrades.includes(upgradeId)) {
@@ -46,7 +45,6 @@ function getUpgradesForTower(tower) {
     }
   }
   
-  // Add element path specific upgrades
   if (tower.elementPath && ELEMENT_UPGRADES[tower.elementPath]) {
     for (const upgradeId of ELEMENT_UPGRADES[tower.elementPath]) {
       if (!upgrades.includes(upgradeId)) {
@@ -55,7 +53,6 @@ function getUpgradesForTower(tower) {
     }
   }
   
-  // Filter to only upgrades that are available for this tower
   return upgrades.filter(id => {
     const upgrade = STAT_UPGRADES[id];
     return upgrade && isUpgradeAvailable(upgrade, tower);
@@ -68,142 +65,6 @@ function getUpgradesForTower(tower) {
  */
 function TowerUpgradesUIMixin(Base) {
   return class extends Base {
-    /**
-     * Toggle upgrades panel visibility
-     */
-    toggleUpgradesPanel() {
-      const el = this.elements;
-      if (!el.tooltipUpgradesSection) return;
-      
-      const isVisible = el.tooltipUpgradesSection.style.display !== 'none';
-      
-      if (isVisible) {
-        this.hideUpgradesPanel();
-      } else {
-        this.showUpgradesPanel();
-      }
-    }
-
-    /**
-     * Show upgrades panel for selected tower
-     */
-    showUpgradesPanel() {
-      const el = this.elements;
-      const tower = this.game?.selectedTower;
-      
-      if (!el.tooltipUpgradesSection || !el.upgradesGrid || !tower) return;
-      
-      // Update button state
-      if (el.btnUpgrade) {
-        el.btnUpgrade.classList.add('active');
-      }
-      
-      // Show section
-      el.tooltipUpgradesSection.style.display = 'block';
-      
-      // Populate upgrades
-      this.populateUpgradesGrid(tower);
-    }
-
-    /**
-     * Hide upgrades panel
-     */
-    hideUpgradesPanel() {
-      const el = this.elements;
-      
-      if (el.tooltipUpgradesSection) {
-        el.tooltipUpgradesSection.style.display = 'none';
-      }
-      
-      if (el.btnUpgrade) {
-        el.btnUpgrade.classList.remove('active');
-      }
-    }
-
-    /**
-     * Populate upgrades grid with available upgrades
-     */
-    populateUpgradesGrid(tower) {
-      const el = this.elements;
-      if (!el.upgradesGrid) return;
-      
-      const gold = this.game?.modules?.economy?.gold || 0;
-      const towerLevel = tower.level || 1;
-      
-      el.upgradesGrid.innerHTML = '';
-      
-      // Get dynamic list of upgrades for this tower
-      const upgradeIds = getUpgradesForTower(tower);
-      
-      upgradeIds.forEach(upgradeId => {
-        const upgrade = STAT_UPGRADES[upgradeId];
-        if (!upgrade) return;
-        
-        const currentLevel = tower.getUpgradeLevel(upgradeId);
-        const cost = calculateUpgradeCost(upgrade, currentLevel, towerLevel);
-        const canAfford = gold >= cost;
-        
-        // Create upgrade row
-        const row = document.createElement('div');
-        row.className = `upgrade-row${!canAfford ? ' disabled' : ''}`;
-        row.dataset.upgradeId = upgradeId;
-        
-        // Format effect text
-        const effectText = this.formatEffectText(upgrade);
-        
-        row.innerHTML = `
-          <span class="upgrade-emoji">${upgrade.emoji}</span>
-          <div class="upgrade-info-col">
-            <div class="upgrade-name-row">${upgrade.name}</div>
-            <div class="upgrade-effect">${effectText}</div>
-          </div>
-          <span class="upgrade-lvl">Lv.${currentLevel}</span>
-          <button class="upgrade-buy-btn" data-upgrade="${upgradeId}" ${!canAfford ? 'disabled' : ''}>
-            ${cost}g
-          </button>
-        `;
-        
-        // Add click handler for buy button
-        const buyBtn = row.querySelector('.upgrade-buy-btn');
-        buyBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.purchaseUpgrade(upgradeId);
-        });
-        
-        el.upgradesGrid.appendChild(row);
-      });
-    }
-
-    /**
-     * Format effect text for upgrade (NEW PERCENTAGE SYSTEM)
-     */
-    formatEffectText(upgrade) {
-      const effect = upgrade.effect;
-      
-      // New percentage-based system
-      if (effect.type === 'percentage') {
-        const percent = Math.abs(effect.percentPerLevel * 100);
-        const sign = effect.percentPerLevel >= 0 ? '+' : '-';
-        return `${sign}${percent}% per lvl`;
-      }
-      
-      // Additive effects (crit, chain, etc.)
-      const value = effect.valuePerLevel;
-      
-      switch (effect.stat) {
-        case 'critChance':
-          return `+${(value * 100).toFixed(0)}% crit chance`;
-        case 'critDmgMod':
-          return `+${(value * 100).toFixed(0)}% crit dmg`;
-        case 'chainCount':
-          return `+${value} chain targets`;
-        case 'hpRegen':
-          return `+${value} HP/s`;
-        default:
-          return `+${value} per lvl`;
-      }
-    }
-
     /**
      * Purchase an upgrade for selected tower
      */
@@ -227,24 +88,16 @@ function TowerUpgradesUIMixin(Base) {
       // Spend gold
       economy.spendGold(cost);
       
-      // Apply upgrade to tower (no XP from stat upgrades)
+      // Apply upgrade to tower
       tower.applyStatUpgrade(upgradeId, upgrade);
       
-      // Refresh upgrades grid with new prices (panel stays open)
-      this.populateUpgradesGrid(tower);
-      
-      // Refresh tooltip stats without closing panel
-      this.refreshTooltipData(tower);
+      // Refresh bottom panel
+      if (this.showTowerInBottomPanel) {
+        this.showTowerInBottomPanel(tower);
+      }
       
       // Refresh gold display
       this.updateUI(this.game.getState());
-    }
-
-    /**
-     * Upgrade selected tower (toggle panel)
-     */
-    upgradeSelectedTower() {
-      this.toggleUpgradesPanel();
     }
 
     /**
@@ -270,8 +123,11 @@ function TowerUpgradesUIMixin(Base) {
         towerModule.removeTower(tower.id);
       }
       
-      // Deselect and hide tooltip
+      // Deselect and hide bottom panel selection
       this.deselectTower();
+      if (this.hideBottomPanelSelection) {
+        this.hideBottomPanelSelection();
+      }
       
       // Update UI
       this.updateUI(this.game.getState());
@@ -279,4 +135,4 @@ function TowerUpgradesUIMixin(Base) {
   };
 }
 
-module.exports = { TowerUpgradesUIMixin };
+module.exports = { TowerUpgradesUIMixin, getUpgradesForTower, STAT_UPGRADES, calculateUpgradeCost };

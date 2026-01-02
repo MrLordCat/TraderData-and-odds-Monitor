@@ -85,23 +85,7 @@ function createBrokerManager(ctx){
             event.preventDefault();
             return;
           }
-          // Space toggles stats unless focus is editable
-          if (input.key === ' ') {
-          // Defer to page context to decide if focus is in an editable control
-          try {
-            view.webContents.executeJavaScript(`(function(){
-              const ae=document.activeElement; if(!ae) return false;
-              const tag=ae.tagName; const editable=ae.isContentEditable;
-              if(editable) return true;
-              if(tag==='INPUT'){ const tp=(ae.getAttribute('type')||'text').toLowerCase(); if(['text','search','number','email','password','url','tel'].includes(tp)) return true; }
-              if(tag==='TEXTAREA') return true;
-              return false; })();`, true).then(isEditable => {
-                if(isEditable){ return; }
-                mainWindow.webContents.send('stats-toggle');
-                event.preventDefault();
-              }).catch(()=>{});
-          } catch(_) {}
-          }
+          // Space hotkey REMOVED - now handled by addons (e.g. Power Towers game)
         }
       });
     } catch(_) {}

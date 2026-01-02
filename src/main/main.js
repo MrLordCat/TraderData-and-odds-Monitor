@@ -819,14 +819,7 @@ app.on('browser-window-created', (_e, win)=>{
           try { if(excelExtractorController && excelExtractorController.toggle) excelExtractorController.toggle(); } catch(_){ }
           return;
         }
-        // Space toggles embedded stats
-        if(input.key===' '){
-          const now=Date.now();
-          if(now - lastStatsToggleTs < 500) return; // throttle 500ms
-          lastStatsToggleTs = now;
-          toggleStatsEmbedded();
-          return;
-        }
+        // Space hotkey REMOVED - now handled by addons (e.g. Power Towers game)
         // Numpad5 handled by globalShortcut.register - no fallback needed (causes double toggle)
         // Ctrl+F12 -> open Board (odds) BrowserView DevTools
         if(input.key==='F12' && input.control){

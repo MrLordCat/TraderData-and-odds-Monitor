@@ -24,7 +24,7 @@ class PowerNode {
     this.type = options.type || 'unknown';
     this.nodeType = options.nodeType || 'generic'; // generator, storage, transfer, consumer
     
-    // Position
+    // Position (grid)
     this.gridX = options.gridX || 0;
     this.gridY = options.gridY || 0;
     this.worldX = options.worldX || 0;
@@ -34,6 +34,14 @@ class PowerNode {
     this.gridWidth = options.gridWidth || 1;
     this.gridHeight = options.gridHeight || 1;
     this.shape = options.shape || 'rect';  // 'rect', 'L', etc.
+    
+    // Grid size in pixels (from config or default)
+    this.gridSize = options.gridSize || 24;
+    
+    // Center position in pixels (like towers have x/y)
+    this.x = 0;
+    this.y = 0;
+    this._calculateCenterPosition();
     
     // Base Power properties (before any modifiers)
     this.baseInputChannels = options.inputChannels ?? 1;
@@ -76,6 +84,36 @@ class PowerNode {
     
     // Initial stat calculation
     this.recalculateStats();
+  }
+
+  /**
+   * Calculate center position in pixels (unified with towers)
+   * Updates this.x and this.y
+   * Uses worldX/worldY if provided, otherwise calculates from grid position
+   */
+  _calculateCenterPosition() {
+    // If worldX/worldY are provided, use them as center
+    if (this.worldX && this.worldY) {
+      this.x = this.worldX;
+      this.y = this.worldY;
+      return;
+    }
+    
+    const gs = this.gridSize;
+    
+    if (this.shape === 'L' && this.gridWidth === 2 && this.gridHeight === 2) {
+      // L-shape: center at junction point
+      this.x = (this.gridX + 1) * gs;
+      this.y = (this.gridY + 1) * gs;
+    } else {
+      // Rectangle: geometric center
+      this.x = this.gridX * gs + (this.gridWidth * gs) / 2;
+      this.y = this.gridY * gs + (this.gridHeight * gs) / 2;
+    }
+    
+    // Sync worldX/worldY with calculated values
+    this.worldX = this.x;
+    this.worldY = this.y;
   }
 
   /**

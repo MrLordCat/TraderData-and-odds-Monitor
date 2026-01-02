@@ -148,11 +148,24 @@ class EnergyModule {
    * Get render data
    */
   getRenderData() {
+    // Calculate total potential consumption from towers
+    let totalConsumption = 0;
+    if (this.gameCore?.modules?.towers) {
+      const towers = this.gameCore.modules.towers.getTowersArray();
+      for (const tower of towers) {
+        // Consumption = energyCostPerShot * attackSpeed (shots per second)
+        const costPerShot = tower.energyCostPerShot || 0;
+        const attackSpeed = tower.attackSpeed || 1;
+        totalConsumption += costPerShot * attackSpeed;
+      }
+    }
+    
     return {
       ...this.buildingManager.getRenderData(),
       totalGeneration: this.totalGeneration,
-      totalStorage: this.totalStorage,
-      totalCapacity: this.totalCapacity
+      totalStored: this.totalStorage,
+      totalCapacity: this.totalCapacity,
+      totalConsumption: Math.round(totalConsumption * 10) / 10 // Round to 1 decimal
     };
   }
 

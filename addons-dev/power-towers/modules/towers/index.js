@@ -80,6 +80,8 @@ class TowersModule {
       this.upgradeHandlers.handleUpgradeStat(data));
     this.eventBus.on('tower:set-element', (data) => 
       this.upgradeHandlers.handleSetElement(data));
+    this.eventBus.on('tower:upgrade-ability', (data) => 
+      this.upgradeHandlers.handleUpgradeAbility(data));
     this.eventBus.on('tower:set-power-draw', (data) => 
       this.upgradeHandlers.handleSetPowerDraw(data));
     this.eventBus.on('tower:damage', (data) => 

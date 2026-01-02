@@ -19,6 +19,7 @@ const { EnergyTooltipMixin } = require('./energy-tooltip-ui');
 const { CanvasEventsMixin } = require('./canvas-events');
 const { GameEventsMixin } = require('./game-events');
 const { UIEventsMixin } = require('./ui-events');
+const { BottomPanelMixin } = require('./bottom-panel-ui');
 const { PlacementManager, BUILDING_TYPES } = require('../placement');
 const CONFIG = require('../../core/config');
 
@@ -69,6 +70,9 @@ class GameControllerBase {
    * Initialize controller with container
    */
   init(container) {
+    // Store container reference for child mixins
+    this.container = container;
+    
     // Cache screen elements
     this.screens = {
       menu: container.querySelector('#screen-menu'),
@@ -84,63 +88,18 @@ class GameControllerBase {
     this.elements = {
       gold: container.querySelector('#stat-gold'),
       lives: container.querySelector('#stat-lives'),
-      energy: container.querySelector('#stat-energy'),
       wave: container.querySelector('#stat-wave'),
+      // New energy HUD elements
+      energyProd: container.querySelector('#stat-energy-prod'),
+      energyCons: container.querySelector('#stat-energy-cons'),
+      energyStored: container.querySelector('#stat-energy-stored'),
+      energyCap: container.querySelector('#stat-energy-cap'),
       overlay: container.querySelector('#game-overlay'),
       overlayTitle: container.querySelector('#overlay-title'),
       overlayMessage: container.querySelector('#overlay-message'),
       overlayBtn: container.querySelector('#overlay-btn'),
-      buildToolbar: container.querySelector('#build-toolbar'),
-      towerSelect: container.querySelector('#tower-select'),
-      towerItems: container.querySelectorAll('.tower-item'),
-      // Tower tooltip
-      towerTooltip: container.querySelector('#tower-tooltip'),
-      tooltipIcon: container.querySelector('#tooltip-icon'),
-      tooltipName: container.querySelector('#tooltip-name'),
-      tooltipLevel: container.querySelector('#tooltip-level'),
-      tooltipLevelProgress: container.querySelector('#tooltip-level-progress'),
-      tooltipLevelText: container.querySelector('#tooltip-level-text'),
-      tooltipAttackType: container.querySelector('#tooltip-attack-type'),
-      tooltipElement: container.querySelector('#tooltip-element'),
-      tooltipDmg: container.querySelector('#tooltip-dmg'),
-      tooltipRng: container.querySelector('#tooltip-rng'),
-      tooltipSpd: container.querySelector('#tooltip-spd'),
-      tooltipCrit: container.querySelector('#tooltip-crit'),
-      tooltipCritdmg: container.querySelector('#tooltip-critdmg'),
-      tooltipSplashRow: container.querySelector('#tooltip-splash-row'),
-      tooltipSplash: container.querySelector('#tooltip-splash'),
-      tooltipHp: container.querySelector('#tooltip-hp'),
-      tooltipEnergy: container.querySelector('#tooltip-energy'),
-      tooltipPowerCost: container.querySelector('#tooltip-powercost'),
-      tooltipClose: container.querySelector('#tooltip-close'),
-      tooltipAttackSection: container.querySelector('#tooltip-attack-section'),
-      tooltipElementSection: container.querySelector('#tooltip-element-section'),
-      tooltipTypeBtns: container.querySelectorAll('.tooltip-type-btn'),
-      tooltipElementBtns: container.querySelectorAll('.tooltip-element-btn'),
-      // Biome section (Tower)
-      towerBiomeSection: container.querySelector('#tower-biome-section'),
-      towerBiomeIcons: container.querySelector('#tower-biome-icons'),
-      towerBiomeBonus: container.querySelector('#tower-biome-bonus'),
-      detailBiome: container.querySelector('#detail-biome'),
-      // Stat detail popups
-      detailPowerCost: container.querySelector('#detail-powercost'),
       btnStart: container.querySelector('#btn-start'),
-      btnUpgrade: container.querySelector('#btn-upgrade'),
-      btnAbilities: container.querySelector('#btn-abilities'),
-      btnSell: container.querySelector('#btn-sell'),
-      // Stat upgrades section
-      tooltipUpgradesSection: container.querySelector('#tooltip-upgrades-section'),
-      upgradesGrid: container.querySelector('#upgrades-grid'),
-      // Ability upgrades section
-      tooltipAbilitiesSection: container.querySelector('#tooltip-abilities-section'),
-      abilitiesGrid: container.querySelector('#abilities-grid'),
-      // Lightning charge controls
-      lightningChargeSection: container.querySelector('#lightning-charge-section'),
-      lightningChargeSlider: container.querySelector('#lightning-charge-slider'),
-      lightningChargeValue: container.querySelector('#lightning-charge-value'),
-      lightningChargeCost: container.querySelector('#lightning-charge-cost'),
-      lightningChargeDamage: container.querySelector('#lightning-charge-damage'),
-      // Energy building tooltip
+      // Energy building tooltip (still used for energy buildings)
       energyTooltip: container.querySelector('#energy-tooltip'),
       energyTooltipIcon: container.querySelector('#energy-tooltip-icon'),
       energyTooltipName: container.querySelector('#energy-tooltip-name'),
@@ -177,11 +136,82 @@ class GameControllerBase {
       energyBtnConnect: container.querySelector('#energy-btn-connect'),
       energyBtnUpgrade: container.querySelector('#energy-btn-upgrade'),
       energyBtnSell: container.querySelector('#energy-btn-sell'),
-      energyUpgradeBtns: container.querySelectorAll('#energy-upgrades-grid .upgrade-stat-btn')
+      energyUpgradeBtns: container.querySelectorAll('#energy-upgrades-grid .upgrade-stat-btn'),
+      // Pause menu
+      pauseMenuOverlay: container.querySelector('#pause-menu-overlay'),
+      pauseBtnResume: container.querySelector('#pause-btn-resume'),
+      pauseBtnSettings: container.querySelector('#pause-btn-settings'),
+      pauseBtnQuit: container.querySelector('#pause-btn-quit'),
+      // Bottom panel
+      bottomPanel: container.querySelector('#bottom-panel'),
+      panelStats: container.querySelector('#panel-stats'),
+      panelStatsEmpty: container.querySelector('.panel-stats-empty'),
+      panelStatsContent: container.querySelector('#panel-stats-content'),
+      statsGridTower: container.querySelector('#stats-grid-tower'),
+      statsGridEnergy: container.querySelector('#stats-grid-energy'),
+      // Panel stats values (tower)
+      panelDmg: container.querySelector('#panel-dmg'),
+      panelRng: container.querySelector('#panel-rng'),
+      panelSpd: container.querySelector('#panel-spd'),
+      panelCrit: container.querySelector('#panel-crit'),
+      panelCritdmg: container.querySelector('#panel-critdmg'),
+      panelPower: container.querySelector('#panel-power'),
+      panelHp: container.querySelector('#panel-hp'),
+      panelSplash: container.querySelector('#panel-splash'),
+      panelChain: container.querySelector('#panel-chain'),
+      // Element ability stats
+      panelBurn: container.querySelector('#panel-burn'),
+      panelSpread: container.querySelector('#panel-spread'),
+      panelSlow: container.querySelector('#panel-slow'),
+      panelFreeze: container.querySelector('#panel-freeze'),
+      panelPoison: container.querySelector('#panel-poison'),
+      panelShock: container.querySelector('#panel-shock'),
+      panelDrain: container.querySelector('#panel-drain'),
+      // Panel stats values (energy)
+      panelStored: container.querySelector('#panel-stored'),
+      panelOutput: container.querySelector('#panel-output'),
+      panelRange: container.querySelector('#panel-range'),
+      panelGen: container.querySelector('#panel-gen'),
+      // Avatar section
+      panelAvatar: container.querySelector('#panel-avatar'),
+      avatarEmpty: container.querySelector('.avatar-empty'),
+      avatarContent: container.querySelector('#avatar-content'),
+      avatarIcon: container.querySelector('#avatar-icon'),
+      avatarName: container.querySelector('#avatar-name'),
+      avatarLevel: container.querySelector('#avatar-level'),
+      avatarXpFill: container.querySelector('#avatar-xp-fill'),
+      avatarXpValue: container.querySelector('#avatar-xp-value'),
+      avatarEnergyFill: container.querySelector('#avatar-energy-fill'),
+      avatarEnergyValue: container.querySelector('#avatar-energy-value'),
+      avatarBtnSell: container.querySelector('#avatar-btn-sell'),
+      // Actions section - using new IDs from bottom-panel module
+      panelActions: container.querySelector('#panel-build'),
+      actionsBuild: container.querySelector('#build-menu'), // New ID
+      actionsTower: container.querySelector('#actions-tower'),
+      actionsEnergy: container.querySelector('#actions-energy'),
+      buildGrid: container.querySelector('.build-cards-grid'), // New class
+      buildItems: container.querySelectorAll('.build-card'), // New class
+      // Tower actions
+      actionAttackType: container.querySelector('#action-attack-type'),
+      actionElement: container.querySelector('#action-element'),
+      actionUpgrades: container.querySelector('#action-upgrades'),
+      actionAbilities: container.querySelector('#action-abilities'),
+      upgradesGridPanel: container.querySelector('#upgrades-grid-panel'),
+      abilitiesGridPanel: container.querySelector('#abilities-grid-panel'),
+      // Energy actions
+      actionConnect: container.querySelector('#action-connect'),
+      actionUpgradeEnergy: container.querySelector('#action-upgrade-energy'),
+      energyUpgradesPanel: container.querySelector('#energy-upgrades-panel'),
+      energyChannelsBtn: container.querySelector('#energy-channels-btn'),
+      // Wave control
+      waveControl: container.querySelector('#wave-control')
     };
     
     // Setup navigation
     this.setupScreenNavigation(container);
+    
+    // Setup bottom panel events (build cards, etc.)
+    this.setupBottomPanelEvents();
     
     // Setup resize observer
     this.setupResizeObserver();
@@ -200,10 +230,18 @@ class GameControllerBase {
   setupResizeObserver() {
     if (!this.canvasContainer) return;
     
+    // ResizeObserver for container size changes
     this.resizeObserver = new ResizeObserver(() => {
       this.resizeCanvas();
     });
     this.resizeObserver.observe(this.canvasContainer);
+    
+    // Also listen to window resize for fullscreen/maximize changes
+    this._windowResizeHandler = () => {
+      // Small delay to let layout settle
+      setTimeout(() => this.resizeCanvas(), 50);
+    };
+    window.addEventListener('resize', this._windowResizeHandler);
     
     // Initial resize
     setTimeout(() => this.resizeCanvas(), 50);
@@ -222,15 +260,18 @@ class GameControllerBase {
     if (width < 200 || height < 200) return;
     if (Math.abs(this.canvas.width - width) < 5 && Math.abs(this.canvas.height - height) < 5) return;
     
+    // Update canvas dimensions
     this.canvas.width = width;
     this.canvas.height = height;
     
+    // Update camera viewport
     if (this.camera) {
       this.camera.setViewportSize(width, height);
     }
+    
+    // Update renderer (WebGL viewport, projections, text canvases)
     if (this.renderer) {
-      this.renderer.width = width;
-      this.renderer.height = height;
+      this.renderer.resize(width, height);
     }
     
     this.renderGame();
@@ -306,17 +347,16 @@ class GameControllerBase {
     this.placingTower = false;
     this.selectedPath = null;
     
-    // Reset tower item UI
-    if (this.elements.towerItems) {
-      this.elements.towerItems.forEach(item => {
-        item.classList.remove('placing', 'selected', 'disabled');
-      });
-    }
+    // Reset build card UI
+    const buildCards = this.screens.game?.querySelectorAll('.build-card') || [];
+    buildCards.forEach(item => {
+      item.classList.remove('placing', 'selected', 'disabled');
+    });
     
     // Hide tooltip if visible
     this.hideTowerInfo();
     
-    if (this.elements.btnStart) this.elements.btnStart.textContent = '▶ Start Wave';
+    if (this.elements.btnStart) this.elements.btnStart.innerHTML = '▶ Start Wave <span class="hotkey-hint">[Space]</span>';
     
     // Mark that we need to re-setup UI events on next game init
     this._needsUIEventSetup = true;
@@ -452,6 +492,7 @@ class GameControllerBase {
   setupEventListeners() {
     this.setupUIEvents();
     this.setupCanvasEvents();
+    this.setupBottomPanelEvents();
   }
 
   /**
@@ -469,10 +510,11 @@ class GameControllerBase {
     this._lastCanAfford = canAfford;
     
     // Update base tower affordability
-    this.elements.towerItems.forEach(item => {
+    const towerCards = this.screens.game?.querySelectorAll('.build-card[data-type="tower"]') || [];
+    towerCards.forEach(item => {
       item.classList.toggle('disabled', !canAfford);
       
-      const priceEl = item.querySelector('.tower-price');
+      const priceEl = item.querySelector('.build-card-price');
       if (priceEl) {
         priceEl.style.color = canAfford ? '#ffd700' : '#fc8181';
       }
@@ -492,13 +534,12 @@ class GameControllerBase {
    */
   updateTowerPriceDisplay() {
     // Update all tower-price elements
-    this.elements.towerItems?.forEach(item => {
-      const priceEl = item.querySelector('.tower-price');
+    const towerCards = this.screens.game?.querySelectorAll('.build-card[data-type="tower"]') || [];
+    towerCards.forEach(item => {
+      const priceEl = item.querySelector('.build-card-price');
       if (priceEl) {
         priceEl.textContent = `${this.towerCost}g`;
       }
-      // Update title tooltip too
-      item.title = `Build Tower (${this.towerCost}g)`;
     });
   }
 
@@ -508,18 +549,13 @@ class GameControllerBase {
   enterPlacementMode() {
     this.placingTower = true;
     
-    // Update UI
-    this.elements.towerItems.forEach(item => {
-      item.classList.add('placing');
+    // Update UI - highlight tower build card
+    const buildCards = this.screens.game?.querySelectorAll('.build-card') || [];
+    buildCards.forEach(card => {
+      if (card.dataset.type === 'tower') {
+        card.classList.add('placing');
+      }
     });
-    
-    // Hide attack/element sections while placing
-    if (this.elements.attackTypeSection) {
-      this.elements.attackTypeSection.style.display = 'none';
-    }
-    if (this.elements.elementSection) {
-      this.elements.elementSection.style.display = 'none';
-    }
     
     // Update PlacementManager state
     if (this.placementManager) {
@@ -546,9 +582,10 @@ class GameControllerBase {
       this.placementManager.exitPlacementMode();
     }
     
-    // Update UI
-    this.elements.towerItems.forEach(item => {
-      item.classList.remove('placing');
+    // Update UI - remove highlight
+    const buildCards = this.screens.game?.querySelectorAll('.build-card') || [];
+    buildCards.forEach(card => {
+      card.classList.remove('placing');
     });
     
     // Clear hover and re-render
@@ -570,13 +607,13 @@ class GameControllerBase {
       this.placementManager.enterPlacementMode(BUILDING_TYPES.ENERGY, buildingType);
     }
     
-    // Update UI - highlight selected energy building
-    const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
-    energyItems.forEach(item => {
-      if (item.dataset.building === buildingType) {
-        item.classList.add('placing');
+    // Update UI - highlight selected energy building card
+    const buildCards = this.screens.game?.querySelectorAll('.build-card') || [];
+    buildCards.forEach(card => {
+      if (card.dataset.type === 'energy' && card.dataset.building === buildingType) {
+        card.classList.add('placing');
       } else {
-        item.classList.remove('placing');
+        card.classList.remove('placing');
       }
     });
     
@@ -600,10 +637,10 @@ class GameControllerBase {
       this.placementManager.exitPlacementMode();
     }
     
-    // Update UI
-    const energyItems = this.screens.game?.querySelectorAll('.energy-item') || [];
-    energyItems.forEach(item => {
-      item.classList.remove('placing');
+    // Update UI - remove highlights
+    const buildCards = this.screens.game?.querySelectorAll('.build-card') || [];
+    buildCards.forEach(card => {
+      card.classList.remove('placing');
     });
     
     if (this.renderer) {
@@ -739,8 +776,12 @@ class GameControllerBase {
       attackTypeId 
     });
     
-    // Update UI
-    this.updateTooltipSections(tower);
+    // Update UI - refresh the bottom panel
+    setTimeout(() => {
+      if (this.game?.selectedTower) {
+        this.showTowerInBottomPanel(this.game.selectedTower);
+      }
+    }, 50);
     this.updateTowerAffordability();
   }
   
@@ -764,8 +805,12 @@ class GameControllerBase {
       elementId 
     });
     
-    // Update UI
-    this.updateTooltipSections(tower);
+    // Update UI - refresh the bottom panel
+    setTimeout(() => {
+      if (this.game?.selectedTower) {
+        this.showTowerInBottomPanel(this.game.selectedTower);
+      }
+    }, 50);
     this.updateTowerAffordability();
   }
 
@@ -814,11 +859,28 @@ class GameControllerBase {
       last.lives = state.lives;
     }
     
-    // Energy
-    const energyVal = Math.floor(state.energy?.energy || 0);
-    if (last.energy !== energyVal) {
-      el.energy.textContent = energyVal;
-      last.energy = energyVal;
+    // Energy - New detailed display
+    const energyState = state.energy || {};
+    const energyProd = Math.floor(energyState.totalGeneration || 0);
+    const energyCons = Math.floor(energyState.totalConsumption || 0);
+    const energyStored = Math.floor(energyState.totalStored || 0);
+    const energyCap = Math.floor(energyState.totalCapacity || 0);
+    
+    if (last.energyProd !== energyProd && el.energyProd) {
+      el.energyProd.textContent = `+${energyProd}`;
+      last.energyProd = energyProd;
+    }
+    if (last.energyCons !== energyCons && el.energyCons) {
+      el.energyCons.textContent = `-${energyCons}`;
+      last.energyCons = energyCons;
+    }
+    if (last.energyStored !== energyStored && el.energyStored) {
+      el.energyStored.textContent = energyStored;
+      last.energyStored = energyStored;
+    }
+    if (last.energyCap !== energyCap && el.energyCap) {
+      el.energyCap.textContent = energyCap;
+      last.energyCap = energyCap;
     }
     
     // Wave with timer
@@ -838,7 +900,7 @@ class GameControllerBase {
     if (state.firstWaveStarted) {
       const btnText = state.paused ? '▶ Resume' : '⏸ Pause';
       if (last.btnText !== btnText) {
-        el.btnStart.textContent = btnText;
+        el.btnStart.innerHTML = `${btnText} <span class="hotkey-hint">[Space]</span>`;
         last.btnText = btnText;
       }
     }
@@ -895,6 +957,11 @@ class GameControllerBase {
       renderData.connectingFromBuilding = this.connectingFromBuilding;
     }
     
+    // Add selected energy building for range display
+    if (this.selectedEnergyBuilding) {
+      renderData.selectedEnergyBuilding = this.selectedEnergyBuilding;
+    }
+    
     this.renderer.render(renderData);
     
     // Update energy building tooltip in real-time if visible
@@ -942,20 +1009,25 @@ class GameControllerBase {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
+    if (this._windowResizeHandler) {
+      window.removeEventListener('resize', this._windowResizeHandler);
+    }
     if (this.game) {
       this.game.stop();
     }
   }
 }
 
-// Apply mixins in order (energy tooltip before tower tooltip for proper override chain)
+// Apply mixins in order (BottomPanel inside so its methods are available to tooltip mixins)
 const GameController = TowerTooltipMixin(
   TowerUpgradesUIMixin(
     AbilityUpgradesUIMixin(
       EnergyTooltipMixin(
-        CanvasEventsMixin(
-          GameEventsMixin(
-            UIEventsMixin(GameControllerBase)
+        BottomPanelMixin(
+          CanvasEventsMixin(
+            GameEventsMixin(
+              UIEventsMixin(GameControllerBase)
+            )
           )
         )
       )

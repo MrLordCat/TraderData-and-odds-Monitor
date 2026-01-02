@@ -107,6 +107,7 @@ class EnergyBuildingManager {
       gridWidth: def.gridWidth || 1,
       gridHeight: def.gridHeight || 1,
       shape: def.shape || 'rect',
+      gridSize: this.config?.GRID_SIZE || 24,  // Pass grid size for pixel calculation
       ...def.stats
     });
 

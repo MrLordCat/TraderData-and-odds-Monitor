@@ -14,7 +14,9 @@ const {
   getElementPathCost,
   applyStatUpgrade,
   applyElementPath,
-  calculateTotalInvested
+  calculateTotalInvested,
+  applyElementAbilityUpgrade,
+  getElementAbilityUpgradeCost
 } = require('../../core/tower-upgrades');
 
 /**
@@ -199,6 +201,42 @@ function createUpgradeHandlers(context) {
   }
 
   /**
+   * Handle element ability upgrade
+   */
+  function handleUpgradeAbility({ towerId, abilityId }) {
+    const tower = towers.get(towerId);
+    if (!tower) return;
+    
+    // Check if tower has element
+    if (!tower.elementPath) {
+      eventBus.emit('tower:upgrade-failed', { 
+        reason: 'Tower has no element' 
+      });
+      return;
+    }
+    
+    const cost = getElementAbilityUpgradeCost(tower, abilityId);
+    
+    eventBus.emit('economy:check-afford', {
+      amount: cost,
+      callback: (canAfford) => {
+        if (!canAfford) {
+          eventBus.emit('tower:upgrade-failed', { reason: 'Not enough gold' });
+          return;
+        }
+        
+        if (applyElementAbilityUpgrade(tower, abilityId)) {
+          eventBus.emit('economy:spend', cost);
+          eventBus.emit('tower:ability-upgraded', { tower, abilityId });
+          eventBus.emit('tower:updated', { tower });
+        } else {
+          eventBus.emit('tower:upgrade-failed', { reason: 'Max level reached' });
+        }
+      }
+    });
+  }
+
+  /**
    * Handle tower taking damage
    */
   function handleTowerDamage({ towerId, damage, source }, deselectCallback) {
@@ -277,6 +315,7 @@ function createUpgradeHandlers(context) {
     handleUpgradeStat,
     handleSetElement,
     handleSetPowerDraw,
+    handleUpgradeAbility,
     handleTowerDamage,
     handleSellRequest,
     healTower

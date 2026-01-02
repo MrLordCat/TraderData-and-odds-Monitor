@@ -149,11 +149,11 @@ class PowerTransfer extends PowerNode {
    * Get effective channels (more upgrade potential)
    */
   getEffectiveInputChannels() {
-    return this.inputChannels + this.upgrades.channels;
+    return this.inputChannels + (this.upgradeLevels?.channels || 0);
   }
 
   getEffectiveOutputChannels() {
-    return this.outputChannels + this.upgrades.channels;
+    return this.outputChannels + (this.upgradeLevels?.channels || 0);
   }
 
   /**
@@ -161,8 +161,9 @@ class PowerTransfer extends PowerNode {
    */
   upgrade(type) {
     if (type === 'channels') {
-      if (this.upgrades.channels < this.maxChannelUpgrades) {
-        this.upgrades.channels++;
+      const currentChannels = this.upgradeLevels?.channels || 0;
+      if (currentChannels < this.maxChannelUpgrades) {
+        this.upgradeLevels.channels = currentChannels + 1;
         this.inputChannels = this.getEffectiveInputChannels();
         this.outputChannels = this.getEffectiveOutputChannels();
         this.level++;

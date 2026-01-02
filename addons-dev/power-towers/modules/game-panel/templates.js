@@ -2,6 +2,8 @@
  * Power Towers TD - HTML Templates
  */
 
+const { getBottomPanelTemplate } = require('./bottom-panel/templates');
+
 /**
  * Launcher template for attached mode (sidebar)
  */
@@ -104,15 +106,42 @@ function getGameTemplate() {
       
       <!-- Game Screen -->
       <div class="game-screen gameplay-screen" id="screen-game" style="display: none;">
-        <div class="game-stats-bar">
-          <div class="stat-item"><span class="stat-icon">💰</span><span class="stat-value" id="stat-gold">100</span></div>
-          <div class="stat-item"><span class="stat-icon">❤️</span><span class="stat-value" id="stat-lives">20</span></div>
-          <div class="stat-item"><span class="stat-icon">⚡</span><span class="stat-value" id="stat-energy">50</span></div>
-          <div class="stat-item"><span class="stat-icon">🌊</span><span class="stat-value" id="stat-wave">0</span></div>
-        </div>
         
         <div class="canvas-container">
           <canvas id="game-canvas"></canvas>
+          
+          <!-- Top HUD - centered stats -->
+          <div class="top-hud-wrapper">
+            <div class="top-hud">
+              <div class="hud-section hud-gold">
+                <span class="hud-icon">💰</span>
+                <span class="hud-value" id="stat-gold">100</span>
+              </div>
+              <div class="hud-divider"></div>
+              <div class="hud-section hud-lives">
+                <span class="hud-icon">❤️</span>
+                <span class="hud-value" id="stat-lives">20</span>
+              </div>
+              <div class="hud-divider"></div>
+              <div class="hud-section hud-wave">
+                <span class="hud-icon">🌊</span>
+                <span class="hud-value" id="stat-wave">0</span>
+              </div>
+              <div class="hud-divider"></div>
+              <div class="hud-section hud-energy">
+                <span class="hud-icon">⚡</span>
+                <div class="hud-energy-group">
+                  <span class="energy-stored" id="stat-energy-stored">0</span>
+                  <span class="energy-sep">/</span>
+                  <span class="energy-cap" id="stat-energy-cap">100</span>
+                  <span class="energy-sep">|</span>
+                  <span class="energy-prod" id="stat-energy-prod">+0</span>
+                  <span class="energy-cons" id="stat-energy-cons">-0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div class="game-overlay" id="game-overlay" style="display: none;">
             <div class="overlay-content">
               <h3 id="overlay-title">Game Over</h3>
@@ -324,111 +353,16 @@ function getGameTemplate() {
           </div>
         </div>
         
-        <div class="build-toolbar" id="build-toolbar">
-          <div class="toolbar-section towers-section">
-            <div class="section-label">Towers:</div>
-            <div class="tower-select" id="tower-select">
-              <!-- Single tower type -->
-              <div class="tower-item" data-tower="base" title="Build Tower (50g)">
-                <button class="tower-btn">🏗️</button>
-                <span class="tower-price">50g</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Energy Buildings Section -->
-          <div class="toolbar-section energy-section">
-            <div class="section-label">Power:</div>
-            <div class="energy-select" id="energy-select">
-              <div class="energy-item" data-building="base-generator" title="Basic Generator - Stable power (50g)">
-                <button class="energy-btn">⚡</button>
-                <span class="energy-price">50g</span>
-              </div>
-              <div class="energy-item" data-building="bio-generator" title="Bio Generator - Uses trees (80g)">
-                <button class="energy-btn">🌳</button>
-                <span class="energy-price">80g</span>
-              </div>
-              <div class="energy-item" data-building="wind-generator" title="Wind Turbine - Needs mountains (100g)">
-                <button class="energy-btn">💨</button>
-                <span class="energy-price">100g</span>
-              </div>
-              <div class="energy-item" data-building="solar-generator" title="Solar Panel - Biome efficiency (90g)">
-                <button class="energy-btn">☀️</button>
-                <span class="energy-price">90g</span>
-              </div>
-              <div class="energy-item" data-building="water-generator" title="Hydro Generator - Needs water (95g)">
-                <button class="energy-btn">💧</button>
-                <span class="energy-price">95g</span>
-              </div>
-              <div class="energy-item" data-building="battery" title="Battery - Energy storage (60g)">
-                <button class="energy-btn">🔋</button>
-                <span class="energy-price">60g</span>
-              </div>
-              <div class="energy-item" data-building="power-transfer" title="Power Relay - Multi-channel (75g)">
-                <button class="energy-btn">🔌</button>
-                <span class="energy-price">75g</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Attack Type Selection (shows after tower is selected) -->
-          <div class="toolbar-section attack-type-section" id="attack-type-section" style="display: none;">
-            <div class="section-label">Attack Type:</div>
-            <div class="attack-type-select" id="attack-type-select">
-              <div class="attack-type-item" data-type="siege" title="Siege - AoE damage, slower">
-                <button class="type-btn">💥</button>
-                <span class="type-price">75g</span>
-              </div>
-              <div class="attack-type-item" data-type="normal" title="Normal - Fast attacks">
-                <button class="type-btn">🎯</button>
-                <span class="type-price">50g</span>
-              </div>
-              <div class="attack-type-item" data-type="magic" title="Magic - Power scaling">
-                <button class="type-btn">✨</button>
-                <span class="type-price">100g</span>
-              </div>
-              <div class="attack-type-item" data-type="piercing" title="Piercing - High crit">
-                <button class="type-btn">🗡️</button>
-                <span class="type-price">60g</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Element Path Selection -->
-          <div class="toolbar-section element-section" id="element-section" style="display: none;">
-            <div class="section-label">Element:</div>
-            <div class="element-select" id="element-select">
-              <div class="element-item" data-element="fire" title="Fire - Burn DoT">
-                <button class="element-btn">🔥</button>
-                <span class="element-price">100g</span>
-              </div>
-              <div class="element-item" data-element="ice" title="Ice - Slow enemies">
-                <button class="element-btn">❄️</button>
-                <span class="element-price">100g</span>
-              </div>
-              <div class="element-item" data-element="lightning" title="Lightning - Chain attacks">
-                <button class="element-btn">⚡</button>
-                <span class="element-price">120g</span>
-              </div>
-              <div class="element-item" data-element="nature" title="Nature - Poison + Life">
-                <button class="element-btn">🌿</button>
-                <span class="element-price">100g</span>
-              </div>
-              <div class="element-item" data-element="dark" title="Dark - True damage">
-                <button class="element-btn">💀</button>
-                <span class="element-price">150g</span>
-              </div>
-            </div>
-          </div>
+        <div class="game-controls">
+          <button id="btn-start" class="game-btn primary">▶ Start Wave <span class="hotkey-hint">[Space]</span></button>
         </div>
         
-        <div class="game-controls">
-          <button id="btn-start" class="game-btn primary">▶ Start Wave</button>
-        </div>
+        <!-- Bottom Panel (3-section layout) -->
+        ${getBottomPanelTemplate()}
         
         <div class="game-footer">
           <button class="back-btn small" data-screen="menu">☰ Menu</button>
-          <p class="hint">Click tower icon to build</p>
+          <p class="hint">Space = Start/Pause | ESC = Menu</p>
         </div>
       </div>
     </div>

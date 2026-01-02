@@ -759,11 +759,18 @@ class GameRenderer {
   }
   
   _renderConnectionRange(building) {
-    const range = building.connectionRange || 200;
+    const gridSize = CONFIG.GRID_SIZE;
+    // Use effective range (in tiles) converted to pixels
+    const rangeInTiles = building.getEffectiveRange?.() || building.range || 4;
+    const range = rangeInTiles * gridSize;
+    
+    // Use center coordinates (same as _renderEnergyBuildings)
+    const centerX = building.worldX ?? building.x;
+    const centerY = building.worldY ?? building.y;
     
     this.shapeRenderer.begin('triangles', this.camera);
-    this.shapeRenderer.circle(building.x, building.y, range, 0.3, 0.8, 1, 0.1);
-    this.shapeRenderer.circleOutline(building.x, building.y, range, 2 / this.camera.zoom, 0.3, 0.8, 1, 0.5);
+    this.shapeRenderer.circle(centerX, centerY, range, 0.3, 0.8, 1, 0.1);
+    this.shapeRenderer.circleOutline(centerX, centerY, range, 2 / this.camera.zoom, 0.3, 0.8, 1, 0.5);
     this.shapeRenderer.end();
   }
   
@@ -1664,23 +1671,60 @@ class GameRenderer {
       centerY = y + gridSize / 2;
     }
     
-    // Preview range (tower range)
+    // Preview range based on building type
     if (this.canPlaceHover) {
-      this.shapeRenderer.circleOutline(centerX, centerY, CONFIG.TOWER_BASE_RANGE || 60, 1 / this.camera.zoom, color.r, color.g, color.b, 0.3);
+      let previewRange;
+      let rangeColor = { r: color.r, g: color.g, b: color.b };
+      
+      if (this.hoverBuildingType) {
+        // Energy building - show connection range in tiles * gridSize
+        const ENERGY_BUILDINGS = require('../modules/energy/building-defs').ENERGY_BUILDINGS;
+        const def = ENERGY_BUILDINGS[this.hoverBuildingType];
+        if (def && def.range) {
+          previewRange = def.range * gridSize; // Convert tiles to pixels
+          rangeColor = { r: 0.29, g: 0.56, b: 0.85 }; // Blue for energy range
+        } else {
+          previewRange = CONFIG.TOWER_BASE_RANGE || 60;
+        }
+      } else {
+        // Tower - show attack range
+        previewRange = CONFIG.TOWER_BASE_RANGE || 60;
+      }
+      
+      this.shapeRenderer.circleOutline(centerX, centerY, previewRange, 1 / this.camera.zoom, rangeColor.r, rangeColor.g, rangeColor.b, 0.4);
+      // Also draw filled circle for better visibility
+      this.shapeRenderer.circle(centerX, centerY, previewRange, rangeColor.r, rangeColor.g, rangeColor.b, 0.08);
     }
     
     this.shapeRenderer.end();
   }
   
   _renderRangeIndicator(data) {
-    if (!data.selectedTower) return;
+    // Tower range indicator (yellow)
+    if (data.selectedTower) {
+      const tower = data.selectedTower;
+      this.shapeRenderer.begin('triangles', this.camera);
+      this.shapeRenderer.circle(tower.x, tower.y, tower.range, 1, 0.84, 0, 0.1);
+      this.shapeRenderer.circleOutline(tower.x, tower.y, tower.range, 1 / this.camera.zoom, 1, 0.84, 0, 0.3);
+      this.shapeRenderer.end();
+    }
     
-    const tower = data.selectedTower;
-    
-    this.shapeRenderer.begin('triangles', this.camera);
-    this.shapeRenderer.circle(tower.x, tower.y, tower.range, 1, 0.84, 0, 0.1);
-    this.shapeRenderer.circleOutline(tower.x, tower.y, tower.range, 1 / this.camera.zoom, 1, 0.84, 0, 0.3);
-    this.shapeRenderer.end();
+    // Energy building connection range indicator (blue)
+    if (data.selectedEnergyBuilding) {
+      const building = data.selectedEnergyBuilding;
+      const gridSize = CONFIG.GRID_SIZE;
+      
+      // Use worldX/worldY or x/y for center position
+      const centerX = building.worldX ?? building.x;
+      const centerY = building.worldY ?? building.y;
+      const rangeInTiles = building.getEffectiveRange?.() || building.range || 4;
+      const range = rangeInTiles * gridSize; // Convert tiles to pixels
+      
+      this.shapeRenderer.begin('triangles', this.camera);
+      this.shapeRenderer.circle(centerX, centerY, range, 0.29, 0.56, 0.85, 0.1);
+      this.shapeRenderer.circleOutline(centerX, centerY, range, 1.5 / this.camera.zoom, 0.29, 0.56, 0.85, 0.5);
+      this.shapeRenderer.end();
+    }
   }
   
   _renderMinimap(data) {

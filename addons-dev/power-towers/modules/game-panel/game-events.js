@@ -19,6 +19,11 @@ function GameEventsMixin(Base) {
       this.game.on(this.GameEvents.GAME_TICK, () => {
         this.updateUI(this.game.getState());
         
+        // Update bottom panel stats in real-time for selected tower
+        if (this.game.selectedTower) {
+          this.updateBottomPanelStats(this.game.selectedTower);
+        }
+        
         // Update tooltip energy display in real-time if visible
         if (this.game.selectedTower && this.elements.towerTooltip?.classList.contains('visible')) {
           this.updateTooltipEnergy(this.game.selectedTower);
@@ -27,6 +32,11 @@ function GameEventsMixin(Base) {
         // Update energy building tooltip in real-time if visible
         if (this.selectedEnergyBuilding && this.elements.energyTooltip?.classList.contains('visible')) {
           this.updateEnergyTooltipRealtime(this.selectedEnergyBuilding);
+        }
+        
+        // Update energy building stats in real-time
+        if (this.selectedEnergyBuilding) {
+          this.updateBottomPanelEnergyStats(this.selectedEnergyBuilding);
         }
       });
       
@@ -47,10 +57,12 @@ function GameEventsMixin(Base) {
       
       // Listen for tower updates (attack type set, element set, XP gain, etc.)
       this.game.on('tower:updated', (data) => {
-        // Only update if this tower is currently selected and tooltip is visible
+        // Only update if this tower is currently selected
         if (data?.tower && this.game.selectedTower?.id === data.tower.id) {
-          // Use updateTowerInfo to refresh without closing upgrades panel
-          this.updateTowerInfo(data.tower);
+          // Update bottom panel
+          if (this.showTowerInBottomPanel) {
+            this.showTowerInBottomPanel(data.tower);
+          }
         }
         this.updateTowerAffordability();
       });
@@ -58,8 +70,9 @@ function GameEventsMixin(Base) {
       // Listen for gold changes to update upgrade prices dynamically
       this.game.on('economy:updated', () => {
         const tower = this.game?.selectedTower;
-        if (tower && this.elements.tooltipUpgradesSection?.style.display !== 'none') {
-          this.populateUpgradesGrid(tower);
+        // Update bottom panel upgrades if tower is selected
+        if (tower && this.showTowerInBottomPanel) {
+          this.showTowerInBottomPanel(tower);
         }
         this.updateTowerAffordability();
         this.updateEnergyAffordability();
