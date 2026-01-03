@@ -3,15 +3,16 @@
  * 
  * Recalculates effective tower stats after modifiers.
  * 
- * NEW SYSTEM:
- * 1. Tower level gives +1% to ALL base stats per level
+ * SYSTEM:
+ * 1. Tower level gives bonus to ALL base stats per level (configurable)
  * 2. Attack type modifiers apply to leveled base stats
- * 3. Stat upgrades give % bonus to final values
+ * 3. Stat upgrades give % bonus to final values (configurable)
  * 4. Element/terrain bonuses apply last
  */
 
 const { mergeAttackTypes } = require('../../core/attack-types');
 const { BASE_TOWER } = require('../../core/tower-upgrades');
+const CONFIG = require('../../core/config');
 
 /**
  * Recalculate tower's effective stats after any change
@@ -45,10 +46,11 @@ function recalculateTowerStats(tower) {
   
   // =========================================
   // STEP 1: Apply level bonus to base stats
-  // Each level gives +1% to base stats
+  // Each level gives configurable % bonus to base stats
   // =========================================
   const level = tower.level || 1;
-  const levelBonus = 1 + (level - 1) * 0.01; // Level 1 = 1.0, Level 10 = 1.09
+  const levelBonusPercent = CONFIG.TOWER_LEVEL_BONUS_PERCENT || 0.01;
+  const levelBonus = 1 + (level - 1) * levelBonusPercent;
   
   const leveledBaseDamage = tower.baseDamage * levelBonus;
   const leveledBaseRange = tower.baseRange * levelBonus;
@@ -65,23 +67,24 @@ function recalculateTowerStats(tower) {
   
   // =========================================
   // STEP 3: Apply stat upgrades as % bonus
-  // Each upgrade level gives % bonus to current value
+  // Each upgrade level gives configurable % bonus
   // =========================================
   const upgradeLevels = tower.upgradeLevels || {};
+  const bonuses = CONFIG.TOWER_UPGRADE_BONUSES || {};
   
-  // Damage: +5% per level
+  // Damage
   if (upgradeLevels.damage) {
-    damage *= (1 + upgradeLevels.damage * 0.05);
+    damage *= (1 + upgradeLevels.damage * (bonuses.damage || 0.05));
   }
   
-  // Attack Speed: +4% per level
+  // Attack Speed
   if (upgradeLevels.attackSpeed) {
-    fireRate *= (1 + upgradeLevels.attackSpeed * 0.04);
+    fireRate *= (1 + upgradeLevels.attackSpeed * (bonuses.attackSpeed || 0.04));
   }
   
-  // Range: +5% per level
+  // Range
   if (upgradeLevels.range) {
-    range *= (1 + upgradeLevels.range * 0.05);
+    range *= (1 + upgradeLevels.range * (bonuses.range || 0.05));
   }
   
   // Apply final values
@@ -106,9 +109,9 @@ function recalculateTowerStats(tower) {
   const leveledBaseHp = tower.baseHp * levelBonus;
   tower.maxHp = leveledBaseHp * tower.hpMultiplier;
   
-  // HP upgrade: +8% per level
+  // HP upgrade
   if (upgradeLevels.hp) {
-    tower.maxHp *= (1 + upgradeLevels.hp * 0.08);
+    tower.maxHp *= (1 + upgradeLevels.hp * (bonuses.hp || 0.08));
   }
   
   // Keep current HP ratio when max changes
@@ -132,43 +135,43 @@ function recalculateTowerStats(tower) {
   // =========================================
   // STEP 7: Critical stats
   // =========================================
-  const baseCrit = attackType.critChance || tower.baseCritChance || 0.05;
-  const baseCritDmg = attackType.critDmgMod || tower.baseCritDmgMod || 1.5;
+  const baseCrit = attackType.critChance || tower.baseCritChance || (CONFIG.TOWER_BASE_CRIT_CHANCE || 0.05);
+  const baseCritDmg = attackType.critDmgMod || tower.baseCritDmgMod || (CONFIG.TOWER_BASE_CRIT_DAMAGE || 1.5);
   
-  // Crit Chance: +1% per level (additive)
-  tower.critChance = baseCrit + (upgradeLevels.critChance || 0) * 0.01;
-  tower.critChance = Math.min(0.75, tower.critChance); // Cap at 75%
+  // Crit Chance (additive)
+  tower.critChance = baseCrit + (upgradeLevels.critChance || 0) * (bonuses.critChance || 0.01);
+  tower.critChance = Math.min(CONFIG.TOWER_CRIT_CHANCE_CAP || 0.75, tower.critChance);
   
-  // Crit Damage: +10% per level (additive to multiplier)
-  tower.critDmgMod = baseCritDmg + (upgradeLevels.critDamage || 0) * 0.1;
+  // Crit Damage (additive to multiplier)
+  tower.critDmgMod = baseCritDmg + (upgradeLevels.critDamage || 0) * (bonuses.critDamage || 0.1);
   
   // =========================================
   // STEP 8: Copy attack type properties & apply upgrades
   // =========================================
   
-  // Splash Radius: +8% per level
+  // Splash Radius
   let splashRadius = attackType.splashRadius || 0;
   if (splashRadius && upgradeLevels.splashRadius) {
-    splashRadius *= (1 + upgradeLevels.splashRadius * 0.08);
+    splashRadius *= (1 + upgradeLevels.splashRadius * (bonuses.splashRadius || 0.08));
   }
   tower.splashRadius = splashRadius;
   tower.splashDmgFalloff = attackType.splashDmgFalloff;
-  tower.splashCanCrit = attackType.splashCanCrit || false; // Unlockable via cards
+  tower.splashCanCrit = attackType.splashCanCrit || false;
   
-  // Chain Count: +1 per level (additive, capped at 10)
+  // Chain Count (flat bonus, capped)
   let chainCount = tower.baseChainCount || attackType.chainCount || 0;
   if (upgradeLevels.chainCount) {
-    chainCount += upgradeLevels.chainCount;
-    chainCount = Math.min(10, chainCount);
+    chainCount += upgradeLevels.chainCount * (bonuses.chainCount || 1);
+    chainCount = Math.min(CONFIG.TOWER_CHAIN_COUNT_CAP || 10, chainCount);
   }
   tower.chainCount = chainCount;
   tower.chainDmgFalloff = tower.chainDmgFalloff !== undefined ? tower.chainDmgFalloff : attackType.chainDmgFalloff;
-  tower.chainCanCrit = tower.elementAbilities?.chain?.canCrit || false; // From element abilities
+  tower.chainCanCrit = tower.elementAbilities?.chain?.canCrit || false;
   
-  // Power Scaling: +10% per level
+  // Power Scaling
   let powerScaling = attackType.powerScaling || 1.0;
   if (upgradeLevels.powerScaling) {
-    powerScaling *= (1 + upgradeLevels.powerScaling * 0.10);
+    powerScaling *= (1 + upgradeLevels.powerScaling * (bonuses.powerScaling || 0.10));
   }
   tower.powerScaling = powerScaling;
   tower.minPowerDraw = attackType.minPowerDraw;
@@ -176,41 +179,39 @@ function recalculateTowerStats(tower) {
   tower.overdriveEfficiency = attackType.overdriveEfficiency;
   
   // =========================================
-  // STEP 9: Energy Storage (+10% per level)
+  // STEP 9: Energy Storage
   // =========================================
   if (tower.baseEnergyStorage) {
     let energyStorage = tower.baseEnergyStorage * levelBonus;
     if (upgradeLevels.energyStorage) {
-      energyStorage *= (1 + upgradeLevels.energyStorage * 0.10);
+      energyStorage *= (1 + upgradeLevels.energyStorage * (bonuses.energyStorage || 0.10));
     }
     tower.energyStorage = energyStorage;
   }
   
   // =========================================
-  // STEP 10: Power Hit Cost (NEW SYSTEM)
-  // Base formula: damage * 0.5 + level%
-  // Then apply attack type modifier and powerEfficiency upgrade
+  // STEP 10: Power Hit Cost
   // =========================================
   const powerHitCostMod = attackType.powerHitCostMod || 1.0;
+  const levelCostBonusPercent = CONFIG.TOWER_LEVEL_BONUS_PERCENT || 0.01;
+  const basePowerCostRatio = CONFIG.TOWER_BASE_POWER_COST_RATIO || 0.5;
   
-  // Base cost = 50% of effective damage + 1% per tower level
-  let basePowerCost = tower.damage * 0.5;
-  const levelCostBonus = 1 + (level - 1) * 0.01; // +1% per level
+  let basePowerCost = tower.damage * basePowerCostRatio;
+  const levelCostBonus = 1 + (level - 1) * levelCostBonusPercent;
   basePowerCost *= levelCostBonus;
-  
-  // Apply attack type modifier (Siege = 1.4, Normal = 0.8, etc.)
   basePowerCost *= powerHitCostMod;
   
-  // Apply powerEfficiency upgrade: -3% per level (min 20% of original)
+  // Apply powerEfficiency upgrade
   if (upgradeLevels.powerEfficiency) {
-    const reduction = Math.min(0.8, upgradeLevels.powerEfficiency * 0.03);
+    const maxReduction = CONFIG.TOWER_POWER_EFFICIENCY_CAP || 0.8;
+    const reductionPerLevel = bonuses.powerEfficiency || 0.03;
+    const reduction = Math.min(maxReduction, upgradeLevels.powerEfficiency * reductionPerLevel);
     basePowerCost *= (1 - reduction);
   }
   
-  // Store both the cost per shot and the modifier for display
   tower.energyCostPerShot = Math.max(1, Math.round(basePowerCost));
   tower.powerHitCostMod = powerHitCostMod;
-  tower.basePowerCost = tower.damage * 0.5; // For tooltip display
+  tower.basePowerCost = tower.damage * basePowerCostRatio;
   
   // Projectile visuals
   tower.projectileColor = tower.elementColor || attackType.projectileColor;

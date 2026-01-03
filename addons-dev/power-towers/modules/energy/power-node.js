@@ -4,14 +4,12 @@
  * Base class for all power buildings.
  * Common properties: input/output channels, range, capacity, upgrades
  * 
- * XP SYSTEM: Buildings gain XP from energy processed
- * - Every 100 energy = 1 XP
- * - Every 10 XP = 1 level
- * 
- * LEVEL BONUSES: Each level gives +2% to all stats
- * 
- * STAT UPGRADES: Similar to towers, each upgrade gives % bonus
+ * XP SYSTEM: Buildings gain XP from energy processed (configurable in CONFIG)
+ * LEVEL BONUSES: Each level gives configurable % bonus to all stats
+ * STAT UPGRADES: Similar to towers, each upgrade gives configurable % bonus
  */
+
+const CONFIG = require('../../core/config');
 
 let nodeIdCounter = 0;
 
@@ -64,7 +62,7 @@ class PowerNode {
     this.xp = 0;                    // Current XP
     this.totalEnergyProcessed = 0; // Total energy for XP calculation
     this.level = 1;
-    this.maxLevel = 20;            // Max level from XP (increased)
+    this.maxLevel = CONFIG.ENERGY_MAX_LEVEL || 20;
     
     // Stat upgrades (like towers - each gives % bonus)
     this.upgradeLevels = {
@@ -118,20 +116,22 @@ class PowerNode {
 
   /**
    * Add energy processed (for XP calculation)
-   * Every 100 energy = 1 XP, every 10 XP = 1 level
+   * Configurable: energy per XP and XP per level in CONFIG
    */
   addEnergyProcessed(amount) {
     this.totalEnergyProcessed += amount;
     
-    // Calculate XP: 100 energy = 1 XP
-    const newXp = Math.floor(this.totalEnergyProcessed / 100);
+    // Calculate XP from energy processed
+    const energyPerXp = 100 / (CONFIG.ENERGY_XP_PER_100_ENERGY || 1);
+    const newXp = Math.floor(this.totalEnergyProcessed / energyPerXp);
     
     if (newXp > this.xp) {
       const xpGained = newXp - this.xp;
       this.xp = newXp;
       
-      // Check level up: every 10 XP = 1 level
-      const newLevel = Math.min(Math.floor(1 + (this.xp / 10)), this.maxLevel);
+      // Check level up
+      const xpPerLevel = CONFIG.ENERGY_XP_PER_LEVEL || 10;
+      const newLevel = Math.min(Math.floor(1 + (this.xp / xpPerLevel)), this.maxLevel);
       if (newLevel > this.level) {
         const oldLevel = this.level;
         this.level = newLevel;
@@ -152,52 +152,55 @@ class PowerNode {
    * Get XP progress to next level
    */
   getXpProgress() {
-    const xpForCurrentLevel = (this.level - 1) * 10;
+    const xpPerLevel = CONFIG.ENERGY_XP_PER_LEVEL || 10;
+    const xpForCurrentLevel = (this.level - 1) * xpPerLevel;
     const xpIntoLevel = this.xp - xpForCurrentLevel;
-    const xpNeeded = 10; // 10 XP per level
     return {
       current: xpIntoLevel,
-      needed: xpNeeded,
-      percent: (xpIntoLevel / xpNeeded) * 100
+      needed: xpPerLevel,
+      percent: (xpIntoLevel / xpPerLevel) * 100
     };
   }
   
   /**
    * Recalculate all effective stats based on level and upgrades
-   * Similar to tower stat calculation
+   * Uses configurable bonuses from CONFIG
    */
   recalculateStats() {
-    // Level bonus: +2% per level to all stats
-    const levelBonus = 1 + (this.level - 1) * 0.02;
+    const bonuses = CONFIG.ENERGY_UPGRADE_BONUSES || {};
+    const levelBonusPercent = CONFIG.ENERGY_LEVEL_BONUS_PERCENT || 0.02;
+    const levelBonus = 1 + (this.level - 1) * levelBonusPercent;
     
-    // Input Rate: base * level bonus * upgrade bonus (+5% per upgrade)
+    // Input Rate
     this.inputRate = this.baseInputRate * levelBonus;
     if (this.upgradeLevels.inputRate) {
-      this.inputRate *= (1 + this.upgradeLevels.inputRate * 0.05);
+      this.inputRate *= (1 + this.upgradeLevels.inputRate * (bonuses.inputRate || 0.05));
     }
     
-    // Output Rate: base * level bonus * upgrade bonus (+5% per upgrade)
+    // Output Rate
     this.outputRate = this.baseOutputRate * levelBonus;
     if (this.upgradeLevels.outputRate) {
-      this.outputRate *= (1 + this.upgradeLevels.outputRate * 0.05);
+      this.outputRate *= (1 + this.upgradeLevels.outputRate * (bonuses.outputRate || 0.05));
     }
     
-    // Capacity: base * level bonus * upgrade bonus (+10% per upgrade)
+    // Capacity
     this.capacity = this.baseCapacity * levelBonus;
     if (this.upgradeLevels.capacity) {
-      this.capacity *= (1 + this.upgradeLevels.capacity * 0.10);
+      this.capacity *= (1 + this.upgradeLevels.capacity * (bonuses.capacity || 0.10));
     }
     
-    // Range: base + level bonus (flat) + upgrade bonus
-    this.range = this.baseRange + Math.floor((this.level - 1) * 0.2);
+    // Range (flat bonus per level)
+    const rangePerLevel = CONFIG.ENERGY_RANGE_PER_LEVEL || 0.2;
+    this.range = this.baseRange + Math.floor((this.level - 1) * rangePerLevel);
     if (this.upgradeLevels.range) {
-      this.range += this.upgradeLevels.range;
+      this.range += this.upgradeLevels.range * (bonuses.range || 1);
     }
     
     // Channels: base + upgrade bonus (only if base > 0)
+    const channelsPerUpgrade = bonuses.channels || 1;
     const channelsUpgrade = this.upgradeLevels.channels || 0;
-    this.inputChannels = this.baseInputChannels > 0 ? this.baseInputChannels + channelsUpgrade : 0;
-    this.outputChannels = this.baseOutputChannels > 0 ? this.baseOutputChannels + channelsUpgrade : 0;
+    this.inputChannels = this.baseInputChannels > 0 ? this.baseInputChannels + channelsUpgrade * channelsPerUpgrade : 0;
+    this.outputChannels = this.baseOutputChannels > 0 ? this.baseOutputChannels + channelsUpgrade * channelsPerUpgrade : 0;
     
     // Apply biome modifiers if present
     if (this.biomeModifiers) {

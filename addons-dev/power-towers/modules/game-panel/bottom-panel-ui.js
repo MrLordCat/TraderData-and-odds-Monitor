@@ -851,27 +851,37 @@ function BottomPanelMixin(Base) {
       if (!upgradesGrid) return;
       
       const gold = this.game?.getState?.().gold || 0;
+      const CONFIG = require('../../core/config');
+      const costs = CONFIG.ENERGY_UPGRADE_COSTS || {};
+      const bonuses = CONFIG.ENERGY_UPGRADE_BONUSES || {};
+      const costMultiplier = CONFIG.ENERGY_UPGRADE_COST_MULTIPLIER || 1.2;
       
       // Clear grid
       upgradesGrid.innerHTML = '';
       
-      // Energy building upgrade definitions
+      // Energy building upgrade definitions (costs and bonuses from CONFIG)
       const ENERGY_UPGRADES = [
-        { id: 'capacity', name: 'Capacity', emoji: '🔋', stat: 'capacity', bonus: '+25%', baseCost: 30 },
-        { id: 'output', name: 'Output', emoji: '📤', stat: 'outputRate', bonus: '+20%', baseCost: 40 },
-        { id: 'channels', name: 'Channels', emoji: '🔌', stat: 'channels', bonus: '+1 In/Out', baseCost: 60 },
-        { id: 'range', name: 'Range', emoji: '📡', stat: 'range', bonus: '+1', baseCost: 50 },
-        { id: 'efficiency', name: 'Efficiency', emoji: '⚡', stat: 'efficiency', bonus: '+10%', baseCost: 35 },
+        { id: 'capacity', name: 'Capacity', emoji: '🔋', stat: 'capacity', 
+          bonus: `+${Math.round((bonuses.capacity || 0.10) * 100)}%`, baseCost: costs.capacity || 30 },
+        { id: 'output', name: 'Output', emoji: '📤', stat: 'outputRate', 
+          bonus: `+${Math.round((bonuses.outputRate || 0.05) * 100)}%`, baseCost: costs.output || 40 },
+        { id: 'channels', name: 'Channels', emoji: '🔌', stat: 'channels', 
+          bonus: `+${bonuses.channels || 1} In/Out`, baseCost: costs.channels || 60 },
+        { id: 'range', name: 'Range', emoji: '📡', stat: 'range', 
+          bonus: `+${bonuses.range || 1}`, baseCost: costs.range || 50 },
+        { id: 'efficiency', name: 'Efficiency', emoji: '⚡', stat: 'efficiency', 
+          bonus: `+${Math.round((bonuses.efficiency || 0.10) * 100)}%`, baseCost: costs.efficiency || 35 },
       ];
       
       // Add generation upgrade for generators
       if (building.type === 'generator' || building.type === 'solar' || building.type === 'hydro' || building.type === 'wind' || building.type === 'geo') {
-        ENERGY_UPGRADES.push({ id: 'generation', name: 'Gen Rate', emoji: '⚡', stat: 'generationRate', bonus: '+15%', baseCost: 45 });
+        ENERGY_UPGRADES.push({ id: 'generation', name: 'Gen Rate', emoji: '⚡', stat: 'generationRate', 
+          bonus: `+${Math.round((bonuses.generation || 0.15) * 100)}%`, baseCost: costs.generation || 45 });
       }
       
       for (const upgrade of ENERGY_UPGRADES) {
         const currentLevel = building.upgradeLevels?.[upgrade.id] || 0;
-        const cost = Math.floor(upgrade.baseCost * Math.pow(1.2, currentLevel));
+        const cost = Math.floor(upgrade.baseCost * Math.pow(costMultiplier, currentLevel));
         const canAfford = gold >= cost;
         
         const card = document.createElement('div');
@@ -915,30 +925,35 @@ function BottomPanelMixin(Base) {
       if (!building.upgradeLevels) building.upgradeLevels = {};
       building.upgradeLevels[upgradeId] = (building.upgradeLevels[upgradeId] || 0) + 1;
       
+      // Get bonuses from CONFIG
+      const CONFIG = require('../../core/config');
+      const bonuses = CONFIG.ENERGY_UPGRADE_BONUSES || {};
+      
       // Apply stat boost based on upgrade type
       const level = building.upgradeLevels[upgradeId];
       switch (upgradeId) {
         case 'capacity':
-          building.capacity = Math.floor((building.baseCapacity || 50) * (1 + level * 0.25));
+          building.capacity = Math.floor((building.baseCapacity || 50) * (1 + level * (bonuses.capacity || 0.10)));
           break;
         case 'output':
-          building.outputRate = Math.floor((building.baseOutputRate || 10) * (1 + level * 0.2));
+          building.outputRate = Math.floor((building.baseOutputRate || 10) * (1 + level * (bonuses.outputRate || 0.05)));
           break;
         case 'range':
-          building.range = (building.baseRange || 4) + level;
+          building.range = (building.baseRange || 4) + level * (bonuses.range || 1);
           break;
         case 'efficiency':
-          building.efficiency = 1 + level * 0.1;
+          building.efficiency = 1 + level * (bonuses.efficiency || 0.10);
           break;
         case 'generation':
           if (building.generationRate !== undefined) {
-            building.generationRate = Math.floor((building.baseGenerationRate || 5) * (1 + level * 0.15));
+            building.generationRate = Math.floor((building.baseGenerationRate || 5) * (1 + level * (bonuses.generation || 0.15)));
           }
           break;
         case 'channels':
           // Channels upgrade: +1 input AND +1 output per level
           // BUT only if building has that channel type (generators have 0 inputs)
-          const channelsLevel = level;
+          const channelsBonus = bonuses.channels || 1;
+          const channelsLevel = level * channelsBonus;
           if ((building.baseInputChannels || 0) > 0) {
             building.inputChannels = building.baseInputChannels + channelsLevel;
           }

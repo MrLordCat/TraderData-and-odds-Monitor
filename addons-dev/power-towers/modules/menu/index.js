@@ -5,6 +5,7 @@
  */
 
 const { GameEvents } = require('../../core/event-bus');
+const CONFIG = require('../../core/config');
 
 // Menu states
 const MENU_SCREENS = {
@@ -164,7 +165,8 @@ class MenuModule {
   getUpgradeCost(upgradeId) {
     const upgrade = this.upgrades[upgradeId];
     if (!upgrade) return Infinity;
-    return Math.floor(upgrade.cost * Math.pow(1.5, upgrade.level));
+    const multiplier = CONFIG.MENU_UPGRADE_COST_MULTIPLIER || 1.5;
+    return Math.floor(upgrade.cost * Math.pow(multiplier, upgrade.level));
   }
 
   /**

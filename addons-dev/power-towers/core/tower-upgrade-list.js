@@ -19,16 +19,17 @@
 const { STAT_UPGRADES } = require('./upgrades/stat-upgrades');
 const { ABILITIES } = require('./upgrades/abilities');
 const { PASSIVE_EFFECTS } = require('./upgrades/passive-effects');
+const CONFIG = require('./config');
 
 // =========================================
-// COST CONFIGURATION
+// COST CONFIGURATION (from CONFIG)
 // =========================================
 const COST_CONFIG = {
   // Base upgrade cost formula: baseCost * (scaleFactor ^ upgradeLevel)
   // Tower level discount: cost * (1 - (towerLevel - 1) * discountPerLevel)
   
-  discountPerTowerLevel: 0.05,  // 5% discount per tower level
-  maxDiscount: 0.5,             // Max 50% discount
+  discountPerTowerLevel: CONFIG.TOWER_UPGRADE_DISCOUNT_PER_LEVEL || 0.05,  // 5% discount per tower level
+  maxDiscount: CONFIG.TOWER_UPGRADE_MAX_DISCOUNT || 0.5,             // Max 50% discount
   
   // When upgrade is purchased, next upgrade costs more
   // But when tower levels up, discount resets the effective price

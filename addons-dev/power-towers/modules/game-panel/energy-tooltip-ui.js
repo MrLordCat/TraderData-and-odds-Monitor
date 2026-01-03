@@ -3,27 +3,32 @@
  * Handles energy building selection and connections (UI in bottom panel)
  */
 
-// Base upgrade costs
-const BASE_UPGRADE_COSTS = {
+const CONFIG = require('../../core/config');
+
+// Base upgrade costs (from CONFIG)
+const BASE_UPGRADE_COSTS = CONFIG.ENERGY_TOOLTIP_COSTS || {
   capacity: 20,
   outputRate: 25,
   range: 30,
   channels: 50
 };
 
-// Max upgrade levels
-const MAX_UPGRADE_LEVELS = {
+// Max upgrade levels (from CONFIG)
+const MAX_UPGRADE_LEVELS = CONFIG.ENERGY_TOOLTIP_MAX_LEVELS || {
   capacity: 5,
   outputRate: 5,
   range: 5
 };
+
+// Cost multiplier (from CONFIG)
+const TOOLTIP_COST_MULTIPLIER = CONFIG.ENERGY_TOOLTIP_COST_MULTIPLIER || 1.5;
 
 /**
  * Calculate upgrade cost for energy building
  */
 function calculateEnergyUpgradeCost(stat, currentLevel) {
   const baseCost = BASE_UPGRADE_COSTS[stat] || 20;
-  return Math.floor(baseCost * Math.pow(1.5, currentLevel));
+  return Math.floor(baseCost * Math.pow(TOOLTIP_COST_MULTIPLIER, currentLevel));
 }
 
 /**

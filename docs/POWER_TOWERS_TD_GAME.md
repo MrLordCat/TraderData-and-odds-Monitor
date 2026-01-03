@@ -1,6 +1,6 @@
 # Power Towers TD - Roguelike Tower Defense Game
 
-> Inspired by Power Towers TD custom map from Warcraft 3, evolved into a roguelike format with **WebGL rendering** and **unified building system**.
+> Inspired by Power Towers TD custom map from Warcraft 3, evolved into a roguelike format with **WebGL rendering**, **elemental abilities**, and **unified building system**.
 
 ## 🎯 Concept
 
@@ -17,7 +17,7 @@ A Tower Defense game with a unique **energy system mechanic** — towers require
 **WebGL-rendered** 2D graphics with Warcraft 3 inspired visuals:
 - Procedural terrain with biome colors and decorations
 - WC3-style towers with platforms, crystals, and turrets
-- Multi-cell energy buildings (L-shaped, 2x2)
+- Multi-cell energy buildings with unique visuals per type
 - Particle effects for attacks and abilities
 
 ---
@@ -29,9 +29,9 @@ A Tower Defense game with a unique **energy system mechanic** — towers require
 #### Technical Specifications
 | Property | Value | Notes |
 |----------|-------|-------|
-| **Map Size** | 2560×1920 px | 80×60 grid cells |
-| **Grid Cell** | 32×32 px | Tower/building placement unit |
-| **Visual Expansion** | 20% | Wall boundary around playable area |
+| **Map Size** | 2000×2000 px | Configurable via CONFIG |
+| **Grid Cell** | 20×20 px | Tower/building placement unit |
+| **Visual Padding** | 10% | Wall boundary around playable area |
 | **Path Type** | Spiral | 2 loops, tightening toward center |
 
 #### Biome System (6 types)
@@ -45,34 +45,28 @@ Biome Types:
 └── 🔥 Burned   - Dark terrain, fire bonus
 ```
 
-#### Map Generation
-- **Spawn Point**: Edge of map (randomized)
-- **Base Point**: Center of map
-- **Path Algorithm**: Double-loop spiral from edge to center
-- **Terrain**: Biome-based with procedural noise
-- **20% Visual Expansion**: Visible wall/boundary around playable area
+### Enemy System
 
-### Enemy System (Implemented)
-
-#### Enemy Types
-| Type | Emoji | Health | Speed | Reward | Notes |
-|------|-------|--------|-------|--------|-------|
-| Minion | 👾 | 20 | 40 px/s | 10g | Basic enemy |
-| Scout | 🦎 | 20 | 80 px/s | 15g | Fast but fragile |
-| Brute | 🐗 | 100 | 25 px/s | 30g | Slow tank |
-| Swarmling | 🐜 | 15 | 60 px/s | 5g | Spawns in groups |
-| Boss | 👹 | 1000 | 20 px/s | 200g | Every 10 waves |
+#### Enemy Types (from CONFIG)
+| Type | Emoji | Health | Speed | Reward | XP |
+|------|-------|--------|-------|--------|-----|
+| Minion | 👾 | 20 | 40 px/s | 10g | 1 |
+| Scout | 🦎 | 20 | 80 px/s | 15g | 2 |
+| Brute | 🐗 | 100 | 25 px/s | 30g | 3 |
+| Swarmling | 🐜 | 15 | 60 px/s | 5g | 1 |
+| Boss | 👹 | 1000 | 20 px/s | 200g | 10 |
 
 #### Wave System
-- **Auto-wave**: 15 seconds between waves
-- **Difficulty scaling**: HP and speed increase per wave
+- **Wave delay**: 3000ms between waves
+- **Spawn interval**: 800ms between enemies
+- **HP scaling**: ×1.05 per wave
+- **Speed scaling**: ×1.02 per wave
 - **Boss waves**: Every 10 waves
-- **Enemy composition**: Mix varies by wave number
 
-### Tower System (Implemented)
+### Tower System
 
 #### Single Tower Mechanic
-Player builds **Base Towers** and upgrades them via:
+Player builds **Base Towers** and upgrades them:
 
 ```
 🗼 Base Tower ─── Cost: 30 gold
@@ -83,481 +77,243 @@ Player builds **Base Towers** and upgrades them via:
       │      ├── ✨ Magic   (1.5x vs magic-weak)
       │      └── 🗡️ Piercing (ignores armor)
       │
-      ├──2️⃣ Upgrade Stats
-      │      ├── Damage (10 → +20%)
-      │      ├── Range (60 → +15%)
-      │      └── Fire Rate (1.0 → +10%)
+      ├──2️⃣ Upgrade Stats (infinite levels)
+      │      ├── Damage     (+5% per level)
+      │      ├── Attack Speed (+4% per level)
+      │      ├── Range      (+5% per level)
+      │      ├── HP         (+8% per level)
+      │      ├── Crit Chance (+1% per level, cap 75%)
+      │      ├── Crit Damage (+10% per level)
+      │      └── Power Efficiency (-3% energy cost)
       │
-      └──3️⃣ Choose Element Path
-             ├── 🔥 Fire    - Burn DoT, AoE damage
-             ├── ❄️ Ice     - Slow, Freeze
-             ├── ⚡ Lightning - Chain damage, fast attack
-             ├── 🌿 Nature  - Poison, area control
-             └── 💀 Dark    - True damage, lifesteal
+      └──3️⃣ Choose Element Path (unlocks abilities)
+             ├── 🔥 Fire    - Burn DoT, AoE damage, Inferno
+             ├── ❄️ Ice     - Slow, Freeze, Shatter
+             ├── ⚡ Lightning - Chain damage, Charge Shot
+             ├── 🌿 Nature  - Poison, Thorns, Entangle
+             └── 💀 Dark    - True damage, Lifesteal, Void
 ```
 
-#### Tower Stats
+#### Tower Base Stats (from CONFIG)
 | Stat | Base Value | Notes |
 |------|------------|-------|
-| Damage | 10 | Multiplied by attack type & element |
+| Damage | 10 | +1% per tower level |
 | Range | 60 px | 3 grid cells |
 | Fire Rate | 1.0/s | Attacks per second |
 | Energy Cost | 2 | Per shot |
+| HP | 100 | Tower health |
+| Crit Chance | 5% | Base critical chance |
+| Crit Damage | 1.5× | Critical multiplier |
 
 #### Tower XP System
-- Towers gain XP for each enemy killed
-- XP unlocks stat upgrades
-- Visual level indicator (💎 gem count)
+- **XP Multiplier**: ×2 (configurable)
+- **Level thresholds**: [0, 3, 8, 15, 25, 40, 60, 85, 115, 150]
+- **Level bonus**: +1% to all stats per level
+- **Upgrade discount**: 5% per level (max 50%)
 
-### Energy System (Implemented)
+#### Element Abilities
+Each element path unlocks unique abilities with upgrade tiers:
 
-#### Architecture
-```
-⚡ Energy System
-├── PlacementManager  - Unified placement for ALL buildings
-├── PowerNetwork      - Manages connections
-├── PowerNode         - Base class for all energy entities
-├── Generators        - Produce energy
-├── Storage           - Battery, relay
-└── Consumers         - Towers (via adapter)
-```
+**🔥 Fire Path:**
+- Burn (DoT) → Inferno (AoE) → Meteor (massive AoE)
+- Fire spread mechanics
 
-#### Energy Buildings
+**❄️ Ice Path:**
+- Slow → Freeze → Shatter (bonus damage to frozen)
+- Chill stacking system
 
-| Building | Icon | Cost | Size | Generation | Notes |
-|----------|------|------|------|------------|-------|
-| Base Generator | ⚡ | 50g | 1×1 | 5/tick | Stable, no terrain requirement |
-| Bio Generator | 🌳 | 80g | **2×2 L-shape** | 8/tick | +bonus per nearby tree |
-| Wind Turbine | 💨 | 100g | 1×1 | 12/tick | Needs mountains, unstable |
-| Solar Panel | ☀️ | 90g | 1×1 | 10/tick | Biome-dependent efficiency |
-| Water Generator | 💧 | 120g | 1×1 | 15/tick | Needs water, AoE bonus |
-| Battery | 🔋 | 60g | **2×2** | 0 | Storage: 200, decay 1%/tick |
-| Power Relay | 📡 | 40g | 1×1 | 0 | 2 input, 2 output channels |
+**⚡ Lightning Path:**
+- Chain Lightning → Charge Shot → Overload
+- Configurable charge target (0-100%)
 
-#### Multi-Cell Buildings
-```
-Bio Generator (L-shape 2x2):     Battery (2x2):
-┌───┬───┐                        ┌───┬───┐
-│ █ │   │ ← empty corner         │ █ │ █ │
-├───┼───┤                        ├───┼───┤
-│ █ │ █ │                        │ █ │ █ │
-└───┴───┘                        └───┴───┘
-```
+**🌿 Nature Path:**
+- Poison → Thorns → Entangle (root)
+- Spreading poison mechanics
+
+**💀 Dark Path:**
+- Soul Siphon → Void → Death Mark
+- Lifesteal and true damage
+
+### Energy System
+
+#### Energy Building Types
+
+| Building | Icon | Cost | Size | Gen/tick | Special |
+|----------|------|------|------|----------|---------|
+| Generator | ⚡ | 50g | 1×1 | 5 | Stable, no requirements |
+| Bio Generator | 🌳 | 80g | 2×2 L | 8 | Bonus from nearby nature |
+| Wind Turbine | 💨 | 100g | 1×1 | 12 | Fluctuating output |
+| Solar Panel | ☀️ | 90g | 1×1 | 10 | Biome-dependent |
+| Hydro Generator | 💧 | 120g | 1×1 | 15 | Needs water proximity |
+| Geothermal | 🌋 | 150g | 1×1 | 20 | Needs burned terrain |
+| Battery | 🔋 | 60g | 2×2 | 0 | Storage: 200, relay |
+| Relay | 📡 | 40g | 1×1 | 0 | 2 in, 2 out channels |
+
+#### Unique Building Visuals
+Each energy building has distinct WebGL rendering:
+- **Generator**: Blue core with pulsing glow, energy rings
+- **Solar**: Yellow panels with sun rays animation
+- **Wind**: Rotating turbine blades
+- **Hydro**: Water flow effect, blue waves
+- **Geo**: Orange lava core with heat shimmer
+- **Bio**: Green organic mass with leaf particles
+- **Battery**: Lightning bolt icon, charge level indicator
+- **Relay**: Signal waves emanating outward
+
+#### Energy Building XP & Upgrades
+Energy buildings gain XP from energy processed:
+- **XP rate**: 1 XP per 100 energy
+- **XP per level**: 10
+- **Max level**: 20
+- **Level bonus**: +2% to all stats per level
+
+**Upgrade Types:**
+| Upgrade | Bonus | Base Cost |
+|---------|-------|-----------|
+| Capacity | +10% per level | 30g |
+| Output | +5% per level | 40g |
+| Channels | +1 In/Out per level | 60g |
+| Range | +1 per level | 50g |
+| Efficiency | +10% per level | 35g |
+| Generation | +15% per level | 45g |
 
 #### Power Network
-- Buildings connect via channels (range-based)
-- Energy flows: Generator → Battery/Relay → Tower
-- Each tower has PowerConsumer adapter
-- No passive energy regeneration (disabled)
-
-#### Channel System
 ```
 Connection Flow:
-Generator (output:1) ──→ Relay (input:2, output:2) ──→ Tower
-     │                                                    │
-     └─────────────────→ Battery (input:1) ───────────────┘
+Generator (output:1) ──→ Relay (in:2, out:2) ──→ Tower
+     │                                              │
+     └─────────────→ Battery (in:1, out:1) ─────────┘
 ```
 
-### Economy (Implemented)
+- Buildings connect via channels (range-based)
+- **Powered bonus**: +10% damage, +15% fire rate
+- **Unpowered penalty**: -10% damage, -20% fire rate
+- **Overcharge**: Up to 2× power draw for bonus damage
+
+### Economy
 
 | Source | Amount |
 |--------|--------|
-| Starting Gold | 200 |
+| Starting Gold | 4000 |
 | Enemy Kill | 5-200g (by type) |
-| Wave Bonus | 10g per wave completed |
+| Wave Bonus | Variable |
 
-### Menu System (Implemented)
+### Menu System
 
-#### Screens
-```
-📋 Menu Screens
-├── 🎮 Start     - New game button
-├── 🔧 Upgrades  - Permanent upgrades
-├── 💡 Tips      - Game hints
-└── ⚙️ Settings  - Options
-```
-
-#### Permanent Upgrades
-| Upgrade | Max Level | Cost | Bonus |
-|---------|-----------|------|-------|
+#### Permanent Upgrades (gems)
+| Upgrade | Max | Base Cost | Effect |
+|---------|-----|-----------|--------|
 | Starting Gold | 10 | 100 gems | +50g per level |
 | Starting Lives | 5 | 150 gems | +1 life per level |
 | Tower Damage | 10 | 200 gems | +5% per level |
 | Energy Regen | 5 | 175 gems | +10% per level |
 
----
-
-## 🚀 Game Startup Flow
-
-### Overview
-The game follows a specific initialization sequence from sidebar launch to wave start:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 1. SIDEBAR (Attached Mode)                                                  │
-│    └─► "Launch Game" button → IPC 'module-detach' → Opens new window       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ 2. DETACHED WINDOW                                                          │
-│    └─► GamePanelModule.onMount() → GameController.init()                   │
-│        └─► Shows Menu Screen (screen-menu)                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ 3. MENU SCREEN                                                              │
-│    └─► "Start Game" button → showScreen('game') → initializeGame()         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ 4. GAME SCREEN (Prep Phase)                                                 │
-│    └─► GameCore created, map generated                                     │
-│    └─► running=false, firstWaveStarted=false                               │
-│    └─► Player can build towers & energy buildings                          │
-│    └─► Energy system WORKS (update runs even before wave)                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ 5. START WAVE                                                               │
-│    └─► "Start Wave" button → game.startWave()                              │
-│        ├─► running=true, firstWaveStarted=true                             │
-│        ├─► Emit GAME_START event                                           │
-│        ├─► Start gameLoop() (60 FPS)                                       │
-│        └─► Emit 'wave:start' → EnemiesModule.startNextWave()               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ 6. GAME LOOP (Active)                                                       │
-│    └─► Every frame: update modules → emit GAME_TICK → render               │
-│    └─► Auto-wave: every 15 seconds emit 'wave:start'                       │
-│    └─► Button becomes Pause/Resume toggle                                  │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Detailed Flow
-
-#### Step 1: Launch from Sidebar
-```javascript
-// modules/game-panel/index.js (Attached Mode)
-// When "Launch Game" clicked:
-ipcRenderer.invoke('module-detach', { 
-  moduleId: 'game-panel',
-  modulePath: modulePath,
-  title: 'Power Towers TD',
-  width: 800, height: 950
-});
-```
-
-#### Step 2: Window Initialization
-```javascript
-// modules/game-panel/index.js (Detached Mode)
-onMount(container) {
-  this.gameController = new GameController({ GameCore, GameRenderer, ... });
-  this.gameController.init(container);  // → shows Menu screen
-}
-```
-
-#### Step 3: Menu → Game Screen
-```javascript
-// modules/game-panel/game-controller.js
-setupScreenNavigation(container) {
-  // "Start Game" button has data-screen="game"
-  btn.addEventListener('click', () => {
-    this.showScreen('game');
-    if (!this.game) {
-      this.initializeGame();  // Create GameCore
-    }
-  });
-}
-```
-
-#### Step 4: Game Initialization (Prep Phase)
-```javascript
-// modules/game-panel/game-controller.js
-initializeGame() {
-  this.game = new this.GameCore();  // Creates all modules
-  this.camera = new this.Camera();
-  this.renderer = new this.GameRenderer(this.canvas, this.camera);
-  
-  // Center camera on base
-  const basePos = waypoints[waypoints.length - 1];
-  this.camera.centerOn(basePos.x, basePos.y);
-  
-  this.setupGameEvents();  // Subscribe to GAME_TICK, etc.
-  this.renderGame();       // Initial render
-}
-
-// core/game-core-modular.js - GameCore constructor
-initModules() {
-  this.modules = {
-    menu, map, towers, enemies, combat, 
-    damageNumbers, economy, energy, player
-  };
-  
-  // Initialize all modules
-  for (const module of Object.values(this.modules)) {
-    module.init();
-  }
-  
-  // Generate map (creates terrain, path, waypoints)
-  this.modules.map.generateMap();
-  
-  // Set starting resources
-  this.modules.economy.gold = CONFIG.STARTING_GOLD;  // 400
-  this.modules.player.lives = CONFIG.STARTING_LIVES; // 20
-  
-  // Game NOT running yet!
-  this.running = false;
-  this.firstWaveStarted = false;
-}
-```
-
-**Important:** During prep phase:
-- `running = false` — no game loop
-- `firstWaveStarted = false`
-- Energy module STILL updates (buildings work)
-- Player can build towers and energy buildings
-- Enemies do NOT spawn
-
-#### Step 5: Start Wave
-```javascript
-// modules/game-panel/ui-events.js
-toggleGame() {
-  // First click: start wave
-  if (!this.game.firstWaveStarted) {
-    this.game.startWave();
-    this.elements.btnStart.textContent = '⏸ Pause';
-    return;
-  }
-  // After: toggle pause/resume
-}
-
-// core/game-core-modular.js
-startWave() {
-  if (!this.running) {
-    this.running = true;
-    this.paused = false;
-    this.firstWaveStarted = true;
-    this.autoWaveTimer = 0;
-    this.lastTick = performance.now();
-    
-    this.eventBus.emit(GameEvents.GAME_START, this.getState());
-    this.gameLoop();  // Start the loop!
-  }
-  
-  this.eventBus.emit('wave:start');  // Trigger enemy spawning
-}
-
-// modules/enemies/index.js
-init() {
-  this.eventBus.on('wave:start', () => this.startNextWave());
-}
-
-startNextWave() {
-  this.currentWave++;
-  this.waveInProgress = true;
-  const waveEnemies = this.generateWaveComposition(this.currentWave);
-  this.spawnQueue.push(...waveEnemies);
-  this.eventBus.emit('wave:started', { wave: this.currentWave });
-}
-```
-
-#### Step 6: Game Loop
-```javascript
-// core/game-core-modular.js
-gameLoop() {
-  if (!this.running || this.paused) return;
-  
-  const deltaTime = (now - this.lastTick) / 1000;
-  
-  this.update(deltaTime);
-  this.eventBus.emit(GameEvents.GAME_TICK, { deltaTime, state });
-  
-  this.animationId = requestAnimationFrame(() => this.gameLoop());
-}
-
-update(deltaTime) {
-  // Always update energy (even during menu)
-  this.modules.energy.update(deltaTime);
-  
-  // Auto-wave timer (15 seconds)
-  if (this.firstWaveStarted) {
-    this.autoWaveTimer += deltaTime;
-    if (this.autoWaveTimer >= 15) {
-      this.autoWaveTimer = 0;
-      this.eventBus.emit('wave:start');  // Next wave!
-    }
-  }
-  
-  // Update combat modules
-  this.modules.enemies.update(deltaTime);
-  this.modules.towers.update(deltaTime, enemies);
-  this.modules.combat.update(deltaTime, enemies);
-  // ...
-}
-```
-
-### State Diagram
-
-```
-              ┌──────────────────────────────────────────┐
-              │              MENU SCREEN                 │
-              │  running=false, firstWaveStarted=false   │
-              └─────────────────┬────────────────────────┘
-                                │ "Start Game" click
-                                ▼
-              ┌──────────────────────────────────────────┐
-              │           PREP PHASE (Game Screen)       │
-              │  running=false, firstWaveStarted=false   │
-              │  - Build towers ✓                        │
-              │  - Build energy buildings ✓              │
-              │  - Energy system works ✓                 │
-              │  - Enemies do NOT spawn                  │
-              └─────────────────┬────────────────────────┘
-                                │ "Start Wave" click
-                                ▼
-              ┌──────────────────────────────────────────┐
-              │              ACTIVE GAME                 │
-              │  running=true, firstWaveStarted=true     │
-              │  - Enemies spawn                         │
-              │  - Towers attack                         │
-              │  - Auto-wave every 15s                   │
-              │  - Button = Pause/Resume                 │
-              └─────────────────┬────────────────────────┘
-                                │ Lives = 0
-                                ▼
-              ┌──────────────────────────────────────────┐
-              │              GAME OVER                   │
-              │  gameOver=true, running=false            │
-              │  - Show overlay                          │
-              │  - "Try Again" → restart                 │
-              └──────────────────────────────────────────┘
-```
-
-### Key Events During Startup
-
-| Phase | Event | Triggered By | Handlers |
-|-------|-------|--------------|----------|
-| Init | `map:generated` | MapModule.generateMap() | EnemiesModule (receives waypoints) |
-| Start Wave | `GAME_START` | GameCore.startWave() | MenuModule, TowersModule |
-| Start Wave | `wave:start` | GameCore.startWave() | EnemiesModule.startNextWave() |
-| Each Frame | `GAME_TICK` | GameCore.gameLoop() | GameController (render + UI update) |
-| Wave Spawn | `wave:started` | EnemiesModule | UI (wave counter) |
+Cost multiplier: ×1.5 per level
 
 ---
 
-## 🏗️ Technical Architecture (Current)
+## 🏗️ Technical Architecture
 
 ### File Structure
 ```
 addons-dev/power-towers/
-├── manifest.json              # Version: 0.2.0
+├── manifest.json              # Addon manifest
 ├── index.js                   # Entry point
 │
 ├── core/                      # Core systems
-│   ├── config.js              # Constants (MAP: 2560×1920, GRID: 32)
-│   ├── event-bus.js           # EventBus for modules
-│   ├── game-core-modular.js   # Main orchestrator
+│   ├── config.js              # ⭐ All game parameters
+│   ├── event-bus.js           # EventBus communication
+│   ├── game-core-modular.js   # Main game orchestrator
 │   ├── attack-types.js        # Siege/Normal/Magic/Piercing
 │   ├── biomes.js              # Biome definitions
-│   └── tower-upgrades.js      # Upgrade definitions
-│   └── systems/
-│       └── camera.js          # Camera with zoom/pan
+│   ├── element-abilities.js   # Element ability definitions
+│   ├── tower-upgrade-list.js  # Upgrade system
+│   └── upgrades/              # Upgrade definitions
+│       ├── stat-upgrades.js
+│       ├── abilities.js
+│       └── passive-effects.js
 │
 ├── modules/                   # Feature modules
 │   ├── map/                   # Map generation
-│   │   ├── index.js           # MapModule
-│   │   ├── map-generator.js   # Spiral path generator
-│   │   ├── noise-generator.js # Terrain noise
-│   │   ├── seeded-random.js   # Seeded RNG
-│   │   └── generator-config.js
-│   │
-│   ├── placement/             # 🆕 Unified Placement System
-│   │   └── index.js           # PlacementManager (towers + buildings)
-│   │
+│   ├── placement/             # Unified placement system
 │   ├── towers/                # Tower system
-│   │   ├── index.js           # TowersModule
-│   │   ├── tower-factory.js   # Tower creation
-│   │   ├── tower-stats.js     # Stat calculation
-│   │   ├── tower-combat.js    # Targeting & attack
+│   │   ├── tower-factory.js
+│   │   ├── tower-stats.js     # Uses CONFIG for all bonuses
+│   │   ├── tower-combat.js
 │   │   └── tower-upgrade-handlers.js
-│   │
 │   ├── enemies/               # Enemy system
-│   │   └── index.js           # EnemiesModule, ENEMY_TYPES
-│   │
-│   ├── combat/                # Combat system
-│   │   ├── index.js           # CombatModule, projectiles
-│   │   └── damage-numbers.js  # Floating damage text
-│   │
+│   │   ├── index.js
+│   │   └── status-effects.js  # DoT, slow, freeze, etc.
+│   ├── combat/                # Combat & projectiles
 │   ├── economy/               # Gold management
-│   │   └── index.js           # EconomyModule
-│   │
-│   ├── energy/                # Energy system ⚡
-│   │   ├── index.js           # EnergyModule
-│   │   ├── power-network.js   # PowerNetwork class
-│   │   ├── power-node.js      # PowerNode base (with gridWidth/Height)
-│   │   ├── generators.js      # All generator types
-│   │   ├── storage.js         # Battery (2x2), PowerTransfer
-│   │   ├── building-defs.js   # Building configs (with sizes/shapes)
-│   │   ├── building-manager.js # Uses PlacementManager
-│   │   └── upgrade-system.js  # Building upgrades
-│   │
+│   ├── energy/                # Energy system
+│   │   ├── index.js
+│   │   ├── power-network.js
+│   │   ├── power-node.js      # Uses CONFIG for bonuses
+│   │   ├── generators.js
+│   │   ├── storage.js
+│   │   └── building-defs.js
 │   ├── player/                # Player state
-│   │   └── index.js           # PlayerModule (lives, XP)
-│   │
-│   ├── menu/                  # Menu system
-│   │   └── index.js           # MenuModule, MENU_SCREENS
-│   │
+│   ├── menu/                  # Menu & meta-upgrades
 │   └── game-panel/            # UI Module
-│       ├── index.js           # SidebarModule
-│       ├── templates.js       # HTML (toolbar with towers + energy)
-│       ├── styles.js          # CSS
-│       ├── game-controller.js # Main controller (with PlacementManager)
-│       ├── canvas-events.js   # Mouse/keyboard (uses PlacementManager)
-│       ├── game-events.js     # Game event bindings
-│       ├── ui-events.js       # UI button handlers
-│       ├── tower-tooltip.js   # Tower info popup
-│       └── tower-upgrades-ui.js # Upgrade panel
+│       ├── index.js
+│       ├── templates.js
+│       ├── styles.js
+│       ├── game-controller.js
+│       ├── bottom-panel-ui.js # Uses CONFIG for upgrades
+│       ├── ability-upgrades-ui.js
+│       └── energy-tooltip-ui.js
 │
-└── renderer/                  # 🆕 WebGL Rendering Engine
-    ├── game-renderer.js       # Main renderer (WC3-style graphics)
+└── renderer/                  # WebGL Rendering
+    ├── game-renderer.js       # Main renderer
     └── engine/                # WebGL infrastructure
-        ├── index.js           # Engine exports
         ├── core/
-        │   ├── gl-context.js      # WebGL context wrapper
-        │   ├── shader-manager.js  # GLSL shaders
-        │   └── texture-manager.js # Texture atlas
         ├── rendering/
-        │   ├── sprite-batch.js    # Batched sprite rendering
-        │   ├── shape-renderer.js  # Circles, rects, lines
-        │   └── particle-system.js # GPU particles
         └── systems/
-            └── object-pool.js     # Memory optimization
 ```
 
-### Unified Placement System (PlacementManager)
+### Configuration System (config.js)
 
-All building placement (towers AND energy buildings) goes through `PlacementManager`:
-
-```javascript
-PlacementManager
-├── canPlace(gridX, gridY, def)      // Universal validation
-├── canPlaceTower(gridX, gridY)      // Tower shortcut
-├── canPlaceEnergy(gridX, gridY, type) // Energy shortcut
-├── getCellsForBuilding(...)         // Calculate cells (1×1, 2×2, L-shape)
-├── getBuildingCenter(...)           // World coordinates
-├── enterPlacementMode(type, id)     // Enter placement mode
-├── exitPlacementMode()              // Exit placement mode
-├── canAffordTower()                 // Check tower cost
-└── canAffordEnergy(type)            // Check building cost
-```
-
-**Benefits:**
-- Single source of truth for all placement logic
-- L-shape calculation in one place (not duplicated)
-- Consistent collision detection for all buildings
-- Cleaner code: 80 lines → 3 lines
-
-### Module Communication
-
-All modules communicate via **EventBus** — no direct dependencies:
+All game parameters are centralized in `config.js` organized by category:
 
 ```javascript
-// Example: Tower kills enemy
-TowersModule:   kills enemy, stores lastHitTowerId
-EnemiesModule:  emit('enemy:killed', { enemyId, killerId, reward })
-TowersModule:   on('enemy:killed') → add XP to tower
-EconomyModule:  on('enemy:killed') → add gold
+CONFIG = {
+  // 1. MAP & DISPLAY
+  MAP_WIDTH, MAP_HEIGHT, GRID_SIZE, TARGET_FPS...
+  
+  // 2. ECONOMY
+  STARTING_GOLD, BASE_TOWER_COST, UPGRADE_COST_MULTIPLIER...
+  TOWER_UPGRADE_DISCOUNT_PER_LEVEL, TOWER_UPGRADE_MAX_DISCOUNT...
+  MENU_UPGRADE_COST_MULTIPLIER...
+  
+  // 3. WAVES & ENEMIES
+  WAVE_DELAY_MS, SPAWN_INTERVAL_MS...
+  ENEMY_HP_MULTIPLIER, ENEMY_SPEED_MULTIPLIER...
+  ENEMY_TYPES: { basic, fast, tank, swarm, boss }
+  
+  // 4. XP & LEVELING
+  XP_MULTIPLIER, TOWER_XP_THRESHOLDS...
+  ENERGY_XP_PER_100_ENERGY, ENERGY_XP_PER_LEVEL, ENERGY_MAX_LEVEL...
+  
+  // 5. TOWERS
+  TOWER_BASE_DAMAGE, TOWER_BASE_RANGE, TOWER_BASE_HP...
+  TOWER_LEVEL_BONUS_PERCENT: 0.01
+  TOWER_UPGRADE_BONUSES: { damage, attackSpeed, range, hp, critChance... }
+  TOWER_CRIT_CHANCE_CAP, TOWER_CHAIN_COUNT_CAP, TOWER_POWER_EFFICIENCY_CAP...
+  
+  // 6. ENERGY SYSTEM
+  ENERGY_LEVEL_BONUS_PERCENT, ENERGY_RANGE_PER_LEVEL...
+  ENERGY_UPGRADE_BONUSES: { inputRate, outputRate, capacity, channels... }
+  ENERGY_UPGRADE_COSTS: { capacity, output, channels, range... }
+  TOWER_POWER_BONUSES: { powered: {...}, unpowered: {...} }
+  
+  // 7. COMBAT
+  PROJECTILE_SPEED...
+  
+  // 8. VISUALS
+  COLORS: { background, grid, tower, enemy, ui... }
+  PATH_WAYPOINTS, BASE_POSITION
+}
 ```
 
 ### Key Events
@@ -565,122 +321,13 @@ EconomyModule:  on('enemy:killed') → add gold
 |-------|------|-------------|
 | `GAME_START` | - | Game begins |
 | `GAME_OVER` | { won } | Game ends |
-| `wave:started` | { wave } | Wave spawns |
-| `wave:complete` | { wave } | Wave cleared |
+| `GAME_TICK` | { deltaTime } | Each frame update |
+| `wave:start` | - | Start next wave |
+| `wave:started` | { wave } | Wave spawned |
 | `tower:built` | { tower } | Tower placed |
-| `tower:updated` | { tower } | Tower stats changed |
+| `tower:levelup` | { tower } | Tower leveled up |
 | `enemy:killed` | { reward, killerId } | Enemy died |
-| `enemy:escaped` | { enemy } | Enemy reached base |
-| `economy:updated` | { gold } | Gold changed |
-| `energy:stats-updated` | { generation, storage } | Energy state |
-| `power:network-state` | { connections } | Network updated |
-
-### Game Loop
-```javascript
-// 60 FPS target
-gameLoop(currentTime) {
-  deltaTime = currentTime - lastTick
-  
-  // Update all modules
-  modules.map.update(deltaTime)
-  modules.towers.update(deltaTime)    // Targeting, attacks
-  modules.enemies.update(deltaTime)   // Movement
-  modules.combat.update(deltaTime)    // Projectiles
-  modules.energy.update(deltaTime)    // Power flow
-  modules.player.update(deltaTime)    // Auto-wave timer
-  
-  // Render
-  renderer.render()
-}
-```
-
-### Camera System
-```javascript
-Camera {
-  x, y              // World position
-  zoom              // 0.5 - 2.0
-  viewportWidth/Height
-  
-  screenToWorld(sx, sy)  // Click → grid coords
-  worldToScreen(wx, wy)  // Grid → canvas coords
-  centerOn(x, y)         // Move camera
-  zoomBy(factor)         // Zoom in/out
-  pan(dx, dy)            // Move camera by offset
-}
-```
-
----
-
-## 🎨 WebGL Rendering Engine
-
-### Architecture
-```
-GameRenderer (WebGL)
-├── GLContext          - WebGL 1/2 initialization
-├── ShaderManager      - GLSL vertex/fragment shaders
-├── TextureManager     - Texture atlas management
-├── SpriteBatch        - Batched sprite rendering (10,000+ per draw)
-├── ShapeRenderer      - Circles, rects, lines, arcs
-└── ParticleSystem     - GPU-accelerated particles
-```
-
-### WC3-Style Graphics
-
-#### Towers
-- **Base platform** with element-colored glow
-- **Central crystal** matching element (Fire=red, Ice=cyan, etc.)
-- **Rotating turret** with element-specific design
-- **Range indicator** on hover/selection
-
-#### Energy Buildings
-- **Bio Generator (L-shape)**: Bio tank, leaves, rotating gear
-- **Battery (2x2)**: 4 cells with lightning bolt, charge indicator
-- **Standard buildings**: Type-specific icons with glow effects
-
-### Performance
-- **Sprite batching**: 10,000+ sprites in single draw call
-- **Object pooling**: Memory-efficient entity management
-- **Dirty flag system**: Only re-render when needed
-- **60 FPS target** with delta-time updates
-
----
-
-## 🖥️ UI Layout (Current)
-
-### Toolbar (Single Row)
-```
-┌────────────────────────────────────────────────────────┐
-│ 🗼 30   ⚡ 50  🌳 80  💨 100  ☀️ 90  💧 120  🔋 60  📡 40 │
-│ Tower  Base  Bio   Wind  Solar Water Battery Relay    │
-└────────────────────────────────────────────────────────┘
-```
-
-### Game Area
-```
-┌─────────────────────────────────────────┐
-│  Wave: 5   💰 250   ❤️ 20      │  ← Stats bar
-├─────────────────────────────────────────┤
-│                                         │
-│         🛤️ Spiral Path                  │
-│            (enemies)                    │
-│                 🗼 Tower                │
-│              ⚡ Generator               │
-│                                         │
-│                 🏰                       │  ← Base (center)
-└─────────────────────────────────────────┘
-```
-
-### Tower Tooltip
-```
-┌──────────────────────┐
-│ 🗼 Tower (Lvl 3)     │
-│ ❤️ 100/100           │
-│ 💥 25 dmg  📐 80 rng │
-│ ⚡ 2/shot  🔥 Fire   │
-├──────────────────────┤
-│ [Upgrade] [Sell: 15] │
-└──────────────────────┘
-```
+| `energy:stats-updated` | { generation, storage } | Energy changed |
 
 ---
 
@@ -688,12 +335,13 @@ GameRenderer (WebGL)
 
 | Action | Control |
 |--------|---------|
-| Place tower/building | Left-click on empty cell |
-| Select tower | Left-click on tower |
-| Deselect | Left-click on empty / Right-click |
-| Pan camera | Middle-drag / Right-drag |
+| Place tower/building | Left-click toolbar + left-click map |
+| Select tower/building | Left-click on it |
+| Deselect | Right-click / ESC |
+| Pan camera | Middle-drag / WASD |
 | Zoom | Scroll wheel |
-| Exit placement mode | Right-click |
+| Start wave | Space / Start button |
+| Pause/Resume | Space / Pause button |
 
 ---
 
@@ -702,98 +350,39 @@ GameRenderer (WebGL)
 ### ✅ Implemented
 - [x] Modular architecture with EventBus
 - [x] Map generation with spiral path
-- [x] **Biome system** (6 biome types with bonuses)
-- [x] **20% map expansion** with wall boundary
-- [x] Single tower system (Base → Attack Type → Element)
+- [x] Biome system (6 types)
+- [x] Single tower system with attack types
+- [x] 5 Element paths with unique abilities
 - [x] Tower XP and level system
+- [x] Tower stat upgrades (infinite)
 - [x] 5 enemy types with wave scaling
+- [x] Status effects (burn, slow, freeze, poison)
 - [x] Combat system with projectiles
-- [x] Damage numbers (floating text)
+- [x] Damage numbers
 - [x] Complete energy system
-  - [x] 5 generator types with terrain dependencies
-  - [x] Battery with decay **(2×2 size)**
-  - [x] **Bio Generator (L-shaped 2×2)**
-  - [x] Power relay with multi-channel
-  - [x] Tower power integration
-- [x] **Unified PlacementManager** (towers + buildings)
-- [x] **Multi-cell building support** (1×1, 2×2, L-shape)
-- [x] Economy module (gold)
-- [x] Player module (lives, game over)
-- [x] Menu system with permanent upgrades
+  - [x] 7 building types
+  - [x] Unique visuals per building
+  - [x] Building XP and levels
+  - [x] Building upgrades (6 types)
+  - [x] Channel system (In/Out)
+  - [x] Power network with bonuses
+- [x] Unified PlacementManager
+- [x] Multi-cell building support
+- [x] Economy module
+- [x] Menu with permanent upgrades
 - [x] Camera with zoom/pan
-- [x] UI toolbar (towers + energy)
-- [x] Tower tooltip with upgrades panel
-- [x] Detachable game window
-- [x] **WebGL rendering engine**
-  - [x] Sprite batching (10,000+)
-  - [x] Shape renderer (circles, rects, lines)
-  - [x] Particle system
-  - [x] WC3-style tower graphics
-  - [x] WC3-style building graphics
+- [x] WebGL rendering engine
+- [x] **Centralized CONFIG system**
 
 ### 🚧 Planned
 - [ ] Card system (every 10 waves)
-- [ ] More enemy types
-- [ ] Boss mechanics
+- [ ] More enemy types (flying, magic-immune)
+- [ ] Boss mechanics (special attacks)
 - [ ] Sound effects
 - [ ] Achievement system
-- [ ] Content pack system
+- [ ] Save/Load system
 
 ---
 
-## 📊 Configuration Reference
-
-### config.js
-```javascript
-CONFIG = {
-  // Map
-  MAP_WIDTH: 2560,      // 80 cells × 32px
-  MAP_HEIGHT: 1920,     // 60 cells × 32px
-  GRID_SIZE: 32,
-  MAP_EXPANSION: 0.2,   // 20% visual expansion
-  
-  // Display
-  TARGET_FPS: 60,
-  
-  // Game Balance
-  STARTING_GOLD: 400,
-  STARTING_LIVES: 20,
-  STARTING_ENERGY: 50,
-  MAX_ENERGY: 100,
-  ENERGY_REGEN: 0,  // disabled
-  
-  // Tower
-  BASE_TOWER_COST: 50,
-  TOWER_BASE_DAMAGE: 10,
-  TOWER_BASE_RANGE: 60,
-  TOWER_BASE_FIRE_RATE: 1.0,
-  TOWER_BASE_ENERGY_COST: 2,
-  
-  // Wave
-  WAVE_DELAY_MS: 3000,
-  SPAWN_INTERVAL_MS: 800,
-  ENEMIES_BASE_COUNT: 5,
-  ENEMIES_PER_WAVE: 2
-}
-```
-
-### Building Sizes (building-defs.js)
-```javascript
-ENERGY_BUILDINGS = {
-  'bio-generator': { 
-    gridWidth: 2, 
-    gridHeight: 2, 
-    shape: 'L'      // L-shape (3 cells)
-  },
-  'battery': { 
-    gridWidth: 2, 
-    gridHeight: 2   // Standard 2×2 (4 cells)
-  },
-  // All others: 1×1 (default)
-}
-```
-
----
-
-*Document updated: 01.01.2026*
-*Game Version: 0.2.0*
+*Document updated: 03.01.2026*
+*Game Version: 0.3.0*
