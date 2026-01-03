@@ -130,6 +130,7 @@ function CanvasEventsMixin(Base) {
           const energyModule = this.game.getModule('energy');
           const energyBuilding = energyModule?.getBuildingAt?.(gridX, gridY);
           if (energyBuilding) {
+            this.game.selectTower(null); // Deselect tower when selecting energy building
             this.hideTowerInfo(); // Hide tower tooltip when selecting energy building
             this.showEnergyBuildingInfo(energyBuilding);
           } else {

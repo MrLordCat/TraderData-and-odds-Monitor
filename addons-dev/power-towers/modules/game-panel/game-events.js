@@ -19,8 +19,12 @@ function GameEventsMixin(Base) {
       this.game.on(this.GameEvents.GAME_TICK, () => {
         this.updateUI(this.game.getState());
         
-        // Update bottom panel stats in real-time for selected tower
-        if (this.game.selectedTower) {
+        // Check if tower panel is actually visible before updating
+        const isTowerPanelVisible = this.elements.panelStatsContent?.style.display !== 'none' 
+                                    && this.elements.statsGridTower?.style.display !== 'none';
+        
+        // Update bottom panel stats in real-time for selected tower (only if panel is visible)
+        if (this.game.selectedTower && isTowerPanelVisible && !this.selectedEnergyBuilding) {
           this.updateBottomPanelStats(this.game.selectedTower);
         }
         
@@ -29,13 +33,17 @@ function GameEventsMixin(Base) {
           this.updateTooltipEnergy(this.game.selectedTower);
         }
         
+        // Check if energy panel is visible
+        const isEnergyPanelVisible = this.elements.panelStatsContent?.style.display !== 'none' 
+                                     && this.elements.statsGridEnergy?.style.display !== 'none';
+        
         // Update energy building tooltip in real-time if visible
         if (this.selectedEnergyBuilding && this.elements.energyTooltip?.classList.contains('visible')) {
           this.updateEnergyTooltipRealtime(this.selectedEnergyBuilding);
         }
         
-        // Update energy building stats in real-time
-        if (this.selectedEnergyBuilding) {
+        // Update energy building stats in real-time (only if panel is visible)
+        if (this.selectedEnergyBuilding && isEnergyPanelVisible) {
           this.updateBottomPanelEnergyStats(this.selectedEnergyBuilding);
         }
       });
@@ -57,11 +65,18 @@ function GameEventsMixin(Base) {
       
       // Listen for tower updates (attack type set, element set, XP gain, etc.)
       this.game.on('tower:updated', (data) => {
-        // Only update if this tower is currently selected
-        if (data?.tower && this.game.selectedTower?.id === data.tower.id) {
-          // Update bottom panel
-          if (this.showTowerInBottomPanel) {
-            this.showTowerInBottomPanel(data.tower);
+        // Only update bottom panel if:
+        // 1. This tower is currently selected
+        // 2. No energy building is selected
+        // 3. Tower panel is actually visible (not build menu)
+        const isTowerPanelVisible = this.elements.panelStatsContent?.style.display !== 'none' 
+                                    && this.elements.statsGridTower?.style.display !== 'none';
+        
+        if (data?.tower && this.game.selectedTower?.id === data.tower.id 
+            && !this.selectedEnergyBuilding && isTowerPanelVisible) {
+          // Just update stats, don't call full showTowerInBottomPanel
+          if (this.updateBottomPanelStats) {
+            this.updateBottomPanelStats(data.tower);
           }
         }
         this.updateTowerAffordability();
@@ -69,13 +84,11 @@ function GameEventsMixin(Base) {
       
       // Listen for gold changes to update upgrade prices dynamically
       this.game.on('economy:updated', () => {
-        const tower = this.game?.selectedTower;
-        // Update bottom panel upgrades if tower is selected
-        if (tower && this.showTowerInBottomPanel) {
-          this.showTowerInBottomPanel(tower);
-        }
+        // Don't switch UI at all - just update affordability
+        // The full panel refresh should only happen on explicit selection
         this.updateTowerAffordability();
         this.updateEnergyAffordability();
+        this.updateBuildItemStates?.();
       });
       
       // Tower level up notification

@@ -14,12 +14,12 @@ function getLayoutStyles() {
       height: 100%;
       min-height: 0;
       box-sizing: border-box;
-      overflow: hidden;
+      overflow: visible;
     }
     
-    .game-screen { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: hidden; }
+    .game-screen { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: visible; }
     .game-screen.menu-screen { align-items: center; justify-content: center; padding: 20px; }
-    .gameplay-screen { flex: 1; min-height: 0; position: relative; padding-bottom: 0; }
+    .gameplay-screen { flex: 1; min-height: 0; position: relative; padding-bottom: 0; overflow: visible; }
     
     .menu-title { text-align: center; margin-bottom: 24px; }
     .menu-icon { font-size: 64px; display: block; margin-bottom: 12px; }

@@ -36,16 +36,6 @@ function BottomPanelMixin(Base) {
       })));
       
       el.buildItems.forEach(item => {
-        // DEBUG: hover logging
-        item.addEventListener('mouseenter', () => {
-          console.log('[BottomPanel] HOVER on:', item.dataset.building || item.dataset.type);
-          const popup = item.querySelector('.build-card-popup');
-          console.log('[BottomPanel] Popup element:', popup);
-          if (popup) {
-            console.log('[BottomPanel] Popup computed style display:', getComputedStyle(popup).display);
-          }
-        });
-        
         item.addEventListener('click', (e) => {
           e.stopPropagation();
           const type = item.dataset.type;
@@ -163,32 +153,11 @@ function BottomPanelMixin(Base) {
     }
     
     /**
-     * Setup stat hover popups - position above the bottom panel
+     * Setup stat hover popups - now handled by pure CSS like build cards
+     * CSS :hover on .stat-item shows .stat-detail-popup
      */
     setupStatHoverPopups() {
-      const el = this.elements;
-      const bottomPanel = el.bottomPanel;
-      if (!bottomPanel) return;
-      
-      const statItems = bottomPanel.querySelectorAll('.stat-hoverable');
-      statItems.forEach(item => {
-        // Skip if already setup
-        if (item._hoverSetup) return;
-        item._hoverSetup = true;
-        
-        const popup = item.querySelector('.stat-detail-popup');
-        if (!popup) return;
-        
-        item.addEventListener('mouseenter', () => {
-          const rect = item.getBoundingClientRect();
-          const panelRect = bottomPanel.getBoundingClientRect();
-          
-          // Position above the panel
-          popup.style.left = `${rect.left + rect.width / 2}px`;
-          popup.style.top = `${panelRect.top - 10}px`;
-          popup.style.transform = 'translate(-50%, -100%)';
-        });
-      });
+      // No-op - CSS handles this identically to build-card-popup
     }
     
     /**
@@ -428,18 +397,22 @@ function BottomPanelMixin(Base) {
       // Update level
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${tower.level || 1}`;
       
-      // Update XP bar and value
+      // Update XP bar and value using actual level thresholds
       const xp = tower.upgradePoints || 0;
       const level = tower.level || 1;
-      const xpForLevel = (level - 1) * 10;
-      const xpInLevel = xp - xpForLevel;
-      const xpPercent = Math.min(100, (xpInLevel / 10) * 100);
+      // Level thresholds from tower-upgrades.js TOWER_LEVEL_CONFIG
+      const levelThresholds = [0, 3, 8, 15, 25, 40, 60, 85, 115, 150];
+      const currentThreshold = levelThresholds[level - 1] || 0;
+      const nextThreshold = levelThresholds[level] || (currentThreshold + 40);
+      const xpInLevel = xp - currentThreshold;
+      const xpNeeded = nextThreshold - currentThreshold;
+      const xpPercent = Math.min(100, (xpInLevel / xpNeeded) * 100);
       
       if (el.avatarXpFill) {
         el.avatarXpFill.style.width = `${xpPercent}%`;
       }
       if (el.avatarXpValue) {
-        el.avatarXpValue.textContent = `${xpInLevel}/10`;
+        el.avatarXpValue.textContent = `${xpInLevel}/${xpNeeded}`;
       }
       
       // Update Energy bar and value
@@ -656,14 +629,25 @@ function BottomPanelMixin(Base) {
       if (el.avatarName) el.avatarName.textContent = this.getTowerDisplayName(tower);
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${tower.level || 1}`;
       
-      // XP bar
+      // XP bar - use actual level thresholds
       if (el.avatarXpFill && tower.calculateLevel) {
         const xp = tower.upgradePoints || 0;
         const level = tower.level || 1;
-        const xpForLevel = (level - 1) * 10;
-        const xpInLevel = xp - xpForLevel;
-        const percent = Math.min(100, (xpInLevel / 10) * 100);
-        el.avatarXpFill.style.width = `${percent}%`;
+        const maxLevel = 10;
+        
+        // Use actual level thresholds from tower-upgrades.js
+        const levelThresholds = [0, 3, 8, 15, 25, 40, 60, 85, 115, 150];
+        
+        if (level >= maxLevel) {
+          el.avatarXpFill.style.width = '100%';
+        } else {
+          const currentLevelXp = levelThresholds[level - 1] || 0;
+          const nextLevelXp = levelThresholds[level] || currentLevelXp + 10;
+          const xpInLevel = xp - currentLevelXp;
+          const xpNeeded = nextLevelXp - currentLevelXp;
+          const percent = Math.min(100, (xpInLevel / xpNeeded) * 100);
+          el.avatarXpFill.style.width = `${percent}%`;
+        }
       }
       
       // Show tower actions (flex for 3-column layout)

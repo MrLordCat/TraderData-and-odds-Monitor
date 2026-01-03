@@ -791,15 +791,20 @@ class GameRenderer {
       const gh = building.gridHeight || 1;
       const shape = building.shape || 'rect';
       const nodeType = building.nodeType || 'generator';
+      const buildingType = building.type || 'base-generator';
       const fillPct = building.fillPercent || 0;
       
-      // WC3-style colors by type
-      const colors = {
-        generator: { base: '#2d5a27', accent: '#4CAF50', glow: '#7fff7f' },
-        storage: { base: '#1a3a5c', accent: '#2196F3', glow: '#6fc3ff' },
-        transfer: { base: '#5c3a1a', accent: '#FF9800', glow: '#ffcc66' }
+      // Unique colors per building type
+      const typeColors = {
+        'base-generator': { base: '#2d5a27', accent: '#4CAF50', glow: '#7fff7f' },
+        'bio-generator': { base: '#1a4a1a', accent: '#2e7d32', glow: '#81c784' },
+        'wind-generator': { base: '#37474f', accent: '#78909c', glow: '#b0bec5' },
+        'solar-generator': { base: '#e65100', accent: '#ff9800', glow: '#ffcc02' },
+        'water-generator': { base: '#01579b', accent: '#0288d1', glow: '#4fc3f7' },
+        'basic-battery': { base: '#1a3a5c', accent: '#2196F3', glow: '#6fc3ff' },
+        'power-transfer': { base: '#5c3a1a', accent: '#FF9800', glow: '#ffcc66' }
       };
-      const c = colors[nodeType] || colors.generator;
+      const c = typeColors[buildingType] || typeColors['base-generator'];
       const baseColor = this._parseColor(c.base);
       const accentColor = this._parseColor(c.accent);
       const glowColor = this._parseColor(c.glow);
@@ -822,8 +827,8 @@ class GameRenderer {
         // 2x2 Battery - large square building
         this._renderLargeBattery(cx, cy, gridSize, baseColor, accentColor, glowColor, fillPct);
       } else {
-        // Standard 1x1 building
-        this._renderStandardEnergyBuilding(cx, cy, gridSize, nodeType, baseColor, accentColor, glowColor, fillPct);
+        // Standard 1x1 building - render based on specific type
+        this._renderEnergyBuildingByType(cx, cy, gridSize, buildingType, baseColor, accentColor, glowColor, fillPct);
       }
       
       // === ENERGY BAR UNDER BUILDING ===
@@ -961,6 +966,238 @@ class GameRenderer {
     
     // Border
     this.shapeRenderer.rectOutline(cx - w/2, cy - h/2, w, h, 2, 0.1, 0.1, 0.1, 0.7);
+  }
+  
+  /**
+   * Render energy building by specific type with unique visuals
+   */
+  _renderEnergyBuildingByType(cx, cy, gridSize, buildingType, baseColor, accentColor, glowColor, fillPct) {
+    const s = gridSize;
+    const size = s * 0.8;
+    
+    switch (buildingType) {
+      case 'solar-generator':
+        this._renderSolarPanel(cx, cy, s, baseColor, accentColor, glowColor, fillPct);
+        break;
+      case 'wind-generator':
+        this._renderWindTurbine(cx, cy, s, baseColor, accentColor, glowColor, fillPct);
+        break;
+      case 'water-generator':
+        this._renderHydroGenerator(cx, cy, s, baseColor, accentColor, glowColor, fillPct);
+        break;
+      case 'power-transfer':
+        this._renderPowerRelay(cx, cy, s, baseColor, accentColor, glowColor, fillPct);
+        break;
+      case 'basic-battery':
+        this._renderSmallBattery(cx, cy, s, baseColor, accentColor, glowColor, fillPct);
+        break;
+      case 'base-generator':
+      default:
+        this._renderBaseGenerator(cx, cy, s, baseColor, accentColor, glowColor, fillPct);
+        break;
+    }
+  }
+  
+  /**
+   * Base Generator - Industrial turbine with rotating gear
+   */
+  _renderBaseGenerator(cx, cy, s, baseColor, accentColor, glowColor, fillPct) {
+    const size = s * 0.8;
+    
+    // Base platform - hexagonal look
+    this.shapeRenderer.circle(cx, cy, size * 0.85, baseColor.r * 0.4, baseColor.g * 0.4, baseColor.b * 0.4, 1);
+    
+    // Main housing
+    this.shapeRenderer.circle(cx, cy, size * 0.7, baseColor.r, baseColor.g, baseColor.b, 1);
+    this.shapeRenderer.circle(cx, cy, size * 0.55, baseColor.r * 0.8, baseColor.g * 0.8, baseColor.b * 0.8, 1);
+    
+    // Rotating turbine
+    const gearAngle = this.time * 0.003;
+    for (let i = 0; i < 6; i++) {
+      const a = gearAngle + (i * Math.PI / 3);
+      const gx = cx + Math.cos(a) * size * 0.35;
+      const gy = cy + Math.sin(a) * size * 0.35;
+      this.shapeRenderer.rect(gx - 3, gy - 3, 6, 6, accentColor.r, accentColor.g, accentColor.b, 1);
+    }
+    
+    // Center core with spark
+    this.shapeRenderer.circle(cx, cy, size * 0.2, accentColor.r, accentColor.g, accentColor.b, 1);
+    const spark = Math.sin(this.time * 0.008) * 0.5 + 0.5;
+    this.shapeRenderer.circle(cx, cy, size * 0.12, glowColor.r, glowColor.g, glowColor.b, spark);
+  }
+  
+  /**
+   * Solar Panel - Flat panel with grid pattern, tilted appearance
+   */
+  _renderSolarPanel(cx, cy, s, baseColor, accentColor, glowColor, fillPct) {
+    const size = s * 0.85;
+    
+    // Support stand
+    this.shapeRenderer.rect(cx - 3, cy + size * 0.2, 6, size * 0.4, 0.2, 0.2, 0.2, 1);
+    
+    // Panel frame (dark border)
+    this.shapeRenderer.rect(cx - size * 0.5, cy - size * 0.4, size, size * 0.6, 0.15, 0.15, 0.15, 1);
+    
+    // Solar cells (dark blue with grid)
+    const panelW = size * 0.9;
+    const panelH = size * 0.5;
+    this.shapeRenderer.rect(cx - panelW/2, cy - size * 0.35, panelW, panelH, 
+      baseColor.r * 0.5, baseColor.g * 0.5, baseColor.b * 0.5, 1);
+    
+    // Grid lines on panel (horizontal)
+    for (let i = 1; i < 4; i++) {
+      const y = cy - size * 0.35 + (panelH / 4) * i;
+      this.shapeRenderer.rect(cx - panelW/2, y - 1, panelW, 2, 0.1, 0.1, 0.1, 0.8);
+    }
+    // Grid lines (vertical)
+    for (let i = 1; i < 4; i++) {
+      const x = cx - panelW/2 + (panelW / 4) * i;
+      this.shapeRenderer.rect(x - 1, cy - size * 0.35, 2, panelH, 0.1, 0.1, 0.1, 0.8);
+    }
+    
+    // Sun reflection effect
+    const pulse = Math.sin(this.time * 0.003) * 0.3 + 0.7;
+    this.shapeRenderer.rect(cx - panelW * 0.2, cy - size * 0.3, panelW * 0.15, panelH * 0.3, 
+      glowColor.r, glowColor.g, glowColor.b, pulse * 0.4);
+    
+    // Status LED
+    this.shapeRenderer.circle(cx + size * 0.35, cy + size * 0.25, 3, glowColor.r, glowColor.g, glowColor.b, pulse);
+  }
+  
+  /**
+   * Wind Turbine - Tall pole with rotating blades
+   */
+  _renderWindTurbine(cx, cy, s, baseColor, accentColor, glowColor, fillPct) {
+    const size = s * 0.8;
+    
+    // Base platform
+    this.shapeRenderer.circle(cx, cy + size * 0.3, size * 0.35, baseColor.r * 0.5, baseColor.g * 0.5, baseColor.b * 0.5, 1);
+    
+    // Pole/tower
+    this.shapeRenderer.rect(cx - 4, cy - size * 0.1, 8, size * 0.6, 0.4, 0.4, 0.45, 1);
+    this.shapeRenderer.rect(cx - 3, cy - size * 0.1, 6, size * 0.6, 0.5, 0.5, 0.55, 1);
+    
+    // Nacelle (hub housing)
+    this.shapeRenderer.circle(cx, cy - size * 0.25, size * 0.18, baseColor.r, baseColor.g, baseColor.b, 1);
+    this.shapeRenderer.circle(cx, cy - size * 0.25, size * 0.12, accentColor.r, accentColor.g, accentColor.b, 1);
+    
+    // Rotating blades (3 blades)
+    const bladeAngle = this.time * 0.005;
+    const bladeLength = size * 0.5;
+    const hubY = cy - size * 0.25;
+    
+    for (let i = 0; i < 3; i++) {
+      const a = bladeAngle + (i * Math.PI * 2 / 3);
+      const bx = cx + Math.cos(a) * bladeLength * 0.5;
+      const by = hubY + Math.sin(a) * bladeLength * 0.5;
+      
+      // Blade body (tapered)
+      this.shapeRenderer.line(cx, hubY, bx, by, 5, 0.9, 0.9, 0.95, 1);
+      this.shapeRenderer.line(cx, hubY, bx, by, 3, 1, 1, 1, 1);
+    }
+    
+    // Center hub
+    this.shapeRenderer.circle(cx, hubY, size * 0.08, 0.3, 0.3, 0.35, 1);
+  }
+  
+  /**
+   * Hydro Generator - Water wheel / turbine with waves
+   */
+  _renderHydroGenerator(cx, cy, s, baseColor, accentColor, glowColor, fillPct) {
+    const size = s * 0.8;
+    
+    // Water base with wave effect
+    const waveOffset = Math.sin(this.time * 0.004) * 3;
+    this.shapeRenderer.rect(cx - size * 0.5, cy + size * 0.1, size, size * 0.3, 
+      accentColor.r * 0.3, accentColor.g * 0.5, accentColor.b * 0.8, 0.7);
+    
+    // Building frame
+    this.shapeRenderer.rect(cx - size * 0.4, cy - size * 0.35, size * 0.8, size * 0.5, 
+      baseColor.r, baseColor.g, baseColor.b, 1);
+    
+    // Water wheel (rotating)
+    const wheelAngle = this.time * 0.003;
+    const wheelR = size * 0.3;
+    this.shapeRenderer.circle(cx, cy, wheelR, baseColor.r * 0.6, baseColor.g * 0.6, baseColor.b * 0.6, 1);
+    
+    // Wheel spokes
+    for (let i = 0; i < 8; i++) {
+      const a = wheelAngle + (i * Math.PI / 4);
+      const sx = cx + Math.cos(a) * wheelR * 0.9;
+      const sy = cy + Math.sin(a) * wheelR * 0.9;
+      this.shapeRenderer.line(cx, cy, sx, sy, 3, accentColor.r, accentColor.g, accentColor.b, 1);
+    }
+    
+    // Center hub
+    this.shapeRenderer.circle(cx, cy, size * 0.1, accentColor.r, accentColor.g, accentColor.b, 1);
+    
+    // Water droplet decorations
+    const dropY = cy + size * 0.2 + waveOffset;
+    this.shapeRenderer.circle(cx - size * 0.25, dropY, 4, glowColor.r, glowColor.g, glowColor.b, 0.6);
+    this.shapeRenderer.circle(cx + size * 0.2, dropY - 2, 3, glowColor.r, glowColor.g, glowColor.b, 0.5);
+  }
+  
+  /**
+   * Power Relay - Antenna/transmission node
+   */
+  _renderPowerRelay(cx, cy, s, baseColor, accentColor, glowColor, fillPct) {
+    const size = s * 0.8;
+    
+    // Base platform
+    this.shapeRenderer.circle(cx, cy + size * 0.2, size * 0.4, baseColor.r * 0.5, baseColor.g * 0.5, baseColor.b * 0.5, 1);
+    
+    // Main column
+    this.shapeRenderer.rect(cx - 5, cy - size * 0.2, 10, size * 0.5, baseColor.r, baseColor.g, baseColor.b, 1);
+    
+    // Antenna dish
+    const dishY = cy - size * 0.35;
+    this.shapeRenderer.circle(cx, dishY, size * 0.25, accentColor.r * 0.7, accentColor.g * 0.7, accentColor.b * 0.7, 1);
+    this.shapeRenderer.circle(cx, dishY, size * 0.18, accentColor.r, accentColor.g, accentColor.b, 1);
+    
+    // Antenna spike
+    this.shapeRenderer.line(cx, dishY, cx, dishY - size * 0.25, 3, accentColor.r, accentColor.g, accentColor.b, 1);
+    
+    // Signal rings (pulsing)
+    const pulse = Math.sin(this.time * 0.006) * 0.5 + 0.5;
+    this.shapeRenderer.circleOutline(cx, dishY, size * 0.35 + pulse * 5, 2, glowColor.r, glowColor.g, glowColor.b, pulse * 0.5);
+    this.shapeRenderer.circleOutline(cx, dishY, size * 0.45 + pulse * 8, 2, glowColor.r, glowColor.g, glowColor.b, pulse * 0.3);
+  }
+  
+  /**
+   * Small Battery - Compact energy storage
+   */
+  _renderSmallBattery(cx, cy, s, baseColor, accentColor, glowColor, fillPct) {
+    const size = s * 0.8;
+    
+    // Base shadow
+    this.shapeRenderer.rect(cx - size * 0.4 + 2, cy - size * 0.35 + 2, size * 0.8, size * 0.7, 0, 0, 0, 0.3);
+    
+    // Battery body
+    this.shapeRenderer.rect(cx - size * 0.4, cy - size * 0.35, size * 0.8, size * 0.7, baseColor.r, baseColor.g, baseColor.b, 1);
+    
+    // Battery terminal (top bump)
+    this.shapeRenderer.rect(cx - size * 0.15, cy - size * 0.45, size * 0.3, size * 0.12, 
+      baseColor.r * 0.8, baseColor.g * 0.8, baseColor.b * 0.8, 1);
+    
+    // Inner chamber
+    this.shapeRenderer.rect(cx - size * 0.3, cy - size * 0.25, size * 0.6, size * 0.5, 
+      accentColor.r * 0.2, accentColor.g * 0.2, accentColor.b * 0.2, 1);
+    
+    // Energy fill level
+    if (fillPct > 0) {
+      const fillH = size * 0.45 * fillPct;
+      this.shapeRenderer.rect(cx - size * 0.25, cy + size * 0.2 - fillH, size * 0.5, fillH,
+        accentColor.r, accentColor.g, accentColor.b, 0.9);
+    }
+    
+    // Charge indicator lights
+    const litCount = Math.floor(fillPct * 4);
+    for (let i = 0; i < 4; i++) {
+      const lx = cx - size * 0.25 + (size * 0.5 / 3) * i;
+      const isLit = i < litCount;
+      this.shapeRenderer.circle(lx, cy + size * 0.28, 3, 
+        isLit ? glowColor.r : 0.2, isLit ? glowColor.g : 0.2, isLit ? glowColor.b : 0.2, isLit ? 1 : 0.5);
+    }
   }
   
   /**

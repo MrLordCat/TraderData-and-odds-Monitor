@@ -6,6 +6,41 @@
 function getBottomPanelStyles() {
   return `
     /* ========================================
+       UNIFIED HOVER POPUP SYSTEM
+       Used by both build-card and stat-item
+       ======================================== */
+    .hover-popup {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-bottom: 8px;
+      min-width: 180px;
+      max-width: 280px;
+      padding: 10px 12px;
+      background: rgba(10, 15, 28, 0.98);
+      border: 1px solid rgba(72, 187, 120, 0.6);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 15px rgba(72, 187, 120, 0.15);
+      z-index: 9999;
+      pointer-events: none;
+      font-size: 11px;
+      color: #e2e8f0;
+      white-space: normal;
+      text-align: left;
+    }
+    
+    /* Hoverable container - parent must have this class */
+    .has-popup {
+      position: relative;
+      overflow: visible;
+    }
+    .has-popup:hover .hover-popup {
+      display: block;
+    }
+    
+    /* ========================================
        BOTTOM PANEL - 3 Sections Layout
        ======================================== */
     .bottom-panel {
@@ -43,6 +78,9 @@ function getBottomPanelStyles() {
     .panel-stats {
       flex: 28;
       min-width: 200px;
+      overflow: visible;
+      position: relative;
+      z-index: 100;
     }
     
     .panel-stats-empty {
@@ -63,7 +101,6 @@ function getBottomPanelStyles() {
     }
     
     .panel-stats-content {
-      height: 100%;
       overflow: visible;
     }
     
@@ -71,7 +108,6 @@ function getBottomPanelStyles() {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(55px, 1fr));
       gap: 4px;
-      height: 100%;
       align-content: start;
       overflow: visible;
     }
@@ -102,29 +138,23 @@ function getBottomPanelStyles() {
       color: #fff;
     }
     
-    /* Stat Detail Popup (on hover) - above the stat item */
-    .stat-detail-popup {
-      display: none;
-      position: absolute;
-      bottom: calc(100% + 8px);
-      left: 50%;
-      transform: translateX(-50%);
-      min-width: 200px;
-      max-width: 280px;
-      padding: 10px 12px;
-      background: rgba(10, 15, 28, 0.98);
-      border: 1px solid rgba(72, 187, 120, 0.5);
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-      z-index: 9999;
-      pointer-events: none;
-      font-size: 11px;
-      color: #e2e8f0;
-      white-space: nowrap;
-    }
-    .stat-item:hover .stat-detail-popup,
-    .stat-hoverable:hover .stat-detail-popup {
+    /* Stat popup uses unified .hover-popup class - see top of file */
+    .stat-item:hover .hover-popup {
       display: block;
+    }
+    /* Stat popup content styles */
+    .hover-popup .detail-line {
+      margin-bottom: 4px;
+    }
+    .hover-popup .detail-line:last-child {
+      margin-bottom: 0;
+    }
+    .hover-popup .detail-label {
+      color: #a0aec0;
+    }
+    .hover-popup .detail-value {
+      color: #68d391;
+      font-weight: 600;
     }
 
     /* ========================================

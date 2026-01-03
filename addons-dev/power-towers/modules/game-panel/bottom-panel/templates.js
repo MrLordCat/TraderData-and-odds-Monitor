@@ -163,84 +163,96 @@ function getBottomPanelTemplate() {
             <div class="stat-item stat-hoverable" data-stat="damage">
               <span class="stat-label">⚔️ DMG</span>
               <span class="stat-value" id="panel-dmg">10</span>
-              <div class="stat-detail-popup" id="panel-detail-dmg"></div>
+              <div class="hover-popup" id="panel-detail-dmg">
+                <div class="detail-line"><span class="detail-label">Base damage per hit</span></div>
+              </div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="range">
               <span class="stat-label">📍 RNG</span>
               <span class="stat-value" id="panel-rng">80</span>
-              <div class="stat-detail-popup" id="panel-detail-rng"></div>
+              <div class="hover-popup" id="panel-detail-rng">
+                <div class="detail-line"><span class="detail-label">Attack range in pixels</span></div>
+              </div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="speed">
               <span class="stat-label">⚡ SPD</span>
               <span class="stat-value" id="panel-spd">1.0</span>
-              <div class="stat-detail-popup" id="panel-detail-spd"></div>
+              <div class="hover-popup" id="panel-detail-spd">
+                <div class="detail-line"><span class="detail-label">Attacks per second</span></div>
+              </div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="crit">
               <span class="stat-label">🎯 CRIT</span>
               <span class="stat-value" id="panel-crit">5%</span>
-              <div class="stat-detail-popup" id="panel-detail-crit"></div>
+              <div class="hover-popup" id="panel-detail-crit">
+                <div class="detail-line"><span class="detail-label">Critical hit chance</span></div>
+              </div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="critdmg">
               <span class="stat-label">💥 CDMG</span>
               <span class="stat-value" id="panel-critdmg">150%</span>
-              <div class="stat-detail-popup" id="panel-detail-critdmg"></div>
+              <div class="hover-popup" id="panel-detail-critdmg">
+                <div class="detail-line"><span class="detail-label">Critical damage multiplier</span></div>
+              </div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="energy">
-              <span class="stat-label">🔋 PWR</span>
+              <span class="stat-label">🔋 PWR/Hit</span>
               <span class="stat-value" id="panel-power">5</span>
-              <div class="stat-detail-popup" id="panel-detail-power"></div>
+              <div class="hover-popup" id="panel-detail-power">
+                <div class="detail-line"><span class="detail-label">Energy cost per shot</span></div>
+              </div>
             </div>
             <!-- Conditional stats - hidden by default -->
             <div class="stat-item stat-hoverable" data-stat="hp" id="stat-row-hp" style="display: none;">
               <span class="stat-label">❤️ HP</span>
               <span class="stat-value" id="panel-hp">100/100</span>
-              <div class="stat-detail-popup" id="panel-detail-hp"></div>
+              <div class="hover-popup" id="panel-detail-hp"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="splash" id="stat-row-splash" style="display: none;">
               <span class="stat-label">💣 SPLASH</span>
               <span class="stat-value" id="panel-splash">60</span>
-              <div class="stat-detail-popup" id="panel-detail-splash"></div>
+              <div class="hover-popup" id="panel-detail-splash"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="chain" id="stat-row-chain" style="display: none;">
               <span class="stat-label">⛓️ CHAIN</span>
               <span class="stat-value" id="panel-chain">3</span>
-              <div class="stat-detail-popup" id="panel-detail-chain"></div>
+              <div class="hover-popup" id="panel-detail-chain"></div>
             </div>
             <!-- Element ability stats -->
             <div class="stat-item stat-hoverable" data-stat="burn" id="stat-row-burn" style="display: none;">
               <span class="stat-label">🔥 BURN</span>
               <span class="stat-value" id="panel-burn">5/s</span>
-              <div class="stat-detail-popup" id="panel-detail-burn"></div>
+              <div class="hover-popup" id="panel-detail-burn"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="spread" id="stat-row-spread" style="display: none;">
               <span class="stat-label">🔥 SPREAD</span>
               <span class="stat-value" id="panel-spread">15%</span>
-              <div class="stat-detail-popup" id="panel-detail-spread"></div>
+              <div class="hover-popup" id="panel-detail-spread"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="slow" id="stat-row-slow" style="display: none;">
               <span class="stat-label">❄️ SLOW</span>
               <span class="stat-value" id="panel-slow">30%</span>
-              <div class="stat-detail-popup" id="panel-detail-slow"></div>
+              <div class="hover-popup" id="panel-detail-slow"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="freeze" id="stat-row-freeze" style="display: none;">
               <span class="stat-label">❄️ FREEZE</span>
               <span class="stat-value" id="panel-freeze">5%</span>
-              <div class="stat-detail-popup" id="panel-detail-freeze"></div>
+              <div class="hover-popup" id="panel-detail-freeze"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="poison" id="stat-row-poison" style="display: none;">
               <span class="stat-label">🌿 POISON</span>
               <span class="stat-value" id="panel-poison">3/s</span>
-              <div class="stat-detail-popup" id="panel-detail-poison"></div>
+              <div class="hover-popup" id="panel-detail-poison"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="shock" id="stat-row-shock" style="display: none;">
               <span class="stat-label">⚡ SHOCK</span>
               <span class="stat-value" id="panel-shock">10%</span>
-              <div class="stat-detail-popup" id="panel-detail-shock"></div>
+              <div class="hover-popup" id="panel-detail-shock"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="drain" id="stat-row-drain" style="display: none;">
               <span class="stat-label">💀 DRAIN</span>
               <span class="stat-value" id="panel-drain">10%</span>
-              <div class="stat-detail-popup" id="panel-detail-drain"></div>
+              <div class="hover-popup" id="panel-detail-drain"></div>
             </div>
           </div>
           <!-- Energy Stats Grid -->
@@ -248,22 +260,22 @@ function getBottomPanelTemplate() {
             <div class="stat-item stat-hoverable" data-stat="stored">
               <span class="stat-label">🔋 Stored</span>
               <span class="stat-value" id="panel-stored">0/50</span>
-              <div class="stat-detail-popup" id="panel-detail-stored"></div>
+              <div class="hover-popup" id="panel-detail-stored"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="output">
               <span class="stat-label">📤 Output</span>
               <span class="stat-value" id="panel-output">15/s</span>
-              <div class="stat-detail-popup" id="panel-detail-output"></div>
+              <div class="hover-popup" id="panel-detail-output"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="range">
               <span class="stat-label">📍 Range</span>
               <span class="stat-value" id="panel-range">4</span>
-              <div class="stat-detail-popup" id="panel-detail-range"></div>
+              <div class="hover-popup" id="panel-detail-range"></div>
             </div>
             <div class="stat-item stat-hoverable" data-stat="gen">
               <span class="stat-label">⚡ Gen</span>
               <span class="stat-value" id="panel-gen">5/s</span>
-              <div class="stat-detail-popup" id="panel-detail-gen"></div>
+              <div class="hover-popup" id="panel-detail-gen"></div>
             </div>
           </div>
         </div>
