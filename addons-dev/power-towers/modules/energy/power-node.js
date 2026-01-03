@@ -194,9 +194,10 @@ class PowerNode {
       this.range += this.upgradeLevels.range;
     }
     
-    // Channels: base + upgrade bonus
-    this.inputChannels = this.baseInputChannels + Math.floor(this.upgradeLevels.channels / 2);
-    this.outputChannels = this.baseOutputChannels + Math.floor(this.upgradeLevels.channels / 2);
+    // Channels: base + upgrade bonus (only if base > 0)
+    const channelsUpgrade = this.upgradeLevels.channels || 0;
+    this.inputChannels = this.baseInputChannels > 0 ? this.baseInputChannels + channelsUpgrade : 0;
+    this.outputChannels = this.baseOutputChannels > 0 ? this.baseOutputChannels + channelsUpgrade : 0;
     
     // Apply biome modifiers if present
     if (this.biomeModifiers) {

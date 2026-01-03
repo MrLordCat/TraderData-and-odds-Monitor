@@ -536,6 +536,29 @@ function BottomPanelMixin(Base) {
       if (el.panelRange) el.panelRange.textContent = Math.floor(building.range || 0);
       if (el.panelGen) el.panelGen.textContent = `${Math.floor(state.generation || 0)}/s`;
       
+      // Update channels display
+      const energyModule = this.game?.modules?.energy;
+      const powerNetwork = energyModule?.powerNetwork;
+      let usedInputs = 0, usedOutputs = 0;
+      if (powerNetwork && building.id) {
+        const connections = powerNetwork.connections || [];
+        usedInputs = connections.filter(c => c.to === building.id).length;
+        usedOutputs = connections.filter(c => c.from === building.id).length;
+      }
+      const maxInputs = building.inputChannels || 0;
+      const maxOutputs = building.outputChannels || 0;
+      if (el.panelChannels) {
+        if (maxInputs > 0 && maxOutputs > 0) {
+          el.panelChannels.textContent = `${usedInputs}/${maxInputs} : ${usedOutputs}/${maxOutputs}`;
+        } else if (maxOutputs > 0) {
+          el.panelChannels.textContent = `Out: ${usedOutputs}/${maxOutputs}`;
+        } else if (maxInputs > 0) {
+          el.panelChannels.textContent = `In: ${usedInputs}/${maxInputs}`;
+        } else {
+          el.panelChannels.textContent = '-';
+        }
+      }
+      
       // Update XP bar
       if (el.avatarXpFill) {
         const xpProgress = building.getXpProgress?.() || { percent: 0 };
@@ -574,6 +597,37 @@ function BottomPanelMixin(Base) {
           .base('Rate:', `${formatInt(building.outputRate || 0)}/s`)
           .line('Connections:', `${building.connections?.length || 0}`, 'detail-value')
           .build();
+      }
+      
+      // CHANNELS (In/Out)
+      const detailChannels = document.getElementById('panel-detail-channels');
+      if (detailChannels) {
+        // Get used channels from power network
+        const energyModule = this.game?.modules?.energy;
+        const powerNetwork = energyModule?.powerNetwork;
+        let usedInputs = 0, usedOutputs = 0;
+        if (powerNetwork && building.id) {
+          const connections = powerNetwork.connections || [];
+          usedInputs = connections.filter(c => c.to === building.id).length;
+          usedOutputs = connections.filter(c => c.from === building.id).length;
+        }
+        const maxInputs = building.inputChannels || 0;
+        const maxOutputs = building.outputChannels || 0;
+        const baseIn = building.baseInputChannels || 0;
+        const baseOut = building.baseOutputChannels || 0;
+        const upg = building.upgradeLevels?.channels || 0;
+        
+        const builder = createDetailBuilder();
+        if (maxInputs > 0) {
+          builder.line('📥 Inputs:', `${usedInputs}/${maxInputs} used`, usedInputs >= maxInputs ? 'detail-crit' : 'detail-value');
+        }
+        if (maxOutputs > 0) {
+          builder.line('📤 Outputs:', `${usedOutputs}/${maxOutputs} used`, usedOutputs >= maxOutputs ? 'detail-crit' : 'detail-value');
+        }
+        builder.line('Base:', `${baseIn > 0 ? baseIn : '-'}/${baseOut > 0 ? baseOut : '-'}`, 'detail-base');
+        builder.line('Upgraded:', upg > 0 ? `+${upg}` : '-', 'detail-level');
+        
+        detailChannels.innerHTML = builder.build();
       }
       
       // GENERATION
@@ -732,6 +786,30 @@ function BottomPanelMixin(Base) {
       if (el.panelRange) el.panelRange.textContent = Math.floor(building.range || 0);
       if (el.panelGen) el.panelGen.textContent = `${Math.floor(state.generation || 0)}/s`;
       
+      // Get used channels from power network
+      const energyModule = this.game?.modules?.energy;
+      const powerNetwork = energyModule?.powerNetwork;
+      let usedInputs = 0, usedOutputs = 0;
+      if (powerNetwork && building.id) {
+        const connections = powerNetwork.connections || [];
+        usedInputs = connections.filter(c => c.to === building.id).length;
+        usedOutputs = connections.filter(c => c.from === building.id).length;
+      }
+      const maxInputs = building.inputChannels || 0;
+      const maxOutputs = building.outputChannels || 0;
+      if (el.panelChannels) {
+        // Format: "usedIn/maxIn : usedOut/maxOut" or just one side if only that exists
+        if (maxInputs > 0 && maxOutputs > 0) {
+          el.panelChannels.textContent = `${usedInputs}/${maxInputs} : ${usedOutputs}/${maxOutputs}`;
+        } else if (maxOutputs > 0) {
+          el.panelChannels.textContent = `Out: ${usedOutputs}/${maxOutputs}`;
+        } else if (maxInputs > 0) {
+          el.panelChannels.textContent = `In: ${usedInputs}/${maxInputs}`;
+        } else {
+          el.panelChannels.textContent = '-';
+        }
+      }
+      
       // Show avatar
       if (el.avatarEmpty) el.avatarEmpty.style.display = 'none';
       if (el.avatarContent) el.avatarContent.style.display = 'flex';
@@ -757,6 +835,9 @@ function BottomPanelMixin(Base) {
       // Update energy upgrades grid
       this.updateEnergyUpgradesInPanel(building);
       
+      // Update energy detail popups
+      this.updateEnergyDetailPopups(building);
+      
       // Setup stat hover popups
       this.setupStatHoverPopups();
     }
@@ -778,6 +859,7 @@ function BottomPanelMixin(Base) {
       const ENERGY_UPGRADES = [
         { id: 'capacity', name: 'Capacity', emoji: '🔋', stat: 'capacity', bonus: '+25%', baseCost: 30 },
         { id: 'output', name: 'Output', emoji: '📤', stat: 'outputRate', bonus: '+20%', baseCost: 40 },
+        { id: 'channels', name: 'Channels', emoji: '🔌', stat: 'channels', bonus: '+1 In/Out', baseCost: 60 },
         { id: 'range', name: 'Range', emoji: '📡', stat: 'range', bonus: '+1', baseCost: 50 },
         { id: 'efficiency', name: 'Efficiency', emoji: '⚡', stat: 'efficiency', bonus: '+10%', baseCost: 35 },
       ];
@@ -823,11 +905,11 @@ function BottomPanelMixin(Base) {
      * Purchase energy building upgrade
      */
     purchaseEnergyUpgrade(building, upgradeId, cost) {
-      const state = this.game?.getState?.();
-      if (!state || state.gold < cost) return;
+      const economy = this.game?.modules?.economy;
+      if (!economy || economy.gold < cost) return;
       
       // Deduct gold
-      this.game.addGold(-cost);
+      economy.spendGold(cost);
       
       // Apply upgrade
       if (!building.upgradeLevels) building.upgradeLevels = {};
@@ -853,6 +935,22 @@ function BottomPanelMixin(Base) {
             building.generationRate = Math.floor((building.baseGenerationRate || 5) * (1 + level * 0.15));
           }
           break;
+        case 'channels':
+          // Channels upgrade: +1 input AND +1 output per level
+          // BUT only if building has that channel type (generators have 0 inputs)
+          const channelsLevel = level;
+          if ((building.baseInputChannels || 0) > 0) {
+            building.inputChannels = building.baseInputChannels + channelsLevel;
+          }
+          if ((building.baseOutputChannels || 0) > 0) {
+            building.outputChannels = building.baseOutputChannels + channelsLevel;
+          }
+          break;
+      }
+      
+      // Also call recalculateStats if building has it (for PowerNode)
+      if (building.recalculateStats) {
+        building.recalculateStats();
       }
       
       // Refresh panel

@@ -170,6 +170,7 @@ class GameControllerBase {
       // Panel stats values (energy)
       panelStored: container.querySelector('#panel-stored'),
       panelOutput: container.querySelector('#panel-output'),
+      panelChannels: container.querySelector('#panel-channels'),
       panelRange: container.querySelector('#panel-range'),
       panelGen: container.querySelector('#panel-gen'),
       // Avatar section

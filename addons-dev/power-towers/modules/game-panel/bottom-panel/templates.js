@@ -267,6 +267,11 @@ function getBottomPanelTemplate() {
               <span class="stat-value" id="panel-output">15/s</span>
               <div class="hover-popup" id="panel-detail-output"></div>
             </div>
+            <div class="stat-item stat-hoverable" data-stat="channels">
+              <span class="stat-label">🔌 In/Out</span>
+              <span class="stat-value" id="panel-channels">0/1 : 0/1</span>
+              <div class="hover-popup" id="panel-detail-channels"></div>
+            </div>
             <div class="stat-item stat-hoverable" data-stat="range">
               <span class="stat-label">📍 Range</span>
               <span class="stat-value" id="panel-range">4</span>
