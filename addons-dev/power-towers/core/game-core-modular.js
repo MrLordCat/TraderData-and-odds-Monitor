@@ -374,15 +374,28 @@ class GameCore {
    * Now only builds BASE tower - attack type selected separately
    */
   placeTower(gridX, gridY) {
-    // Check if position is valid
-    if (!this.modules.map.isBuildable(gridX, gridY)) {
-      this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Cannot build here!' });
+    const buildInfo = this.modules.map.getBuildability
+      ? this.modules.map.getBuildability(gridX, gridY)
+      : { buildable: this.modules.map.isBuildable(gridX, gridY), reason: 'unknown' };
+
+    if (!buildInfo.buildable) {
+      const message = this._formatBuildBlockMessage(buildInfo);
+      this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: message });
+      console.warn('[GameCore] placeTower blocked', {
+        gridX,
+        gridY,
+        reason: buildInfo.reason,
+        terrain: buildInfo.terrain,
+        biome: buildInfo.biome
+      });
       return false;
     }
-    
+
     // Check if tower already exists
     if (this.modules.towers.getTowerAt(gridX, gridY)) {
-      this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: 'Tower already exists!' });
+      const message = 'Tower already exists!';
+      console.warn('[GameCore] placeTower blocked: tower already exists', { gridX, gridY });
+      this.eventBus.emit(GameEvents.UI_MESSAGE, { type: 'error', text: message });
       return false;
     }
     
@@ -396,6 +409,30 @@ class GameCore {
     // Build tower via event
     this.eventBus.emit('tower:build-request', { gridX, gridY });
     return true;
+  }
+
+  _formatBuildBlockMessage(buildInfo) {
+    if (!buildInfo) return 'Cannot build here!';
+    switch (buildInfo.reason) {
+      case 'out-of-bounds':
+        return 'Cannot build outside the map!';
+      case 'path':
+        return 'Cannot build on the path!';
+      case 'terrain-blocked':
+        return `Cannot build on ${buildInfo.terrain || 'this terrain'}!`;
+      case 'biome-blocked': {
+        const biomeSuffix = buildInfo.biome ? ` (${buildInfo.biome})` : '';
+        return `Biome prevents building${biomeSuffix}!`;
+      }
+      case 'water-biome-override':
+        // Should not hit UI because we allow it, but keep for completeness
+        return 'Shore build allowed by biome.';
+      case 'unknown-terrain':
+      case 'no-terrain':
+        return 'Cannot build here (terrain unavailable)!';
+      default:
+        return 'Cannot build here!';
+    }
   }
 
   /**

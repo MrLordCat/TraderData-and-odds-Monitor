@@ -10,16 +10,21 @@ function getBottomPanelStyles() {
        ======================================== */
     .bottom-panel {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 120px);
+      max-width: 900px;
       display: flex;
       gap: 2px;
-      background: linear-gradient(180deg, rgba(15, 20, 30, 0.98) 0%, rgba(10, 15, 25, 0.99) 100%);
-      border-top: 1px solid rgba(100, 150, 255, 0.15);
-      height: 140px;
+      background: linear-gradient(180deg, rgba(15, 20, 30, 0.95) 0%, rgba(10, 15, 25, 0.98) 100%);
+      border: 1px solid rgba(100, 150, 255, 0.2);
+      border-radius: 12px;
+      height: 220px;
       z-index: 60;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+      box-shadow: 0 -4px 30px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      overflow: visible;
     }
 
     .panel-section {
@@ -59,13 +64,16 @@ function getBottomPanelStyles() {
     
     .panel-stats-content {
       height: 100%;
+      overflow: visible;
     }
     
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
+      grid-template-columns: repeat(auto-fill, minmax(55px, 1fr));
+      gap: 4px;
       height: 100%;
+      align-content: start;
+      overflow: visible;
     }
     
     .stat-item {
@@ -78,6 +86,7 @@ function getBottomPanelStyles() {
       border-radius: 6px;
       padding: 6px 4px;
       cursor: default;
+      overflow: visible;
     }
     .stat-item:hover {
       background: rgba(72, 187, 120, 0.15);
@@ -93,30 +102,28 @@ function getBottomPanelStyles() {
       color: #fff;
     }
     
-    /* Stat Detail Popup (on hover) - bottom panel specific */
-    .bottom-panel .stat-detail-popup,
-    .panel-stats .stat-detail-popup {
+    /* Stat Detail Popup (on hover) - above the stat item */
+    .stat-detail-popup {
       display: none;
-      position: absolute !important;
-      bottom: 100% !important;
-      left: 50% !important;
-      top: auto !important;
-      right: auto !important;
-      transform: translateX(-50%) !important;
-      margin-bottom: 8px;
-      min-width: 180px;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      min-width: 200px;
+      max-width: 280px;
       padding: 10px 12px;
-      background: rgba(10, 15, 28, 0.98) !important;
+      background: rgba(10, 15, 28, 0.98);
       border: 1px solid rgba(72, 187, 120, 0.5);
       border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
       z-index: 9999;
       pointer-events: none;
       font-size: 11px;
       color: #e2e8f0;
+      white-space: nowrap;
     }
-    .bottom-panel .stat-item:hover .stat-detail-popup,
-    .panel-stats .stat-hoverable:hover .stat-detail-popup {
+    .stat-item:hover .stat-detail-popup,
+    .stat-hoverable:hover .stat-detail-popup {
       display: block;
     }
 
@@ -124,10 +131,12 @@ function getBottomPanelStyles() {
        Section 2: Avatar (center)
        ======================================== */
     .panel-avatar {
-      flex: 30;
-      min-width: 180px;
+      flex: 35;
+      min-width: 220px;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     
     .avatar-empty {
@@ -152,27 +161,35 @@ function getBottomPanelStyles() {
     .avatar-content {
       display: flex;
       flex-direction: column;
-      align-items: center;
+      align-items: stretch;
       gap: 6px;
-      height: 100%;
+      width: 100%;
+      padding: 4px;
+    }
+    .avatar-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
     }
     .avatar-icon {
-      font-size: 32px;
+      font-size: 28px;
       line-height: 1;
     }
     .avatar-info {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 2px;
+      align-items: flex-start;
+      gap: 1px;
+      flex: 1;
     }
     .avatar-name {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       color: #fff;
     }
     .avatar-type {
-      font-size: 10px;
+      font-size: 9px;
       color: #a0aec0;
     }
     .avatar-level {
@@ -196,8 +213,7 @@ function getBottomPanelStyles() {
     }
     
     .sell-btn {
-      margin-top: auto;
-      padding: 5px 14px;
+      padding: 4px 10px;
       border: none;
       border-radius: 4px;
       background: rgba(252, 129, 129, 0.2);
@@ -210,6 +226,56 @@ function getBottomPanelStyles() {
       background: rgba(252, 129, 129, 0.35);
       transform: scale(1.02);
     }
+
+    /* Avatar inline actions (attack type / element) */
+    .avatar-actions {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .avatar-subsection {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .avatar-subtitle {
+      font-size: 10px;
+      color: #a0aec0;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .avatar-card-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+      gap: 4px;
+    }
+    .avatar-action-card {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      color: #e2e8f0;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .avatar-action-card:hover {
+      background: rgba(104, 211, 145, 0.18);
+      border-color: rgba(104, 211, 145, 0.5);
+      transform: translateY(-1px);
+    }
+    .avatar-action-card .card-icon { font-size: 14px; }
+    .avatar-action-card .card-label { font-size: 11px; }
 
     /* ========================================
        Section 3: Build/Actions (right)
@@ -361,6 +427,30 @@ function getBottomPanelStyles() {
       height: 100%;
     }
     
+    /* Tower upgrades two-column layout */
+    .tower-upgrades-container {
+      display: flex;
+      gap: 8px;
+      height: 100%;
+    }
+    .upgrades-column,
+    .abilities-column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .column-header {
+      font-size: 10px;
+      font-weight: 600;
+      color: #a0aec0;
+      padding: 4px 6px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+    
     .actions-row {
       display: flex;
       gap: 6px;
@@ -394,18 +484,88 @@ function getBottomPanelStyles() {
     .action-label { font-size: 9px; }
     
     .upgrades-panel,
-    .abilities-panel,
-    .energy-upgrades-panel {
+    .abilities-panel {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
     }
     
+    .energy-actions-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .energy-action {
+      flex: none !important;
+      width: 100%;
+    }
+    
     .upgrades-grid,
     .abilities-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 4px;
+      padding: 2px;
+    }
+    
+    /* Upgrade Card Styles */
+    .upgrade-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 4px;
+      background: rgba(40, 50, 70, 0.9);
+      border: 1px solid rgba(100, 120, 150, 0.5);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-height: 50px;
+    }
+    .upgrade-card:hover {
+      background: rgba(72, 187, 120, 0.15);
+      border-color: rgba(72, 187, 120, 0.5);
+      transform: translateY(-1px);
+    }
+    .upgrade-card.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .upgrade-card.disabled:hover {
+      transform: none;
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.1);
+    }
+    .upgrade-card .card-top {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 2px;
+    }
+    .upgrade-card .card-icon {
+      font-size: 14px;
+    }
+    .upgrade-card .card-name {
+      font-size: 9px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .upgrade-card .card-bottom {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      font-size: 8px;
+      color: #a0aec0;
+    }
+    .upgrade-card .card-cost {
+      color: #ffd700;
+      font-weight: 600;
+    }
+    .upgrade-card .card-level {
+      color: #68d391;
+    }
+    .upgrade-card .card-bonus {
+      color: #63b3ed;
     }
   `;
 }

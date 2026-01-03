@@ -150,6 +150,11 @@ function getGameTemplate() {
             </div>
           </div>
           
+          <!-- Bottom HUD - Wave control button -->
+          <div class="bottom-hud-wrapper">
+            <button id="btn-start" class="wave-control-btn">▶ Start Wave <span class="hotkey-hint">[Space]</span></button>
+          </div>
+          
           <!-- Tower Tooltip (floating popup) -->
           <div class="tower-tooltip" id="tower-tooltip">
             <div class="tooltip-header">
@@ -353,9 +358,7 @@ function getGameTemplate() {
           </div>
         </div>
         
-        <div class="game-controls">
-          <button id="btn-start" class="game-btn primary">▶ Start Wave <span class="hotkey-hint">[Space]</span></button>
-        </div>
+
         
         <!-- Bottom Panel (3-section layout) -->
         ${getBottomPanelTemplate()}

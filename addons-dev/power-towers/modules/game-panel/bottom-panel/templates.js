@@ -190,6 +190,58 @@ function getBottomPanelTemplate() {
               <span class="stat-value" id="panel-power">5</span>
               <div class="stat-detail-popup" id="panel-detail-power"></div>
             </div>
+            <!-- Conditional stats - hidden by default -->
+            <div class="stat-item stat-hoverable" data-stat="hp" id="stat-row-hp" style="display: none;">
+              <span class="stat-label">❤️ HP</span>
+              <span class="stat-value" id="panel-hp">100/100</span>
+              <div class="stat-detail-popup" id="panel-detail-hp"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="splash" id="stat-row-splash" style="display: none;">
+              <span class="stat-label">💣 SPLASH</span>
+              <span class="stat-value" id="panel-splash">60</span>
+              <div class="stat-detail-popup" id="panel-detail-splash"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="chain" id="stat-row-chain" style="display: none;">
+              <span class="stat-label">⛓️ CHAIN</span>
+              <span class="stat-value" id="panel-chain">3</span>
+              <div class="stat-detail-popup" id="panel-detail-chain"></div>
+            </div>
+            <!-- Element ability stats -->
+            <div class="stat-item stat-hoverable" data-stat="burn" id="stat-row-burn" style="display: none;">
+              <span class="stat-label">🔥 BURN</span>
+              <span class="stat-value" id="panel-burn">5/s</span>
+              <div class="stat-detail-popup" id="panel-detail-burn"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="spread" id="stat-row-spread" style="display: none;">
+              <span class="stat-label">🔥 SPREAD</span>
+              <span class="stat-value" id="panel-spread">15%</span>
+              <div class="stat-detail-popup" id="panel-detail-spread"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="slow" id="stat-row-slow" style="display: none;">
+              <span class="stat-label">❄️ SLOW</span>
+              <span class="stat-value" id="panel-slow">30%</span>
+              <div class="stat-detail-popup" id="panel-detail-slow"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="freeze" id="stat-row-freeze" style="display: none;">
+              <span class="stat-label">❄️ FREEZE</span>
+              <span class="stat-value" id="panel-freeze">5%</span>
+              <div class="stat-detail-popup" id="panel-detail-freeze"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="poison" id="stat-row-poison" style="display: none;">
+              <span class="stat-label">🌿 POISON</span>
+              <span class="stat-value" id="panel-poison">3/s</span>
+              <div class="stat-detail-popup" id="panel-detail-poison"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="shock" id="stat-row-shock" style="display: none;">
+              <span class="stat-label">⚡ SHOCK</span>
+              <span class="stat-value" id="panel-shock">10%</span>
+              <div class="stat-detail-popup" id="panel-detail-shock"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="drain" id="stat-row-drain" style="display: none;">
+              <span class="stat-label">💀 DRAIN</span>
+              <span class="stat-value" id="panel-drain">10%</span>
+              <div class="stat-detail-popup" id="panel-detail-drain"></div>
+            </div>
           </div>
           <!-- Energy Stats Grid -->
           <div class="stats-grid stats-grid-energy" id="stats-grid-energy" style="display: none;">
@@ -224,18 +276,71 @@ function getBottomPanelTemplate() {
           <div class="avatar-hint">Select a building<br>to see details</div>
         </div>
         <div class="avatar-content" id="avatar-content" style="display: none;">
-          <div class="avatar-icon" id="avatar-icon">🗼</div>
-          <div class="avatar-info">
-            <div class="avatar-name" id="avatar-name">Tower</div>
-            <div class="avatar-type" id="avatar-type">⚪ Base</div>
-            <div class="avatar-level">
-              <span id="avatar-level-text">Lvl 1</span>
-              <div class="avatar-xp-bar">
-                <div class="avatar-xp-fill" id="avatar-xp-fill" style="width: 0%"></div>
+          <div class="avatar-header">
+            <div class="avatar-icon" id="avatar-icon">🗼</div>
+            <div class="avatar-info">
+              <div class="avatar-name" id="avatar-name">Tower</div>
+              <div class="avatar-type" id="avatar-type">⚪ Base</div>
+              <div class="avatar-level">
+                <span id="avatar-level-text">Lvl 1</span>
+                <div class="avatar-xp-bar">
+                  <div class="avatar-xp-fill" id="avatar-xp-fill" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+            <button class="sell-btn" id="avatar-btn-sell" title="Sell">💰</button>
+          </div>
+
+          <!-- Inline actions: attack type / element selection -->
+          <div class="avatar-actions">
+            <div class="avatar-subsection" id="action-attack-type" style="display: none;">
+              <div class="avatar-subtitle">Attack Type</div>
+              <div class="avatar-card-row">
+                <button class="avatar-action-card" data-action="attack-type" data-type="normal" title="Normal">
+                  <span class="card-icon">🎯</span>
+                  <span class="card-label">Normal</span>
+                </button>
+                <button class="avatar-action-card" data-action="attack-type" data-type="siege" title="Siege">
+                  <span class="card-icon">💥</span>
+                  <span class="card-label">Siege</span>
+                </button>
+                <button class="avatar-action-card" data-action="attack-type" data-type="magic" title="Magic">
+                  <span class="card-icon">✨</span>
+                  <span class="card-label">Magic</span>
+                </button>
+                <button class="avatar-action-card" data-action="attack-type" data-type="piercing" title="Piercing">
+                  <span class="card-icon">🗡️</span>
+                  <span class="card-label">Piercing</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="avatar-subsection" id="action-element" style="display: none;">
+              <div class="avatar-subtitle">Element</div>
+              <div class="avatar-card-row">
+                <button class="avatar-action-card" data-action="element" data-element="fire" title="Fire">
+                  <span class="card-icon">🔥</span>
+                  <span class="card-label">Fire</span>
+                </button>
+                <button class="avatar-action-card" data-action="element" data-element="ice" title="Ice">
+                  <span class="card-icon">❄️</span>
+                  <span class="card-label">Ice</span>
+                </button>
+                <button class="avatar-action-card" data-action="element" data-element="lightning" title="Lightning">
+                  <span class="card-icon">⚡</span>
+                  <span class="card-label">Lightning</span>
+                </button>
+                <button class="avatar-action-card" data-action="element" data-element="nature" title="Nature">
+                  <span class="card-icon">🌿</span>
+                  <span class="card-label">Nature</span>
+                </button>
+                <button class="avatar-action-card" data-action="element" data-element="dark" title="Dark">
+                  <span class="card-icon">💀</span>
+                  <span class="card-label">Dark</span>
+                </button>
               </div>
             </div>
           </div>
-          <button class="sell-btn" id="avatar-btn-sell" title="Sell">💰 Sell</button>
         </div>
       </div>
       
@@ -246,40 +351,48 @@ function getBottomPanelTemplate() {
           ${generateBuildMenu()}
         </div>
         
-        <!-- Tower Actions (when tower selected) -->
+        <!-- Tower Actions (when tower selected) - Two columns: Upgrades | Abilities -->
         <div class="actions-menu actions-tower" id="actions-tower" style="display: none;">
-          <div class="actions-row">
-            <button class="action-btn" id="action-upgrades" title="Stat Upgrades">
-              <span class="action-icon">⬆️</span>
-              <span class="action-label">Upgrades</span>
-            </button>
-            <button class="action-btn" id="action-abilities" title="Element Abilities">
-              <span class="action-icon">✨</span>
-              <span class="action-label">Abilities</span>
-            </button>
-          </div>
-          <div class="upgrades-panel" id="upgrades-panel" style="display: none;">
-            <div class="upgrades-grid" id="tower-upgrades-grid"></div>
-          </div>
-          <div class="abilities-panel" id="abilities-panel" style="display: none;">
-            <div class="abilities-grid" id="tower-abilities-grid"></div>
+          <div class="tower-upgrades-container">
+            <!-- Upgrades Column -->
+            <div class="upgrades-column">
+              <div class="column-header">⬆️ Upgrades</div>
+              <div class="upgrades-panel" id="upgrades-panel">
+                <div class="upgrades-grid" id="upgrades-grid-panel"></div>
+              </div>
+            </div>
+            <!-- Abilities Column -->
+            <div class="abilities-column">
+              <div class="column-header">✨ Abilities</div>
+              <div class="abilities-panel" id="abilities-panel">
+                <div class="abilities-grid" id="abilities-grid-panel"></div>
+              </div>
+            </div>
           </div>
         </div>
         
-        <!-- Energy Actions (when energy selected) -->
+        <!-- Energy Actions (when energy selected) - Upgrades grid like towers -->
         <div class="actions-menu actions-energy" id="actions-energy" style="display: none;">
-          <div class="actions-row">
-            <button class="action-btn" id="action-connect" title="Connect to network">
-              <span class="action-icon">🔗</span>
-              <span class="action-label">Connect</span>
-            </button>
-            <button class="action-btn" id="action-upgrade-energy" title="Upgrade building">
-              <span class="action-icon">⬆️</span>
-              <span class="action-label">Upgrade</span>
-            </button>
-          </div>
-          <div class="energy-upgrades-panel" id="energy-upgrades-panel" style="display: none;">
-            <div class="upgrades-grid" id="energy-upgrades-grid"></div>
+          <div class="tower-upgrades-container">
+            <!-- Upgrades Column -->
+            <div class="upgrades-column">
+              <div class="column-header">⬆️ Upgrades</div>
+              <div class="upgrades-panel" id="energy-upgrades-panel">
+                <div class="upgrades-grid" id="energy-upgrades-grid"></div>
+              </div>
+            </div>
+            <!-- Actions Column -->
+            <div class="abilities-column">
+              <div class="column-header">🔧 Actions</div>
+              <div class="abilities-panel" id="energy-actions-panel">
+                <div class="energy-actions-grid">
+                  <button class="action-btn energy-action" id="action-connect" title="Connect to network">
+                    <span class="action-icon">🔗</span>
+                    <span class="action-label">Connect</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

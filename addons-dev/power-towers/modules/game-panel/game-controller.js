@@ -194,8 +194,8 @@ class GameControllerBase {
       // Tower actions
       actionAttackType: container.querySelector('#action-attack-type'),
       actionElement: container.querySelector('#action-element'),
-      actionUpgrades: container.querySelector('#action-upgrades'),
-      actionAbilities: container.querySelector('#action-abilities'),
+      upgradesPanel: container.querySelector('#upgrades-panel'),
+      abilitiesPanel: container.querySelector('#abilities-panel'),
       upgradesGridPanel: container.querySelector('#upgrades-grid-panel'),
       abilitiesGridPanel: container.querySelector('#abilities-grid-panel'),
       // Energy actions

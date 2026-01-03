@@ -163,10 +163,32 @@ function BottomPanelMixin(Base) {
     }
     
     /**
-     * @deprecated Use CSS :hover instead
+     * Setup stat hover popups - position above the bottom panel
      */
     setupStatHoverPopups() {
-      // No-op - CSS handles this now
+      const el = this.elements;
+      const bottomPanel = el.bottomPanel;
+      if (!bottomPanel) return;
+      
+      const statItems = bottomPanel.querySelectorAll('.stat-hoverable');
+      statItems.forEach(item => {
+        // Skip if already setup
+        if (item._hoverSetup) return;
+        item._hoverSetup = true;
+        
+        const popup = item.querySelector('.stat-detail-popup');
+        if (!popup) return;
+        
+        item.addEventListener('mouseenter', () => {
+          const rect = item.getBoundingClientRect();
+          const panelRect = bottomPanel.getBoundingClientRect();
+          
+          // Position above the panel
+          popup.style.left = `${rect.left + rect.width / 2}px`;
+          popup.style.top = `${panelRect.top - 10}px`;
+          popup.style.transform = 'translate(-50%, -100%)';
+        });
+      });
     }
     
     /**
@@ -649,16 +671,47 @@ function BottomPanelMixin(Base) {
       if (el.actionsTower) el.actionsTower.style.display = 'flex';
       if (el.actionsEnergy) el.actionsEnergy.style.display = 'none';
       
-      // Show/hide attack type and element sections
-      if (el.actionAttackType) {
-        el.actionAttackType.style.display = tower.attackTypeId === 'base' ? 'block' : 'none';
+      // Show/hide attack type and element sections (now inside avatar section)
+      // Re-query elements in case they weren't found during init
+      const actionAttackType = el.actionAttackType || el.bottomPanel?.querySelector('#action-attack-type');
+      const actionElement = el.actionElement || el.bottomPanel?.querySelector('#action-element');
+      
+      if (actionAttackType) {
+        actionAttackType.style.display = tower.attackTypeId === 'base' ? 'block' : 'none';
+        // Re-attach click handlers if not done
+        if (!actionAttackType._eventsAttached) {
+          actionAttackType._eventsAttached = true;
+          actionAttackType.querySelectorAll('[data-action="attack-type"]').forEach(card => {
+            card.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const type = card.dataset.type;
+              this.setTowerAttackType(type);
+            });
+          });
+        }
       }
-      if (el.actionElement) {
+      if (actionElement) {
         const showElement = tower.attackTypeId !== 'base' && !tower.elementPath;
-        el.actionElement.style.display = showElement ? 'block' : 'none';
+        actionElement.style.display = showElement ? 'block' : 'none';
+        // Re-attach click handlers if not done
+        if (!actionElement._eventsAttached) {
+          actionElement._eventsAttached = true;
+          actionElement.querySelectorAll('[data-action="element"]').forEach(card => {
+            card.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const element = card.dataset.element;
+              this.setTowerElement(element);
+            });
+          });
+        }
       }
       
-      // Update upgrade grid
+      // Always show tower actions panel when tower is selected
+      if (el.actionsTower) {
+        el.actionsTower.style.display = 'flex';
+      }
+      
+      // Always update upgrade and abilities grids
       this.updateTowerUpgradesInPanel(tower);
       
       // Update special stats (splash, chain, element abilities)
@@ -702,19 +755,124 @@ function BottomPanelMixin(Base) {
       if (el.avatarName) el.avatarName.textContent = this.getEnergyBuildingName(building);
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${building.level || 1}`;
       
+      // Hide attack type and element sections (tower-only)
+      if (el.actionAttackType) el.actionAttackType.style.display = 'none';
+      if (el.actionElement) el.actionElement.style.display = 'none';
+      
       // XP bar for energy buildings
       if (el.avatarXpFill) {
         const xpProgress = building.getXpProgress?.() || { percent: 0 };
         el.avatarXpFill.style.width = `${xpProgress.percent}%`;
       }
       
-      // Show energy actions
+      // Show energy actions (with upgrades)
       if (el.actionsBuild) el.actionsBuild.style.display = 'none';
       if (el.actionsTower) el.actionsTower.style.display = 'none';
-      if (el.actionsEnergy) el.actionsEnergy.style.display = 'block';
+      if (el.actionsEnergy) el.actionsEnergy.style.display = 'flex';
       
-      // Reset upgrade panel state
-      if (el.energyUpgradesPanel) el.energyUpgradesPanel.style.display = 'none';
+      // Update energy upgrades grid
+      this.updateEnergyUpgradesInPanel(building);
+      
+      // Setup stat hover popups
+      this.setupStatHoverPopups();
+    }
+    
+    /**
+     * Update energy building upgrades in panel
+     */
+    updateEnergyUpgradesInPanel(building) {
+      const el = this.elements;
+      const upgradesGrid = el.bottomPanel?.querySelector('#energy-upgrades-grid');
+      if (!upgradesGrid) return;
+      
+      const gold = this.game?.getState?.().gold || 0;
+      
+      // Clear grid
+      upgradesGrid.innerHTML = '';
+      
+      // Energy building upgrade definitions
+      const ENERGY_UPGRADES = [
+        { id: 'capacity', name: 'Capacity', emoji: '🔋', stat: 'capacity', bonus: '+25%', baseCost: 30 },
+        { id: 'output', name: 'Output', emoji: '📤', stat: 'outputRate', bonus: '+20%', baseCost: 40 },
+        { id: 'range', name: 'Range', emoji: '📡', stat: 'range', bonus: '+1', baseCost: 50 },
+        { id: 'efficiency', name: 'Efficiency', emoji: '⚡', stat: 'efficiency', bonus: '+10%', baseCost: 35 },
+      ];
+      
+      // Add generation upgrade for generators
+      if (building.type === 'generator' || building.type === 'solar' || building.type === 'hydro' || building.type === 'wind' || building.type === 'geo') {
+        ENERGY_UPGRADES.push({ id: 'generation', name: 'Gen Rate', emoji: '⚡', stat: 'generationRate', bonus: '+15%', baseCost: 45 });
+      }
+      
+      for (const upgrade of ENERGY_UPGRADES) {
+        const currentLevel = building.upgradeLevels?.[upgrade.id] || 0;
+        const cost = Math.floor(upgrade.baseCost * Math.pow(1.2, currentLevel));
+        const canAfford = gold >= cost;
+        
+        const card = document.createElement('div');
+        card.className = `upgrade-card${!canAfford ? ' disabled' : ''}`;
+        card.dataset.upgradeId = upgrade.id;
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="card-icon">${upgrade.emoji}</span>
+            <span class="card-name">${upgrade.name}</span>
+          </div>
+          <div class="card-bottom">
+            <span class="card-cost">${cost}g</span>
+            <span class="card-level">Lv.${currentLevel}</span>
+            <span class="card-bonus">${upgrade.bonus}</span>
+          </div>
+        `;
+        card.title = `${upgrade.name}\nLevel ${currentLevel} → ${currentLevel + 1}\nCost: ${cost}g`;
+        
+        if (canAfford) {
+          card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.purchaseEnergyUpgrade(building, upgrade.id, cost);
+          });
+        }
+        
+        upgradesGrid.appendChild(card);
+      }
+    }
+    
+    /**
+     * Purchase energy building upgrade
+     */
+    purchaseEnergyUpgrade(building, upgradeId, cost) {
+      const state = this.game?.getState?.();
+      if (!state || state.gold < cost) return;
+      
+      // Deduct gold
+      this.game.addGold(-cost);
+      
+      // Apply upgrade
+      if (!building.upgradeLevels) building.upgradeLevels = {};
+      building.upgradeLevels[upgradeId] = (building.upgradeLevels[upgradeId] || 0) + 1;
+      
+      // Apply stat boost based on upgrade type
+      const level = building.upgradeLevels[upgradeId];
+      switch (upgradeId) {
+        case 'capacity':
+          building.capacity = Math.floor((building.baseCapacity || 50) * (1 + level * 0.25));
+          break;
+        case 'output':
+          building.outputRate = Math.floor((building.baseOutputRate || 10) * (1 + level * 0.2));
+          break;
+        case 'range':
+          building.range = (building.baseRange || 4) + level;
+          break;
+        case 'efficiency':
+          building.efficiency = 1 + level * 0.1;
+          break;
+        case 'generation':
+          if (building.generationRate !== undefined) {
+            building.generationRate = Math.floor((building.baseGenerationRate || 5) * (1 + level * 0.15));
+          }
+          break;
+      }
+      
+      // Refresh panel
+      this.showEnergyBuildingInBottomPanel(building);
     }
     
     /**
@@ -808,13 +966,24 @@ function BottomPanelMixin(Base) {
       };
       return names[building.type] || 'Building';
     }
-    
+
     /**
      * Update tower upgrades in bottom panel - compact card layout
      */
     updateTowerUpgradesInPanel(tower) {
       const el = this.elements;
-      if (!el.upgradesGridPanel) return;
+      
+      // Try to get element directly if not in cache
+      if (!el.upgradesGridPanel) {
+        el.upgradesGridPanel = el.bottomPanel?.querySelector('#upgrades-grid-panel');
+      }
+      
+      if (!el.upgradesGridPanel) {
+        console.warn('[BottomPanel] upgradesGridPanel not found');
+        return;
+      }
+      
+      console.log('[BottomPanel] Updating upgrades for tower:', tower?.id, 'attackTypeId:', tower?.attackTypeId);
       
       const gold = this.game?.getState?.().gold || 0;
       const towerLevel = tower.level || 1;
@@ -840,8 +1009,11 @@ function BottomPanelMixin(Base) {
       // Filter to available upgrades for this tower
       const availableUpgrades = allUpgrades.filter(id => {
         const upgrade = STAT_UPGRADES[id];
-        return upgrade && isUpgradeAvailable(upgrade, tower);
+        const available = upgrade && isUpgradeAvailable(upgrade, tower);
+        return available;
       });
+      
+      console.log('[BottomPanel] Available upgrades:', availableUpgrades.length, availableUpgrades);
       
       for (const upgradeId of availableUpgrades) {
         const upgrade = STAT_UPGRADES[upgradeId];
@@ -911,11 +1083,7 @@ function BottomPanelMixin(Base) {
         el.upgradesGridPanel.appendChild(card);
       }
       
-      // Show/hide upgrades section based on tower state
-      // Show after attack type is chosen
-      if (el.actionUpgrades) {
-        el.actionUpgrades.style.display = tower.attackTypeId !== 'base' ? 'block' : 'none';
-      }
+      console.log('[BottomPanel] Added cards to grid, children count:', el.upgradesGridPanel.children.length);
       
       // Also update abilities panel
       this.updateTowerAbilitiesInPanel(tower);

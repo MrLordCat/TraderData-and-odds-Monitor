@@ -19,7 +19,7 @@ function getLayoutStyles() {
     
     .game-screen { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: hidden; }
     .game-screen.menu-screen { align-items: center; justify-content: center; padding: 20px; }
-    .gameplay-screen { flex: 1; min-height: 0; position: relative; padding-bottom: 190px; }
+    .gameplay-screen { flex: 1; min-height: 0; position: relative; padding-bottom: 0; }
     
     .menu-title { text-align: center; margin-bottom: 24px; }
     .menu-icon { font-size: 64px; display: block; margin-bottom: 12px; }

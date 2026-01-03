@@ -233,16 +233,8 @@ class MapModule {
     
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        // Check terrain
-        const terrain = this.terrain[y][x];
-        const terrainDef = TERRAIN_TYPES[terrain];
-        const terrainBuildable = terrainDef && terrainDef.buildable;
-        
-        // Check biome
-        const biomeBuildable = this.biomeGenerator.isCellBuildable(x, y);
-        
-        // Cell is buildable if both terrain and biome allow it
-        if (terrainBuildable && biomeBuildable) {
+        const buildInfo = this.getBuildability(x, y);
+        if (buildInfo.buildable) {
           this.buildableCells.push({ x, y });
         }
       }
@@ -250,20 +242,55 @@ class MapModule {
   }
 
   /**
+   * Get detailed buildability info for a cell
+   * @returns {{ buildable: boolean, reason: string, terrain?: string|null, biome?: string|null }}
+   */
+  getBuildability(gridX, gridY) {
+    // Bounds check first
+    if (gridX < 0 || gridX >= this.width || gridY < 0 || gridY >= this.height) {
+      return { buildable: false, reason: 'out-of-bounds', terrain: null, biome: null };
+    }
+
+    const terrain = this.terrain?.[gridY]?.[gridX] ?? null;
+    if (terrain === null) {
+      return { buildable: false, reason: 'no-terrain', terrain: null, biome: null };
+    }
+
+    // Explicitly treat path cells as blocked for clarity
+    if (this.isPathCell(gridX, gridY)) {
+      return { buildable: false, reason: 'path', terrain, biome: this.biomeGenerator.getBiomeAt(gridX, gridY) };
+    }
+
+    const terrainDef = TERRAIN_TYPES[terrain];
+    const biomeAllowed = this.biomeGenerator.isCellBuildable(gridX, gridY);
+    const biomeId = this.biomeGenerator.getBiomeAt(gridX, gridY);
+
+    if (!terrainDef) {
+      return { buildable: false, reason: 'unknown-terrain', terrain, biome: biomeId };
+    }
+
+    // Normal rule: terrain must allow AND biome must allow
+    if (terrainDef.buildable) {
+      if (!biomeAllowed) {
+        return { buildable: false, reason: 'biome-blocked', terrain, biome: biomeId };
+      }
+      return { buildable: true, reason: 'ok', terrain, biome: biomeId };
+    }
+
+    // Special case: visually dry biome sitting on a water terrain tile (border cases)
+    // Allow placement if biome says buildable even though terrain says water
+    if (terrain === 'water' && biomeAllowed) {
+      return { buildable: true, reason: 'water-biome-override', terrain, biome: biomeId };
+    }
+
+    return { buildable: false, reason: 'terrain-blocked', terrain, biome: biomeId };
+  }
+
+  /**
    * Check if a cell is buildable (terrain + biome)
    */
   isBuildable(gridX, gridY) {
-    if (gridX < 0 || gridX >= this.width || gridY < 0 || gridY >= this.height) {
-      return false;
-    }
-    
-    // Check terrain
-    const terrain = this.terrain[gridY][gridX];
-    const terrainDef = TERRAIN_TYPES[terrain];
-    if (!terrainDef || !terrainDef.buildable) return false;
-    
-    // Check biome
-    return this.biomeGenerator.isCellBuildable(gridX, gridY);
+    return this.getBuildability(gridX, gridY).buildable;
   }
 
   /**

@@ -6,13 +6,16 @@
 function getCanvasStyles() {
   return `
     .canvas-container { 
-      position: relative; border-radius: 10px; overflow: hidden; 
-      flex: 1; min-height: 0;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border-radius: 10px; overflow: hidden; 
       display: flex; align-items: center; justify-content: center;
       background: #0a0a12;
     }
     #game-canvas {
       display: block;
+      width: 100%;
+      height: 100%;
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
       cursor: crosshair;
     }
