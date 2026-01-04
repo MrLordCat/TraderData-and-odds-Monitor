@@ -282,6 +282,11 @@ function getBottomPanelTemplate() {
               <span class="stat-value" id="panel-gen">5/s</span>
               <div class="hover-popup" id="panel-detail-gen"></div>
             </div>
+            <div class="stat-item stat-hoverable" data-stat="trees" id="stat-row-trees" style="display: none;">
+              <span class="stat-label">🌲 Trees</span>
+              <span class="stat-value" id="panel-trees">0/12</span>
+              <div class="hover-popup" id="panel-detail-trees"></div>
+            </div>
           </div>
         </div>
       </div>

@@ -687,9 +687,14 @@ function BottomPanelMixin(Base) {
       if (el.panelRange) el.panelRange.textContent = Math.floor(building.range || 0);
       if (el.panelGen) el.panelGen.textContent = `${Math.floor(state.generation || 0)}/s`;
       
+      // BioGenerator trees stat (update in real-time)
+      if (building.type === 'bio-generator' && el.panelTrees) {
+        el.panelTrees.textContent = `${building.treesUsed || 0}/${building.maxTrees || 12}`;
+      }
+      
       // Update channels display
       const energyModule = this.game?.modules?.energy;
-      const powerNetwork = energyModule?.powerNetwork;
+      const powerNetwork = energyModule?.buildingManager?.network;
       let usedInputs = 0, usedOutputs = 0;
       if (powerNetwork && building.id) {
         const connections = powerNetwork.connections || [];
@@ -755,7 +760,7 @@ function BottomPanelMixin(Base) {
       if (detailChannels) {
         // Get used channels from power network
         const energyModule = this.game?.modules?.energy;
-        const powerNetwork = energyModule?.powerNetwork;
+        const powerNetwork = energyModule?.buildingManager?.network;
         let usedInputs = 0, usedOutputs = 0;
         if (powerNetwork && building.id) {
           const connections = powerNetwork.connections || [];
@@ -798,6 +803,21 @@ function BottomPanelMixin(Base) {
         detailRange.innerHTML = createDetailBuilder()
           .base('Range:', `${formatInt(building.range || 0)} cells`)
           .line('Level bonus:', `+${(level - 1) * 5}%`, 'detail-level')
+          .build();
+      }
+      
+      // TREES (BioGenerator only)
+      const detailTrees = document.getElementById('panel-detail-trees');
+      if (detailTrees && building.type === 'bio-generator') {
+        const treesUsed = building.treesUsed || 0;
+        const maxTrees = building.maxTrees || 12;
+        const treeRadius = building.treeRadius || 3;
+        const genPerTree = building.generationPerTree || 2;
+        detailTrees.innerHTML = createDetailBuilder()
+          .line('Trees in range:', `${treesUsed}/${maxTrees}`, treesUsed >= maxTrees ? 'detail-crit' : 'detail-value')
+          .line('Scan radius:', `${treeRadius} cells`, 'detail-base')
+          .line('Gen per tree:', `+${genPerTree}/s`, 'detail-level')
+          .line('Total from trees:', `+${treesUsed * genPerTree}/s`, 'detail-value')
           .build();
       }
     }
@@ -937,9 +957,16 @@ function BottomPanelMixin(Base) {
       if (el.panelRange) el.panelRange.textContent = Math.floor(building.range || 0);
       if (el.panelGen) el.panelGen.textContent = `${Math.floor(state.generation || 0)}/s`;
       
+      // BioGenerator trees stat
+      const isBioGen = building.type === 'bio-generator';
+      if (el.statRowTrees) el.statRowTrees.style.display = isBioGen ? '' : 'none';
+      if (el.panelTrees && isBioGen) {
+        el.panelTrees.textContent = `${building.treesUsed || 0}/${building.maxTrees || 12}`;
+      }
+      
       // Get used channels from power network
       const energyModule = this.game?.modules?.energy;
-      const powerNetwork = energyModule?.powerNetwork;
+      const powerNetwork = energyModule?.buildingManager?.network;
       let usedInputs = 0, usedOutputs = 0;
       if (powerNetwork && building.id) {
         const connections = powerNetwork.connections || [];

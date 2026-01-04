@@ -173,6 +173,8 @@ class GameControllerBase {
       panelChannels: container.querySelector('#panel-channels'),
       panelRange: container.querySelector('#panel-range'),
       panelGen: container.querySelector('#panel-gen'),
+      panelTrees: container.querySelector('#panel-trees'),
+      statRowTrees: container.querySelector('#stat-row-trees'),
       // Avatar section
       panelAvatar: container.querySelector('#panel-avatar'),
       avatarEmpty: container.querySelector('.avatar-empty'),
