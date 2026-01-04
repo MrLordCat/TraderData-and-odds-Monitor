@@ -28,7 +28,7 @@ const ATTACK_TYPES = {
     dmgMod: 1.0,           // Base damage multiplier
     atkSpdMod: 1.0,        // Attack speed multiplier
     rangeMod: 1.0,         // Range multiplier
-    energyCostMod: 1.0,    // Energy cost multiplier (legacy)
+    energyCostMod: 1.0,  // Energy cost multiplier
     
     // Power Hit Cost: energy per shot = damage * 0.5 * powerHitCostMod
     powerHitCostMod: 1.0,  // Multiplier for power cost per shot
@@ -55,18 +55,6 @@ const ATTACK_TYPES = {
     maxPowerDraw: 100,     // Maximum power draw (overdrive can exceed)
     overdriveEfficiency: 0,// Efficiency above 100% (0 = disabled)
     
-    // DoT (Damage over Time)
-    burnDamage: 0,
-    burnDuration: 0,
-    poisonDamage: 0,
-    poisonDuration: 0,
-    
-    // Debuffs
-    slowPercent: 0,
-    slowDuration: 0,
-    armorReduction: 0,
-    armorReductionDuration: 0,
-    
     // Visual
     color: '#888888',
     projectileColor: '#cccccc',
@@ -87,7 +75,7 @@ const ATTACK_TYPES = {
     dmgMod: 1.2,           // 120% base damage
     atkSpdMod: 0.5,        // 50% attack speed (slower)
     rangeMod: 1.1,         // 110% range
-    energyCostMod: 1.5,    // 150% energy cost (legacy)
+    energyCostMod: 1.5,  // Energy cost multiplier
     
     // Power Hit Cost: Siege costs 40% more energy per shot
     powerHitCostMod: 1.4,  // 140% power cost
@@ -114,18 +102,6 @@ const ATTACK_TYPES = {
     maxPowerDraw: 100,
     overdriveEfficiency: 0,
     
-    // DoT
-    burnDamage: 0,
-    burnDuration: 0,
-    poisonDamage: 0,
-    poisonDuration: 0,
-    
-    // Debuffs
-    slowPercent: 0,
-    slowDuration: 0,
-    armorReduction: 0,
-    armorReductionDuration: 0,
-    
     // Visual
     color: '#ff6b35',
     projectileColor: '#ff4500',
@@ -146,7 +122,7 @@ const ATTACK_TYPES = {
     dmgMod: 0.9,           // 90% base damage
     atkSpdMod: 1.5,        // 150% attack speed (faster)
     rangeMod: 1.0,         // Standard range
-    energyCostMod: 0.8,    // 80% energy cost (legacy)
+    energyCostMod: 0.8,  // Energy cost multiplier
     
     // Power Hit Cost: Normal is efficient
     powerHitCostMod: 0.8,  // 80% power cost
@@ -172,18 +148,6 @@ const ATTACK_TYPES = {
     maxPowerDraw: 100,
     overdriveEfficiency: 0,
     
-    // DoT
-    burnDamage: 0,
-    burnDuration: 0,
-    poisonDamage: 0,
-    poisonDuration: 0,
-    
-    // Debuffs
-    slowPercent: 0,
-    slowDuration: 0,
-    armorReduction: 0,
-    armorReductionDuration: 0,
-    
     // Visual
     color: '#4a90d9',
     projectileColor: '#87ceeb',
@@ -204,7 +168,7 @@ const ATTACK_TYPES = {
     dmgMod: 0.6,           // 60% base damage (before power scaling)
     atkSpdMod: 0.9,        // 90% attack speed
     rangeMod: 1.2,         // 120% range
-    energyCostMod: 0.5,    // Lower base cost (legacy)
+    energyCostMod: 0.5,  // Energy cost multiplier
     
     // Power Hit Cost: Magic uses power differently (via powerScaling)
     powerHitCostMod: 0.6,  // 60% base power cost (but power scaling adds more)
@@ -230,18 +194,6 @@ const ATTACK_TYPES = {
     maxPowerDraw: 100,     // Normal max
     overdriveEfficiency: 0.5, // 50% efficiency above 100% (diminishing returns)
     
-    // DoT
-    burnDamage: 0,
-    burnDuration: 0,
-    poisonDamage: 0,
-    poisonDuration: 0,
-    
-    // Debuffs
-    slowPercent: 0,
-    slowDuration: 0,
-    armorReduction: 0,
-    armorReductionDuration: 0,
-    
     // Visual
     color: '#9b59b6',
     projectileColor: '#e056fd',
@@ -262,7 +214,7 @@ const ATTACK_TYPES = {
     dmgMod: 0.85,          // 85% base damage
     atkSpdMod: 1.1,        // 110% attack speed
     rangeMod: 0.9,         // 90% range (needs precision)
-    energyCostMod: 1.0,    // Standard energy cost (legacy)
+    energyCostMod: 1.0,  // Energy cost multiplier
     
     // Power Hit Cost: Piercing is efficient
     powerHitCostMod: 0.9,  // 90% power cost
@@ -287,18 +239,6 @@ const ATTACK_TYPES = {
     minPowerDraw: 0,
     maxPowerDraw: 100,
     overdriveEfficiency: 0,
-    
-    // DoT
-    burnDamage: 0,
-    burnDuration: 0,
-    poisonDamage: 0,
-    poisonDuration: 0,
-    
-    // Debuffs
-    slowPercent: 0,
-    slowDuration: 0,
-    armorReduction: 5,     // Slight armor reduction
-    armorReductionDuration: 2000,
     
     // Visual
     color: '#e74c3c',
@@ -406,14 +346,6 @@ function applyAttackTypeModifiers(baseStats, attackTypeId) {
     minPowerDraw: attackType.minPowerDraw,
     maxPowerDraw: attackType.maxPowerDraw,
     overdriveEfficiency: attackType.overdriveEfficiency,
-    burnDamage: attackType.burnDamage,
-    burnDuration: attackType.burnDuration,
-    poisonDamage: attackType.poisonDamage,
-    poisonDuration: attackType.poisonDuration,
-    slowPercent: attackType.slowPercent,
-    slowDuration: attackType.slowDuration,
-    armorReduction: attackType.armorReduction,
-    armorReductionDuration: attackType.armorReductionDuration,
     
     // Visual properties
     projectileColor: attackType.projectileColor,

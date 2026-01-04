@@ -90,17 +90,6 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     overdriveEfficiency: 0,
     currentPowerDraw: 50,
     
-    // DoT/Debuffs (from element path)
-    burnDamage: 0,
-    burnDuration: 0,
-    poisonDamage: 0,
-    poisonDuration: 0,
-    slowPercent: 0,
-    slowDuration: 0,
-    armorReduction: 0,
-    armorReductionDuration: 0,
-    trueDamagePercent: 0,
-    
     // Element bonuses
     elementDmgBonus: 0,
     elementRangeBonus: 0,
@@ -114,9 +103,8 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     upgradeLevels: {},     // { damage: 2, range: 1, ... }
     elementPath: null,     // 'fire', 'ice', etc.
     elementTier: 0,        // 0-3
-    elementEffects: {},    // Current element effects
     
-    // Element ability upgrades (NEW)
+    // Element ability upgrades
     abilityUpgrades: {},   // { burn_damage: 2, spread_chance: 1, ... }
     elementAbilities: null, // Computed abilities with upgrades applied
     

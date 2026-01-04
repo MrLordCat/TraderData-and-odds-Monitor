@@ -2082,18 +2082,6 @@ class GameRenderer {
         this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 6, 2 / camera.zoom, 0.3, 0, 0.4, curseAlpha * 0.5);
       }
       
-      // Fallback to legacy effects
-      if (!hasBurn && enemy.burnDuration > 0) {
-        const flicker = Math.sin(this.frameCount * 0.3) * 2;
-        this.shapeRenderer.circle(enemy.x + flicker, enemy.y - size - 3, 3, 0.96, 0.4, 0.4, 1);
-      }
-      if (!hasSlow && enemy.slowDuration > 0) {
-        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 2, 2 / camera.zoom, 0.39, 0.7, 0.93, 0.8);
-      }
-      if (!hasPoison && enemy.poisonDuration > 0) {
-        this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 3, 2 / camera.zoom, 0.2, 0.8, 0.3, 0.6);
-      }
-      
       // Health bar
       const hpRatio = enemy.maxHealth > 0 ? enemy.health / enemy.maxHealth : (enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1);
       const barWidth = size * 2;
@@ -2120,14 +2108,7 @@ class GameRenderer {
    * Check if enemy has a specific status effect
    */
   _hasStatusEffect(enemy, type) {
-    if (enemy.statusEffects && enemy.statusEffects.length > 0) {
-      return enemy.statusEffects.some(e => e.type === type);
-    }
-    // Fallback to legacy
-    if (type === 'burn') return enemy.burnDuration > 0;
-    if (type === 'slow') return enemy.slowDuration > 0;
-    if (type === 'poison') return enemy.poisonDuration > 0;
-    return false;
+    return enemy.statusEffects?.some(e => e.type === type) || false;
   }
   
   /**

@@ -196,20 +196,6 @@ function performAttack(tower, eventBus) {
     chainDmgFalloff: tower.chainDmgFalloff,
     chainCanCrit: tower.chainCanCrit || false,
     
-    // DoT/Debuffs (legacy, for compatibility)
-    burnDamage: tower.burnDamage,
-    burnDuration: tower.burnDuration,
-    poisonDamage: tower.poisonDamage,
-    poisonDuration: tower.poisonDuration,
-    slowPercent: tower.slowPercent,
-    slowDuration: tower.slowDuration,
-    armorReduction: tower.armorReduction,
-    armorReductionDuration: tower.armorReductionDuration,
-    trueDamagePercent: tower.trueDamagePercent,
-    
-    // Element effects (legacy)
-    elementEffects: tower.elementEffects,
-    
     // Costs
     energyCost,
     powerCost,
