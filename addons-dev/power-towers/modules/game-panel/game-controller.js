@@ -19,7 +19,7 @@ const { EnergyTooltipMixin } = require('./energy-tooltip-ui');
 const { CanvasEventsMixin } = require('./canvas-events');
 const { GameEventsMixin } = require('./game-events');
 const { UIEventsMixin } = require('./ui-events');
-const { BottomPanelMixin } = require('./bottom-panel-ui');
+const { BottomPanelMixin } = require('./bottom-panel');
 const { PlacementManager, BUILDING_TYPES } = require('../placement');
 const CONFIG = require('../../core/config');
 
