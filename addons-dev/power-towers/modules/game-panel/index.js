@@ -34,8 +34,7 @@ module.exports = function({ SidebarModule, registerModule }) {
     const renderer = require(path.join(rendererPath, 'game-renderer.js'));
     GameRenderer = renderer.GameRenderer;
     
-    const tower = require(path.join(corePath, 'entities', 'tower.js'));
-    TOWER_PATHS = tower.TOWER_PATHS;
+    TOWER_PATHS = require(path.join(corePath, 'entities', 'tower-paths.js'));
     
     const cameraModule = require(path.join(corePath, 'systems', 'camera.js'));
     Camera = cameraModule.Camera;
