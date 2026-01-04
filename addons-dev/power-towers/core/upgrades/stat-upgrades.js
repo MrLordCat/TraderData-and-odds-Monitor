@@ -161,6 +161,7 @@ const STAT_UPGRADES = {
 
   // =========================================
   // HP / FORTIFICATION (+8% per level)
+  // DISABLED - no longer available as upgrade
   // =========================================
   hp: {
     id: 'hp',
@@ -175,6 +176,11 @@ const STAT_UPGRADES = {
       percentPerLevel: 0.08,
     },
     
+    // Disabled - not available for any tower
+    requires: {
+      attackTypes: []  // Empty array = never available
+    },
+    
     cost: {
       base: 15,
       scaleFactor: 1.10,
@@ -185,6 +191,7 @@ const STAT_UPGRADES = {
 
   // =========================================
   // HP REGEN (+0.5 per level, fixed)
+  // DISABLED - no longer available as upgrade
   // =========================================
   hpRegen: {
     id: 'hpRegen',
@@ -199,6 +206,11 @@ const STAT_UPGRADES = {
       valuePerLevel: 0.5,
     },
     
+    // Disabled - not available for any tower
+    requires: {
+      attackTypes: []  // Empty array = never available
+    },
+    
     cost: {
       base: 20,
       scaleFactor: 1.12,
@@ -209,6 +221,7 @@ const STAT_UPGRADES = {
 
   // =========================================
   // ENERGY STORAGE (+10% per level)
+  // Only available for Lightning element
   // =========================================
   energyStorage: {
     id: 'energyStorage',
@@ -221,6 +234,11 @@ const STAT_UPGRADES = {
       type: 'percentage',
       stat: 'energyStorage',
       percentPerLevel: 0.10,
+    },
+    
+    // Only available for Lightning element towers
+    requires: {
+      elementPaths: ['lightning']
     },
     
     cost: {

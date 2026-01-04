@@ -1,6 +1,13 @@
 /**
- * Power Towers TD - Abilities
- * Special effects that can be unlocked/upgraded
+ * @deprecated This file is deprecated. Use element-abilities.js instead.
+ * 
+ * Power Towers TD - Abilities (OLD TIER-BASED SYSTEM)
+ * 
+ * This file contains the old tier-based ability system.
+ * The new system uses ELEMENT_ABILITIES from element-abilities.js
+ * with abilityUpgrades instead of abilityTiers.
+ * 
+ * Kept for backwards compatibility. Will be removed in future version.
  */
 
 const ABILITIES = {

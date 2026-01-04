@@ -12,12 +12,14 @@
  * 
  * STRUCTURE:
  * - upgrades/stat-upgrades.js - Basic stat improvements
- * - upgrades/abilities.js - Special abilities with tiers
+ * - upgrades/abilities.js - @deprecated - use element-abilities.js instead
  * - upgrades/passive-effects.js - Passive bonuses
+ * 
+ * NOTE: For element ability upgrades, use ELEMENT_ABILITIES from element-abilities.js
  */
 
 const { STAT_UPGRADES } = require('./upgrades/stat-upgrades');
-const { ABILITIES } = require('./upgrades/abilities');
+const { ABILITIES } = require('./upgrades/abilities'); // @deprecated
 const { PASSIVE_EFFECTS } = require('./upgrades/passive-effects');
 const CONFIG = require('./config');
 
@@ -238,14 +240,14 @@ module.exports = {
   // Configs
   COST_CONFIG,
   STAT_UPGRADES,
-  ABILITIES,
+  ABILITIES,           // @deprecated - use ELEMENT_ABILITIES from element-abilities.js
   PASSIVE_EFFECTS,
   
   // Functions
   calculateUpgradeCost,
-  calculateAbilityCost,
+  calculateAbilityCost,   // @deprecated - use getAbilityUpgradeCost from element-abilities.js
   getUpgradeEffectValue,
-  getAbilityEffects,
+  getAbilityEffects,      // @deprecated - use getElementAbilities from element-abilities.js
   isUpgradeAvailable,
   getAvailableUpgradesForTower
 };

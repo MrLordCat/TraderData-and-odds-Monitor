@@ -25,26 +25,47 @@ const CONFIG = require('../core/config');
 // Biome colors (RGB 0-1)
 const BIOME_COLORS = {
   plains: { r: 0.35, g: 0.55, b: 0.35 },
-  forest: { r: 0.2, g: 0.4, b: 0.2 },
+  forest: { r: 0.18, g: 0.38, b: 0.18 },
   desert: { r: 0.85, g: 0.75, b: 0.5 },
-  water: { r: 0.25, g: 0.45, b: 0.65 },
-  mountains: { r: 0.45, g: 0.4, b: 0.4 },
-  burned: { r: 0.2, g: 0.15, b: 0.15 },
+  water: { r: 0.22, g: 0.42, b: 0.62 },
+  mountains: { r: 0.45, g: 0.42, b: 0.42 },
+  burned: { r: 0.18, g: 0.12, b: 0.12 },
 };
 
-// Biome color variants for visual variety
+// Biome color variants for visual variety (more variants for richer look)
 const BIOME_VARIANTS = {
   plains: [
     { r: 0.38, g: 0.58, b: 0.38 },
     { r: 0.32, g: 0.52, b: 0.32 },
+    { r: 0.36, g: 0.54, b: 0.34 },
+    { r: 0.34, g: 0.56, b: 0.36 },
   ],
   forest: [
-    { r: 0.18, g: 0.38, b: 0.18 },
-    { r: 0.22, g: 0.42, b: 0.22 },
+    { r: 0.16, g: 0.35, b: 0.16 },
+    { r: 0.2, g: 0.4, b: 0.2 },
+    { r: 0.17, g: 0.36, b: 0.17 },
+    { r: 0.19, g: 0.39, b: 0.19 },
   ],
   desert: [
     { r: 0.88, g: 0.78, b: 0.53 },
     { r: 0.82, g: 0.72, b: 0.47 },
+    { r: 0.85, g: 0.74, b: 0.48 },
+    { r: 0.87, g: 0.76, b: 0.52 },
+  ],
+  water: [
+    { r: 0.2, g: 0.4, b: 0.6 },
+    { r: 0.24, g: 0.44, b: 0.64 },
+    { r: 0.21, g: 0.41, b: 0.61 },
+  ],
+  mountains: [
+    { r: 0.43, g: 0.4, b: 0.4 },
+    { r: 0.47, g: 0.44, b: 0.44 },
+    { r: 0.44, g: 0.41, b: 0.41 },
+  ],
+  burned: [
+    { r: 0.16, g: 0.1, b: 0.1 },
+    { r: 0.2, g: 0.14, b: 0.14 },
+    { r: 0.17, g: 0.11, b: 0.11 },
   ],
 };
 
@@ -182,6 +203,7 @@ class GameRenderer {
    */
   invalidateStaticCache() {
     this.decorationCacheDirty = true;
+    this._pathCellSetDirty = true;  // Also invalidate path cell cache
   }
   
   // ============================================
@@ -514,22 +536,145 @@ class GameRenderer {
   }
   
   _renderPath(data) {
-    if (!data.pathCells) return;
+    if (!data.pathCells || data.pathCells.length === 0) return;
     
-    this.shapeRenderer.begin('triangles', this.camera);
-    
+    const camera = this.camera;
     const gridSize = CONFIG.GRID_SIZE;
-    const color = this._parseColor(CONFIG.COLORS.path);
     
+    // Create path cell lookup Set for fast checking
+    if (!this._pathCellSet || this._pathCellSetDirty) {
+      this._pathCellSet = new Set();
+      for (const cell of data.pathCells) {
+        this._pathCellSet.add(`${cell.x},${cell.y}`);
+      }
+      this._pathCellSetDirty = false;
+    }
+    
+    this.shapeRenderer.begin('triangles', camera);
+    
+    // Colors for road path
+    const roadBase = { r: 0.32, g: 0.30, b: 0.28 };       // Main road surface
+    const roadDark = { r: 0.25, g: 0.23, b: 0.21 };       // Road shadows/variation
+    const roadLight = { r: 0.38, g: 0.36, b: 0.34 };      // Road highlights
+    const borderOuter = { r: 0.45, g: 0.40, b: 0.35 };    // Outer border (stone)
+    const borderInner = { r: 0.28, g: 0.25, b: 0.22 };    // Inner border shadow
+    
+    const borderWidth = 3;  // Border thickness in pixels
+    
+    // First pass: Draw the road surface for all cells
     for (const cell of data.pathCells) {
-      this.shapeRenderer.rect(
-        cell.x * gridSize, cell.y * gridSize,
-        gridSize, gridSize,
-        color.r, color.g, color.b, 0.8
-      );
+      const cx = cell.x * gridSize;
+      const cy = cell.y * gridSize;
+      
+      // Base road surface
+      const hash = (cell.x * 17 + cell.y * 31) % 100;
+      const baseColor = hash < 50 ? roadBase : (hash < 80 ? roadDark : roadLight);
+      
+      this.shapeRenderer.rect(cx, cy, gridSize, gridSize, baseColor.r, baseColor.g, baseColor.b, 1);
+    }
+    
+    // Second pass: Draw borders only on outer edges
+    for (const cell of data.pathCells) {
+      const cx = cell.x * gridSize;
+      const cy = cell.y * gridSize;
+      
+      // Check adjacent cells
+      const hasTop = this._pathCellSet.has(`${cell.x},${cell.y - 1}`);
+      const hasBottom = this._pathCellSet.has(`${cell.x},${cell.y + 1}`);
+      const hasLeft = this._pathCellSet.has(`${cell.x - 1},${cell.y}`);
+      const hasRight = this._pathCellSet.has(`${cell.x + 1},${cell.y}`);
+      
+      // Draw borders only where there's no adjacent path cell
+      
+      // Top border
+      if (!hasTop) {
+        // Outer stone border
+        this.shapeRenderer.rect(cx, cy, gridSize, borderWidth, 
+          borderOuter.r, borderOuter.g, borderOuter.b, 1);
+        // Inner shadow line
+        this.shapeRenderer.rect(cx, cy + borderWidth, gridSize, 1, 
+          borderInner.r, borderInner.g, borderInner.b, 0.6);
+      }
+      
+      // Bottom border
+      if (!hasBottom) {
+        // Inner shadow
+        this.shapeRenderer.rect(cx, cy + gridSize - borderWidth - 1, gridSize, 1, 
+          borderInner.r, borderInner.g, borderInner.b, 0.4);
+        // Outer stone border
+        this.shapeRenderer.rect(cx, cy + gridSize - borderWidth, gridSize, borderWidth, 
+          borderOuter.r, borderOuter.g, borderOuter.b, 1);
+      }
+      
+      // Left border
+      if (!hasLeft) {
+        // Outer stone border
+        this.shapeRenderer.rect(cx, cy, borderWidth, gridSize, 
+          borderOuter.r, borderOuter.g, borderOuter.b, 1);
+        // Inner shadow line
+        this.shapeRenderer.rect(cx + borderWidth, cy, 1, gridSize, 
+          borderInner.r, borderInner.g, borderInner.b, 0.5);
+      }
+      
+      // Right border
+      if (!hasRight) {
+        // Inner shadow
+        this.shapeRenderer.rect(cx + gridSize - borderWidth - 1, cy, 1, gridSize, 
+          borderInner.r, borderInner.g, borderInner.b, 0.3);
+        // Outer stone border
+        this.shapeRenderer.rect(cx + gridSize - borderWidth, cy, borderWidth, gridSize, 
+          borderOuter.r, borderOuter.g, borderOuter.b, 1);
+      }
+      
+      // Corner overlaps - make them look nicer
+      if (!hasTop && !hasLeft) {
+        this.shapeRenderer.rect(cx, cy, borderWidth, borderWidth, 
+          borderOuter.r * 1.1, borderOuter.g * 1.1, borderOuter.b * 1.1, 1);
+      }
+      if (!hasTop && !hasRight) {
+        this.shapeRenderer.rect(cx + gridSize - borderWidth, cy, borderWidth, borderWidth, 
+          borderOuter.r * 1.1, borderOuter.g * 1.1, borderOuter.b * 1.1, 1);
+      }
+      if (!hasBottom && !hasLeft) {
+        this.shapeRenderer.rect(cx, cy + gridSize - borderWidth, borderWidth, borderWidth, 
+          borderOuter.r * 1.1, borderOuter.g * 1.1, borderOuter.b * 1.1, 1);
+      }
+      if (!hasBottom && !hasRight) {
+        this.shapeRenderer.rect(cx + gridSize - borderWidth, cy + gridSize - borderWidth, borderWidth, borderWidth, 
+          borderOuter.r * 1.1, borderOuter.g * 1.1, borderOuter.b * 1.1, 1);
+      }
+    }
+    
+    // Third pass: Add subtle road details (cracks, worn spots) - sparse
+    for (const cell of data.pathCells) {
+      const cx = cell.x * gridSize;
+      const cy = cell.y * gridSize;
+      const hash = (cell.x * 13 + cell.y * 29) % 100;
+      
+      // Occasional worn spot
+      if (hash < 8) {
+        const wx = cx + gridSize * 0.3 + (hash % 8);
+        const wy = cy + gridSize * 0.4 + ((hash * 2) % 8);
+        this.shapeRenderer.circle(wx, wy, 2, roadDark.r, roadDark.g, roadDark.b, 0.4);
+      }
+      
+      // Rare crack line
+      if (hash > 90) {
+        const lx = cx + 5 + (hash % 10);
+        const ly = cy + 3;
+        this.shapeRenderer.rect(lx, ly, 1, gridSize - 6, 0.2, 0.18, 0.16, 0.3);
+      }
     }
     
     this.shapeRenderer.end();
+  }
+  
+  /**
+   * Check if a cell is on the path
+   */
+  _isPathCell(x, y) {
+    if (!this._pathCellSet) return false;
+    return this._pathCellSet.has(`${x},${y}`);
   }
   
   _renderDecorations(data) {
@@ -548,75 +693,194 @@ class GameRenderer {
     
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
+        // Skip path cells - no decorations on the path!
+        if (this._isPathCell(x, y)) continue;
+        
         const biome = data.biomeMap[y]?.[x];
         if (!biome) continue;
         
         const cellX = x * gridSize;
         const cellY = y * gridSize;
         const hash = (x * 31 + y * 17) % 100;
+        const hash2 = (x * 13 + y * 23) % 100;  // Second hash for more variety
         
         switch (biome) {
           case 'forest':
-            // Trees - sparse placement
-            if (hash < 25) {
+            // Primary trees - dense placement
+            if (hash < 35) {
               const offsetX = (hash % 5) * gridSize / 6;
               const offsetY = ((hash * 3) % 5) * gridSize / 6;
               const treeX = cellX + gridSize * 0.2 + offsetX;
               const treeY = cellY + gridSize * 0.2 + offsetY;
-              const size = gridSize * 0.25;
+              const size = gridSize * (0.22 + (hash % 10) * 0.01);
               
+              // Tree shadow
+              this.shapeRenderer.circle(treeX + 2, treeY + 3, size * 0.9, 0.05, 0.12, 0.05, 0.4);
               // Tree crown (darker green circle)
-              this.shapeRenderer.circle(treeX, treeY, size, 0.08, 0.25, 0.08, 0.9);
+              this.shapeRenderer.circle(treeX, treeY, size, 0.08, 0.25, 0.08, 0.95);
+              // Crown depth layer
+              this.shapeRenderer.circle(treeX + size * 0.15, treeY + size * 0.15, size * 0.7, 0.06, 0.2, 0.06, 0.8);
               // Highlight
-              this.shapeRenderer.circle(treeX - size * 0.2, treeY - size * 0.2, size * 0.3, 0.15, 0.4, 0.15, 0.6);
+              this.shapeRenderer.circle(treeX - size * 0.25, treeY - size * 0.25, size * 0.35, 0.18, 0.45, 0.18, 0.7);
+            }
+            // Secondary smaller bushes
+            if (hash2 < 20 && hash >= 35) {
+              const bx = cellX + gridSize * 0.6;
+              const by = cellY + gridSize * 0.5;
+              this.shapeRenderer.circle(bx, by, gridSize * 0.12, 0.1, 0.28, 0.1, 0.8);
+              this.shapeRenderer.circle(bx - 1, by - 1, gridSize * 0.06, 0.15, 0.35, 0.15, 0.6);
+            }
+            // Grass tufts
+            if (hash2 > 60 && hash2 < 75) {
+              const gx = cellX + (hash2 % 15);
+              const gy = cellY + ((hash2 * 2) % 15);
+              this.shapeRenderer.circle(gx, gy, 1.5, 0.2, 0.4, 0.15, 0.5);
             }
             break;
             
           case 'desert':
-            // Cacti/dunes - very sparse
-            if (hash < 15) {
+            // Sand dunes - layered
+            if (hash < 25) {
               const cx = cellX + gridSize * 0.5;
               const cy = cellY + gridSize * 0.5;
-              // Sand mound
-              this.shapeRenderer.circle(cx, cy, gridSize * 0.2, 0.75, 0.65, 0.4, 0.5);
+              // Dune shadow
+              this.shapeRenderer.circle(cx + 3, cy + 2, gridSize * 0.25, 0.65, 0.55, 0.35, 0.4);
+              // Main dune
+              this.shapeRenderer.circle(cx, cy, gridSize * 0.22, 0.8, 0.7, 0.45, 0.6);
+              // Dune highlight
+              this.shapeRenderer.circle(cx - 2, cy - 2, gridSize * 0.1, 0.9, 0.8, 0.55, 0.4);
+            }
+            // Cacti (sparse)
+            if (hash2 < 8) {
+              const cx = cellX + gridSize * 0.3 + (hash2 % 8);
+              const cy = cellY + gridSize * 0.4;
+              // Cactus body (vertical ellipse-ish)
+              this.shapeRenderer.rect(cx - 2, cy - 6, 4, 10, 0.2, 0.45, 0.2, 0.9);
+              this.shapeRenderer.rect(cx - 1, cy - 5, 2, 8, 0.25, 0.5, 0.25, 0.8);
+              // Cactus arms
+              if (hash2 > 4) {
+                this.shapeRenderer.rect(cx + 2, cy - 2, 4, 2, 0.2, 0.45, 0.2, 0.9);
+                this.shapeRenderer.rect(cx + 4, cy - 4, 2, 4, 0.2, 0.45, 0.2, 0.9);
+              }
+            }
+            // Sand ripples
+            if (hash > 50 && hash < 70) {
+              const rx = cellX + 3;
+              const ry = cellY + gridSize * 0.5 + (hash % 8);
+              this.shapeRenderer.rect(rx, ry, gridSize - 6, 1, 0.75, 0.65, 0.4, 0.3);
             }
             break;
             
           case 'mountains':
-            // Rocks
-            if (hash < 20) {
-              const rx = cellX + gridSize * 0.3 + (hash % 4) * 4;
-              const ry = cellY + gridSize * 0.4 + ((hash * 2) % 4) * 4;
-              this.shapeRenderer.circle(rx, ry, gridSize * 0.15, 0.35, 0.33, 0.38, 0.7);
+            // Large rocks
+            if (hash < 25) {
+              const rx = cellX + gridSize * 0.3 + (hash % 4) * 2;
+              const ry = cellY + gridSize * 0.4 + ((hash * 2) % 4) * 2;
+              const size = gridSize * (0.15 + (hash % 8) * 0.01);
+              // Rock shadow
+              this.shapeRenderer.circle(rx + 2, ry + 2, size, 0.2, 0.18, 0.2, 0.5);
+              // Rock body
+              this.shapeRenderer.circle(rx, ry, size, 0.4, 0.38, 0.42, 0.9);
+              // Rock highlight
+              this.shapeRenderer.circle(rx - size * 0.3, ry - size * 0.3, size * 0.4, 0.5, 0.48, 0.52, 0.6);
+            }
+            // Small pebbles
+            if (hash2 < 30 && hash >= 25) {
+              const px = cellX + (hash2 % 16);
+              const py = cellY + ((hash2 * 3) % 16);
+              this.shapeRenderer.circle(px, py, 2, 0.35, 0.33, 0.38, 0.7);
+            }
+            // Mountain cracks/shadows
+            if (hash > 70) {
+              const lx = cellX + 4;
+              const ly = cellY + (hash % 12);
+              this.shapeRenderer.rect(lx, ly, 1, 6, 0.25, 0.23, 0.28, 0.4);
             }
             break;
             
           case 'plains':
-            // Grass dots - very sparse
-            if (hash < 8) {
+            // Grass patches - more detailed
+            if (hash < 15) {
               const gx = cellX + gridSize * 0.5;
               const gy = cellY + gridSize * 0.5;
-              this.shapeRenderer.circle(gx, gy, 2, 0.45, 0.65, 0.35, 0.5);
+              // Grass clump shadow
+              this.shapeRenderer.circle(gx + 1, gy + 1, 3, 0.25, 0.4, 0.2, 0.3);
+              // Grass clump
+              this.shapeRenderer.circle(gx, gy, 2.5, 0.4, 0.6, 0.3, 0.6);
+            }
+            // Small flowers (rare)
+            if (hash2 < 5) {
+              const fx = cellX + gridSize * 0.3 + (hash2 % 10);
+              const fy = cellY + gridSize * 0.6;
+              // Flower colors based on hash
+              const flowerColors = [
+                { r: 0.9, g: 0.3, b: 0.3 },  // Red
+                { r: 0.9, g: 0.9, b: 0.3 },  // Yellow
+                { r: 0.6, g: 0.3, b: 0.8 },  // Purple
+                { r: 0.9, g: 0.6, b: 0.8 },  // Pink
+              ];
+              const fc = flowerColors[hash2 % flowerColors.length];
+              this.shapeRenderer.circle(fx, fy, 2, fc.r, fc.g, fc.b, 0.8);
+              this.shapeRenderer.circle(fx, fy, 1, 1, 1, 0.5, 0.9);
+            }
+            // Dirt patches
+            if (hash > 85) {
+              const dx = cellX + (hash % 10);
+              const dy = cellY + ((hash * 2) % 10);
+              this.shapeRenderer.circle(dx, dy, 3, 0.45, 0.4, 0.3, 0.4);
             }
             break;
             
           case 'burned':
-            // Ash/embers
-            if (hash < 30) {
-              this.shapeRenderer.circle(
-                cellX + gridSize * 0.5,
-                cellY + gridSize * 0.5,
-                gridSize * 0.1, 0.15, 0.1, 0.1, 0.4
-              );
+            // Ash piles
+            if (hash < 25) {
+              const ax = cellX + gridSize * 0.5 + (hash % 6) - 3;
+              const ay = cellY + gridSize * 0.5 + ((hash * 2) % 6) - 3;
+              this.shapeRenderer.circle(ax, ay, gridSize * 0.12, 0.12, 0.08, 0.08, 0.6);
+            }
+            // Embers (glowing)
+            if (hash2 < 10) {
+              const ex = cellX + gridSize * 0.3 + (hash2 % 12);
+              const ey = cellY + gridSize * 0.4 + ((hash2 * 2) % 10);
+              const pulse = Math.sin(this.frameCount * 0.08 + hash2) * 0.3 + 0.7;
+              this.shapeRenderer.circle(ex, ey, 1.5, 0.9 * pulse, 0.3 * pulse, 0.1, 0.8);
+            }
+            // Charred wood
+            if (hash > 60 && hash < 75) {
+              const wx = cellX + 4 + (hash % 8);
+              const wy = cellY + gridSize * 0.5;
+              this.shapeRenderer.rect(wx, wy - 1, 6, 2, 0.1, 0.08, 0.06, 0.7);
+            }
+            // Smoke wisps
+            if (hash2 > 80) {
+              const sx = cellX + gridSize * 0.5;
+              const sy = cellY + gridSize * 0.3;
+              const smokeY = sy - Math.sin(this.frameCount * 0.02 + x) * 3;
+              this.shapeRenderer.circle(sx, smokeY, 2, 0.3, 0.3, 0.35, 0.2);
             }
             break;
             
           case 'water':
-            // Animated wave highlights
+            // Animated wave highlights - more detailed
             const wavePhase = Math.sin(this.frameCount * 0.02 + x * 0.3 + y * 0.2);
-            if (wavePhase > 0.3) {
-              const wy = cellY + gridSize * 0.5 + wavePhase * 3;
-              this.shapeRenderer.rect(cellX + 4, wy, gridSize - 8, 2, 0.5, 0.8, 0.95, 0.3 * wavePhase);
+            const wavePhase2 = Math.sin(this.frameCount * 0.025 + x * 0.25 + y * 0.35);
+            
+            // Primary wave
+            if (wavePhase > 0.2) {
+              const wy = cellY + gridSize * 0.4 + wavePhase * 4;
+              this.shapeRenderer.rect(cellX + 3, wy, gridSize - 6, 2, 0.45, 0.75, 0.9, 0.35 * wavePhase);
+            }
+            // Secondary wave
+            if (wavePhase2 > 0.3) {
+              const wy2 = cellY + gridSize * 0.7 + wavePhase2 * 3;
+              this.shapeRenderer.rect(cellX + 5, wy2, gridSize - 10, 1.5, 0.5, 0.8, 0.95, 0.25 * wavePhase2);
+            }
+            // Water sparkles
+            if (hash < 10) {
+              const sparkle = Math.sin(this.frameCount * 0.1 + hash) * 0.5 + 0.5;
+              const sx = cellX + (hash % 15) + 2;
+              const sy = cellY + ((hash * 3) % 15) + 2;
+              this.shapeRenderer.circle(sx, sy, 1, 1, 1, 1, sparkle * 0.4);
             }
             break;
         }
@@ -1077,27 +1341,31 @@ class GameRenderer {
     this.shapeRenderer.rect(cx - 4, cy - size * 0.1, 8, size * 0.6, 0.4, 0.4, 0.45, 1);
     this.shapeRenderer.rect(cx - 3, cy - size * 0.1, 6, size * 0.6, 0.5, 0.5, 0.55, 1);
     
-    // Nacelle (hub housing)
-    this.shapeRenderer.circle(cx, cy - size * 0.25, size * 0.18, baseColor.r, baseColor.g, baseColor.b, 1);
-    this.shapeRenderer.circle(cx, cy - size * 0.25, size * 0.12, accentColor.r, accentColor.g, accentColor.b, 1);
+    // Nacelle (hub housing) - slightly larger
+    this.shapeRenderer.circle(cx, cy - size * 0.25, size * 0.22, baseColor.r, baseColor.g, baseColor.b, 1);
+    this.shapeRenderer.circle(cx, cy - size * 0.25, size * 0.15, accentColor.r, accentColor.g, accentColor.b, 1);
     
-    // Rotating blades (3 blades)
+    // Rotating blades (3 blades) - LARGER blades
     const bladeAngle = this.time * 0.005;
-    const bladeLength = size * 0.5;
+    const bladeLength = size * 0.75;  // Increased from 0.5 to 0.75
     const hubY = cy - size * 0.25;
     
     for (let i = 0; i < 3; i++) {
       const a = bladeAngle + (i * Math.PI * 2 / 3);
-      const bx = cx + Math.cos(a) * bladeLength * 0.5;
-      const by = hubY + Math.sin(a) * bladeLength * 0.5;
+      const bx = cx + Math.cos(a) * bladeLength;
+      const by = hubY + Math.sin(a) * bladeLength;
       
-      // Blade body (tapered)
-      this.shapeRenderer.line(cx, hubY, bx, by, 5, 0.9, 0.9, 0.95, 1);
-      this.shapeRenderer.line(cx, hubY, bx, by, 3, 1, 1, 1, 1);
+      // Blade body (wider tapered blades)
+      this.shapeRenderer.line(cx, hubY, bx, by, 7, 0.85, 0.85, 0.9, 1);  // Increased width from 5 to 7
+      this.shapeRenderer.line(cx, hubY, bx, by, 4, 0.95, 0.95, 1, 1);     // Increased width from 3 to 4
+      
+      // Blade tip highlight
+      this.shapeRenderer.circle(bx, by, 2, 1, 1, 1, 0.7);
     }
     
-    // Center hub
-    this.shapeRenderer.circle(cx, hubY, size * 0.08, 0.3, 0.3, 0.35, 1);
+    // Center hub - slightly larger
+    this.shapeRenderer.circle(cx, hubY, size * 0.1, 0.25, 0.25, 0.3, 1);
+    this.shapeRenderer.circle(cx, hubY, size * 0.06, 0.4, 0.4, 0.45, 1);
   }
   
   /**
@@ -1379,6 +1647,7 @@ class GameRenderer {
     const y = tower.y;
     const baseSize = (tower.size || 20);
     const level = tower.level || 1;
+    const attackType = tower.attackTypeId || 'base';
     
     // Get element colors
     const elementColors = {
@@ -1390,8 +1659,18 @@ class GameRenderer {
       none: { base: '#3a3a3a', accent: '#718096', glow: '#A0AEC0' }
     };
     
+    // Attack type visual modifiers
+    const attackTypeVisuals = {
+      base: { platformScale: 1.0, bodyScale: 1.0, turretStyle: 'standard' },
+      siege: { platformScale: 1.15, bodyScale: 1.1, turretStyle: 'siege' },
+      normal: { platformScale: 1.0, bodyScale: 0.95, turretStyle: 'normal' },
+      magic: { platformScale: 1.0, bodyScale: 1.0, turretStyle: 'magic' },
+      piercing: { platformScale: 0.95, bodyScale: 0.9, turretStyle: 'piercing' }
+    };
+    
     const element = tower.elementPath || 'none';
     const colors = elementColors[element] || elementColors.none;
+    const atkVisuals = attackTypeVisuals[attackType] || attackTypeVisuals.base;
     const baseColor = this._parseColor(colors.base);
     const accentColor = this._parseColor(colors.accent);
     const glowColor = this._parseColor(colors.glow);
@@ -1402,15 +1681,23 @@ class GameRenderer {
     }
     
     // === BASE PLATFORM ===
+    const platformScale = atkVisuals.platformScale;
     // Shadow
-    this.shapeRenderer.circle(x + 2, y + 3, baseSize * 0.55, 0, 0, 0, 0.4);
+    this.shapeRenderer.circle(x + 2, y + 3, baseSize * 0.55 * platformScale, 0, 0, 0, 0.4);
     
-    // Stone base (octagon-ish)
-    this.shapeRenderer.circle(x, y, baseSize * 0.55, 0.3, 0.28, 0.25, 1);
-    this.shapeRenderer.circle(x, y, baseSize * 0.48, 0.4, 0.38, 0.35, 1);
+    // Stone base (octagon-ish) - siege gets reinforced look
+    if (attackType === 'siege') {
+      // Siege: reinforced heavy platform with metal rim
+      this.shapeRenderer.circle(x, y, baseSize * 0.6, 0.25, 0.22, 0.2, 1);
+      this.shapeRenderer.circle(x, y, baseSize * 0.55, 0.35, 0.32, 0.3, 1);
+      this.shapeRenderer.circleOutline(x, y, baseSize * 0.58, 2 / camera.zoom, 0.4, 0.35, 0.3, 0.8);
+    } else {
+      this.shapeRenderer.circle(x, y, baseSize * 0.55 * platformScale, 0.3, 0.28, 0.25, 1);
+      this.shapeRenderer.circle(x, y, baseSize * 0.48 * platformScale, 0.4, 0.38, 0.35, 1);
+    }
     
     // === TOWER BODY ===
-    const bodySize = baseSize * 0.4;
+    const bodySize = baseSize * 0.4 * atkVisuals.bodyScale;
     
     // Main tower structure
     this.shapeRenderer.circle(x, y, bodySize, baseColor.r, baseColor.g, baseColor.b, 1);
@@ -1420,27 +1707,36 @@ class GameRenderer {
     this.shapeRenderer.circleOutline(x, y, bodySize * 0.7, 2 / camera.zoom, 
       accentColor.r, accentColor.g, accentColor.b, 0.8);
     
-    // === TURRET / WEAPON ===
+    // === TURRET / WEAPON (attack type specific) ===
     const rotation = tower.rotation || 0;
-    const turretLen = baseSize * 0.5;
-    const turretWidth = 4 / camera.zoom;
-    
-    // Turret barrel
-    const tx = x + Math.cos(rotation) * turretLen * 0.3;
-    const ty = y + Math.sin(rotation) * turretLen * 0.3;
-    const tex = x + Math.cos(rotation) * turretLen;
-    const tey = y + Math.sin(rotation) * turretLen;
-    
-    this.shapeRenderer.line(tx, ty, tex, tey, turretWidth + 2, 0.2, 0.2, 0.2, 1);
-    this.shapeRenderer.line(tx, ty, tex, tey, turretWidth, accentColor.r, accentColor.g, accentColor.b, 1);
-    
-    // Turret tip glow
-    this.shapeRenderer.circle(tex, tey, 3 / camera.zoom, glowColor.r, glowColor.g, glowColor.b, 0.8);
+    this._renderTowerTurret(x, y, baseSize, rotation, attackType, accentColor, glowColor, camera);
     
     // === CENTER CRYSTAL / ORB ===
     const orbPulse = Math.sin(this.time * 0.005) * 0.2 + 0.8;
-    this.shapeRenderer.circle(x, y, bodySize * 0.3, glowColor.r * orbPulse, glowColor.g * orbPulse, glowColor.b * orbPulse, 1);
-    this.shapeRenderer.circle(x, y, bodySize * 0.15, 1, 1, 1, 0.6);
+    
+    if (attackType === 'magic') {
+      // Magic: larger pulsing orb with orbiting particles
+      const magicPulse = Math.sin(this.time * 0.004) * 0.3 + 0.7;
+      this.shapeRenderer.circle(x, y, bodySize * 0.4, glowColor.r * magicPulse, glowColor.g * magicPulse, glowColor.b * magicPulse, 0.9);
+      this.shapeRenderer.circle(x, y, bodySize * 0.25, 1, 1, 1, 0.7);
+      
+      // Orbiting magic particles
+      for (let i = 0; i < 3; i++) {
+        const orbitAngle = this.time * 0.006 + (i * Math.PI * 2 / 3);
+        const orbitDist = bodySize * 0.9;
+        const px = x + Math.cos(orbitAngle) * orbitDist;
+        const py = y + Math.sin(orbitAngle) * orbitDist;
+        this.shapeRenderer.circle(px, py, 2.5 / camera.zoom, accentColor.r, accentColor.g, accentColor.b, 0.8);
+      }
+    } else {
+      this.shapeRenderer.circle(x, y, bodySize * 0.3, glowColor.r * orbPulse, glowColor.g * orbPulse, glowColor.b * orbPulse, 1);
+      this.shapeRenderer.circle(x, y, bodySize * 0.15, 1, 1, 1, 0.6);
+    }
+    
+    // === ATTACK TYPE INDICATOR ===
+    if (attackType !== 'base') {
+      this._renderAttackTypeIndicator(x, y, baseSize, attackType, camera);
+    }
     
     // === LEVEL INDICATORS ===
     if (level > 1) {
@@ -1471,6 +1767,189 @@ class GameRenderer {
       type: 'consumer',  // Towers are energy consumers
       showEmptyWarning: true
     });
+  }
+  
+  /**
+   * Render tower turret based on attack type
+   * - Siege: dual heavy barrels
+   * - Normal: single accurate barrel with scope
+   * - Magic: no barrel, energy streams
+   * - Piercing: long spear-like barrel
+   * - Base: standard single barrel
+   */
+  _renderTowerTurret(x, y, baseSize, rotation, attackType, accentColor, glowColor, camera) {
+    const turretLen = baseSize * 0.5;
+    const turretWidth = 4 / camera.zoom;
+    
+    switch (attackType) {
+      case 'siege': {
+        // Siege: dual heavy cannons
+        const spread = 0.25; // angle spread between barrels
+        const barrelWidth = turretWidth * 1.4;
+        
+        for (const offset of [-spread, spread]) {
+          const r = rotation + offset;
+          const tx = x + Math.cos(r) * turretLen * 0.2;
+          const ty = y + Math.sin(r) * turretLen * 0.2;
+          const tex = x + Math.cos(r) * turretLen * 0.9;
+          const tey = y + Math.sin(r) * turretLen * 0.9;
+          
+          // Heavy barrel outline
+          this.shapeRenderer.line(tx, ty, tex, tey, barrelWidth + 3, 0.15, 0.15, 0.15, 1);
+          this.shapeRenderer.line(tx, ty, tex, tey, barrelWidth, accentColor.r * 0.8, accentColor.g * 0.8, accentColor.b * 0.8, 1);
+          
+          // Muzzle
+          this.shapeRenderer.circle(tex, tey, 4 / camera.zoom, glowColor.r, glowColor.g, glowColor.b, 0.7);
+        }
+        
+        // Center mount
+        this.shapeRenderer.circle(x + Math.cos(rotation) * turretLen * 0.15, 
+                                   y + Math.sin(rotation) * turretLen * 0.15, 
+                                   5 / camera.zoom, 0.3, 0.3, 0.35, 1);
+        break;
+      }
+      
+      case 'normal': {
+        // Normal: sleek accurate barrel with scope
+        const tx = x + Math.cos(rotation) * turretLen * 0.3;
+        const ty = y + Math.sin(rotation) * turretLen * 0.3;
+        const tex = x + Math.cos(rotation) * turretLen;
+        const tey = y + Math.sin(rotation) * turretLen;
+        
+        // Main barrel (thinner, more precise)
+        this.shapeRenderer.line(tx, ty, tex, tey, turretWidth, 0.2, 0.2, 0.2, 1);
+        this.shapeRenderer.line(tx, ty, tex, tey, turretWidth - 1, accentColor.r, accentColor.g, accentColor.b, 1);
+        
+        // Scope/sight on top
+        const scopeX = x + Math.cos(rotation) * turretLen * 0.5;
+        const scopeY = y + Math.sin(rotation) * turretLen * 0.5;
+        const perpAngle = rotation + Math.PI / 2;
+        const scopeOffset = 3 / camera.zoom;
+        this.shapeRenderer.circle(scopeX + Math.cos(perpAngle) * scopeOffset, 
+                                   scopeY + Math.sin(perpAngle) * scopeOffset, 
+                                   2.5 / camera.zoom, 0.2, 0.5, 0.8, 1);
+        
+        // Targeting reticle glow at tip
+        this.shapeRenderer.circle(tex, tey, 3 / camera.zoom, glowColor.r, glowColor.g, glowColor.b, 0.9);
+        this.shapeRenderer.circleOutline(tex, tey, 5 / camera.zoom, 1 / camera.zoom, 
+          glowColor.r, glowColor.g, glowColor.b, 0.5);
+        break;
+      }
+      
+      case 'magic': {
+        // Magic: energy streams instead of barrels
+        const streamCount = 2;
+        const streamPulse = Math.sin(this.time * 0.008) * 0.3 + 0.7;
+        
+        for (let i = 0; i < streamCount; i++) {
+          const streamAngle = rotation + (i - 0.5) * 0.4;
+          const streamLen = turretLen * (0.7 + Math.sin(this.time * 0.01 + i) * 0.2);
+          const sex = x + Math.cos(streamAngle) * streamLen;
+          const sey = y + Math.sin(streamAngle) * streamLen;
+          
+          // Ethereal energy stream
+          this.shapeRenderer.line(x, y, sex, sey, 2 / camera.zoom, 
+            glowColor.r * streamPulse, glowColor.g * streamPulse, glowColor.b * streamPulse, 0.6);
+          
+          // Energy tip
+          this.shapeRenderer.circle(sex, sey, 2.5 / camera.zoom, 
+            accentColor.r, accentColor.g, accentColor.b, streamPulse);
+        }
+        break;
+      }
+      
+      case 'piercing': {
+        // Piercing: long spear-like barrel
+        const spearLen = turretLen * 1.3;
+        const tx = x + Math.cos(rotation) * turretLen * 0.1;
+        const ty = y + Math.sin(rotation) * turretLen * 0.1;
+        const tex = x + Math.cos(rotation) * spearLen;
+        const tey = y + Math.sin(rotation) * spearLen;
+        
+        // Spear shaft (tapered)
+        this.shapeRenderer.line(tx, ty, tex, tey, turretWidth - 1, 0.2, 0.2, 0.2, 1);
+        this.shapeRenderer.line(tx, ty, tex, tey, turretWidth - 2, accentColor.r, accentColor.g, accentColor.b, 1);
+        
+        // Spear tip (arrowhead shape using small lines)
+        const tipLen = 6 / camera.zoom;
+        const tipSpread = 0.4;
+        for (const side of [-1, 1]) {
+          const tipAngle = rotation + Math.PI + (tipSpread * side);
+          const tipX = tex + Math.cos(tipAngle) * tipLen;
+          const tipY = tey + Math.sin(tipAngle) * tipLen;
+          this.shapeRenderer.line(tex, tey, tipX, tipY, 2 / camera.zoom, 
+            glowColor.r, glowColor.g, glowColor.b, 1);
+        }
+        
+        // Sharp tip glow
+        this.shapeRenderer.circle(tex, tey, 2 / camera.zoom, 1, 1, 1, 0.9);
+        break;
+      }
+      
+      default: {
+        // Base: standard single barrel
+        const tx = x + Math.cos(rotation) * turretLen * 0.3;
+        const ty = y + Math.sin(rotation) * turretLen * 0.3;
+        const tex = x + Math.cos(rotation) * turretLen;
+        const tey = y + Math.sin(rotation) * turretLen;
+        
+        this.shapeRenderer.line(tx, ty, tex, tey, turretWidth + 2, 0.2, 0.2, 0.2, 1);
+        this.shapeRenderer.line(tx, ty, tex, tey, turretWidth, accentColor.r, accentColor.g, accentColor.b, 1);
+        
+        // Turret tip glow
+        this.shapeRenderer.circle(tex, tey, 3 / camera.zoom, glowColor.r, glowColor.g, glowColor.b, 0.8);
+        break;
+      }
+    }
+  }
+  
+  /**
+   * Render small attack type indicator icon near tower
+   */
+  _renderAttackTypeIndicator(x, y, baseSize, attackType, camera) {
+    // Position at bottom-left of tower
+    const ix = x - baseSize * 0.45;
+    const iy = y + baseSize * 0.45;
+    const iconSize = 4 / camera.zoom;
+    
+    // Attack type colors
+    const typeColors = {
+      siege: { r: 1.0, g: 0.4, b: 0.2 },    // Orange-red
+      normal: { r: 0.3, g: 0.6, b: 0.9 },   // Blue
+      magic: { r: 0.6, g: 0.3, b: 0.8 },    // Purple
+      piercing: { r: 0.9, g: 0.8, b: 0.2 }  // Gold
+    };
+    
+    const color = typeColors[attackType] || { r: 0.5, g: 0.5, b: 0.5 };
+    
+    // Background circle
+    this.shapeRenderer.circle(ix, iy, iconSize + 1, 0, 0, 0, 0.5);
+    this.shapeRenderer.circle(ix, iy, iconSize, color.r, color.g, color.b, 0.9);
+    
+    // Inner symbol based on type
+    switch (attackType) {
+      case 'siege':
+        // Explosion shape - small star
+        for (let i = 0; i < 4; i++) {
+          const a = i * Math.PI / 2;
+          const sx = ix + Math.cos(a) * iconSize * 0.6;
+          const sy = iy + Math.sin(a) * iconSize * 0.6;
+          this.shapeRenderer.circle(sx, sy, 1 / camera.zoom, 1, 1, 1, 0.9);
+        }
+        break;
+      case 'normal':
+        // Crosshair
+        this.shapeRenderer.circle(ix, iy, iconSize * 0.4, 1, 1, 1, 0.9);
+        break;
+      case 'magic':
+        // Sparkle
+        this.shapeRenderer.circle(ix, iy, iconSize * 0.3, 1, 1, 1, 0.9);
+        break;
+      case 'piercing':
+        // Arrow point
+        this.shapeRenderer.circle(ix, iy, iconSize * 0.35, 1, 1, 1, 0.9);
+        break;
+    }
   }
   
   _renderEnemies(data) {

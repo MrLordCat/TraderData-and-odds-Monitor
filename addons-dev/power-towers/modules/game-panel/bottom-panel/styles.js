@@ -565,6 +565,24 @@ function getBottomPanelStyles() {
       background: rgba(255,255,255,0.05);
       border-color: rgba(255,255,255,0.1);
     }
+    .upgrade-card.maxed {
+      opacity: 0.7;
+      cursor: default;
+      border-color: rgba(72, 187, 120, 0.6);
+      background: rgba(72, 187, 120, 0.1);
+    }
+    .upgrade-card.maxed:hover {
+      transform: none;
+    }
+    .upgrade-card.maxed .card-cost {
+      color: #68d391;
+    }
+    .ability-hint {
+      text-align: center;
+      padding: 16px;
+      color: rgba(255,255,255,0.5);
+      font-size: 11px;
+    }
     .upgrade-card .card-top {
       display: flex;
       align-items: center;

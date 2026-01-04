@@ -290,12 +290,14 @@ function applyStatUpgrade(tower, statId) {
 }
 
 /**
- * Apply ability tier upgrade to tower
+ * @deprecated Use applyElementAbilityUpgrade instead
+ * Apply ability tier upgrade to tower (OLD tier-based system)
  * @param {Object} tower - Tower instance
  * @param {string} abilityId - Ability to upgrade
  * @returns {boolean} Success
  */
 function applyAbilityUpgrade(tower, abilityId) {
+  console.warn('[DEPRECATED] applyAbilityUpgrade - use applyElementAbilityUpgrade instead');
   const ability = ABILITIES[abilityId];
   if (!ability) return false;
   
@@ -496,12 +498,14 @@ function getStatUpgradeCost(statId, tower) {
 }
 
 /**
- * Get ability upgrade cost for tower
+ * @deprecated Use getElementAbilityUpgradeCost instead
+ * Get ability upgrade cost for tower (OLD tier-based system)
  * @param {string} abilityId - Ability ID
  * @param {Object} tower - Tower instance
  * @returns {number} Cost
  */
 function getAbilityUpgradeCost(abilityId, tower) {
+  console.warn('[DEPRECATED] getAbilityUpgradeCost - use getElementAbilityUpgradeCost instead');
   const ability = ABILITIES[abilityId];
   if (!ability) return Infinity;
   
@@ -586,16 +590,16 @@ module.exports = {
   getAttackTypeCost,
   getElementPathCost,
   getStatUpgradeCost,
-  getAbilityUpgradeCost,
+  getAbilityUpgradeCost,      // @deprecated - use getElementAbilityUpgradeCost
   getPassiveUpgradeCost,
-  getElementAbilityUpgradeCost,  // NEW
+  getElementAbilityUpgradeCost,  // NEW - element ability upgrades
   
   // Apply functions
   applyStatUpgrade,
-  applyAbilityUpgrade,
+  applyAbilityUpgrade,        // @deprecated - use applyElementAbilityUpgrade
   applyPassiveUpgrade,
   applyElementPath,
-  applyElementAbilityUpgrade,    // NEW
+  applyElementAbilityUpgrade,    // NEW - element ability upgrades
   
   // Info functions
   getTowerBuildSummary,

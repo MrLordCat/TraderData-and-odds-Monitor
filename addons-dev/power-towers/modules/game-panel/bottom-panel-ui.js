@@ -352,11 +352,13 @@ function BottomPanelMixin(Base) {
       const slowRow = document.getElementById('stat-row-slow');
       const freezeRow = document.getElementById('stat-row-freeze');
       if (tower.elementPath === 'ice') {
-        const slowPct = Math.floor((abilities.slow?.slowAmount || 0.3) * 100);
+        // Use basePercent from ELEMENT_ABILITIES
+        const slowPct = Math.floor((abilities.slow?.basePercent || 0.3) * 100);
         if (el.panelSlow) el.panelSlow.textContent = `${slowPct}%`;
         if (slowRow) slowRow.style.display = '';
         
-        const freezeChance = Math.floor((abilities.freeze?.chance || 0.05) * 100);
+        // Use baseChance from ELEMENT_ABILITIES
+        const freezeChance = Math.floor((abilities.freeze?.baseChance || 0.08) * 100);
         if (el.panelFreeze) el.panelFreeze.textContent = `${freezeChance}%`;
         if (freezeRow) freezeRow.style.display = '';
       } else {
@@ -367,8 +369,8 @@ function BottomPanelMixin(Base) {
       // Nature element - Poison DPS
       const poisonRow = document.getElementById('stat-row-poison');
       if (tower.elementPath === 'nature') {
-        const poisonDmg = abilities.poison?.baseDamage || 3;
-        if (el.panelPoison) el.panelPoison.textContent = `${poisonDmg}/s`;
+        const poisonDmg = abilities.poison?.baseDamage || 4;
+        if (el.panelPoison) el.panelPoison.textContent = `${poisonDmg.toFixed(1)}/s`;
         if (poisonRow) poisonRow.style.display = '';
       } else {
         if (poisonRow) poisonRow.style.display = 'none';
@@ -377,7 +379,8 @@ function BottomPanelMixin(Base) {
       // Lightning element - Shock chance  
       const shockRow = document.getElementById('stat-row-shock');
       if (tower.elementPath === 'lightning') {
-        const shockChance = Math.floor((abilities.shock?.chance || 0.1) * 100);
+        // Use baseChance from ELEMENT_ABILITIES
+        const shockChance = Math.floor((abilities.shock?.baseChance || 0.1) * 100);
         if (el.panelShock) el.panelShock.textContent = `${shockChance}%`;
         if (shockRow) shockRow.style.display = '';
       } else {
@@ -387,7 +390,8 @@ function BottomPanelMixin(Base) {
       // Dark element - Life drain %
       const drainRow = document.getElementById('stat-row-drain');
       if (tower.elementPath === 'dark') {
-        const drainPct = Math.floor((abilities.drain?.lifeSteal || 0.1) * 100);
+        // Use basePercent from ELEMENT_ABILITIES
+        const drainPct = Math.floor((abilities.drain?.basePercent || 0.1) * 100);
         if (el.panelDrain) el.panelDrain.textContent = `${drainPct}%`;
         if (drainRow) drainRow.style.display = '';
       } else {
@@ -520,6 +524,153 @@ function BottomPanelMixin(Base) {
         builder.final(formatInt(tower.energyCostPerShot || 0))
           .formula('Base × (1 - Efficiency%)');
         detailPower.innerHTML = builder.build();
+      }
+      
+      // Update ability stat popups
+      this.updateAbilityStatDetailPopups(tower);
+    }
+    
+    /**
+     * Update ability stat detail popups for tower
+     * Shows base value, upgrade bonuses, and total for element abilities
+     * Uses actual tower.elementAbilities which are computed from abilityUpgrades
+     */
+    updateAbilityStatDetailPopups(tower) {
+      const { createDetailBuilder } = require('./utils/stat-detail-builder');
+      const { formatInt } = require('./utils/format-helpers');
+      const { ELEMENT_ABILITIES } = require('../../core/element-abilities');
+      
+      const elementPath = tower.elementPath;
+      if (!elementPath || !ELEMENT_ABILITIES[elementPath]) return;
+      
+      const abilities = tower.elementAbilities || {};
+      const abilityUpgrades = tower.abilityUpgrades || {};
+      const baseConfig = ELEMENT_ABILITIES[elementPath];
+      
+      // BURN (Fire) - DPS stat
+      const detailBurn = document.getElementById('panel-detail-burn');
+      if (detailBurn && elementPath === 'fire') {
+        const baseDmg = baseConfig.burn?.baseDamage || 5;
+        const finalDmg = abilities.burn?.baseDamage || baseDmg;
+        const upgLevel = abilityUpgrades.burn_damage || 0;
+        const valuePerLevel = baseConfig.upgrades?.burn_damage?.valuePerLevel || 2;
+        
+        const builder = createDetailBuilder()
+          .base('Base:', `${baseDmg}/s`);
+        if (upgLevel > 0) {
+          builder.line(`Upgrades (${upgLevel}):`, `+${upgLevel * valuePerLevel}`, 'detail-upgrade');
+        }
+        builder.final(`${formatInt(finalDmg)}/s`)
+          .formula('Fire damage per second');
+        detailBurn.innerHTML = builder.build();
+      }
+      
+      // SPREAD (Fire) - Ignite chance
+      const detailSpread = document.getElementById('panel-detail-spread');
+      if (detailSpread && elementPath === 'fire') {
+        const baseChance = baseConfig.ignite?.spreadChance || 0.15;
+        const finalChance = abilities.ignite?.spreadChance || baseChance;
+        const upgLevel = abilityUpgrades.spread_chance || 0;
+        const valuePerLevel = baseConfig.upgrades?.spread_chance?.valuePerLevel || 0.08;
+        
+        const builder = createDetailBuilder()
+          .base('Base:', `${Math.round(baseChance * 100)}%`);
+        if (upgLevel > 0) {
+          builder.line(`Upgrades (${upgLevel}):`, `+${Math.round(upgLevel * valuePerLevel * 100)}%`, 'detail-upgrade');
+        }
+        builder.final(`${Math.round(finalChance * 100)}%`)
+          .formula('Chance to spread fire');
+        detailSpread.innerHTML = builder.build();
+      }
+      
+      // SLOW (Ice) - Slow amount
+      const detailSlow = document.getElementById('panel-detail-slow');
+      if (detailSlow && elementPath === 'ice') {
+        const baseSlow = baseConfig.slow?.basePercent || 0.3;
+        const finalSlow = abilities.slow?.basePercent || baseSlow;
+        const upgLevel = abilityUpgrades.slow_percent || 0;
+        const valuePerLevel = baseConfig.upgrades?.slow_percent?.valuePerLevel || 0.08;
+        
+        const builder = createDetailBuilder()
+          .base('Base:', `${Math.round(baseSlow * 100)}%`);
+        if (upgLevel > 0) {
+          builder.line(`Upgrades (${upgLevel}):`, `+${Math.round(upgLevel * valuePerLevel * 100)}%`, 'detail-upgrade');
+        }
+        builder.final(`${Math.round(finalSlow * 100)}%`)
+          .formula('Enemy speed reduction');
+        detailSlow.innerHTML = builder.build();
+      }
+      
+      // FREEZE (Ice) - Freeze chance
+      const detailFreeze = document.getElementById('panel-detail-freeze');
+      if (detailFreeze && elementPath === 'ice') {
+        const baseChance = baseConfig.freeze?.baseChance || 0.08;
+        const finalChance = abilities.freeze?.baseChance || baseChance;
+        const upgLevel = abilityUpgrades.freeze_chance || 0;
+        const valuePerLevel = baseConfig.upgrades?.freeze_chance?.valuePerLevel || 0.04;
+        
+        const builder = createDetailBuilder()
+          .base('Base:', `${Math.round(baseChance * 100)}%`);
+        if (upgLevel > 0) {
+          builder.line(`Upgrades (${upgLevel}):`, `+${Math.round(upgLevel * valuePerLevel * 100)}%`, 'detail-upgrade');
+        }
+        builder.final(`${Math.round(finalChance * 100)}%`)
+          .formula('Chance to freeze enemy');
+        detailFreeze.innerHTML = builder.build();
+      }
+      
+      // POISON (Nature) - DPS stat
+      const detailPoison = document.getElementById('panel-detail-poison');
+      if (detailPoison && elementPath === 'nature') {
+        const baseDmg = baseConfig.poison?.baseDamage || 4;
+        const finalDmg = abilities.poison?.baseDamage || baseDmg;
+        const upgLevel = abilityUpgrades.poison_damage || 0;
+        const valuePerLevel = baseConfig.upgrades?.poison_damage?.valuePerLevel || 1.5;
+        
+        const builder = createDetailBuilder()
+          .base('Base:', `${baseDmg}/s`);
+        if (upgLevel > 0) {
+          builder.line(`Upgrades (${upgLevel}):`, `+${(upgLevel * valuePerLevel).toFixed(1)}`, 'detail-upgrade');
+        }
+        builder.final(`${finalDmg.toFixed(1)}/s`)
+          .formula('Poison damage per second');
+        detailPoison.innerHTML = builder.build();
+      }
+      
+      // SHOCK (Lightning) - Stun chance
+      const detailShock = document.getElementById('panel-detail-shock');
+      if (detailShock && elementPath === 'lightning') {
+        const baseChance = baseConfig.shock?.baseChance || 0.1;
+        const finalChance = abilities.shock?.baseChance || baseChance;
+        const upgLevel = abilityUpgrades.shock_chance || 0;
+        const valuePerLevel = baseConfig.upgrades?.shock_chance?.valuePerLevel || 0.05;
+        
+        const builder = createDetailBuilder()
+          .base('Base:', `${Math.round(baseChance * 100)}%`);
+        if (upgLevel > 0) {
+          builder.line(`Upgrades (${upgLevel}):`, `+${Math.round(upgLevel * valuePerLevel * 100)}%`, 'detail-upgrade');
+        }
+        builder.final(`${Math.round(finalChance * 100)}%`)
+          .formula('Chance to stun enemy');
+        detailShock.innerHTML = builder.build();
+      }
+      
+      // DRAIN (Dark) - Life steal
+      const detailDrain = document.getElementById('panel-detail-drain');
+      if (detailDrain && elementPath === 'dark') {
+        const baseDrain = baseConfig.drain?.basePercent || 0.1;
+        const finalDrain = abilities.drain?.basePercent || baseDrain;
+        const upgLevel = abilityUpgrades.drain_percent || 0;
+        const valuePerLevel = baseConfig.upgrades?.drain_percent?.valuePerLevel || 0.05;
+        
+        const builder = createDetailBuilder()
+          .base('Base:', `${Math.round(baseDrain * 100)}%`);
+        if (upgLevel > 0) {
+          builder.line(`Upgrades (${upgLevel}):`, `+${Math.round(upgLevel * valuePerLevel * 100)}%`, 'detail-upgrade');
+        }
+        builder.final(`${Math.round(finalDrain * 100)}%`)
+          .formula('HP restored per hit');
+        detailDrain.innerHTML = builder.build();
       }
     }
     
@@ -1188,93 +1339,82 @@ function BottomPanelMixin(Base) {
     
     /**
      * Update tower abilities in bottom panel
+     * Shows ELEMENT_ABILITIES upgrades (burn_damage, slow_percent, etc.)
      */
     updateTowerAbilitiesInPanel(tower) {
       const el = this.elements;
       if (!el.abilitiesGridPanel) return;
       
       const gold = this.game?.getState?.().gold || 0;
-      const towerLevel = tower.level || 1;
       
       // Clear current abilities
       el.abilitiesGridPanel.innerHTML = '';
       
-      // Get ability utilities
-      const { 
-        ABILITIES, 
-        calculateAbilityCost, 
-        isUpgradeAvailable,
-        getAbilityEffects 
-      } = require('../../core/tower-upgrade-list');
+      // Get element abilities
+      const { ELEMENT_ABILITIES, getAbilityUpgradeCost } = require('../../core/element-abilities');
       
-      // Filter available abilities for this tower
-      const availableAbilities = Object.entries(ABILITIES).filter(([id, ability]) => {
-        return isUpgradeAvailable(ability, tower);
-      });
-      
-      if (availableAbilities.length === 0) {
-        if (el.actionAbilities) el.actionAbilities.style.display = 'none';
+      const elementPath = tower.elementPath;
+      if (!elementPath || !ELEMENT_ABILITIES[elementPath]) {
+        // No element - show hint
+        el.abilitiesGridPanel.innerHTML = `
+          <div class="ability-hint">
+            Choose an element first
+          </div>
+        `;
         return;
       }
       
-      for (const [abilityId, ability] of availableAbilities) {
-        const currentTier = tower.abilityTiers?.[abilityId] || 0;
-        const nextTier = currentTier + 1;
-        const cost = calculateAbilityCost(ability, nextTier, towerLevel);
+      const elementConfig = ELEMENT_ABILITIES[elementPath];
+      const abilityUpgrades = tower.abilityUpgrades || {};
+      
+      // Show all upgrades for this element
+      for (const [upgradeId, upgrade] of Object.entries(elementConfig.upgrades || {})) {
+        const currentLevel = abilityUpgrades[upgradeId] || 0;
+        const maxLevel = upgrade.maxLevel;
+        const isMaxed = currentLevel >= maxLevel;
+        const cost = isMaxed ? 0 : getAbilityUpgradeCost(elementPath, upgradeId, currentLevel);
         const canAfford = gold >= cost;
         
-        // Get next tier effects for bonus display
-        const effects = getAbilityEffects(ability, nextTier);
+        // Format value for display
         let bonusText = '';
-        if (effects) {
-          const firstEffect = Object.entries(effects)[0];
-          if (firstEffect) {
-            const val = firstEffect[1];
-            bonusText = typeof val === 'number' && val < 1 ? `+${Math.round(val * 100)}%` : `+${val}`;
-          }
+        const value = upgrade.valuePerLevel;
+        const stat = upgrade.stat;
+        if (stat.includes('Percent') || stat.includes('Chance') || stat.includes('Reduction')) {
+          bonusText = `+${Math.round(value * 100)}%`;
+        } else if (stat.includes('Duration')) {
+          bonusText = `+${value.toFixed(1)}s`;
+        } else {
+          bonusText = value < 1 ? `+${Math.round(value * 100)}%` : `+${value}`;
         }
         
         const card = document.createElement('div');
-        card.className = `upgrade-card${!canAfford ? ' disabled' : ''}`;
-        card.dataset.abilityId = abilityId;
+        card.className = `upgrade-card${isMaxed ? ' maxed' : ''}${!canAfford && !isMaxed ? ' disabled' : ''}`;
+        card.dataset.upgradeId = upgradeId;
+        card.dataset.element = elementPath;
         card.innerHTML = `
           <div class="card-top">
-            <span class="card-icon">${ability.emoji}</span>
-            <span class="card-name">${ability.name.slice(0, 5)}</span>
+            <span class="card-icon">${upgrade.icon}</span>
+            <span class="card-name">${upgrade.name.slice(0, 6)}</span>
           </div>
           <div class="card-bottom">
-            <span class="card-cost">${cost}g</span>
-            <span class="card-level">T${currentTier}</span>
+            <span class="card-cost">${isMaxed ? 'MAX' : `${cost}g`}</span>
+            <span class="card-level">${currentLevel}/${maxLevel}</span>
             <span class="card-bonus">${bonusText}</span>
           </div>
         `;
-        card.title = `${ability.name}\nTier ${currentTier} → ${nextTier}\nCost: ${cost}g\n${ability.description}`;
+        card.title = `${upgrade.name}\nLevel ${currentLevel}/${maxLevel}\n${isMaxed ? 'MAXED' : `Cost: ${cost}g`}\n${upgrade.description.replace('{value}', bonusText)}`;
         
-        if (canAfford) {
+        if (canAfford && !isMaxed) {
           card.addEventListener('click', (e) => {
             e.stopPropagation();
-            // Purchase ability via event
-            if (this.game?.selectedTower) {
-              this.game.emit('tower:upgrade-ability', {
-                towerId: this.game.selectedTower.id,
-                abilityId: abilityId
-              });
-              // Refresh panel after purchase
-              setTimeout(() => {
-                if (this.game?.selectedTower) {
-                  this.showTowerInBottomPanel(this.game.selectedTower);
-                }
-              }, 50);
+            // Purchase ability upgrade
+            if (this.purchaseAbilityUpgrade) {
+              this.purchaseAbilityUpgrade(upgradeId);
             }
           });
         }
         
         el.abilitiesGridPanel.appendChild(card);
-      }
-      
-      // Show abilities section if tower has element
-      if (el.actionAbilities) {
-        el.actionAbilities.style.display = tower.elementPath ? 'block' : 'none';
       }
     }
   };
