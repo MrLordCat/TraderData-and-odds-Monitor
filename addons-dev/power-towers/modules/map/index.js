@@ -182,8 +182,6 @@ class MapModule {
    * @param {number} seed - Optional seed for reproducible generation
    */
   generateMap(seed = null) {
-    console.log('[MapModule] Generating new map with biomes...');
-    
     // Generate base map (path, terrain features)
     const mapData = this.generator.generate(seed);
     
@@ -221,8 +219,6 @@ class MapModule {
       biomeMap: this.biomeMap,
       seed: this.currentSeed
     });
-    
-    console.log(`[MapModule] Map generated: ${this.pathCells.length} path cells, biomes enabled, seed: ${this.currentSeed}`);
   }
 
   /**

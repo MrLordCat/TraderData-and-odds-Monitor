@@ -5,19 +5,17 @@
  * 1. BASE_TOWER - Base tower definition
  * 2. ELEMENT_PATHS - Element path configurations
  * 3. Tower level system
- * 4. Functions to apply upgrades from tower-upgrade-list.js
+ * 4. Functions to apply upgrades
  * 
- * For upgrade/ability definitions, see: tower-upgrade-list.js
+ * For stat/passive upgrades, see: tower-upgrade-list.js
+ * For element abilities, see: element-abilities.js
  */
 
 const {
   STAT_UPGRADES,
-  ABILITIES,
   PASSIVE_EFFECTS,
   calculateUpgradeCost,
-  calculateAbilityCost,
-  getUpgradeEffectValue,
-  getAbilityEffects
+  getUpgradeEffectValue
 } = require('./tower-upgrade-list');
 
 // =========================================
@@ -268,46 +266,7 @@ function applyStatUpgrade(tower, statId) {
 }
 
 /**
- * @deprecated Use applyElementAbilityUpgrade instead
- * Apply ability tier upgrade to tower (OLD tier-based system)
- * @param {Object} tower - Tower instance
- * @param {string} abilityId - Ability to upgrade
- * @returns {boolean} Success
- */
-function applyAbilityUpgrade(tower, abilityId) {
-  console.warn('[DEPRECATED] applyAbilityUpgrade - use applyElementAbilityUpgrade instead');
-  const ability = ABILITIES[abilityId];
-  if (!ability) return false;
-  
-  // Initialize tracking
-  if (!tower.abilityTiers) tower.abilityTiers = {};
-  
-  const currentTier = tower.abilityTiers[abilityId] || 0;
-  const newTier = currentTier + 1;
-  tower.abilityTiers[abilityId] = newTier;
-  
-  // Get and apply effects
-  const effects = getAbilityEffects(ability, newTier);
-  if (effects) {
-    // Copy all effects to tower
-    for (const [key, value] of Object.entries(effects)) {
-      tower[key] = value;
-    }
-  }
-  
-  // Add upgrade points
-  addUpgradePoints(tower, 'abilityTier');
-  
-  // Recalculate stats
-  if (tower.recalculateStats) {
-    tower.recalculateStats();
-  }
-  
-  return true;
-}
-
-/**
- * Apply element ability upgrade to tower (NEW system)
+ * Apply element ability upgrade to tower
  * @param {Object} tower - Tower instance
  * @param {string} upgradeId - Ability upgrade ID (e.g., 'burn_damage', 'spread_chance')
  * @returns {boolean} Success
@@ -476,24 +435,6 @@ function getStatUpgradeCost(statId, tower) {
 }
 
 /**
- * @deprecated Use getElementAbilityUpgradeCost instead
- * Get ability upgrade cost for tower (OLD tier-based system)
- * @param {string} abilityId - Ability ID
- * @param {Object} tower - Tower instance
- * @returns {number} Cost
- */
-function getAbilityUpgradeCost(abilityId, tower) {
-  console.warn('[DEPRECATED] getAbilityUpgradeCost - use getElementAbilityUpgradeCost instead');
-  const ability = ABILITIES[abilityId];
-  if (!ability) return Infinity;
-  
-  const currentTier = tower.abilityTiers?.[abilityId] || 0;
-  const towerLevel = tower.level || 1;
-  
-  return calculateAbilityCost(ability, currentTier + 1, towerLevel);
-}
-
-/**
  * Get passive upgrade cost for tower
  * @param {string} passiveId - Passive ID
  * @param {Object} tower - Tower instance
@@ -568,19 +509,16 @@ module.exports = {
   getAttackTypeCost,
   getElementPathCost,
   getStatUpgradeCost,
-  getAbilityUpgradeCost,      // @deprecated - use getElementAbilityUpgradeCost
   getPassiveUpgradeCost,
-  getElementAbilityUpgradeCost,  // NEW - element ability upgrades
+  getElementAbilityUpgradeCost,
   
   // Apply functions
   applyStatUpgrade,
-  applyAbilityUpgrade,        // @deprecated - use applyElementAbilityUpgrade
   applyPassiveUpgrade,
   applyElementPath,
-  applyElementAbilityUpgrade,    // NEW - element ability upgrades
+  applyElementAbilityUpgrade,
   
   // Info functions
   getTowerBuildSummary,
   calculateTotalInvested
 };
-

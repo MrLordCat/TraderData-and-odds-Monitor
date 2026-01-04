@@ -81,7 +81,6 @@ function TowerUpgradesUIMixin(Base) {
       
       const economy = this.game?.modules?.economy;
       if (!economy || economy.gold < cost) {
-        console.log('Not enough gold for upgrade');
         return;
       }
       

@@ -133,8 +133,6 @@ class GameRenderer {
     // Decoration cache (trees, rocks positions)
     this.decorationCache = null;
     this.decorationCacheDirty = true;
-    
-    console.log('[GameRenderer] WebGL initialized', this.glContext.getInfo());
   }
   
   /**

@@ -3,24 +3,18 @@
  * Handles the new 3-section bottom panel
  */
 
-console.log('[BottomPanelModule] ===== MODULE LOADED =====');
-
 /**
  * Mixin for bottom panel UI functionality
  * @param {Class} Base - GameController base class
  */
 function BottomPanelMixin(Base) {
-  console.log('[BottomPanelModule] BottomPanelMixin called with Base:', Base?.name);
   return class extends Base {
     
     /**
      * Setup bottom panel event listeners
      */
     setupBottomPanelEvents() {
-      console.log('[BottomPanel] ===== setupBottomPanelEvents CALLED =====');
-      console.log('[BottomPanel] this.elements:', this.elements);
       const el = this.elements;
-      console.log('[BottomPanel] el.bottomPanel:', el?.bottomPanel);
       if (!el.bottomPanel) {
         console.warn('[BottomPanel] NO bottomPanel element! Aborting setup.');
         return; // Panel not ready yet
@@ -28,12 +22,6 @@ function BottomPanelMixin(Base) {
       
       // Build grid items - support both old .build-item and new .build-card
       el.buildItems = el.bottomPanel.querySelectorAll('.build-item, .build-card');
-      console.log('[BottomPanel] Found build items:', el.buildItems.length);
-      console.log('[BottomPanel] Build items:', Array.from(el.buildItems).map(i => ({
-        type: i.dataset.type,
-        building: i.dataset.building,
-        classes: i.className
-      })));
       
       el.buildItems.forEach(item => {
         item.addEventListener('click', (e) => {
@@ -70,7 +58,6 @@ function BottomPanelMixin(Base) {
       if (el.pauseBtnSettings) {
         el.pauseBtnSettings.addEventListener('click', () => {
           // TODO: Open settings
-          console.log('Settings not implemented yet');
         });
       }
       if (el.pauseBtnQuit) {
@@ -140,24 +127,6 @@ function BottomPanelMixin(Base) {
           this.setTowerElement(element);
         });
       });
-      
-      // Setup unified hover tooltips (for stats and build cards)
-      // NOTE: Tooltips now work via pure CSS :hover, no JS needed
-    }
-    
-    /**
-     * @deprecated Tooltips now use pure CSS :hover
-     */
-    setupHoverTooltips() {
-      // No-op - CSS handles this now
-    }
-    
-    /**
-     * Setup stat hover popups - now handled by pure CSS like build cards
-     * CSS :hover on .stat-item shows .stat-detail-popup
-     */
-    setupStatHoverPopups() {
-      // No-op - CSS handles this identically to build-card-popup
     }
     
     /**
@@ -911,9 +880,6 @@ function BottomPanelMixin(Base) {
       
       // Update stat detail popups content
       this.updateStatDetailPopups(tower);
-      
-      // Re-setup hover positioning for new elements
-      this.setupStatHoverPopups();
     }
     
     /**
@@ -998,9 +964,6 @@ function BottomPanelMixin(Base) {
       
       // Update energy detail popups
       this.updateEnergyDetailPopups(building);
-      
-      // Setup stat hover popups
-      this.setupStatHoverPopups();
     }
     
     /**
@@ -1241,8 +1204,6 @@ function BottomPanelMixin(Base) {
         return;
       }
       
-      console.log('[BottomPanel] Updating upgrades for tower:', tower?.id, 'attackTypeId:', tower?.attackTypeId);
-      
       const gold = this.game?.getState?.().gold || 0;
       const towerLevel = tower.level || 1;
       
@@ -1270,8 +1231,6 @@ function BottomPanelMixin(Base) {
         const available = upgrade && isUpgradeAvailable(upgrade, tower);
         return available;
       });
-      
-      console.log('[BottomPanel] Available upgrades:', availableUpgrades.length, availableUpgrades);
       
       for (const upgradeId of availableUpgrades) {
         const upgrade = STAT_UPGRADES[upgradeId];
@@ -1340,8 +1299,6 @@ function BottomPanelMixin(Base) {
         
         el.upgradesGridPanel.appendChild(card);
       }
-      
-      console.log('[BottomPanel] Added cards to grid, children count:', el.upgradesGridPanel.children.length);
       
       // Also update abilities panel
       this.updateTowerAbilitiesInPanel(tower);

@@ -30,7 +30,6 @@ function AbilityUpgradesUIMixin(Base) {
       
       const elementConfig = ELEMENT_ABILITIES[tower.elementPath];
       if (!elementConfig?.upgrades?.[upgradeKey]) {
-        console.log('Upgrade not found:', upgradeKey);
         return;
       }
       
@@ -38,7 +37,6 @@ function AbilityUpgradesUIMixin(Base) {
       const currentLevel = tower.abilityUpgrades?.[upgradeKey] || 0;
       
       if (currentLevel >= upgrade.maxLevel) {
-        console.log('Upgrade already maxed');
         return;
       }
       
@@ -46,7 +44,6 @@ function AbilityUpgradesUIMixin(Base) {
       
       const economy = this.game?.modules?.economy;
       if (!economy || economy.gold < cost) {
-        console.log('Not enough gold for ability upgrade');
         return;
       }
       

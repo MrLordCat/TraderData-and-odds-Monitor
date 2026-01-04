@@ -219,8 +219,6 @@ function addPowerSupportToTowers(towersModule, energyModule) {
     
     return originalUpdate(deltaTime, enemies);
   };
-  
-  console.log('[TowerPower] Power support added to towers module');
 }
 
 module.exports = { 

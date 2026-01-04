@@ -60,8 +60,6 @@ class MapGenerator {
    */
   generate(seed = null) {
     const actualSeed = seed !== null ? seed : Date.now();
-    console.log(`[MapGenerator] Generating map with seed: ${actualSeed}`);
-    
     this.rng = new SeededRandom(actualSeed);
     this.noise = new NoiseGenerator(actualSeed);
     
@@ -87,8 +85,6 @@ class MapGenerator {
     
     // Step 6: Post-process (ensure playability)
     this._postProcess();
-    
-    console.log(`[MapGenerator] Generation complete: ${this.pathCells.length} path cells, ${this.waypoints.length} waypoints`);
     
     return this.getMapData();
   }
@@ -156,8 +152,7 @@ class MapGenerator {
       worldY: baseGridY * this.gridSize + this.gridSize / 2
     };
 
-    console.log(`[MapGenerator] Fixed path: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
-  }
+    }
 
   /**
    * Generate path using normalized waypoints from config (0..1 grid space)
@@ -218,8 +213,7 @@ class MapGenerator {
       worldY: baseGridY * this.gridSize + this.gridSize / 2
     };
     
-    console.log(`[MapGenerator] Config path: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
-  }
+    }
   
   /**
    * Generate base terrain using noise
@@ -322,8 +316,7 @@ class MapGenerator {
       edge: edge
     };
     
-    console.log(`[MapGenerator] Spawn: ${edge} edge, Base: center (${centerX}, ${centerY})`);
-  }
+    }
   
   /**
    * Pick item based on weights
@@ -375,8 +368,7 @@ class MapGenerator {
     // Build waypoints from path cells (direction changes)
     this._buildWaypointsFromPath();
     
-    console.log(`[MapGenerator] Path generated: ${this.pathCells.length} cells, ${this.waypoints.length} waypoints`);
-  }
+    }
   
   /**
    * Generate safe path using Segment-Walker approach
@@ -388,8 +380,6 @@ class MapGenerator {
     const MIN_SEGMENT = 10; // Reduced for more flexibility
     const MAX_SEGMENT = 15;
     const FIRST_SEGMENT_MIN = 20; // Minimum first segment into the map
-    
-    console.log(`[MapGenerator] Starting Segment-Walker from (${startX},${startY}) to base (${endX},${endY})`);
     
     // Initialize path and tracking
     const path = [];
@@ -448,8 +438,7 @@ class MapGenerator {
       for (let i = 1; i < cells.length; i++) {
         if (!isFree(cells[i].x, cells[i].y, x1, y1)) {
           if (debug) {
-            console.log(`[MapGenerator] canDrawLine BLOCKED at cell (${cells[i].x},${cells[i].y}), i=${i}/${cells.length}`);
-          }
+            }
           return false;
         }
       }
@@ -475,15 +464,12 @@ class MapGenerator {
     
     // Determine initial direction (from edge inward)
     let currentDir = this._getInitialDirection(startX, startY);
-    console.log(`[MapGenerator] Initial direction: ${currentDir}`);
-    
     // === MANDATORY FIRST SEGMENT: Go straight into the map ===
     const firstSegmentLength = this.rng.int(FIRST_SEGMENT_MIN, FIRST_SEGMENT_MIN + 20);
     const { endPt: firstEnd } = this._calcSegmentEndpoint(currentDir, x, y, firstSegmentLength, {
       left: 0, right: this.width - 1, top: 0, bottom: this.height - 1
     });
     
-    console.log(`[MapGenerator] First mandatory segment: ${currentDir} for ${firstSegmentLength} cells to (${firstEnd.x},${firstEnd.y})`);
     addLine(x, y, firstEnd.x, firstEnd.y);
     x = firstEnd.x;
     y = firstEnd.y;
@@ -510,19 +496,15 @@ class MapGenerator {
       iterations++;
       
       const distToBase = Math.abs(x - endX) + Math.abs(y - endY);
-      console.log(`[MapGenerator] Iter ${iterations}: pos=(${x},${y}), distToBase=${distToBase}, totalLen=${totalPathLength}, shrink=${shrinkStep}`);
-      
       // Check if close enough to base AND path is long enough - finish with direct path
       if (distToBase <= finishThreshold && totalPathLength >= minTotalPathLength) {
-        console.log(`[MapGenerator] Close to base and path long enough, finishing directly`);
         this._finishPathToBase(x, y, endX, endY, path, addLine, canDrawLine);
         break;
       }
       
       // Force continue if path is too short even if close to base
       if (distToBase <= finishThreshold && totalPathLength < minTotalPathLength) {
-        console.log(`[MapGenerator] Close to base but path too short (${totalPathLength}/${minTotalPathLength}), continuing`);
-      }
+        }
       
       // Save state for potential rollback
       segmentHistory.push({
@@ -549,8 +531,7 @@ class MapGenerator {
           top: initialBounds.top + Math.floor(shrinkAmount * initialHeight / 2),
           bottom: initialBounds.bottom - Math.floor(shrinkAmount * initialHeight / 2)
         };
-        console.log(`[MapGenerator] Base side changed ${prevBaseSide}->${baseSide}, shrink to ${shrinkStep * 10}%`);
-      }
+        }
       prevBaseSide = baseSide;
       
       // Check if we can still go toward edge (for probability adjustment)
@@ -569,11 +550,7 @@ class MapGenerator {
       // Calculate segment length
       const segmentLength = this._calcSegmentLength(nextDir, x, y, bounds, endX, endY, MIN_SEGMENT, MAX_SEGMENT, this.rng);
       
-      console.log(`[MapGenerator] Trying dir=${nextDir}, segmentLength=${segmentLength}`);
-      
       if (segmentLength < MIN_SEGMENT) {
-        console.log(`[MapGenerator] Segment too short (${segmentLength}), trying other directions`);
-        
         // Try other available directions
         const tried = new Set([nextDir]);
         let found = false;
@@ -592,7 +569,6 @@ class MapGenerator {
               y = tryEnd.y;
               currentDir = tryDir;
               found = true;
-              console.log(`[MapGenerator] Found alternate: ${tryDir} to (${x},${y}), len=${tryActual}`);
               break;
             }
           }
@@ -618,10 +594,8 @@ class MapGenerator {
             lastTurnToBase = recovered.lastTurnToBase;
             prevBaseSide = recovered.prevBaseSide;
             totalPathLength = recovered.totalPathLength;
-            console.log(`[MapGenerator] Rolled back to (${x},${y}), totalLen=${totalPathLength}`);
             continue;
           } else {
-            console.log(`[MapGenerator] Rollback failed, finishing`);
             break;
           }
         }
@@ -630,8 +604,6 @@ class MapGenerator {
       
       // Calculate end point
       const { endPt, actualLength } = this._calcSegmentEndpoint(nextDir, x, y, segmentLength, bounds);
-      
-      console.log(`[MapGenerator] Trying to draw from (${x},${y}) to (${endPt.x},${endPt.y})`);
       
       // Try to draw segment - if blocked, try progressively shorter lengths
       let drawnSegment = false;
@@ -655,8 +627,7 @@ class MapGenerator {
           drawnSegment = true;
           consecutiveRollbacks = 0; // Reset on successful segment
           
-          console.log(`[MapGenerator] Drew segment to (${x},${y}), dir=${currentDir}, len=${tryActual}, total=${totalPathLength}`);
-        } else {
+          } else {
           // Try shorter
           tryLength = Math.floor(tryLength * 0.7);
         }
@@ -664,8 +635,6 @@ class MapGenerator {
       
       if (!drawnSegment) {
         // Segment blocked even at minimum - try alternate direction
-        console.log(`[MapGenerator] Segment blocked in ${nextDir}, trying alternates`);
-        
         const alternates = [this._getTurnLeft(currentDir), this._getTurnRight(currentDir), currentDir]
           .filter(d => d !== nextDir && d !== this._getOppositeDir(currentDir));
         
@@ -684,7 +653,6 @@ class MapGenerator {
               currentDir = altDir;
               drawnSegment = true;
               consecutiveRollbacks = 0; // Reset on successful segment
-              console.log(`[MapGenerator] Used alternate dir ${altDir} to (${x},${y}), total=${totalPathLength}`);
               break;
             }
           }
@@ -693,8 +661,6 @@ class MapGenerator {
       
       if (!drawnSegment) {
         // All directions blocked - rollback
-        console.log(`[MapGenerator] All directions blocked, rolling back`);
-        
         // Progressive rollback - increase depth if stuck in same area
         if (lastRollbackPos && Math.abs(x - lastRollbackPos.x) < 10 && Math.abs(y - lastRollbackPos.y) < 10) {
           consecutiveRollbacks++;
@@ -713,9 +679,7 @@ class MapGenerator {
           lastTurnToBase = recovered.lastTurnToBase;
           prevBaseSide = recovered.prevBaseSide;
           totalPathLength = recovered.totalPathLength;
-          console.log(`[MapGenerator] Rolled back to (${x},${y}), totalLen=${totalPathLength}`);
-        } else {
-          console.log(`[MapGenerator] No recovery possible, finishing`);
+          } else {
           break;
         }
       }
@@ -725,12 +689,10 @@ class MapGenerator {
     if (path.length > 0) {
       const last = path[path.length - 1];
       if (last.x !== endX || last.y !== endY) {
-        console.log(`[MapGenerator] Path ended at (${last.x},${last.y}), finishing to base (${endX},${endY})`);
         this._finishPathToBase(last.x, last.y, endX, endY, path, addLine, canDrawLine);
       }
     }
     
-    console.log(`[MapGenerator] Segment-Walker complete: ${path.length} cells`);
     return path;
   }
   
@@ -1030,8 +992,6 @@ class MapGenerator {
     
     if (rollbackCount <= 0) return null;
     
-    console.log(`[MapGenerator] Rolling back ${rollbackCount} segments (depth ${rollbackDepth})`);
-    
     // Get recovery point
     for (let i = 0; i < rollbackCount; i++) {
       history.pop();
@@ -1057,8 +1017,6 @@ class MapGenerator {
     const oldDir = recovery.currentDir;
     const forceLeft = this.rng.next() < 0.5;
     recovery.currentDir = forceLeft ? this._getTurnLeft(oldDir) : this._getTurnRight(oldDir);
-    console.log(`[MapGenerator] Rollback: force direction ${oldDir} -> ${recovery.currentDir}`);
-    
     return recovery;
   }
   
@@ -1808,36 +1766,6 @@ class MapGenerator {
     cells.push({ x: x1, y: y1 });
     
     return cells;
-  }
-  
-  /**
-   * @deprecated - Kept for reference, not used
-   * Simplify path to key waypoints (direction changes)
-   */
-  _simplifyPath(path) {
-    if (path.length < 3) return path;
-    
-    const waypoints = [path[0]];
-    
-    let lastDirX = path[1].x - path[0].x;
-    let lastDirY = path[1].y - path[0].y;
-    
-    for (let i = 2; i < path.length; i++) {
-      const dirX = path[i].x - path[i-1].x;
-      const dirY = path[i].y - path[i-1].y;
-      
-      // Direction changed - add previous point as waypoint
-      if (dirX !== lastDirX || dirY !== lastDirY) {
-        waypoints.push(path[i-1]);
-        lastDirX = dirX;
-        lastDirY = dirY;
-      }
-    }
-    
-    // Add final point
-    waypoints.push(path[path.length - 1]);
-    
-    return waypoints;
   }
   
   /**

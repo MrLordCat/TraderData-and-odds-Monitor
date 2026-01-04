@@ -5,17 +5,15 @@
  * It can perform initialization, register IPC handlers, etc.
  */
 
-console.log('[power-towers] Addon loaded');
-
 module.exports = {
   name: 'Power Towers TD',
   version: '0.0.2',
   
   init() {
-    console.log('[power-towers] Initialized');
+    // Addon initialized
   },
   
   destroy() {
-    console.log('[power-towers] Destroyed');
+    // Addon destroyed
   }
 };

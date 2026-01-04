@@ -41,7 +41,6 @@ class PowerNetwork {
    */
   registerNode(node) {
     this.nodes.set(node.id, node);
-    console.log(`[PowerNetwork] Registered node: ${node.id} (${node.type})`);
   }
 
   /**
@@ -72,7 +71,6 @@ class PowerNetwork {
     if (existingIdx >= 0) {
       // Already connected - disconnect (toggle)
       this.connections.splice(existingIdx, 1);
-      console.log(`[PowerNetwork] Disconnected (toggle): ${fromId} → ${toId}`);
       this.eventBus.emit('power:disconnected', { from: fromId, to: toId });
       return 'disconnected';
     }
@@ -104,7 +102,6 @@ class PowerNetwork {
       channel: fromOutputUsed
     });
 
-    console.log(`[PowerNetwork] Connected: ${fromId} → ${toId}`);
     this.eventBus.emit('power:connected', { from: fromId, to: toId });
     return true;
   }

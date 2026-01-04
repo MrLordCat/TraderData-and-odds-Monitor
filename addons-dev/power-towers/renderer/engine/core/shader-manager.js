@@ -227,7 +227,6 @@ class ShaderManager {
     for (const [name, source] of Object.entries(SHADERS)) {
       this.compile(name, source.vertex, source.fragment);
     }
-    console.log(`[ShaderManager] Compiled ${Object.keys(SHADERS).length} built-in shaders`);
   }
   
   /**

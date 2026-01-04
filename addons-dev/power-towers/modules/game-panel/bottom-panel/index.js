@@ -48,8 +48,6 @@ class BottomPanelController {
 
     // Initialize each section
     Object.values(this.sections).forEach(section => section.init());
-
-    console.log('[BottomPanel] Initialized');
   }
 
   /**

@@ -65,7 +65,6 @@ class EnergyBuildingManager {
   onGameStart() {
     // Don't reset - allow pre-placed buildings to persist (like towers)
     // Buildings are only reset on full game reset, not on wave start
-    console.log('[EnergyManager] Game started, keeping', this.buildings.size, 'buildings');
   }
 
   /**
@@ -159,8 +158,6 @@ class EnergyBuildingManager {
     if (map && map.setCellOccupied) {
       map.setCellOccupied(gridX, gridY, true);
     }
-
-    console.log(`[EnergyManager] Placed ${type} at (${gridX}, ${gridY})`);
     
     this.eventBus.emit('energy:building-placed', {
       building,
@@ -398,8 +395,6 @@ class EnergyBuildingManager {
       // Make sure consumer references the real tower for energy transfer
       consumer.setTower(tower);
       tower.powerConsumer = consumer;
-      
-      console.log(`[EnergyManager] Using existing adapter consumer ${consumerId} for tower ${tower.id}`);
     } else {
       // Fallback: check for consumer by tower ID
       consumerId = `tower-${tower.id}`;
@@ -412,14 +407,11 @@ class EnergyBuildingManager {
         
         // Store reference
         tower.powerConsumer = consumer;
-        
-        console.log(`[EnergyManager] Created consumer ${consumerId} for tower ${tower.id}`);
       }
     }
     
     // Connect building to tower's consumer
     const success = this.network.connect(fromBuildingId, consumerId);
-    console.log(`[EnergyManager] Connect ${fromBuildingId} -> ${consumerId}: ${success}`);
     return success;
   }
 

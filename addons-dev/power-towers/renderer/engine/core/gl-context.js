@@ -43,7 +43,6 @@ class GLContext {
     if (this.gl) {
       this.isWebGL2 = true;
       this.isWebGL = true;
-      console.log('[GLContext] WebGL 2.0 initialized');
       this._initExtensions();
       return;
     }
@@ -53,7 +52,6 @@ class GLContext {
               this.canvas.getContext('experimental-webgl', this.options);
     if (this.gl) {
       this.isWebGL = true;
-      console.log('[GLContext] WebGL 1.0 initialized');
       this._initExtensions();
       return;
     }
@@ -95,7 +93,6 @@ class GLContext {
     const available = Object.entries(this.extensions)
       .filter(([_, ext]) => ext !== null)
       .map(([name]) => name);
-    console.log('[GLContext] Extensions:', available.join(', ') || 'none');
   }
   
   /**

@@ -93,7 +93,7 @@ function GameEventsMixin(Base) {
       
       // Tower level up notification
       this.game.on('tower:level-up', (data) => {
-        console.log(`Tower leveled up to ${data.newLevel}!`);
+        // Could show toast notification here
       });
       
       this.game.on(this.GameEvents.WAVE_COMPLETE, () => {

@@ -1,25 +1,16 @@
 /**
- * Power Towers TD - Tower Upgrade List & Abilities
+ * Power Towers TD - Tower Upgrade List
  * 
- * Main upgrade system entry point.
- * Imports and re-exports all upgrade data and helper functions.
+ * Stat upgrades and passive effects.
+ * For element ability upgrades, use element-abilities.js
  * 
  * UPGRADE SYSTEM:
  * - Upgrades are infinite (no max level)
  * - Cost scales with upgrade level
  * - Tower level reduces upgrade costs
- * - Each upgrade has clear effects defined here
- * 
- * STRUCTURE:
- * - upgrades/stat-upgrades.js - Basic stat improvements
- * - upgrades/abilities.js - @deprecated - use element-abilities.js instead
- * - upgrades/passive-effects.js - Passive bonuses
- * 
- * NOTE: For element ability upgrades, use ELEMENT_ABILITIES from element-abilities.js
  */
 
 const { STAT_UPGRADES } = require('./upgrades/stat-upgrades');
-const { ABILITIES } = require('./upgrades/abilities'); // @deprecated
 const { PASSIVE_EFFECTS } = require('./upgrades/passive-effects');
 const CONFIG = require('./config');
 
@@ -67,35 +58,6 @@ function calculateUpgradeCost(upgrade, currentLevel, towerLevel = 1) {
 }
 
 /**
- * Calculate ability tier cost with tower level discount
- * @param {Object} ability - Ability config
- * @param {number} targetTier - Tier to unlock (1-4+)
- * @param {number} towerLevel - Tower's level
- * @returns {number} Cost
- */
-function calculateAbilityCost(ability, targetTier, towerLevel = 1) {
-  let baseCost;
-  
-  // Within defined tiers
-  if (targetTier <= ability.tiers.length) {
-    baseCost = ability.tiers[targetTier - 1].cost;
-  } else {
-    // Infinite scaling beyond max tier
-    const extraLevels = targetTier - ability.tiers.length;
-    const scaling = ability.infiniteScaling;
-    baseCost = scaling.costBase * Math.pow(scaling.costScale, extraLevels);
-  }
-  
-  // Tower level discount
-  const discountPercent = Math.min(
-    COST_CONFIG.maxDiscount,
-    (towerLevel - 1) * COST_CONFIG.discountPerTowerLevel
-  );
-  
-  return Math.floor(baseCost * (1 - discountPercent));
-}
-
-/**
  * Get upgrade effect value at level
  * @param {Object} upgrade - Upgrade config
  * @param {number} level - Upgrade level
@@ -114,37 +76,6 @@ function getUpgradeEffectValue(upgrade, level) {
   }
   
   return value;
-}
-
-/**
- * Get ability effects at tier (including infinite scaling)
- * @param {Object} ability - Ability config
- * @param {number} tier - Current tier
- * @returns {Object} Effects
- */
-function getAbilityEffects(ability, tier) {
-  if (tier <= 0) return null;
-  
-  // Within defined tiers
-  if (tier <= ability.tiers.length) {
-    return { ...ability.tiers[tier - 1].effects };
-  }
-  
-  // Infinite scaling: start from max tier effects and add scaling
-  const baseEffects = { ...ability.tiers[ability.tiers.length - 1].effects };
-  const scaling = ability.infiniteScaling;
-  const extraLevels = tier - ability.tiers.length;
-  
-  // Add scaling bonus
-  let bonusValue = scaling.valuePerLevel * extraLevels;
-  if (scaling.maxValue !== undefined) {
-    const currentValue = baseEffects[scaling.stat] || 0;
-    bonusValue = Math.min(bonusValue, scaling.maxValue - currentValue);
-  }
-  
-  baseEffects[scaling.stat] = (baseEffects[scaling.stat] || 0) + bonusValue;
-  
-  return baseEffects;
 }
 
 /**
@@ -171,83 +102,14 @@ function isUpgradeAvailable(upgrade, tower) {
   return true;
 }
 
-/**
- * Get all available upgrades for a tower
- * @param {Object} tower - Tower instance
- * @returns {Object} Available upgrades grouped by category
- */
-function getAvailableUpgradesForTower(tower) {
-  const available = {
-    stats: [],
-    abilities: [],
-    passives: []
-  };
-  
-  // Stat upgrades
-  for (const [id, upgrade] of Object.entries(STAT_UPGRADES)) {
-    if (isUpgradeAvailable(upgrade, tower)) {
-      const currentLevel = tower.upgradeLevels?.[id] || 0;
-      available.stats.push({
-        ...upgrade,
-        currentLevel,
-        cost: calculateUpgradeCost(upgrade, currentLevel, tower.level || 1),
-        effectValue: getUpgradeEffectValue(upgrade, currentLevel + 1)
-      });
-    }
-  }
-  
-  // Abilities
-  for (const [id, ability] of Object.entries(ABILITIES)) {
-    if (isUpgradeAvailable(ability, tower)) {
-      const currentTier = tower.abilityTiers?.[id] || 0;
-      const nextTier = currentTier + 1;
-      available.abilities.push({
-        id: ability.id,
-        name: ability.name,
-        emoji: ability.emoji,
-        description: ability.description,
-        color: ability.color,
-        currentTier,
-        nextTierEffects: getAbilityEffects(ability, nextTier),
-        cost: calculateAbilityCost(ability, nextTier, tower.level || 1)
-      });
-    }
-  }
-  
-  // Passives
-  for (const [id, passive] of Object.entries(PASSIVE_EFFECTS)) {
-    const currentTier = tower.passiveTiers?.[id] || 0;
-    if (currentTier < passive.tiers.length) {
-      const nextTier = currentTier + 1;
-      available.passives.push({
-        id: passive.id,
-        name: passive.name,
-        emoji: passive.emoji,
-        description: passive.description,
-        color: passive.color,
-        currentTier,
-        maxTier: passive.tiers.length,
-        nextTierEffects: passive.tiers[nextTier - 1].effects,
-        cost: passive.tiers[nextTier - 1].cost
-      });
-    }
-  }
-  
-  return available;
-}
-
 module.exports = {
   // Configs
   COST_CONFIG,
   STAT_UPGRADES,
-  ABILITIES,           // @deprecated - use ELEMENT_ABILITIES from element-abilities.js
   PASSIVE_EFFECTS,
   
   // Functions
   calculateUpgradeCost,
-  calculateAbilityCost,   // @deprecated - use getAbilityUpgradeCost from element-abilities.js
   getUpgradeEffectValue,
-  getAbilityEffects,      // @deprecated - use getElementAbilities from element-abilities.js
-  isUpgradeAvailable,
-  getAvailableUpgradesForTower
+  isUpgradeAvailable
 };

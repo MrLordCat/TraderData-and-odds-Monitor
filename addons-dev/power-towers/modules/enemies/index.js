@@ -243,9 +243,6 @@ class EnemiesModule {
     const overlapping = this.enemies.filter(e => 
       Math.abs(e.x - spawnPoint.x) < 20 && Math.abs(e.y - spawnPoint.y) < 20
     );
-    if (overlapping.length > 0) {
-      console.log(`[EnemiesModule] Spawning enemy while ${overlapping.length} enemies near spawn point`);
-    }
     
     const enemy = {
       id: this.nextEnemyId++,
@@ -265,10 +262,8 @@ class EnemiesModule {
       size: type === 'boss' ? 16 : (type === 'tank' ? 12 : (type === 'swarm' ? 6 : 10)),
       emoji: enemyDef.emoji,
       color: enemyDef.color,
-      // Status effects (new system)
+      // Status effects
       statusEffects: [],
-      // Legacy effects (deprecated, for compatibility)
-      effects: [],
       slowMultiplier: 1,
       // Freeze immunity cooldown
       freezeImmunityTimer: 0,
@@ -373,26 +368,6 @@ class EnemiesModule {
     if (StatusEffects.isStunned(enemy)) {
       enemy.slowMultiplier = 0;
     }
-    
-    // === Legacy effects support (deprecated) ===
-    for (let i = enemy.effects.length - 1; i >= 0; i--) {
-      const effect = enemy.effects[i];
-      effect.duration -= deltaTime;
-      
-      if (effect.duration <= 0) {
-        enemy.effects.splice(i, 1);
-        continue;
-      }
-      
-      switch (effect.type) {
-        case 'slow':
-          enemy.slowMultiplier = Math.min(enemy.slowMultiplier, effect.value);
-          break;
-        case 'poison':
-          enemy.health -= effect.value * deltaTime;
-          break;
-      }
-    }
   }
   
   /**
@@ -426,11 +401,10 @@ class EnemiesModule {
    * @param {number} data.enemyId - Target enemy ID
    * @param {number} data.damage - Base damage
    * @param {number} data.towerId - Source tower ID
-   * @param {Array} data.effects - Legacy effects (deprecated)
-   * @param {Object} data.elementEffects - New element effects config
+   * @param {Object} data.elementEffects - Element effects config
    * @param {boolean} data.isCrit - Was critical hit
    */
-  damageEnemy({ enemyId, damage, towerId, effects, elementEffects, isCrit }) {
+  damageEnemy({ enemyId, damage, towerId, elementEffects, isCrit }) {
     const enemy = this.enemies.find(e => e.id === enemyId);
     if (!enemy) {
       console.warn(`[EnemiesModule] damageEnemy: enemy ${enemyId} not found! Current enemies:`, 
@@ -447,22 +421,9 @@ class EnemiesModule {
     const { finalDamage, modifiers } = StatusEffects.calculateDamageWithEffects(enemy, damage);
     enemy.health -= finalDamage;
     
-    // === Apply new element effects ===
+    // Apply element effects
     if (elementEffects) {
       this.applyElementEffects(enemy, elementEffects, towerId, isCrit);
-    }
-    
-    // === Legacy effects support (deprecated) ===
-    if (effects && effects.length > 0) {
-      for (const effect of effects) {
-        const existing = enemy.effects.find(e => e.type === effect.type);
-        if (existing) {
-          existing.duration = effect.duration;
-          existing.value = Math.min(existing.value, effect.value);
-        } else {
-          enemy.effects.push({ ...effect });
-        }
-      }
     }
 
     this.eventBus.emit('enemy:damaged', { 
@@ -585,7 +546,6 @@ class EnemiesModule {
    * Kill enemy
    */
   killEnemy(enemy, index) {
-    console.log(`[EnemiesModule] Killing enemy #${enemy.id} at (${Math.round(enemy.x)}, ${Math.round(enemy.y)}), pathProgress: ${enemy.pathProgress.toFixed(2)}`);
     this.enemies.splice(index, 1);
     this.totalKills++;
     

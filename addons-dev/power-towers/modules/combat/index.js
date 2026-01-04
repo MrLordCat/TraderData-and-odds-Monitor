@@ -256,7 +256,6 @@ class CombatModule {
               damage: chainDamage,
               isCrit: chainIsCrit,
               towerId: projectile.towerId,
-              effects: [],
               // Pass element effects to chain targets too
               elementEffects: projectile.elementAbilities ? {
                 elementPath: projectile.elementPath,

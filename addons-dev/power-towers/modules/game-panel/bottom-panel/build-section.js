@@ -33,8 +33,6 @@ class BuildSection {
 
     this.setupBuildCards();
     this.setupActionButtons();
-    
-    console.log('[BuildSection] Initialized, found', this.elements.buildCards.length, 'build cards');
   }
 
   setupBuildCards() {
@@ -69,8 +67,6 @@ class BuildSection {
   onBuildCardClick(card) {
     const type = card.dataset.type;
     const building = card.dataset.building;
-    
-    console.log('[BuildSection] Build card clicked:', type, building);
     
     // Clear previous placing state
     this.elements.buildCards.forEach(c => c.classList.remove('placing'));
@@ -114,7 +110,6 @@ class BuildSection {
   }
 
   onConnect() {
-    console.log('[BuildSection] Connect clicked');
     this.controller.gameController.startEnergyConnectionMode?.();
   }
 

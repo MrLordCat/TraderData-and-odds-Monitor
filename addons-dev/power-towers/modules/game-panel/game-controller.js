@@ -423,19 +423,15 @@ class GameControllerBase {
       const rect = this.canvasContainer.getBoundingClientRect();
       const width = Math.floor(rect.width);
       const height = Math.floor(rect.height);
-      console.log(`[GameController] Container rect: ${width}x${height}`);
       if (width > 200 && height > 200) {
         this.canvas.width = width;
         this.canvas.height = height;
       }
     }
     
-    console.log(`[GameController] Canvas size: ${this.canvas.width}x${this.canvas.height}`);
-    
     // Initialize camera (no constructor params - use setViewportSize)
     this.camera = new this.Camera();
     this.camera.setViewportSize(this.canvas.width, this.canvas.height);
-    console.log(`[GameController] Camera viewport: ${this.camera.viewportWidth}x${this.camera.viewportHeight}, zoom: ${this.camera.zoom}`);
     
     // Initialize renderer (WebGL - pass canvas, not ctx)
     this.renderer = new this.GameRenderer(this.canvas, this.camera);
@@ -682,7 +678,6 @@ class GameControllerBase {
     );
     
     if (building) {
-      console.log(`[GameController] Placed ${this.placingEnergyType} at (${gridX}, ${gridY})`);
       this.updateUI(this.game.getState());
       this.updateEnergyAffordability();
       this.renderGame();
@@ -769,7 +764,6 @@ class GameControllerBase {
     
     // Check if tower already has attack type
     if (tower.attackTypeId !== 'base') {
-      console.log('Tower already has attack type');
       return;
     }
     
@@ -798,7 +792,6 @@ class GameControllerBase {
     
     // Check if tower already has element
     if (tower.elementPath) {
-      console.log('Tower already has element');
       return;
     }
     
@@ -823,7 +816,6 @@ class GameControllerBase {
   upgradeSelectedTower() {
     if (!this.game?.selectedTower) return;
     // TODO: Open upgrade menu
-    console.log('Upgrade tower - not yet implemented');
     this.showTowerInfo(this.game.selectedTower);
   }
 
