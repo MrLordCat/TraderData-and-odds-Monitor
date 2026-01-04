@@ -550,4 +550,4 @@ class BiomeGenerator {
   }
 }
 
-module.exports = { BiomeGenerator, BIOME_GEN_CONFIG };
+module.exports = { BiomeGenerator };

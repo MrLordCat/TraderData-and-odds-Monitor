@@ -433,4 +433,4 @@ class CombatModule {
   }
 }
 
-module.exports = { CombatModule, PROJECTILE_TYPES };
+module.exports = { CombatModule };

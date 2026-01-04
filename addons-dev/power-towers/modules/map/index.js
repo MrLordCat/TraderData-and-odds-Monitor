@@ -8,8 +8,8 @@
  */
 
 const { GameEvents } = require('../../core/event-bus');
-const { MapGenerator, GENERATOR_CONFIG } = require('./map-generator');
-const { BiomeGenerator, BIOME_GEN_CONFIG } = require('./biome-generator');
+const { MapGenerator } = require('./map-generator');
+const { BiomeGenerator } = require('./biome-generator');
 const { 
   BIOME_TYPES, 
   getBiome, 
@@ -487,4 +487,4 @@ class MapModule {
   }
 }
 
-module.exports = { MapModule, TERRAIN_TYPES };
+module.exports = { MapModule };

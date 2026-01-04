@@ -134,4 +134,4 @@ function TowerUpgradesUIMixin(Base) {
   };
 }
 
-module.exports = { TowerUpgradesUIMixin, getUpgradesForTower, STAT_UPGRADES, calculateUpgradeCost };
+module.exports = { TowerUpgradesUIMixin };

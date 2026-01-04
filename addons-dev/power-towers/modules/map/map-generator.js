@@ -1984,9 +1984,4 @@ class MapGenerator {
   }
 }
 
-module.exports = { 
-  MapGenerator, 
-  SeededRandom, 
-  NoiseGenerator,
-  GENERATOR_CONFIG 
-};
+module.exports = { MapGenerator };

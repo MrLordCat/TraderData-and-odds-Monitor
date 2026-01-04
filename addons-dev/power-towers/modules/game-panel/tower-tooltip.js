@@ -3,22 +3,6 @@
  * Minimal mixin for tower selection (UI moved to bottom panel)
  */
 
-const ATTACK_TYPE_EMOJIS = {
-  base: '⚪',
-  siege: '💥',
-  normal: '🎯',
-  magic: '✨',
-  piercing: '🗡️'
-};
-
-const ELEMENT_EMOJIS = {
-  fire: '🔥',
-  ice: '❄️',
-  lightning: '⚡',
-  nature: '🌿',
-  dark: '💀'
-};
-
 /**
  * Mixin for tower selection functionality
  * @param {Class} Base - GameController base class
@@ -71,4 +55,4 @@ function TowerTooltipMixin(Base) {
   };
 }
 
-module.exports = { TowerTooltipMixin, ATTACK_TYPE_EMOJIS, ELEMENT_EMOJIS };
+module.exports = { TowerTooltipMixin };
