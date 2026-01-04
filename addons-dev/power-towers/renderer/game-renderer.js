@@ -98,10 +98,6 @@ class GameRenderer {
     
     // Text overlay canvas (for damage numbers, FPS, etc.)
     this._initTextCanvas();
-    
-    // Decoration cache (trees, rocks positions)
-    this.decorationCache = null;
-    this.decorationCacheDirty = true;
   }
   
   /**
@@ -161,15 +157,6 @@ class GameRenderer {
    */
   setCamera(camera) {
     this.camera = camera;
-  }
-  
-  /**
-   * Invalidate static cache (when map changes)
-   */
-  invalidateStaticCache() {
-    this.decorationCache = null;
-    this.decorationCacheDirty = true;
-    this._pathCellSetDirty = true;
   }
   
   // ============================================
@@ -291,43 +278,6 @@ class GameRenderer {
   }
   
   /**
-   * Emit particle effect (public API)
-   */
-  emitEffect(type, x, y, options = {}) {
-    this.particles.emit(type, x, y, options);
-  }
-  
-  /**
-   * Convert screen coords to world coords
-   */
-  screenToWorld(screenX, screenY) {
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    const canvasX = (screenX - rect.left) * scaleX;
-    const canvasY = (screenY - rect.top) * scaleY;
-    
-    if (this.camera) {
-      return this.camera.screenToWorld(canvasX, canvasY);
-    }
-    return { x: canvasX, y: canvasY };
-  }
-  
-  /**
-   * Convert screen coords to grid coords
-   */
-  screenToGrid(screenX, screenY) {
-    const world = this.screenToWorld(screenX, screenY);
-    const gridSize = CONFIG.GRID_SIZE;
-    return {
-      gridX: Math.floor(world.x / gridSize),
-      gridY: Math.floor(world.y / gridSize),
-      worldX: world.x,
-      worldY: world.y,
-    };
-  }
-  
-  /**
    * Resize canvas
    */
   resize(width, height) {
@@ -352,26 +302,6 @@ class GameRenderer {
     if (this.camera) {
       this.camera.setViewportSize(width, height);
     }
-  }
-  
-  /**
-   * Toggle FPS display
-   */
-  toggleFps() {
-    this.showFps = !this.showFps;
-  }
-  
-  /**
-   * Get stats
-   */
-  getStats() {
-    return {
-      fps: this.stats.fps,
-      frameTime: this.stats.frameTime.toFixed(2) + 'ms',
-      drawCalls: this.stats.drawCalls,
-      particles: this.particles.activeCount,
-      webgl: this.glContext.getInfo(),
-    };
   }
   
   /**

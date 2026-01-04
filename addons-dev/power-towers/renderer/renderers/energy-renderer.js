@@ -6,6 +6,17 @@
 
 const CONFIG = require('../../core/config');
 
+// Pre-allocated building type colors (avoid object creation in hot path)
+const BUILDING_TYPE_COLORS = {
+  'base-generator': { base: '#2d5a27', accent: '#4CAF50', glow: '#7fff7f' },
+  'bio-generator': { base: '#1a4a1a', accent: '#2e7d32', glow: '#81c784' },
+  'wind-generator': { base: '#37474f', accent: '#78909c', glow: '#b0bec5' },
+  'solar-generator': { base: '#e65100', accent: '#ff9800', glow: '#ffcc02' },
+  'water-generator': { base: '#01579b', accent: '#0288d1', glow: '#4fc3f7' },
+  'basic-battery': { base: '#1a3a5c', accent: '#2196F3', glow: '#6fc3ff' },
+  'power-transfer': { base: '#5c3a1a', accent: '#FF9800', glow: '#ffcc66' }
+};
+
 /**
  * Mixin for energy rendering methods
  * @param {Class} Base - Base GameRenderer class
@@ -189,17 +200,7 @@ function EnergyRendererMixin(Base) {
         const buildingType = building.type || 'base-generator';
         const fillPct = building.fillPercent || 0;
         
-        // Unique colors per building type
-        const typeColors = {
-          'base-generator': { base: '#2d5a27', accent: '#4CAF50', glow: '#7fff7f' },
-          'bio-generator': { base: '#1a4a1a', accent: '#2e7d32', glow: '#81c784' },
-          'wind-generator': { base: '#37474f', accent: '#78909c', glow: '#b0bec5' },
-          'solar-generator': { base: '#e65100', accent: '#ff9800', glow: '#ffcc02' },
-          'water-generator': { base: '#01579b', accent: '#0288d1', glow: '#4fc3f7' },
-          'basic-battery': { base: '#1a3a5c', accent: '#2196F3', glow: '#6fc3ff' },
-          'power-transfer': { base: '#5c3a1a', accent: '#FF9800', glow: '#ffcc66' }
-        };
-        const c = typeColors[buildingType] || typeColors['base-generator'];
+        const c = BUILDING_TYPE_COLORS[buildingType] || BUILDING_TYPE_COLORS['base-generator'];
         const baseColor = this._parseColor(c.base);
         const accentColor = this._parseColor(c.accent);
         const glowColor = this._parseColor(c.glow);

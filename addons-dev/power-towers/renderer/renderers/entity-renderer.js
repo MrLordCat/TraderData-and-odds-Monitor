@@ -6,6 +6,33 @@
 
 const CONFIG = require('../../core/config');
 
+// Pre-allocated color constants (avoid object creation in hot path)
+const ELEMENT_COLORS = {
+  fire: { base: '#8B0000', accent: '#FF4500', glow: '#FF6B35' },
+  ice: { base: '#1a3a5c', accent: '#00BFFF', glow: '#87CEEB' },
+  lightning: { base: '#4a4a00', accent: '#FFD700', glow: '#FFFF88' },
+  nature: { base: '#2d5a27', accent: '#32CD32', glow: '#90EE90' },
+  dark: { base: '#2a1a3a', accent: '#8B008B', glow: '#DA70D6' },
+  none: { base: '#3a3a3a', accent: '#718096', glow: '#A0AEC0' }
+};
+
+const ATTACK_TYPE_VISUALS = {
+  base: { platformScale: 1.0, bodyScale: 1.0 },
+  siege: { platformScale: 1.15, bodyScale: 1.1 },
+  normal: { platformScale: 1.0, bodyScale: 0.95 },
+  magic: { platformScale: 1.0, bodyScale: 1.0 },
+  piercing: { platformScale: 0.95, bodyScale: 0.9 }
+};
+
+const ATTACK_TYPE_COLORS = {
+  siege: { r: 1.0, g: 0.4, b: 0.2 },
+  normal: { r: 0.3, g: 0.6, b: 0.9 },
+  magic: { r: 0.6, g: 0.3, b: 0.8 },
+  piercing: { r: 0.9, g: 0.8, b: 0.2 }
+};
+
+const DEFAULT_ATTACK_COLOR = { r: 0.5, g: 0.5, b: 0.5 };
+
 /**
  * Mixin for entity rendering methods
  * @param {Class} Base - Base GameRenderer class
@@ -41,28 +68,9 @@ function EntityRendererMixin(Base) {
       const level = tower.level || 1;
       const attackType = tower.attackTypeId || 'base';
       
-      // Element colors
-      const elementColors = {
-        fire: { base: '#8B0000', accent: '#FF4500', glow: '#FF6B35' },
-        ice: { base: '#1a3a5c', accent: '#00BFFF', glow: '#87CEEB' },
-        lightning: { base: '#4a4a00', accent: '#FFD700', glow: '#FFFF88' },
-        nature: { base: '#2d5a27', accent: '#32CD32', glow: '#90EE90' },
-        dark: { base: '#2a1a3a', accent: '#8B008B', glow: '#DA70D6' },
-        none: { base: '#3a3a3a', accent: '#718096', glow: '#A0AEC0' }
-      };
-      
-      // Attack type visuals
-      const attackTypeVisuals = {
-        base: { platformScale: 1.0, bodyScale: 1.0 },
-        siege: { platformScale: 1.15, bodyScale: 1.1 },
-        normal: { platformScale: 1.0, bodyScale: 0.95 },
-        magic: { platformScale: 1.0, bodyScale: 1.0 },
-        piercing: { platformScale: 0.95, bodyScale: 0.9 }
-      };
-      
       const element = tower.elementPath || 'none';
-      const colors = elementColors[element] || elementColors.none;
-      const atkVisuals = attackTypeVisuals[attackType] || attackTypeVisuals.base;
+      const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS.none;
+      const atkVisuals = ATTACK_TYPE_VISUALS[attackType] || ATTACK_TYPE_VISUALS.base;
       const baseColor = this._parseColor(colors.base);
       const accentColor = this._parseColor(colors.accent);
       const glowColor = this._parseColor(colors.glow);
@@ -270,14 +278,7 @@ function EntityRendererMixin(Base) {
       const iy = y + baseSize * 0.45;
       const iconSize = 4 / camera.zoom;
       
-      const typeColors = {
-        siege: { r: 1.0, g: 0.4, b: 0.2 },
-        normal: { r: 0.3, g: 0.6, b: 0.9 },
-        magic: { r: 0.6, g: 0.3, b: 0.8 },
-        piercing: { r: 0.9, g: 0.8, b: 0.2 }
-      };
-      
-      const color = typeColors[attackType] || { r: 0.5, g: 0.5, b: 0.5 };
+      const color = ATTACK_TYPE_COLORS[attackType] || DEFAULT_ATTACK_COLOR;
       
       this.shapeRenderer.circle(ix, iy, iconSize + 1, 0, 0, 0, 0.5);
       this.shapeRenderer.circle(ix, iy, iconSize, color.r, color.g, color.b, 0.9);
