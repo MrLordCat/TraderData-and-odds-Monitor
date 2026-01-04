@@ -120,7 +120,7 @@ function TowerStatsMixin(Base) {
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${tower.level || 1}`;
       
       // Update XP bar and value using xp-utils
-      const { getTowerXpProgress } = require('../../core/utils/xp-utils');
+      const { getTowerXpProgress } = require('../../../core/utils/xp-utils');
       const xp = tower.upgradePoints || 0;
       const level = tower.level || 1;
       const xpProgress = getTowerXpProgress(xp, level);
@@ -249,7 +249,7 @@ function TowerStatsMixin(Base) {
     updateAbilityStatDetailPopups(tower) {
       const { createDetailBuilder } = require('./utils/stat-detail-builder');
       const { formatInt } = require('./utils/format-helpers');
-      const { ELEMENT_ABILITIES } = require('../../core/element-abilities');
+      const { ELEMENT_ABILITIES } = require('../../../core/element-abilities');
       
       const elementPath = tower.elementPath;
       if (!elementPath || !ELEMENT_ABILITIES[elementPath]) return;
@@ -419,7 +419,7 @@ function TowerStatsMixin(Base) {
       
       // XP bar - use xp-utils
       if (el.avatarXpFill) {
-        const { getTowerXpProgress } = require('../../core/utils/xp-utils');
+        const { getTowerXpProgress } = require('../../../core/utils/xp-utils');
         const xp = tower.upgradePoints || 0;
         const level = tower.level || 1;
         const xpProgress = getTowerXpProgress(xp, level);

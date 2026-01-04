@@ -38,7 +38,7 @@ function UpgradesMixin(Base) {
         calculateUpgradeCost, 
         isUpgradeAvailable,
         getUpgradeEffectValue 
-      } = require('../../core/tower-upgrade-list');
+      } = require('../../../core/tower-upgrade-list');
       
       // All possible stat upgrades
       const allUpgrades = [
@@ -140,7 +140,7 @@ function UpgradesMixin(Base) {
       el.abilitiesGridPanel.innerHTML = '';
       
       // Get element abilities
-      const { ELEMENT_ABILITIES, getAbilityUpgradeCost } = require('../../core/element-abilities');
+      const { ELEMENT_ABILITIES, getAbilityUpgradeCost } = require('../../../core/element-abilities');
       
       const elementPath = tower.elementPath;
       if (!elementPath || !ELEMENT_ABILITIES[elementPath]) {
@@ -216,7 +216,7 @@ function UpgradesMixin(Base) {
       if (!upgradesGrid) return;
       
       const gold = this.game?.getState?.().gold || 0;
-      const CONFIG = require('../../core/config');
+      const CONFIG = require('../../../core/config');
       const costs = CONFIG.ENERGY_UPGRADE_COSTS || {};
       const bonuses = CONFIG.ENERGY_UPGRADE_BONUSES || {};
       const costMultiplier = CONFIG.ENERGY_UPGRADE_COST_MULTIPLIER || 1.2;
@@ -291,7 +291,7 @@ function UpgradesMixin(Base) {
       building.upgradeLevels[upgradeId] = (building.upgradeLevels[upgradeId] || 0) + 1;
       
       // Get bonuses from CONFIG
-      const CONFIG = require('../../core/config');
+      const CONFIG = require('../../../core/config');
       const bonuses = CONFIG.ENERGY_UPGRADE_BONUSES || {};
       
       // Apply stat boost based on upgrade type
