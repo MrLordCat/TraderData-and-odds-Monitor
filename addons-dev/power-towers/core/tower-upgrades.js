@@ -498,23 +498,18 @@ module.exports = {
   // Configs
   BASE_TOWER,
   ELEMENT_PATHS,
-  ATTACK_TYPE_COSTS,
-  TOWER_LEVEL_CONFIG,
   
   // Tower level
   calculateTowerLevel,
-  addUpgradePoints,
   
   // Cost functions
   getAttackTypeCost,
   getElementPathCost,
   getStatUpgradeCost,
-  getPassiveUpgradeCost,
   getElementAbilityUpgradeCost,
   
   // Apply functions
   applyStatUpgrade,
-  applyPassiveUpgrade,
   applyElementPath,
   applyElementAbilityUpgrade,
   

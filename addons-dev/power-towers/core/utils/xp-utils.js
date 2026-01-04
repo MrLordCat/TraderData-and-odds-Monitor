@@ -125,11 +125,8 @@ function getEnergyXpProgress(xp, level) {
 
 module.exports = {
   // Tower XP
-  getTowerXpThreshold,
   calculateTowerLevel,
   getTowerXpProgress,
   // Energy XP
-  getEnergyXpThreshold,
-  calculateEnergyLevel,
   getEnergyXpProgress,
 };

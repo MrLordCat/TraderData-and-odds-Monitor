@@ -334,20 +334,9 @@ function calculateDamageWithEffects(enemy, baseDamage) {
 }
 
 module.exports = {
-  createStatusEffect,
   applyStatusEffect,
-  removeStatusEffect,
-  getEffectValue,
-  getEffectDamage,
-  hasEffect,
-  getEffect,
   getTotalSlowPercent,
-  getTotalArmorReduction,
-  getTotalDamageAmplify,
-  isFrozen,
-  isShocked,
   isStunned,
   updateStatusEffects,
-  getStatusEffectsRenderData,
   calculateDamageWithEffects,
 };
