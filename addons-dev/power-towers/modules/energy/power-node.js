@@ -152,26 +152,8 @@ class PowerNode {
    * Get XP progress to next level
    */
   getXpProgress() {
-    const xpPerLevel = CONFIG.ENERGY_XP_PER_LEVEL || 10;
-    
-    // If at max level, show 100%
-    if (this.level >= this.maxLevel) {
-      return {
-        current: xpPerLevel,
-        needed: xpPerLevel,
-        percent: 100
-      };
-    }
-    
-    const xpForCurrentLevel = (this.level - 1) * xpPerLevel;
-    const xpIntoLevel = this.xp - xpForCurrentLevel;
-    const percent = Math.max(0, Math.min(100, (xpIntoLevel / xpPerLevel) * 100));
-    
-    return {
-      current: xpIntoLevel,
-      needed: xpPerLevel,
-      percent: percent
-    };
+    const { getEnergyXpProgress } = require('../../core/utils/xp-utils');
+    return getEnergyXpProgress(this.xp, this.level);
   }
   
   /**

@@ -106,10 +106,44 @@ Player builds **Base Towers** and upgrades them:
 | Crit Damage | 1.5× | Critical multiplier |
 
 #### Tower XP System
-- **XP Multiplier**: ×2 (configurable)
-- **Level thresholds**: [0, 3, 8, 15, 25, 40, 60, 85, 115, 150]
-- **Level bonus**: +1% to all stats per level
+Towers gain XP (upgrade points) from upgrades. Level determines stat bonuses and upgrade discounts.
+
+**XP Scaling Formula:**
+```
+XP for level N = BASE_XP × SCALE^(N-2)
+Total XP = sum of all levels
+```
+
+**Config Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `XP_MULTIPLIER` | 2 | Global XP gain multiplier |
+| `TOWER_BASE_XP` | 3 | XP needed for level 2 |
+| `TOWER_XP_SCALE` | 1.5 | Scale factor per level |
+| `TOWER_MAX_LEVEL` | 10 | Maximum tower level |
+
+**Example Thresholds (BASE=3, SCALE=1.5):**
+| Level | XP Needed | Cumulative |
+|-------|-----------|------------|
+| 1 | 0 | 0 |
+| 2 | 3 | 3 |
+| 3 | 5 | 8 |
+| 4 | 7 | 15 |
+| 5 | 10 | 25 |
+| 6 | 15 | 40 |
+| 7 | 23 | 63 |
+| 8 | 34 | 97 |
+| 9 | 51 | 148 |
+| 10 | 77 | 225 |
+
+**Level Bonuses:**
+- **Stat bonus**: +1% to all stats per level
 - **Upgrade discount**: 5% per level (max 50%)
+
+**Utils:** `core/utils/xp-utils.js`
+- `getTowerXpThreshold(level)` - cumulative XP for level
+- `calculateTowerLevel(xp)` - level from XP points
+- `getTowerXpProgress(xp, level)` - {current, needed, percent}
 
 #### Element Abilities
 Each element path unlocks unique abilities with upgrade tiers:
@@ -161,11 +195,23 @@ Each energy building has distinct WebGL rendering:
 - **Relay**: Signal waves emanating outward
 
 #### Energy Building XP & Upgrades
-Energy buildings gain XP from energy processed:
-- **XP rate**: 1 XP per 100 energy
-- **XP per level**: 10
-- **Max level**: 20
-- **Level bonus**: +2% to all stats per level
+Energy buildings gain XP from energy processed (linear scaling).
+
+**Config Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `ENERGY_XP_PER_100_ENERGY` | 2 | XP gained per 100 energy |
+| `ENERGY_XP_PER_LEVEL` | 10 | XP needed per level |
+| `ENERGY_MAX_LEVEL` | 20 | Maximum building level |
+| `ENERGY_LEVEL_BONUS_PERCENT` | 0.02 | +2% stats per level |
+
+**Level Bonuses:**
+- +2% to all stats per level (output, capacity, range, etc.)
+
+**Utils:** `core/utils/xp-utils.js`
+- `getEnergyXpThreshold(level)` - cumulative XP for level
+- `calculateEnergyLevel(xp)` - level from XP
+- `getEnergyXpProgress(xp, level)` - {current, needed, percent}
 
 **Upgrade Types:**
 | Upgrade | Bonus | Base Cost |

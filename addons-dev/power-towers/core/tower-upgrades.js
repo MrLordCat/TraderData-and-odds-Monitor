@@ -24,18 +24,9 @@ const {
 // TOWER LEVEL SYSTEM
 // Tower level is based on total upgrades purchased
 // Higher level = cheaper upgrades
+// Uses scaled formula from CONFIG (TOWER_BASE_XP, TOWER_XP_SCALE)
 // =========================================
 const TOWER_LEVEL_CONFIG = {
-  // Points needed per level
-  // Level 1: 0 points (start)
-  // Level 2: 3 points (3 upgrades)
-  // Level 3: 8 points (5 more upgrades)
-  // etc.
-  pointsPerLevel: [0, 3, 8, 15, 25, 40, 60, 85, 115, 150],
-  
-  // After level 10, each level needs +40 points
-  extraPointsPerLevel: 40,
-  
   // Points awarded per upgrade type
   points: {
     statUpgrade: 1,
@@ -188,27 +179,14 @@ const ELEMENT_PATHS = {
 
 /**
  * Calculate tower level from upgrade points
+ * Uses scaled formula from xp-utils
  * @param {Object} tower - Tower instance
  * @returns {number} Tower level
  */
 function calculateTowerLevel(tower) {
+  const { calculateTowerLevel: calcLevel } = require('./utils/xp-utils');
   const points = tower.upgradePoints || 0;
-  const config = TOWER_LEVEL_CONFIG;
-  
-  // Check defined levels
-  for (let i = config.pointsPerLevel.length - 1; i >= 0; i--) {
-    if (points >= config.pointsPerLevel[i]) {
-      // Check if we're beyond defined levels
-      if (i === config.pointsPerLevel.length - 1) {
-        const extraPoints = points - config.pointsPerLevel[i];
-        const extraLevels = Math.floor(extraPoints / config.extraPointsPerLevel);
-        return i + 1 + extraLevels;
-      }
-      return i + 1;
-    }
-  }
-  
-  return 1;
+  return calcLevel(points);
 }
 
 /**

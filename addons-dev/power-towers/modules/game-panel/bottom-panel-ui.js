@@ -401,22 +401,17 @@ function BottomPanelMixin(Base) {
       // Update level
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${tower.level || 1}`;
       
-      // Update XP bar and value using actual level thresholds
+      // Update XP bar and value using xp-utils
+      const { getTowerXpProgress } = require('../../core/utils/xp-utils');
       const xp = tower.upgradePoints || 0;
       const level = tower.level || 1;
-      // Level thresholds from tower-upgrades.js TOWER_LEVEL_CONFIG
-      const levelThresholds = [0, 3, 8, 15, 25, 40, 60, 85, 115, 150];
-      const currentThreshold = levelThresholds[level - 1] || 0;
-      const nextThreshold = levelThresholds[level] || (currentThreshold + 40);
-      const xpInLevel = xp - currentThreshold;
-      const xpNeeded = nextThreshold - currentThreshold;
-      const xpPercent = Math.min(100, (xpInLevel / xpNeeded) * 100);
+      const xpProgress = getTowerXpProgress(xp, level);
       
       if (el.avatarXpFill) {
-        el.avatarXpFill.style.width = `${xpPercent}%`;
+        el.avatarXpFill.style.width = `${xpProgress.percent}%`;
       }
       if (el.avatarXpValue) {
-        el.avatarXpValue.textContent = `${xpInLevel}/${xpNeeded}`;
+        el.avatarXpValue.textContent = `${xpProgress.current}/${xpProgress.needed}`;
       }
       
       // Update Energy bar and value
@@ -854,25 +849,13 @@ function BottomPanelMixin(Base) {
       if (el.avatarName) el.avatarName.textContent = this.getTowerDisplayName(tower);
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${tower.level || 1}`;
       
-      // XP bar - use actual level thresholds
-      if (el.avatarXpFill && tower.calculateLevel) {
+      // XP bar - use xp-utils
+      if (el.avatarXpFill) {
+        const { getTowerXpProgress } = require('../../core/utils/xp-utils');
         const xp = tower.upgradePoints || 0;
         const level = tower.level || 1;
-        const maxLevel = 10;
-        
-        // Use actual level thresholds from tower-upgrades.js
-        const levelThresholds = [0, 3, 8, 15, 25, 40, 60, 85, 115, 150];
-        
-        if (level >= maxLevel) {
-          el.avatarXpFill.style.width = '100%';
-        } else {
-          const currentLevelXp = levelThresholds[level - 1] || 0;
-          const nextLevelXp = levelThresholds[level] || currentLevelXp + 10;
-          const xpInLevel = xp - currentLevelXp;
-          const xpNeeded = nextLevelXp - currentLevelXp;
-          const percent = Math.min(100, (xpInLevel / xpNeeded) * 100);
-          el.avatarXpFill.style.width = `${percent}%`;
-        }
+        const xpProgress = getTowerXpProgress(xp, level);
+        el.avatarXpFill.style.width = `${xpProgress.percent}%`;
       }
       
       // Show tower actions (flex for 3-column layout)

@@ -127,14 +127,16 @@ const CONFIG = {
   // ║                         4. XP & LEVELING                               ║
   // ╚════════════════════════════════════════════════════════════════════════╝
   
-  // Global XP multiplier
+  // Global XP multiplier (applies to all XP gains)
   XP_MULTIPLIER: 2,
   
-  // Tower XP thresholds (cumulative XP needed for each level)
-  TOWER_XP_THRESHOLDS: [0, 3, 8, 15, 25, 40, 60, 85, 115, 150],
+  // Tower XP scaling
+  TOWER_BASE_XP: 3,               // XP needed for level 2
+  TOWER_XP_SCALE: 1.1,            // Each level needs X times more XP
+  TOWER_MAX_LEVEL: 100,            // Max tower level
   
   // Energy building XP
-  ENERGY_XP_PER_100_ENERGY: 1,    // 1 XP per 100 energy processed
+  ENERGY_XP_PER_100_ENERGY: 2,    // 1 XP per 100 energy processed
   ENERGY_XP_PER_LEVEL: 10,        // XP needed per level
   ENERGY_MAX_LEVEL: 20,           // Max level from XP
   
@@ -153,7 +155,7 @@ const CONFIG = {
   TOWER_BASE_CRIT_DAMAGE: 1.5,
   
   // --- 5.2 Level Bonuses ---
-  TOWER_LEVEL_BONUS_PERCENT: 0.01,     // +1% per tower level to base stats
+  TOWER_LEVEL_BONUS_PERCENT: 0.02,     // +2% per tower level to base stats
   
   // --- 5.3 Upgrade Bonuses (per upgrade level) ---
   TOWER_UPGRADE_BONUSES: {
