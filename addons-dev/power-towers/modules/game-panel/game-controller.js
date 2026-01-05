@@ -181,7 +181,7 @@ class GameControllerBase {
       avatarContent: container.querySelector('#avatar-content'),
       avatarIcon: container.querySelector('#avatar-icon'),
       avatarName: container.querySelector('#avatar-name'),
-      avatarLevel: container.querySelector('#avatar-level'),
+      avatarLevel: container.querySelector('#avatar-level-text'),
       avatarXpFill: container.querySelector('#avatar-xp-fill'),
       avatarXpValue: container.querySelector('#avatar-xp-value'),
       avatarEnergyFill: container.querySelector('#avatar-energy-fill'),
