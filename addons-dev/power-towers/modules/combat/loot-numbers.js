@@ -21,20 +21,20 @@ class LootNumbersModule {
     // Configuration
     this.config = {
       // Timing
-      duration: 1.2,           // Total lifetime in seconds
-      bonusDuration: 1.5,      // Longer for bonus gold
-      riseSpeed: 45,           // Pixels per second (upward) - slower than damage
-      bonusRiseSpeed: 35,      // Even slower for bonus (more visible)
-      fadeStart: 0.5,          // Start fading after this fraction of duration
+      duration: 0.7,           // Total lifetime in seconds (shorter to avoid clutter)
+      bonusDuration: 1.0,      // Longer for bonus gold
+      riseSpeed: 70,           // Pixels per second (upward) - faster rise
+      bonusRiseSpeed: 55,      // Slightly slower for bonus (more visible)
+      fadeStart: 0.3,          // Start fading earlier
       
       // Positioning
-      spreadX: 25,             // Random horizontal spread
+      spreadX: 30,             // Random horizontal spread (more spread)
       startOffsetY: -15,       // Start above enemy position
       
       // Sizes
-      fontSize: 13,            // Base font size
-      bonusFontSize: 15,       // Larger for bonus gold
-      critBonusFontSize: 17,   // Even larger for crit bonus
+      fontSize: 12,            // Base font size (slightly smaller)
+      bonusFontSize: 14,       // Larger for bonus gold
+      critBonusFontSize: 16,   // Even larger for crit bonus
       
       // Colors
       goldColor: '#ffd700',         // Standard gold
@@ -42,13 +42,13 @@ class LootNumbersModule {
       critBonusColor: '#fff700',    // Bright yellow for crit bonus
       
       // Coin particles
-      coinCount: 3,            // Base coins per kill
-      bonusCoinCount: 5,       // More coins for bonus
-      coinSize: 8,             // Coin particle size
-      coinDuration: 0.8,       // Coin particle lifetime
-      coinSpeed: 80,           // Initial velocity
-      coinGravity: 200,        // Gravity for coins
-      coinSpread: 40,          // Spread radius
+      coinCount: 2,            // Base coins per kill (fewer)
+      bonusCoinCount: 4,       // More coins for bonus
+      coinSize: 6,             // Coin particle size (smaller)
+      coinDuration: 0.5,       // Coin particle lifetime (shorter)
+      coinSpeed: 100,          // Initial velocity (faster)
+      coinGravity: 300,        // Gravity for coins (stronger)
+      coinSpread: 30,          // Spread radius
       
       // Icons
       coinIcon: '🪙',          // Coin emoji

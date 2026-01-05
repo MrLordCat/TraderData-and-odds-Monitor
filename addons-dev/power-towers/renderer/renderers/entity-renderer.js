@@ -567,95 +567,99 @@ function EntityRendererMixin(Base) {
      * Render damage numbers
      */
     _renderDamageNumbers(data) {
-      if (!data.damageNumbers || data.damageNumbers.length === 0) return;
-      
+      // Clear text canvas ONCE at the start
       this.textCtx.clearRect(0, 0, this.width, this.height);
       
-      for (const num of data.damageNumbers) {
-        const screen = this.camera.worldToScreen(num.x, num.y);
-        
-        this.textCtx.save();
-        this.textCtx.globalAlpha = num.alpha;
-        
-        const fontSize = (num.fontSize || 14) * (num.scale || 1);
-        this.textCtx.font = `bold ${fontSize}px Arial, sans-serif`;
-        this.textCtx.textAlign = 'center';
-        this.textCtx.textBaseline = 'middle';
-        
-        let text;
-        if (num.type === 'dot' && num.prefix) {
-          text = `${num.prefix}${num.value}`;
-        } else {
-          text = num.isCrit ? `${num.value}!` : String(num.value);
+      // Render damage numbers if any
+      if (data.damageNumbers && data.damageNumbers.length > 0) {
+        for (const num of data.damageNumbers) {
+          const screen = this.camera.worldToScreen(num.x, num.y);
+          
+          this.textCtx.save();
+          this.textCtx.globalAlpha = num.alpha;
+          
+          const fontSize = (num.fontSize || 14) * (num.scale || 1);
+          this.textCtx.font = `bold ${fontSize}px Arial, sans-serif`;
+          this.textCtx.textAlign = 'center';
+          this.textCtx.textBaseline = 'middle';
+          
+          let text;
+          if (num.type === 'dot' && num.prefix) {
+            text = `${num.prefix}${num.value}`;
+          } else {
+            text = num.isCrit ? `${num.value}!` : String(num.value);
+          }
+          
+          this.textCtx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+          this.textCtx.lineWidth = num.type === 'dot' ? 2 : 3;
+          this.textCtx.strokeText(text, screen.x, screen.y);
+          
+          this.textCtx.fillStyle = num.color || '#fff';
+          this.textCtx.fillText(text, screen.x, screen.y);
+          
+          this.textCtx.restore();
         }
-        
-        this.textCtx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-        this.textCtx.lineWidth = num.type === 'dot' ? 2 : 3;
-        this.textCtx.strokeText(text, screen.x, screen.y);
-        
-        this.textCtx.fillStyle = num.color || '#fff';
-        this.textCtx.fillText(text, screen.x, screen.y);
-        
-        this.textCtx.restore();
       }
       
-      this._drawTextOverlay();
+      // NOTE: Don't call _drawTextOverlay here - it's called after loot numbers
     }
     
     /**
      * Render loot numbers (gold gained from kills)
      */
     _renderLootNumbers(data) {
-      if (!data.lootNumbers) return;
-      
-      const { lootNumbers, coinParticles } = data.lootNumbers;
-      
-      // Render coin particles first (behind numbers)
-      if (coinParticles && coinParticles.length > 0) {
-        this._renderCoinParticles(coinParticles);
-      }
-      
-      // Render loot numbers
-      if (!lootNumbers || lootNumbers.length === 0) return;
-      
-      for (const num of lootNumbers) {
-        const screen = this.camera.worldToScreen(num.x, num.y);
+      // Render loot on same canvas (already cleared by _renderDamageNumbers)
+      if (data.lootNumbers) {
+        const { lootNumbers, coinParticles } = data.lootNumbers;
         
-        this.textCtx.save();
-        this.textCtx.globalAlpha = num.alpha;
-        
-        const fontSize = (num.fontSize || 13) * (num.scale || 1);
-        this.textCtx.font = `bold ${fontSize}px Arial, sans-serif`;
-        this.textCtx.textAlign = 'center';
-        this.textCtx.textBaseline = 'middle';
-        
-        // Build text with prefix (coin icon)
-        const prefix = num.prefix || '🪙';
-        const text = `${prefix}+${num.value}`;
-        
-        // Apply coin bob to Y position
-        const bobOffset = num.coinBob || 0;
-        const screenY = screen.y + bobOffset;
-        
-        // Draw shadow/outline
-        this.textCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-        this.textCtx.lineWidth = 3;
-        this.textCtx.strokeText(text, screen.x, screenY);
-        
-        // Draw text
-        this.textCtx.fillStyle = num.color || '#ffd700';
-        this.textCtx.fillText(text, screen.x, screenY);
-        
-        // Extra glow for crit bonus
-        if (num.type === 'crit_bonus') {
-          this.textCtx.globalAlpha = num.alpha * 0.3;
-          this.textCtx.fillStyle = '#ffffff';
-          this.textCtx.fillText(text, screen.x, screenY);
+        // Render coin particles first (behind numbers)
+        if (coinParticles && coinParticles.length > 0) {
+          this._renderCoinParticles(coinParticles);
         }
         
-        this.textCtx.restore();
+        // Render loot numbers
+        if (lootNumbers && lootNumbers.length > 0) {
+          for (const num of lootNumbers) {
+            const screen = this.camera.worldToScreen(num.x, num.y);
+            
+            this.textCtx.save();
+            this.textCtx.globalAlpha = num.alpha;
+            
+            const fontSize = (num.fontSize || 13) * (num.scale || 1);
+            this.textCtx.font = `bold ${fontSize}px Arial, sans-serif`;
+            this.textCtx.textAlign = 'center';
+            this.textCtx.textBaseline = 'middle';
+            
+            // Build text with prefix (coin icon)
+            const prefix = num.prefix || '🪙';
+            const text = `${prefix}+${num.value}`;
+            
+            // Apply coin bob to Y position
+            const bobOffset = num.coinBob || 0;
+            const screenY = screen.y + bobOffset;
+            
+            // Draw shadow/outline
+            this.textCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+            this.textCtx.lineWidth = 3;
+            this.textCtx.strokeText(text, screen.x, screenY);
+            
+            // Draw text
+            this.textCtx.fillStyle = num.color || '#ffd700';
+            this.textCtx.fillText(text, screen.x, screenY);
+            
+            // Extra glow for crit bonus
+            if (num.type === 'crit_bonus') {
+              this.textCtx.globalAlpha = num.alpha * 0.3;
+              this.textCtx.fillStyle = '#ffffff';
+              this.textCtx.fillText(text, screen.x, screenY);
+            }
+            
+            this.textCtx.restore();
+          }
+        }
       }
       
+      // Draw text overlay ONCE after all text is rendered
       this._drawTextOverlay();
     }
     
