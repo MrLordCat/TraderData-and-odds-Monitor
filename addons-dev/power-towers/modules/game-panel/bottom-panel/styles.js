@@ -55,7 +55,7 @@ function getBottomPanelStyles() {
       background: linear-gradient(180deg, rgba(15, 20, 30, 0.95) 0%, rgba(10, 15, 25, 0.98) 100%);
       border: 1px solid rgba(100, 150, 255, 0.2);
       border-radius: 12px;
-      height: 220px;
+      height: 231px;
       z-index: 60;
       box-shadow: 0 -4px 30px rgba(0,0,0,0.5);
       backdrop-filter: blur(10px);
@@ -229,6 +229,16 @@ function getBottomPanelStyles() {
       font-size: 10px;
       color: #68d391;
     }
+    .avatar-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .avatar-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
     .avatar-xp-bar {
       width: 50px;
       height: 4px;
@@ -240,6 +250,28 @@ function getBottomPanelStyles() {
       height: 100%;
       background: linear-gradient(90deg, #48bb78, #68d391);
       transition: width 0.3s;
+    }
+    .avatar-xp-value {
+      font-size: 8px;
+      color: #68d391;
+      min-width: 35px;
+    }
+    .avatar-energy-bar {
+      width: 50px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .avatar-energy-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4299e1, #63b3ed);
+      transition: width 0.3s;
+    }
+    .avatar-energy-value {
+      font-size: 8px;
+      color: #63b3ed;
+      min-width: 35px;
     }
     
     .sell-btn {

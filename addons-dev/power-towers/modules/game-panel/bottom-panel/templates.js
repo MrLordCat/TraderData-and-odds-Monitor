@@ -305,8 +305,19 @@ function getBottomPanelTemplate() {
               <div class="avatar-type" id="avatar-type">⚪ Base</div>
               <div class="avatar-level">
                 <span id="avatar-level-text">Lvl 1</span>
-                <div class="avatar-xp-bar">
-                  <div class="avatar-xp-fill" id="avatar-xp-fill" style="width: 0%"></div>
+                <div class="avatar-bars">
+                  <div class="avatar-bar-row" title="Experience">
+                    <div class="avatar-xp-bar">
+                      <div class="avatar-xp-fill" id="avatar-xp-fill" style="width: 0%"></div>
+                    </div>
+                    <span class="avatar-xp-value" id="avatar-xp-value">0/100</span>
+                  </div>
+                  <div class="avatar-bar-row" title="Energy">
+                    <div class="avatar-energy-bar">
+                      <div class="avatar-energy-fill" id="avatar-energy-fill" style="width: 0%"></div>
+                    </div>
+                    <span class="avatar-energy-value" id="avatar-energy-value">0/100</span>
+                  </div>
                 </div>
               </div>
             </div>
