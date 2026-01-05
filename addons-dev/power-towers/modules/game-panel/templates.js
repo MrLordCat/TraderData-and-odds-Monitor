@@ -150,6 +150,18 @@ function getGameTemplate() {
             </div>
           </div>
           
+          <!-- Pause Menu Overlay (ESC) -->
+          <div class="pause-menu-overlay" id="pause-menu-overlay" style="display: none;">
+            <div class="pause-menu">
+              <h3 class="pause-title">⏸️ Paused</h3>
+              <div class="pause-buttons">
+                <button class="pause-btn primary" id="pause-btn-resume">▶ Resume <span class="hotkey-hint">[Space]</span></button>
+                <button class="pause-btn" id="pause-btn-settings">⚙️ Settings</button>
+                <button class="pause-btn danger" id="pause-btn-quit">🚪 Quit to Menu</button>
+              </div>
+            </div>
+          </div>
+          
           <!-- Bottom HUD - Wave control button -->
           <div class="bottom-hud-wrapper">
             <button id="btn-start" class="wave-control-btn">▶ Start Wave <span class="hotkey-hint">[Space]</span></button>

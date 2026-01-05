@@ -71,10 +71,16 @@ function BottomPanelEventsMixin(Base) {
             this.togglePauseMenu();
           }
         }
-        // Space - Start/Resume wave
+        // Space - Start/Resume wave (also closes pause menu)
         if (e.key === ' ' || e.code === 'Space') {
           if (this.currentScreen === 'game') {
             e.preventDefault();
+            // If pause menu is open, close it first
+            const pauseMenu = this.elements.pauseMenuOverlay;
+            if (pauseMenu && pauseMenu.style.display !== 'none') {
+              this.closePauseMenu();
+              return;
+            }
             this.toggleGame();
           }
         }
