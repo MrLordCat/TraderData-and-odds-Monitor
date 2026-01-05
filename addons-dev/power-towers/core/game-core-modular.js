@@ -149,6 +149,9 @@ class GameCore {
     this.eventBus.on(GameEvents.TOWER_SELECTED, (data) => {
       this.selectedTower = data?.tower || null;
     });
+    this.eventBus.on('tower:deselected', () => {
+      this.selectedTower = null;
+    });
     
     // Provide nearby enemies for chain lightning
     this.eventBus.on('enemies:get-nearby', (data) => {

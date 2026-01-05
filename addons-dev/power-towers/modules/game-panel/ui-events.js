@@ -82,15 +82,26 @@ function UIEventsMixin(Base) {
      * Toggle game start/pause/resume
      */
     toggleGame() {
-      if (!this.game) return;
+      console.log('[toggleGame] called');
+      console.log('[toggleGame] this.game:', this.game);
+      if (!this.game) {
+        console.log('[toggleGame] no game, return');
+        return;
+      }
+      
+      console.log('[toggleGame] game.gameOver:', this.game.gameOver);
+      console.log('[toggleGame] game.firstWaveStarted:', this.game.firstWaveStarted);
+      console.log('[toggleGame] game.paused:', this.game.paused);
       
       if (this.game.gameOver) {
+        console.log('[toggleGame] -> restartGame()');
         this.restartGame();
         return;
       }
       
       // If first wave hasn't started yet, start it
       if (!this.game.firstWaveStarted) {
+        console.log('[toggleGame] -> startWave()');
         this.game.startWave();
         this.elements.btnStart.innerHTML = '⏸ Pause <span class="hotkey-hint">[Space]</span>';
         return;
@@ -98,9 +109,11 @@ function UIEventsMixin(Base) {
 
       // After first wave, button only toggles pause/resume
       if (this.game.paused) {
+        console.log('[toggleGame] -> resume()');
         this.game.resume();
         this.elements.btnStart.innerHTML = '⏸ Pause <span class="hotkey-hint">[Space]</span>';
       } else {
+        console.log('[toggleGame] -> pause()');
         this.game.pause();
         this.elements.btnStart.innerHTML = '▶ Resume <span class="hotkey-hint">[Space]</span>';
       }

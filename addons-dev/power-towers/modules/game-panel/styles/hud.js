@@ -71,7 +71,7 @@ function getHudStyles() {
     /* Bottom HUD - Wave control button */
     .bottom-hud-wrapper {
       position: absolute;
-      bottom: 251px;
+      bottom: 263px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 50;

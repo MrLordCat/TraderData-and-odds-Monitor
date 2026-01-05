@@ -3,6 +3,9 @@
  * Event handlers for the bottom panel UI
  */
 
+// Flag to prevent double registration of keydown handler
+let _keydownHandlerRegistered = false;
+
 /**
  * Mixin for bottom panel event handling
  * @param {Class} Base - Base class
@@ -39,18 +42,6 @@ function BottomPanelEventsMixin(Base) {
         });
       });
       
-      // Avatar sell button
-      if (el.avatarBtnSell) {
-        el.avatarBtnSell.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (this.game?.selectedTower) {
-            this.sellSelectedTower();
-          } else if (this.selectedEnergyBuilding) {
-            this.sellSelectedEnergyBuilding();
-          }
-        });
-      }
-      
       // Pause menu buttons
       if (el.pauseBtnResume) {
         el.pauseBtnResume.addEventListener('click', () => this.closePauseMenu());
@@ -64,27 +55,37 @@ function BottomPanelEventsMixin(Base) {
         el.pauseBtnQuit.addEventListener('click', () => this.quitToMenu());
       }
       
-      // ESC key handler
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          if (this.currentScreen === 'game' && this.game) {
-            this.togglePauseMenu();
-          }
-        }
-        // Space - Start/Resume wave (also closes pause menu)
-        if (e.key === ' ' || e.code === 'Space') {
-          if (this.currentScreen === 'game') {
-            e.preventDefault();
-            // If pause menu is open (display: flex), close it first
-            const pauseMenu = this.elements.pauseMenuOverlay;
-            if (pauseMenu && pauseMenu.style.display === 'flex') {
-              this.closePauseMenu();
-              return;
+      // ESC/Space key handler - only register once!
+      if (!_keydownHandlerRegistered) {
+        _keydownHandlerRegistered = true;
+        const self = this;
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            if (self.currentScreen === 'game' && self.game) {
+              self.togglePauseMenu();
             }
-            this.toggleGame();
           }
-        }
-      });
+          // Space - Start/Resume wave (also closes pause menu)
+          if (e.key === ' ' || e.code === 'Space') {
+            console.log('[Space] pressed, currentScreen:', self.currentScreen);
+            if (self.currentScreen === 'game') {
+              e.preventDefault();
+              // If pause menu is open (display: flex), close it first
+              const pauseMenu = self.elements.pauseMenuOverlay;
+              console.log('[Space] pauseMenu.style.display:', pauseMenu?.style?.display);
+              if (pauseMenu && pauseMenu.style.display === 'flex') {
+                console.log('[Space] -> closePauseMenu()');
+                self.closePauseMenu();
+                return;
+              }
+              console.log('[Space] -> toggleGame()');
+              self.toggleGame();
+            } else {
+              console.log('[Space] skipped - not in game screen');
+            }
+          }
+        });
+      }
       
       // Energy panel actions
       if (el.actionConnect) {

@@ -235,6 +235,12 @@ class TowersModule {
   // =========================================
 
   selectTower(towerId) {
+    // If deselecting (null passed), call deselectTower
+    if (towerId === null) {
+      this.deselectTower();
+      return;
+    }
+    
     this.selectedTowerId = towerId;
     const tower = this.towers.get(towerId);
     

@@ -186,7 +186,10 @@ class GameControllerBase {
       avatarXpValue: container.querySelector('#avatar-xp-value'),
       avatarEnergyFill: container.querySelector('#avatar-energy-fill'),
       avatarEnergyValue: container.querySelector('#avatar-energy-value'),
-      avatarBtnSell: container.querySelector('#avatar-btn-sell'),
+      // Biome section
+      avatarBiome: container.querySelector('#avatar-biome'),
+      biomeSummary: container.querySelector('#biome-summary'),
+      biomePopupContent: container.querySelector('#biome-popup-content'),
       // Actions section - using new IDs from bottom-panel module
       panelActions: container.querySelector('#panel-build'),
       actionsBuild: container.querySelector('#build-menu'), // New ID

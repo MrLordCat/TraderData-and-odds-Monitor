@@ -321,7 +321,14 @@ function getBottomPanelTemplate() {
                 </div>
               </div>
             </div>
-            <button class="sell-btn" id="avatar-btn-sell" title="Sell">💰</button>
+            <!-- Biome Effects -->
+            <div class="avatar-biome has-popup" id="avatar-biome">
+              <div class="biome-label">Biome</div>
+              <div class="biome-summary" id="biome-summary">-</div>
+              <div class="hover-popup biome-popup" id="biome-popup">
+                <div class="biome-popup-content" id="biome-popup-content"></div>
+              </div>
+            </div>
           </div>
 
           <!-- Inline actions: attack type / element selection -->

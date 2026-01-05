@@ -436,7 +436,7 @@ function TowerStatsMixin(Base) {
       const actionElement = el.actionElement || el.bottomPanel?.querySelector('#action-element');
       
       if (actionAttackType) {
-        actionAttackType.style.display = tower.attackTypeId === 'base' ? 'block' : 'none';
+        actionAttackType.style.display = tower.attackTypeId === 'base' ? 'flex' : 'none';
         // Re-attach click handlers if not done
         if (!actionAttackType._eventsAttached) {
           actionAttackType._eventsAttached = true;
@@ -451,7 +451,7 @@ function TowerStatsMixin(Base) {
       }
       if (actionElement) {
         const showElement = tower.attackTypeId !== 'base' && !tower.elementPath;
-        actionElement.style.display = showElement ? 'block' : 'none';
+        actionElement.style.display = showElement ? 'flex' : 'none';
         // Re-attach click handlers if not done
         if (!actionElement._eventsAttached) {
           actionElement._eventsAttached = true;
@@ -478,6 +478,152 @@ function TowerStatsMixin(Base) {
       
       // Update stat detail popups content
       this.updateStatDetailPopups(tower);
+      
+      // Update biome effects display
+      this.updateBiomeDisplay(tower);
+    }
+    
+    /**
+     * Update biome effects display in avatar section
+     */
+    updateBiomeDisplay(tower) {
+      const biomeSummary = document.getElementById('biome-summary');
+      const biomePopupContent = document.getElementById('biome-popup-content');
+      
+      if (!biomeSummary || !biomePopupContent) return;
+      
+      // Get biome breakdown from tower
+      const breakdown = tower.biomeBreakdown;
+      
+      if (!breakdown || !breakdown.base) {
+        biomeSummary.innerHTML = '<span style="color: #a0aec0">None</span>';
+        biomePopupContent.innerHTML = '<div style="color: #a0aec0; text-align: center;">No biome effects</div>';
+        return;
+      }
+      
+      // Calculate total modifiers (multipliers: multiply them together)
+      const totalMods = {};
+      
+      // Add base biome modifiers
+      if (breakdown.base.modifiers) {
+        for (const [stat, value] of Object.entries(breakdown.base.modifiers)) {
+          totalMods[stat] = (totalMods[stat] || 1) * value;
+        }
+      }
+      
+      // Multiply border modifiers
+      if (breakdown.borders) {
+        for (const border of breakdown.borders) {
+          if (border.modifiers) {
+            for (const [stat, value] of Object.entries(border.modifiers)) {
+              totalMods[stat] = (totalMods[stat] || 1) * value;
+            }
+          }
+        }
+      }
+      
+      // Define which stats are for towers vs energy buildings
+      const towerStats = ['towerDamage', 'towerRange', 'attackSpeed', 'critChance', 'hp', 'armor'];
+      const energyStats = ['energyProduction', 'buildCost', 'windEfficiency', 'solarEfficiency', 'hydroEfficiency', 'bioEfficiency'];
+      
+      // Determine if this is a tower (has attackTypeId) or energy building
+      const isTower = !!tower.attackTypeId || tower.type === 'tower';
+      const relevantStats = isTower ? towerStats : energyStats;
+      
+      // Format summary - show only relevant stats for this building type
+      const summaryParts = [];
+      const statLabels = {
+        towerDamage: 'DMG', towerRange: 'RNG', attackSpeed: 'SPD', critChance: 'CRIT',
+        energyProduction: 'NRG', hp: 'HP', armor: 'ARM', buildCost: 'COST',
+        windEfficiency: 'WIND', solarEfficiency: 'SUN', hydroEfficiency: 'HYDRO', bioEfficiency: 'BIO'
+      };
+      
+      for (const [stat, value] of Object.entries(totalMods)) {
+        // Skip if value is 1.0 (no effect) or 0
+        if (value === 1 || value === 0) continue;
+        // Skip if not relevant for this building type (in summary only)
+        if (!relevantStats.includes(stat)) continue;
+        
+        const label = statLabels[stat] || stat.substring(0, 3).toUpperCase();
+        // Convert multiplier to percentage bonus: 0.8 -> -20%, 1.2 -> +20%
+        const bonus = (value - 1) * 100;
+        const sign = bonus > 0 ? '+' : '';
+        const percent = Math.round(bonus);
+        const cls = bonus > 0 ? 'positive' : 'negative';
+        // Format: LABEL VALUE%
+        summaryParts.push(`<span class="mod-item ${cls}">${label} ${sign}${percent}%</span>`);
+      }
+      
+      biomeSummary.innerHTML = summaryParts.length > 0 
+        ? summaryParts.join('') 
+        : `${breakdown.base.emoji || '🌍'} ${breakdown.base.name || 'Default'}`;
+      
+      // Build popup content - show ALL effects in popup
+      let popupHtml = '';
+      
+      // Base biome
+      popupHtml += `
+        <div class="biome-source">
+          <div class="biome-source-header">
+            <span class="biome-source-emoji">${breakdown.base.emoji || '🌍'}</span>
+            <span class="biome-source-name">${breakdown.base.name || 'Unknown'}</span>
+            <span class="biome-source-type">Base</span>
+          </div>
+          <div class="biome-modifiers">
+            ${this.formatBiomeMods(breakdown.base.modifiers)}
+          </div>
+        </div>
+      `;
+      
+      // Border effects
+      if (breakdown.borders && breakdown.borders.length > 0) {
+        for (const border of breakdown.borders) {
+          popupHtml += `
+            <div class="biome-source">
+              <div class="biome-source-header">
+                <span class="biome-source-emoji">${border.emoji || '🔗'}</span>
+                <span class="biome-source-name">${border.name || 'Border'}</span>
+                <span class="biome-source-type">Border</span>
+              </div>
+              ${border.description ? `<div style="font-size: 9px; color: #a0aec0; margin-bottom: 4px;">${border.description}</div>` : ''}
+              <div class="biome-modifiers">
+                ${this.formatBiomeMods(border.modifiers)}
+              </div>
+            </div>
+          `;
+        }
+      }
+      
+      biomePopupContent.innerHTML = popupHtml;
+    }
+    
+    /**
+     * Format biome modifiers for display
+     * Biome modifiers are multipliers: 0.8 = -20%, 1.2 = +20%
+     */
+    formatBiomeMods(modifiers) {
+      if (!modifiers) return '<span style="color: #a0aec0">No effects</span>';
+      
+      const statLabels = {
+        towerDamage: 'Damage', towerRange: 'Range', attackSpeed: 'Speed', critChance: 'Crit',
+        energyProduction: 'Energy', hp: 'HP', armor: 'Armor', buildCost: 'Build Cost',
+        windEfficiency: 'Wind', solarEfficiency: 'Solar', hydroEfficiency: 'Hydro'
+      };
+      
+      const parts = [];
+      for (const [stat, value] of Object.entries(modifiers)) {
+        // Skip if value is 1.0 (no effect) or 0
+        if (value === 1 || value === 0) continue;
+        const label = statLabels[stat] || stat;
+        // Convert multiplier to percentage bonus: 0.8 -> -20%, 1.2 -> +20%
+        const bonus = (value - 1) * 100;
+        const sign = bonus > 0 ? '+' : '';
+        const percent = Math.round(bonus);
+        const cls = bonus > 0 ? 'positive' : 'negative';
+        parts.push(`<span class="biome-mod ${cls}">${sign}${percent}% ${label}</span>`);
+      }
+      
+      return parts.length > 0 ? parts.join('') : '<span style="color: #a0aec0">No effects</span>';
     }
     
     /**
