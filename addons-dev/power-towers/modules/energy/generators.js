@@ -71,7 +71,8 @@ class BioGenerator extends PowerNode {
     });
     
     this.baseGeneration = options.baseGeneration || 8;
-    this.generation = 0;
+    this.treeBonusPerTree = 1; // +1 energy/s per tree
+    this.generation = this.baseGeneration;
     this.treeRadius = 3; // Check trees in 3 cell radius
     this.treesUsed = 0;
     this.maxTrees = 12;
@@ -135,8 +136,11 @@ class BioGenerator extends PowerNode {
 
   generate(dt) {
     this.treesUsed = this.countTrees();
-    const efficiency = this.treesUsed / this.maxTrees;
-    this.generation = this.baseGeneration * efficiency;
+    
+    // Base generation + bonus from trees
+    // Each tree adds treeBonusPerTree to generation
+    const treeBonus = this.treesUsed * this.treeBonusPerTree;
+    this.generation = this.baseGeneration + treeBonus;
     
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;

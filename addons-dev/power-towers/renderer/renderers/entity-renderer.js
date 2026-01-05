@@ -603,6 +603,110 @@ function EntityRendererMixin(Base) {
     }
     
     /**
+     * Render loot numbers (gold gained from kills)
+     */
+    _renderLootNumbers(data) {
+      if (!data.lootNumbers) return;
+      
+      const { lootNumbers, coinParticles } = data.lootNumbers;
+      
+      // Render coin particles first (behind numbers)
+      if (coinParticles && coinParticles.length > 0) {
+        this._renderCoinParticles(coinParticles);
+      }
+      
+      // Render loot numbers
+      if (!lootNumbers || lootNumbers.length === 0) return;
+      
+      for (const num of lootNumbers) {
+        const screen = this.camera.worldToScreen(num.x, num.y);
+        
+        this.textCtx.save();
+        this.textCtx.globalAlpha = num.alpha;
+        
+        const fontSize = (num.fontSize || 13) * (num.scale || 1);
+        this.textCtx.font = `bold ${fontSize}px Arial, sans-serif`;
+        this.textCtx.textAlign = 'center';
+        this.textCtx.textBaseline = 'middle';
+        
+        // Build text with prefix (coin icon)
+        const prefix = num.prefix || '🪙';
+        const text = `${prefix}+${num.value}`;
+        
+        // Apply coin bob to Y position
+        const bobOffset = num.coinBob || 0;
+        const screenY = screen.y + bobOffset;
+        
+        // Draw shadow/outline
+        this.textCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+        this.textCtx.lineWidth = 3;
+        this.textCtx.strokeText(text, screen.x, screenY);
+        
+        // Draw text
+        this.textCtx.fillStyle = num.color || '#ffd700';
+        this.textCtx.fillText(text, screen.x, screenY);
+        
+        // Extra glow for crit bonus
+        if (num.type === 'crit_bonus') {
+          this.textCtx.globalAlpha = num.alpha * 0.3;
+          this.textCtx.fillStyle = '#ffffff';
+          this.textCtx.fillText(text, screen.x, screenY);
+        }
+        
+        this.textCtx.restore();
+      }
+      
+      this._drawTextOverlay();
+    }
+    
+    /**
+     * Render coin particles
+     */
+    _renderCoinParticles(particles) {
+      if (!particles || particles.length === 0) return;
+      
+      for (const coin of particles) {
+        const screen = this.camera.worldToScreen(coin.x, coin.y);
+        
+        this.textCtx.save();
+        this.textCtx.globalAlpha = coin.alpha;
+        
+        // Translate to coin position for rotation
+        this.textCtx.translate(screen.x, screen.y);
+        
+        // Apply rotation (squeeze effect to simulate 3D flip)
+        const squeeze = Math.cos(coin.rotation);
+        this.textCtx.scale(squeeze * coin.scale, coin.scale);
+        
+        // Draw coin
+        const size = coin.size || 8;
+        const color = coin.isBonus ? '#fff700' : '#ffd700';
+        
+        // Coin circle
+        this.textCtx.beginPath();
+        this.textCtx.arc(0, 0, size / 2, 0, Math.PI * 2);
+        this.textCtx.fillStyle = color;
+        this.textCtx.fill();
+        
+        // Coin outline
+        this.textCtx.strokeStyle = '#b8860b';
+        this.textCtx.lineWidth = 1;
+        this.textCtx.stroke();
+        
+        // Inner circle (coin detail)
+        if (Math.abs(squeeze) > 0.3) {
+          this.textCtx.beginPath();
+          this.textCtx.arc(0, 0, size / 4, 0, Math.PI * 2);
+          this.textCtx.strokeStyle = '#daa520';
+          this.textCtx.lineWidth = 1;
+          this.textCtx.stroke();
+        }
+        
+        this.textCtx.restore();
+      }
+    }
+    
+    /**
      * Draw text overlay
      */
     _drawTextOverlay() {

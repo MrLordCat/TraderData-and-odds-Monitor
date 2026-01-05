@@ -155,11 +155,21 @@ function EnergyStatsMixin(Base) {
       const detailGen = document.getElementById('panel-detail-gen');
       if (detailGen) {
         const baseGen = building.baseGeneration || 0;
-        detailGen.innerHTML = createDetailBuilder()
-          .base('Base:', `${formatInt(baseGen)}/s`)
-          .level(level, (level - 1) * 5, `${formatInt(state.generation || 0)}/s`)
-          .final(`${formatInt(state.generation || 0)}/s`)
-          .build();
+        const builder = createDetailBuilder()
+          .base('Base:', `${formatInt(baseGen)}/s`);
+        
+        // Add tree bonus for bio-generator
+        if (building.type === 'bio-generator') {
+          const treesUsed = building.treesUsed || 0;
+          const bonusPerTree = building.treeBonusPerTree || 1;
+          const treeBonus = treesUsed * bonusPerTree;
+          builder.line(`Trees (${treesUsed}×${bonusPerTree}):`, `+${treeBonus}/s`, 'detail-level');
+        }
+        
+        builder.level(level, (level - 1) * 5, `${formatInt(state.generation || 0)}/s`)
+          .final(`${formatInt(state.generation || 0)}/s`);
+        
+        detailGen.innerHTML = builder.build();
       }
       
       // RANGE
@@ -177,12 +187,13 @@ function EnergyStatsMixin(Base) {
         const treesUsed = building.treesUsed || 0;
         const maxTrees = building.maxTrees || 12;
         const treeRadius = building.treeRadius || 3;
-        const genPerTree = building.generationPerTree || 2;
+        const bonusPerTree = building.treeBonusPerTree || 1;
+        const treeBonus = treesUsed * bonusPerTree;
         detailTrees.innerHTML = createDetailBuilder()
           .line('Trees in range:', `${treesUsed}/${maxTrees}`, treesUsed >= maxTrees ? 'detail-crit' : 'detail-value')
           .line('Scan radius:', `${treeRadius} cells`, 'detail-base')
-          .line('Gen per tree:', `+${genPerTree}/s`, 'detail-level')
-          .line('Total from trees:', `+${treesUsed * genPerTree}/s`, 'detail-value')
+          .line('Bonus per tree:', `+${bonusPerTree}/s`, 'detail-level')
+          .line('Total tree bonus:', `+${treeBonus}/s`, 'detail-value')
           .build();
       }
     }

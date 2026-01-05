@@ -131,7 +131,7 @@ const CONFIG = {
   XP_MULTIPLIER: 2,
   
   // Tower XP scaling
-  TOWER_BASE_XP: 3,               // XP needed for level 2
+  TOWER_BASE_XP: 10,               // XP needed for level 2
   TOWER_XP_SCALE: 1.1,            // Each level needs X times more XP
   TOWER_MAX_LEVEL: 100,            // Max tower level
   

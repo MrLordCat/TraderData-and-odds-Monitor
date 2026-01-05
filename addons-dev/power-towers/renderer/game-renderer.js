@@ -241,23 +241,26 @@ class GameRenderer {
     // 17. Damage numbers
     this._renderDamageNumbers(data);
     
-    // 18. Hover indicator
+    // 18. Loot numbers (gold from kills)
+    this._renderLootNumbers(data);
+    
+    // 19. Hover indicator
     this._renderHoverIndicator();
     
-    // 19. Range indicator
+    // 20. Range indicator
     this._renderRangeIndicator(data);
     
-    // 20. Connection range (when connecting buildings)
+    // 21. Connection range (when connecting buildings)
     if (data.connectingFromBuilding) {
       this._renderConnectionRange(data.connectingFromBuilding);
     }
     
     // === UI OVERLAY (screen space) ===
     
-    // 21. Minimap
+    // 22. Minimap
     this._renderMinimap(data);
     
-    // 22. FPS counter
+    // 23. FPS counter
     if (this.showFps) {
       this._renderFps();
     }

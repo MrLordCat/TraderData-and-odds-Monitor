@@ -16,6 +16,7 @@ const { TowersModule } = require('../modules/towers');
 const { EnemiesModule, ENEMY_TYPES } = require('../modules/enemies');
 const { CombatModule } = require('../modules/combat');
 const { DamageNumbersModule } = require('../modules/combat/damage-numbers');
+const { LootNumbersModule } = require('../modules/combat/loot-numbers');
 const { EconomyModule } = require('../modules/economy');
 const { EnergyModule } = require('../modules/energy');
 const { PlayerModule } = require('../modules/player');
@@ -76,6 +77,7 @@ class GameCore {
       enemies: new EnemiesModule(this.eventBus, CONFIG),
       combat: new CombatModule(this.eventBus, CONFIG),
       damageNumbers: new DamageNumbersModule(this.eventBus),
+      lootNumbers: new LootNumbersModule(this.eventBus),
       economy: new EconomyModule(this.eventBus, CONFIG),
       energy: new EnergyModule(this.eventBus, CONFIG, this),  // pass gameCore reference
       player: new PlayerModule(this.eventBus, CONFIG)
@@ -351,6 +353,7 @@ class GameCore {
     this.modules.towers.update(deltaTime, enemies);
     this.modules.combat.update(deltaTime, enemies);
     this.modules.damageNumbers.update(deltaTime);
+    this.modules.lootNumbers.update(deltaTime);
     this.modules.player.update(deltaTime);
     this.modules.economy.update(deltaTime);
   }
@@ -524,6 +527,7 @@ class GameCore {
       projectiles: combatData.projectiles || [],
       effects: combatData.effects || [],
       damageNumbers: this.modules.damageNumbers.getRenderData(),
+      lootNumbers: this.modules.lootNumbers.getRenderData(),
       
       // Economy
       gold: economyData.gold,

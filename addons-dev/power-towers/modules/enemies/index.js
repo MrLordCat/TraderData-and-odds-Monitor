@@ -38,6 +38,10 @@ class EnemiesModule {
     // Stats
     this.totalKills = 0;
     this.escapedEnemies = 0;
+    
+    // Crit bonus gold (will be set by card/upgrade system)
+    this.critBonusGoldChance = 0;    // 0 = disabled, 0.5 = 50% chance on crit kill
+    this.critBonusGoldAmount = 0.5;  // Bonus as fraction of base reward (0.5 = +50%)
   }
 
   /**
@@ -417,6 +421,9 @@ class EnemiesModule {
       enemy.lastDamagedByTowerId = towerId;
     }
     
+    // Store if last hit was a crit (for bonus gold on kill)
+    enemy.lastHitWasCrit = isCrit || false;
+    
     // Calculate damage with status effect modifiers (curse, weaken)
     const { finalDamage, modifiers } = StatusEffects.calculateDamageWithEffects(enemy, damage);
     enemy.health -= finalDamage;
@@ -549,12 +556,25 @@ class EnemiesModule {
     this.enemies.splice(index, 1);
     this.totalKills++;
     
+    // Check for crit bonus gold (placeholder - will be enabled by card system)
+    // critBonusGoldChance and critBonusGoldAmount come from player upgrades/cards
+    let critBonus = 0;
+    if (enemy.lastHitWasCrit && this.critBonusGoldChance > 0) {
+      if (Math.random() < this.critBonusGoldChance) {
+        critBonus = Math.floor(enemy.reward * (this.critBonusGoldAmount || 0.5));
+      }
+    }
+    
     this.eventBus.emit('enemy:killed', { 
       enemy, 
       reward: enemy.reward,
-      killerTowerId: enemy.lastDamagedByTowerId 
+      killerTowerId: enemy.lastDamagedByTowerId,
+      isCrit: enemy.lastHitWasCrit || false,
+      critBonus
     });
-    this.eventBus.emit('economy:gain', enemy.reward);
+    
+    // Add base reward + any crit bonus
+    this.eventBus.emit('economy:gain', enemy.reward + critBonus);
   }
 
   /**
