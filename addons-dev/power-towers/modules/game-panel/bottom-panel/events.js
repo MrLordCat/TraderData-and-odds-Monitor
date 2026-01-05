@@ -75,9 +75,9 @@ function BottomPanelEventsMixin(Base) {
         if (e.key === ' ' || e.code === 'Space') {
           if (this.currentScreen === 'game') {
             e.preventDefault();
-            // If pause menu is open, close it first
+            // If pause menu is open (display: flex), close it first
             const pauseMenu = this.elements.pauseMenuOverlay;
-            if (pauseMenu && pauseMenu.style.display !== 'none') {
+            if (pauseMenu && pauseMenu.style.display === 'flex') {
               this.closePauseMenu();
               return;
             }
