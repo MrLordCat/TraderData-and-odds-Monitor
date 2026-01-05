@@ -28,12 +28,16 @@ class BaseGenerator extends PowerNode {
       range: 4
     });
     
-    this.generation = options.generation || 15; // Increased from 5
-    this.baseGeneration = this.generation;
+    this.baseGeneration = options.generation || 15; // Increased from 5
+    this.generation = this.baseGeneration;
   }
 
   generate(dt) {
-    const produced = this.generation * dt;
+    // Use effectiveGeneration calculated in recalculateStats (includes efficiency upgrade)
+    const gen = this.effectiveGeneration || this.baseGeneration;
+    this.generation = gen;
+    
+    const produced = gen * dt;
     const space = this.capacity - this.stored;
     const actualProduced = Math.min(produced, space);
     this.stored += actualProduced;
@@ -140,7 +144,10 @@ class BioGenerator extends PowerNode {
     // Base generation + bonus from trees
     // Each tree adds treeBonusPerTree to generation
     const treeBonus = this.treesUsed * this.treeBonusPerTree;
-    this.generation = this.baseGeneration + treeBonus;
+    
+    // Apply efficiency upgrade multiplier (from recalculateStats)
+    const effMult = this.efficiencyMultiplier || 1;
+    this.generation = (this.baseGeneration + treeBonus) * effMult;
     
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;
@@ -270,8 +277,12 @@ class WindGenerator extends PowerNode {
       this.generation += Math.sign(diff) * maxChange;
     }
     
+    // Apply efficiency upgrade multiplier
+    const effMult = this.efficiencyMultiplier || 1;
+    const effectiveGen = this.generation * effMult;
+    
     // Produce energy
-    const produced = this.generation * dt;
+    const produced = effectiveGen * dt;
     const space = this.capacity - this.stored;
     const actualProduced = Math.min(produced, space);
     this.stored += actualProduced;
@@ -351,9 +362,10 @@ class SolarGenerator extends PowerNode {
 
   generate(dt) {
     this.currentBiome = this.getBiomeAtPosition();
-    const efficiency = this.biomeEfficiency[this.currentBiome] || 1.0;
+    const biomeEff = this.biomeEfficiency[this.currentBiome] || 1.0;
+    const effMult = this.efficiencyMultiplier || 1;
     
-    this.generation = this.baseGeneration * efficiency;
+    this.generation = this.baseGeneration * biomeEff * effMult;
     
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;
@@ -430,9 +442,10 @@ class WaterGenerator extends PowerNode {
 
   generate(dt) {
     this.waterTiles = this.countWaterTiles();
-    const efficiency = this.waterTiles / this.maxWaterTiles;
+    const waterEff = this.waterTiles / this.maxWaterTiles;
+    const effMult = this.efficiencyMultiplier || 1;
     
-    this.generation = this.baseGeneration * efficiency;
+    this.generation = this.baseGeneration * waterEff * effMult;
     
     const produced = this.generation * dt;
     const space = this.capacity - this.stored;

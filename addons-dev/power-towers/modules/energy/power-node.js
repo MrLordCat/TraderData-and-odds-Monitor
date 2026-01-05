@@ -165,6 +165,9 @@ class PowerNode {
     const levelBonusPercent = CONFIG.ENERGY_LEVEL_BONUS_PERCENT || 0.02;
     const levelBonus = 1 + (this.level - 1) * levelBonusPercent;
     
+    // Efficiency multiplier (applies to generation and other stats)
+    const efficiencyBonus = 1 + (this.upgradeLevels.efficiency || 0) * (bonuses.efficiency || 0.10);
+    
     // Input Rate
     this.inputRate = this.baseInputRate * levelBonus;
     if (this.upgradeLevels.inputRate) {
@@ -195,6 +198,18 @@ class PowerNode {
     const channelsUpgrade = this.upgradeLevels.channels || 0;
     this.inputChannels = this.baseInputChannels > 0 ? this.baseInputChannels + channelsUpgrade * channelsPerUpgrade : 0;
     this.outputChannels = this.baseOutputChannels > 0 ? this.baseOutputChannels + channelsUpgrade * channelsPerUpgrade : 0;
+    
+    // Generation (for generators) - base * level * efficiency * generation upgrade
+    if (this.baseGeneration !== undefined) {
+      let gen = this.baseGeneration * levelBonus * efficiencyBonus;
+      if (this.upgradeLevels.generation) {
+        gen *= (1 + this.upgradeLevels.generation * (bonuses.generation || 0.15));
+      }
+      this.effectiveGeneration = gen;
+    }
+    
+    // Store efficiency multiplier for use in generate()
+    this.efficiencyMultiplier = efficiencyBonus;
     
     // Apply biome modifiers if present
     if (this.biomeModifiers) {
