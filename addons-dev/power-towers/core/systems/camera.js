@@ -6,7 +6,7 @@
  * Viewport: what's visible on canvas (e.g., 400x400 px display)
  */
 
-const CONFIG = require('../config');
+const CONFIG = require('../config/index');
 
 class Camera {
   constructor() {

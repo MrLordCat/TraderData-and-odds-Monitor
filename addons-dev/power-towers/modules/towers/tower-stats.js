@@ -12,7 +12,7 @@
 
 const { mergeAttackTypes } = require('../../core/attack-types');
 const { BASE_TOWER } = require('../../core/tower-upgrades');
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 
 /**
  * Recalculate tower's effective stats after any change

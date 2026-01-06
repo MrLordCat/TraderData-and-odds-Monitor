@@ -7,7 +7,7 @@
 
 const { rollCritical, calculateMagicDamage, getAttackType } = require('../../core/attack-types');
 const { getElementAbilities, calculateLightningChargeCost, calculateLightningChargeDamage } = require('../../core/element-abilities');
-const { ATTACK_TYPE_CONFIG } = require('../../core/attack-types-config');
+const { ATTACK_TYPE_CONFIG } = require('../../core/config/attacks');
 
 /**
  * Get combo config for tower (considers upgrades)

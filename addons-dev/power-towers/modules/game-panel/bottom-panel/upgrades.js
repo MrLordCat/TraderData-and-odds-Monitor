@@ -44,7 +44,7 @@ function UpgradesMixin(Base) {
       const { 
         getAttackTypeUpgrades, 
         calculateAttackTypeUpgradeCost 
-      } = require('../../../core/attack-types-config');
+      } = require('../../../core/config/attacks');
       
       // All possible stat upgrades
       const allUpgrades = [
@@ -145,7 +145,7 @@ function UpgradesMixin(Base) {
       const { 
         getAttackTypeUpgrades, 
         calculateAttackTypeUpgradeCost 
-      } = require('../../../core/attack-types-config');
+      } = require('../../../core/config/attacks');
       
       const upgrades = getAttackTypeUpgrades(tower.attackTypeId);
       if (!upgrades || Object.keys(upgrades).length === 0) return;
@@ -221,7 +221,7 @@ function UpgradesMixin(Base) {
       const { 
         calculateAttackTypeUpgradeCost, 
         applyAttackTypeUpgradeEffect 
-      } = require('../../../core/attack-types-config');
+      } = require('../../../core/config/attacks');
       
       const currentLevel = tower.attackTypeUpgrades?.[upgradeId] || 0;
       const cost = calculateAttackTypeUpgradeCost(attackTypeId, upgradeId, currentLevel, tower.level || 1);
@@ -337,7 +337,7 @@ function UpgradesMixin(Base) {
       if (!upgradesGrid) return;
       
       const gold = this.game?.getState?.().gold || 0;
-      const CONFIG = require('../../../core/config');
+      const CONFIG = require('../../../core/config/index');
       const costs = CONFIG.ENERGY_UPGRADE_COSTS || {};
       const bonuses = CONFIG.ENERGY_UPGRADE_BONUSES || {};
       const costMultiplier = CONFIG.ENERGY_UPGRADE_COST_MULTIPLIER || 1.2;
@@ -412,7 +412,7 @@ function UpgradesMixin(Base) {
       building.upgradeLevels[upgradeId] = (building.upgradeLevels[upgradeId] || 0) + 1;
       
       // Get bonuses from CONFIG
-      const CONFIG = require('../../../core/config');
+      const CONFIG = require('../../../core/config/index');
       const bonuses = CONFIG.ENERGY_UPGRADE_BONUSES || {};
       
       // Apply stat boost based on upgrade type

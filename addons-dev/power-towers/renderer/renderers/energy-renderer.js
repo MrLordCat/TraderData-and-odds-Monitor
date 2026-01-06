@@ -4,7 +4,7 @@
  * Renders energy system: nodes, buildings, connections, bars.
  */
 
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 
 // Pre-allocated building type colors (avoid object creation in hot path)
 const BUILDING_TYPE_COLORS = {

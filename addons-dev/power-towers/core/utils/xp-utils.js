@@ -5,7 +5,7 @@
  * Uses scaling formula instead of hardcoded thresholds.
  */
 
-const CONFIG = require('../config');
+const CONFIG = require('../config/index');
 
 // ╔════════════════════════════════════════════════════════════════════════╗
 // ║                         TOWER XP FUNCTIONS                             ║

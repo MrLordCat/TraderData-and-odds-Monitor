@@ -4,7 +4,7 @@
  * Renders terrain layers: biomes, grid, path, decorations, walls.
  */
 
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 const { BIOME_COLORS, BIOME_VARIANTS } = require('../utils/color-utils');
 
 /**

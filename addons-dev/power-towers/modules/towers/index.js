@@ -12,7 +12,7 @@
 
 const { GameEvents } = require('../../core/event-bus');
 const { ATTACK_TYPES } = require('../../core/attack-types');
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 const {
   BASE_TOWER,
   ELEMENT_PATHS,

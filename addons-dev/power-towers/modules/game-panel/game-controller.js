@@ -21,7 +21,7 @@ const { GameEventsMixin } = require('./game-events');
 const { UIEventsMixin } = require('./ui-events');
 const { BottomPanelMixin } = require('./bottom-panel');
 const { PlacementManager, BUILDING_TYPES } = require('../placement');
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 
 /**
  * Base GameController class

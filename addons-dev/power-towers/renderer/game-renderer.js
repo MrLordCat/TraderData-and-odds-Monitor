@@ -22,7 +22,7 @@ const { SpriteBatch } = require('./engine/rendering/sprite-batch');
 const { ShapeRenderer } = require('./engine/rendering/shape-renderer');
 const { ParticleSystem } = require('./engine/rendering/particle-system');
 const { ObjectPool, PoolManager } = require('./engine/systems/object-pool');
-const CONFIG = require('../core/config');
+const CONFIG = require('../core/config/index');
 
 // Import color utilities
 const { BIOME_COLORS, BIOME_VARIANTS, parseColor } = require('./utils/color-utils');

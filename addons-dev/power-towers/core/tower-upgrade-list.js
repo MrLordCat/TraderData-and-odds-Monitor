@@ -12,7 +12,7 @@
 
 const { STAT_UPGRADES } = require('./upgrades/stat-upgrades');
 const { PASSIVE_EFFECTS } = require('./upgrades/passive-effects');
-const CONFIG = require('./config');
+const CONFIG = require('./config/index');
 
 // =========================================
 // COST CONFIGURATION (from CONFIG)

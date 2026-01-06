@@ -80,13 +80,14 @@ function CanvasEventsMixin(Base) {
     handleCanvasClick(e) {
       if (!this.game || !this.camera) return;
       
+      const gridSize = this.CONFIG?.GRID_SIZE || 20;
       const rect = this.canvas.getBoundingClientRect();
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
       
       const worldPos = this.camera.screenToWorld(screenX, screenY);
-      const gridX = Math.floor(worldPos.x / this.CONFIG.GRID_SIZE);
-      const gridY = Math.floor(worldPos.y / this.CONFIG.GRID_SIZE);
+      const gridX = Math.floor(worldPos.x / gridSize);
+      const gridY = Math.floor(worldPos.y / gridSize);
       
       if (this.placingTower) {
         // Place base tower (no path needed anymore)
@@ -158,13 +159,14 @@ function CanvasEventsMixin(Base) {
     handleCanvasMove(e) {
       if (!this.game || !this.renderer || !this.camera) return;
       
+      const gridSize = this.CONFIG?.GRID_SIZE || 20;
       const rect = this.canvas.getBoundingClientRect();
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
       
       const worldPos = this.camera.screenToWorld(screenX, screenY);
-      const gridX = Math.floor(worldPos.x / this.CONFIG.GRID_SIZE);
-      const gridY = Math.floor(worldPos.y / this.CONFIG.GRID_SIZE);
+      const gridX = Math.floor(worldPos.x / gridSize);
+      const gridY = Math.floor(worldPos.y / gridSize);
       
       if (this.placingTower) {
         // Use PlacementManager if available

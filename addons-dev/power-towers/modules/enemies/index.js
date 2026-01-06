@@ -6,7 +6,7 @@
  */
 
 const { GameEvents } = require('../../core/event-bus');
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 const { EFFECT_TYPES } = require('../../core/element-abilities');
 const StatusEffects = require('./status-effects');
 

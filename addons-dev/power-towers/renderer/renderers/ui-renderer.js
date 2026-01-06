@@ -4,7 +4,7 @@
  * Renders UI elements: hover indicator, range indicators, minimap, FPS.
  */
 
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 
 /**
  * Mixin for UI rendering methods

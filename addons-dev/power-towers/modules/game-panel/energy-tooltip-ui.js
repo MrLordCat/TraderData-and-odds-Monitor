@@ -3,7 +3,7 @@
  * Handles energy building selection and connections (UI in bottom panel)
  */
 
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 
 // Base upgrade costs (from CONFIG)
 const BASE_UPGRADE_COSTS = CONFIG.ENERGY_TOOLTIP_COSTS || {

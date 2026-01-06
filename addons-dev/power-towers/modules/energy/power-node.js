@@ -9,7 +9,7 @@
  * STAT UPGRADES: Similar to towers, each upgrade gives configurable % bonus
  */
 
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 
 let nodeIdCounter = 0;
 

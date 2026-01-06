@@ -4,7 +4,7 @@
  * Renders game entities: towers, enemies, projectiles, effects.
  */
 
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 
 // Pre-allocated color constants (avoid object creation in hot path)
 const ELEMENT_COLORS = {

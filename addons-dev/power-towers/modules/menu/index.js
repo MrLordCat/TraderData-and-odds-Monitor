@@ -5,7 +5,7 @@
  */
 
 const { GameEvents } = require('../../core/event-bus');
-const CONFIG = require('../../core/config');
+const CONFIG = require('../../core/config/index');
 
 // Menu states
 const MENU_SCREENS = {

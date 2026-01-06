@@ -7,7 +7,7 @@
  * @version 0.3.0 - Single tower system
  */
 
-const CONFIG = require('./config');
+const CONFIG = require('./config/index');
 const { EventBus, GameEvents } = require('./event-bus');
 
 // Import modules

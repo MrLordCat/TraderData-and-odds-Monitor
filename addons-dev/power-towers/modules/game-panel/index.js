@@ -39,7 +39,7 @@ module.exports = function({ SidebarModule, registerModule }) {
     const cameraModule = require(path.join(corePath, 'systems', 'camera.js'));
     Camera = cameraModule.Camera;
     
-    CONFIG = require(path.join(corePath, 'config.js'));
+    CONFIG = require(path.join(corePath, 'config', 'index.js'));
   } catch (err) {
     console.error('[game-panel] Failed to load game modules:', err);
   }
