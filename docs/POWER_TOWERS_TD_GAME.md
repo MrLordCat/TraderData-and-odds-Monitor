@@ -72,10 +72,10 @@ Player builds **Base Towers** and upgrades them:
 🗼 Base Tower ─── Cost: 30 gold
       │
       ├──1️⃣ Choose Attack Type (required first)
-      │      ├── 💥 Siege   (2x vs buildings/slow)
-      │      ├── 🎯 Normal  (balanced)
-      │      ├── ✨ Magic   (1.5x vs magic-weak)
-      │      └── 🗡️ Piercing (ignores armor)
+      │      ├── 🎯 Normal  (combo stacks, focus fire → best vs bosses)
+      │      ├── 💥 Siege   (splash damage → best vs swarms)
+      │      ├── ✨ Magic   (power scaling → best with energy)
+      │      └── 🗡️ Piercing (armor penetration, high crit)
       │
       ├──2️⃣ Upgrade Stats (infinite levels)
       │      ├── Damage     (+5% per level)
@@ -86,6 +86,13 @@ Player builds **Base Towers** and upgrades them:
       │      ├── Crit Damage (+10% per level)
       │      └── Power Efficiency (-3% energy cost)
       │
+      ├──2️⃣b Attack Type Upgrades (type-specific)
+      │      ├── 🎯 Normal: Combo Power, Combo Mastery, 
+      │      │            Combo Persistence, Focus Training, Lethal Focus
+      │      ├── 💥 Siege: Splash Radius, Splash Falloff (TODO)
+      │      ├── ✨ Magic: Power Scaling, Overdrive (TODO)
+      │      └── 🗡️ Piercing: Crit Chance, Crit Damage (TODO)
+      │
       └──3️⃣ Choose Element Path (unlocks abilities)
              ├── 🔥 Fire    - Burn DoT, AoE damage, Inferno
              ├── ❄️ Ice     - Slow, Freeze, Shatter
@@ -93,6 +100,25 @@ Player builds **Base Towers** and upgrades them:
              ├── 🌿 Nature  - Poison, Thorns, Entangle
              └── 💀 Dark    - True damage, Lifesteal, Void
 ```
+
+#### Attack Type Mechanics
+
+**🎯 Normal Attack** — Best for single-target sustained damage (bosses)
+- **Combo System**: Each hit on same target adds +5% damage stack (max 10)
+- **Focus Fire**: After 5 hits on same target → guaranteed 2.0× crit
+- **Upgrades**: 5 dedicated upgrades to enhance combo/focus
+
+**💥 Siege Attack** — Best for crowd control (swarms)
+- **Splash Damage**: Hits multiple enemies in radius
+- **Falloff**: Damage decreases at edge of splash
+
+**✨ Magic Attack** — Best with energy investment
+- **Power Scaling**: Damage scales 1.5× with energy supply
+- **Overdrive**: Can consume extra power for burst damage
+
+**🗡️ Piercing Attack** — Best for critical hits
+- **High Crit**: 15% base crit chance (vs 5% normal)
+- **Armor Penetration**: Ignores 20% enemy armor
 
 #### Tower Base Stats (from CONFIG)
 | Stat | Base Value | Notes |
@@ -267,7 +293,20 @@ addons-dev/power-towers/
 ├── index.js                   # Entry point
 │
 ├── core/                      # Core systems
-│   ├── config.js              # ⭐ All game parameters
+│   ├── config/                # ⭐ Modular configuration
+│   │   ├── index.js           # Entry point (aggregates all)
+│   │   ├── base.js            # Map, display, visuals, colors
+│   │   ├── economy.js         # Gold, costs, starting values
+│   │   ├── waves.js           # Wave timing, enemy types
+│   │   ├── tower.js           # Tower stats, upgrades, XP
+│   │   ├── energy.js          # Energy system buildings
+│   │   └── attacks/           # Attack type configs
+│   │       ├── index.js       # Aggregator + helpers
+│   │       ├── normal.js      # Combo System, Focus Fire
+│   │       ├── siege.js       # Splash mechanics
+│   │       ├── magic.js       # Power scaling
+│   │       └── piercing.js    # Critical mechanics
+│   │
 │   ├── event-bus.js           # EventBus communication
 │   ├── game-core-modular.js   # Main game orchestrator
 │   ├── attack-types.js        # Siege/Normal/Magic/Piercing
@@ -285,7 +324,7 @@ addons-dev/power-towers/
 │   ├── towers/                # Tower system
 │   │   ├── tower-factory.js
 │   │   ├── tower-stats.js     # Uses CONFIG for all bonuses
-│   │   ├── tower-combat.js
+│   │   ├── tower-combat.js    # Combo/Focus Fire logic
 │   │   └── tower-upgrade-handlers.js
 │   ├── enemies/               # Enemy system
 │   │   ├── index.js
@@ -318,47 +357,79 @@ addons-dev/power-towers/
         └── systems/
 ```
 
-### Configuration System (config.js)
+### Configuration System (core/config/)
 
-All game parameters are centralized in `config.js` organized by category:
+All game parameters are organized in a modular folder structure:
 
+```
+core/config/
+├── index.js      # Entry point - aggregates all configs
+├── base.js       # Map, display, visuals, colors
+├── economy.js    # Gold, costs, starting values
+├── waves.js      # Wave timing, enemy types
+├── tower.js      # Tower stats, upgrades, XP
+├── energy.js     # Energy system buildings
+└── attacks/      # Attack type specific configs
+    ├── index.js  # Aggregator + helper functions
+    ├── normal.js # Combo System, Focus Fire, upgrades
+    ├── siege.js  # Splash damage mechanics
+    ├── magic.js  # Power scaling mechanics
+    └── piercing.js # Critical hit mechanics
+```
+
+**Usage:**
 ```javascript
-CONFIG = {
-  // 1. MAP & DISPLAY
-  MAP_WIDTH, MAP_HEIGHT, GRID_SIZE, TARGET_FPS...
-  
-  // 2. ECONOMY
-  STARTING_GOLD, BASE_TOWER_COST, UPGRADE_COST_MULTIPLIER...
-  TOWER_UPGRADE_DISCOUNT_PER_LEVEL, TOWER_UPGRADE_MAX_DISCOUNT...
-  MENU_UPGRADE_COST_MULTIPLIER...
-  
-  // 3. WAVES & ENEMIES
-  WAVE_DELAY_MS, SPAWN_INTERVAL_MS...
-  ENEMY_HP_MULTIPLIER, ENEMY_SPEED_MULTIPLIER...
-  ENEMY_TYPES: { basic, fast, tank, swarm, boss }
-  
-  // 4. XP & LEVELING
-  XP_MULTIPLIER, TOWER_XP_THRESHOLDS...
-  ENERGY_XP_PER_100_ENERGY, ENERGY_XP_PER_LEVEL, ENERGY_MAX_LEVEL...
-  
-  // 5. TOWERS
-  TOWER_BASE_DAMAGE, TOWER_BASE_RANGE, TOWER_BASE_HP...
-  TOWER_LEVEL_BONUS_PERCENT: 0.01
-  TOWER_UPGRADE_BONUSES: { damage, attackSpeed, range, hp, critChance... }
-  TOWER_CRIT_CHANCE_CAP, TOWER_CHAIN_COUNT_CAP, TOWER_POWER_EFFICIENCY_CAP...
-  
-  // 6. ENERGY SYSTEM
-  ENERGY_LEVEL_BONUS_PERCENT, ENERGY_RANGE_PER_LEVEL...
-  ENERGY_UPGRADE_BONUSES: { inputRate, outputRate, capacity, channels... }
-  ENERGY_UPGRADE_COSTS: { capacity, output, channels, range... }
-  TOWER_POWER_BONUSES: { powered: {...}, unpowered: {...} }
-  
-  // 7. COMBAT
-  PROJECTILE_SPEED...
-  
-  // 8. VISUALS
-  COLORS: { background, grid, tower, enemy, ui... }
-  PATH_WAYPOINTS, BASE_POSITION
+// Import unified config (backwards compatible)
+const CONFIG = require('./config/index');
+// CONFIG.MAP_WIDTH, CONFIG.ENEMY_TYPES, CONFIG.TOWER_BASE_DAMAGE...
+
+// Import attack type configs with helpers
+const { 
+  ATTACK_TYPE_CONFIG,
+  getAttackTypeUpgrades,
+  calculateAttackTypeUpgradeCost 
+} = require('./config/attacks');
+
+// Direct access to specific attack config
+const NORMAL = require('./config/attacks/normal');
+// NORMAL.combo.baseDmgPerStack, NORMAL.focusFire.baseHitsRequired...
+```
+
+**Config Sections:**
+
+| File | Contents |
+|------|----------|
+| `base.js` | MAP_WIDTH, GRID_SIZE, COLORS, PATH_WAYPOINTS |
+| `economy.js` | STARTING_GOLD, BASE_TOWER_COST, UPGRADE_COST_MULTIPLIER |
+| `waves.js` | WAVE_DELAY_MS, ENEMY_TYPES, scaling multipliers |
+| `tower.js` | TOWER_BASE_*, TOWER_UPGRADE_BONUSES, XP settings |
+| `energy.js` | ENERGY_UPGRADE_*, TOWER_POWER_BONUSES |
+| `attacks/normal.js` | Combo System, Focus Fire, 5 upgrades |
+| `attacks/siege.js` | Splash radius, falloff (TODO) |
+| `attacks/magic.js` | Power scaling, overdrive (TODO) |
+| `attacks/piercing.js` | Crit chance/damage bonuses (TODO) |
+
+**Attack Type Configs:**
+
+Normal Attack (best for bosses):
+```javascript
+normal: {
+  combo: {
+    baseDmgPerStack: 0.05,  // +5% per stack
+    maxStacks: 10,
+    decayTime: 2.0,         // seconds
+  },
+  focusFire: {
+    baseHitsRequired: 5,    // hits for guaranteed crit
+    baseCritBonus: 0.5,     // +50% crit damage
+  },
+  upgrades: {
+    comboDamage,            // +1% per stack per level
+    comboMaxStacks,         // +2 max stacks per level
+    comboDecay,             // +0.5s decay time per level
+    focusFire,              // -1 hit required per level
+    focusCritBonus,         // +15% crit bonus per level
+  }
 }
 ```
 
@@ -398,6 +469,8 @@ CONFIG = {
 - [x] Map generation with spiral path
 - [x] Biome system (6 types)
 - [x] Single tower system with attack types
+- [x] **Normal Attack mechanics** (Combo System, Focus Fire)
+- [x] **Attack type upgrades** (5 upgrades for Normal)
 - [x] 5 Element paths with unique abilities
 - [x] Tower XP and level system
 - [x] Tower stat upgrades (infinite)
@@ -418,9 +491,12 @@ CONFIG = {
 - [x] Menu with permanent upgrades
 - [x] Camera with zoom/pan
 - [x] WebGL rendering engine
-- [x] **Centralized CONFIG system**
+- [x] **Modular CONFIG system** (split into domain files)
 
 ### 🚧 Planned
+- [ ] Siege Attack mechanics (splash upgrades)
+- [ ] Magic Attack mechanics (power scaling upgrades)
+- [ ] Piercing Attack mechanics (crit upgrades)
 - [ ] Card system (every 10 waves)
 - [ ] More enemy types (flying, magic-immune)
 - [ ] Boss mechanics (special attacks)
@@ -430,5 +506,5 @@ CONFIG = {
 
 ---
 
-*Document updated: 03.01.2026*
-*Game Version: 0.3.0*
+*Document updated: 06.01.2026*
+*Game Version: 0.4.0*
