@@ -7,6 +7,40 @@
 
 const { rollCritical, calculateMagicDamage, getAttackType } = require('../../core/attack-types');
 const { getElementAbilities, calculateLightningChargeCost, calculateLightningChargeDamage } = require('../../core/element-abilities');
+const { ATTACK_TYPE_CONFIG } = require('../../core/attack-types-config');
+
+/**
+ * Get combo config for tower (considers upgrades)
+ * @param {Object} tower - Tower instance
+ * @returns {Object} Combo configuration
+ */
+function getComboConfig(tower) {
+  const baseConfig = ATTACK_TYPE_CONFIG.normal?.combo || {};
+  const attackType = tower.attackTypeConfig || getAttackType('normal');
+  
+  return {
+    enabled: attackType.comboEnabled ?? baseConfig.enabled ?? true,
+    dmgPerStack: tower.comboDmgPerStack ?? attackType.comboDmgPerStack ?? baseConfig.baseDmgPerStack ?? 0.05,
+    maxStacks: tower.comboMaxStacks ?? attackType.comboMaxStacks ?? baseConfig.maxStacks ?? 10,
+    decayTime: tower.comboDecayTime ?? attackType.comboDecayTime ?? baseConfig.decayTime ?? 2.0,
+  };
+}
+
+/**
+ * Get focus fire config for tower (considers upgrades)
+ * @param {Object} tower - Tower instance
+ * @returns {Object} Focus fire configuration
+ */
+function getFocusFireConfig(tower) {
+  const baseConfig = ATTACK_TYPE_CONFIG.normal?.focusFire || {};
+  const attackType = tower.attackTypeConfig || getAttackType('normal');
+  
+  return {
+    enabled: attackType.focusFireEnabled ?? baseConfig.enabled ?? true,
+    hitsRequired: tower.focusFireHitsRequired ?? attackType.focusFireHitsRequired ?? baseConfig.baseHitsRequired ?? 5,
+    critBonus: tower.focusFireCritBonus ?? attackType.focusFireCritBonus ?? baseConfig.baseCritBonus ?? 0.5,
+  };
+}
 
 /**
  * Initialize combo state for a tower (call when tower is created)
@@ -32,10 +66,10 @@ function updateComboDecay(tower, deltaTime, currentTime) {
   if (!tower.comboState) return;
   if (tower.attackTypeId !== 'normal') return;
   
-  const attackType = tower.attackTypeConfig || getAttackType('normal');
-  if (!attackType.comboEnabled) return;
+  const comboConfig = getComboConfig(tower);
+  if (!comboConfig.enabled) return;
   
-  const decayTime = attackType.comboDecayTime || 2.0;
+  const decayTime = comboConfig.decayTime;
   const timeSinceHit = currentTime - tower.comboState.lastHitTime;
   
   // Decay stacks if not attacking
@@ -65,28 +99,27 @@ function processComboHit(tower, targetId, currentTime) {
     initComboState(tower);
   }
   
-  const attackType = tower.attackTypeConfig || getAttackType('normal');
+  const comboConfig = getComboConfig(tower);
+  const focusConfig = getFocusFireConfig(tower);
+  
   let damageMultiplier = 1;
   let isFocusFire = false;
   
   // Check if same target
   if (tower.comboState.targetId === targetId) {
     // Same target - build combo
-    if (attackType.comboEnabled) {
-      const maxStacks = attackType.comboMaxStacks || 10;
-      tower.comboState.stacks = Math.min(tower.comboState.stacks + 1, maxStacks);
+    if (comboConfig.enabled) {
+      tower.comboState.stacks = Math.min(tower.comboState.stacks + 1, comboConfig.maxStacks);
       
       // Calculate damage bonus
-      const dmgPerStack = attackType.comboDmgPerStack || 0.05;
-      damageMultiplier = 1 + (tower.comboState.stacks * dmgPerStack);
+      damageMultiplier = 1 + (tower.comboState.stacks * comboConfig.dmgPerStack);
     }
     
     // Track focus fire hits
-    if (attackType.focusFireEnabled) {
+    if (focusConfig.enabled) {
       tower.comboState.focusHits++;
-      const hitsRequired = attackType.focusFireHitsRequired || 5;
       
-      if (tower.comboState.focusHits >= hitsRequired) {
+      if (tower.comboState.focusHits >= focusConfig.hitsRequired) {
         isFocusFire = true;
         tower.comboState.focusHits = 0; // Reset counter
       }
@@ -99,8 +132,7 @@ function processComboHit(tower, targetId, currentTime) {
     tower.comboState.focusFireReady = false;
     
     // First hit gets base combo bonus
-    const dmgPerStack = attackType.comboDmgPerStack || 0.05;
-    damageMultiplier = 1 + dmgPerStack;
+    damageMultiplier = 1 + comboConfig.dmgPerStack;
   }
   
   tower.comboState.lastHitTime = currentTime;
@@ -120,16 +152,22 @@ function processComboHit(tower, targetId, currentTime) {
  * @returns {string} Hex color
  */
 function getComboProjectileColor(tower, isFocusFire) {
-  const attackType = tower.attackTypeConfig || getAttackType('normal');
+  const focusConfig = getFocusFireConfig(tower);
+  const comboConfig = getComboConfig(tower);
   
-  if (isFocusFire && attackType.focusFireColor) {
-    return attackType.focusFireColor; // Gold for focus fire
+  // Focus fire uses gold color
+  if (isFocusFire) {
+    return ATTACK_TYPE_CONFIG.normal?.focusFire?.effectColor || '#ffd700';
   }
   
-  if (attackType.comboColors && tower.comboState) {
-    const colors = attackType.comboColors;
+  // Get combo colors from config
+  const colors = ATTACK_TYPE_CONFIG.normal?.comboColors || [
+    '#87ceeb', '#6ab0e8', '#4d96e1', '#3080d9', '#1a6ad1', '#0055c9'
+  ];
+  
+  if (tower.comboState) {
     const stacks = tower.comboState.stacks || 0;
-    const maxStacks = attackType.comboMaxStacks || 10;
+    const maxStacks = comboConfig.maxStacks;
     
     // Map stacks to color index
     const colorIndex = Math.min(
@@ -139,7 +177,7 @@ function getComboProjectileColor(tower, isFocusFire) {
     return colors[colorIndex];
   }
   
-  return attackType.projectileColor || '#87ceeb';
+  return '#87ceeb';
 }
 
 /**
@@ -312,11 +350,11 @@ function performAttack(tower, eventBus, currentTime = Date.now() / 1000) {
   
   // === FOCUS FIRE (Guaranteed Crit) ===
   if (isFocusFire) {
-    // Focus Fire: Guaranteed critical with bonus damage
+    // Focus Fire: Guaranteed critical with bonus damage from config
+    const focusConfig = getFocusFireConfig(tower);
     const attackType = tower.attackTypeConfig || getAttackType('normal');
     const baseCritMult = attackType.critDmgMod || 1.5;
-    const focusBonus = attackType.focusFireCritBonus || 0.5;
-    const focusCritMult = baseCritMult + focusBonus; // 1.5 + 0.5 = 2.0x
+    const focusCritMult = baseCritMult + focusConfig.critBonus; // 1.5 + 0.5 = 2.0x
     
     finalDamage *= focusCritMult;
     isCrit = true;
@@ -419,4 +457,7 @@ module.exports = {
   updateComboDecay,
   processComboHit,
   getComboProjectileColor,
+  // Config getters (for UI)
+  getComboConfig,
+  getFocusFireConfig,
 };

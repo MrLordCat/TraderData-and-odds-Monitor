@@ -40,6 +40,12 @@ function UpgradesMixin(Base) {
         getUpgradeEffectValue 
       } = require('../../../core/tower-upgrade-list');
       
+      // Get attack type specific upgrades
+      const { 
+        getAttackTypeUpgrades, 
+        calculateAttackTypeUpgradeCost 
+      } = require('../../../core/attack-types-config');
+      
       // All possible stat upgrades
       const allUpgrades = [
         'damage', 'attackSpeed', 'range', 'critChance', 'critDamage',
@@ -122,8 +128,123 @@ function UpgradesMixin(Base) {
         el.upgradesGridPanel.appendChild(card);
       }
       
+      // === ATTACK TYPE SPECIFIC UPGRADES ===
+      // Add Normal Attack upgrades (Combo/Focus Fire)
+      if (tower.attackTypeId === 'normal') {
+        this.renderAttackTypeUpgrades(tower, el.upgradesGridPanel, gold, towerLevel);
+      }
+      
       // Also update abilities panel
       this.updateTowerAbilitiesInPanel(tower);
+    }
+    
+    /**
+     * Render attack type specific upgrades
+     */
+    renderAttackTypeUpgrades(tower, container, gold, towerLevel) {
+      const { 
+        getAttackTypeUpgrades, 
+        calculateAttackTypeUpgradeCost 
+      } = require('../../../core/attack-types-config');
+      
+      const upgrades = getAttackTypeUpgrades(tower.attackTypeId);
+      if (!upgrades || Object.keys(upgrades).length === 0) return;
+      
+      // Add separator
+      const separator = document.createElement('div');
+      separator.className = 'upgrade-separator';
+      separator.innerHTML = `<span>🎯 Normal Attack</span>`;
+      container.appendChild(separator);
+      
+      // Short names for attack type upgrades
+      const shortNames = {
+        comboDamage: 'COMBO',
+        comboMaxStacks: 'STACK',
+        comboDecay: 'DECAY',
+        focusFire: 'FOCUS',
+        focusCritBonus: 'FCRIT'
+      };
+      
+      for (const [upgradeId, upgrade] of Object.entries(upgrades)) {
+        const currentLevel = tower.attackTypeUpgrades?.[upgradeId] || 0;
+        const cost = calculateAttackTypeUpgradeCost(tower.attackTypeId, upgradeId, currentLevel, towerLevel);
+        const canAfford = gold >= cost;
+        
+        // Calculate bonus text
+        let bonusText = '';
+        const val = upgrade.effect.valuePerLevel;
+        if (Math.abs(val) < 1) {
+          bonusText = val > 0 ? `+${Math.round(val * 100)}%` : `${Math.round(val * 100)}%`;
+        } else {
+          bonusText = val > 0 ? `+${val}` : `${val}`;
+        }
+        
+        const card = document.createElement('div');
+        card.className = `upgrade-card attack-type-upgrade${!canAfford ? ' disabled' : ''}`;
+        card.dataset.upgradeId = upgradeId;
+        card.dataset.attackType = tower.attackTypeId;
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="card-icon">${upgrade.emoji}</span>
+            <span class="card-name">${shortNames[upgradeId] || upgrade.name.slice(0, 5)}</span>
+          </div>
+          <div class="card-bottom">
+            <span class="card-cost">${cost}g</span>
+            <span class="card-level">Lv.${currentLevel}</span>
+            <span class="card-bonus">${bonusText}</span>
+          </div>
+        `;
+        card.title = `${upgrade.name}\nLevel ${currentLevel} → ${currentLevel + 1}\nCost: ${cost}g\n${upgrade.description}`;
+        
+        if (canAfford) {
+          card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.purchaseAttackTypeUpgrade(tower.attackTypeId, upgradeId);
+            // Refresh after purchase
+            if (this.game?.selectedTower) {
+              this.showTowerInBottomPanel(this.game.selectedTower);
+            }
+          });
+        }
+        
+        container.appendChild(card);
+      }
+    }
+    
+    /**
+     * Purchase attack type specific upgrade
+     */
+    purchaseAttackTypeUpgrade(attackTypeId, upgradeId) {
+      const tower = this.game?.selectedTower;
+      if (!tower) return;
+      
+      const { 
+        calculateAttackTypeUpgradeCost, 
+        applyAttackTypeUpgradeEffect 
+      } = require('../../../core/attack-types-config');
+      
+      const currentLevel = tower.attackTypeUpgrades?.[upgradeId] || 0;
+      const cost = calculateAttackTypeUpgradeCost(attackTypeId, upgradeId, currentLevel, tower.level || 1);
+      
+      const state = this.game?.getState?.();
+      if (!state || state.gold < cost) return;
+      
+      // Deduct gold
+      this.game.addGold(-cost);
+      
+      // Initialize attackTypeUpgrades if needed
+      if (!tower.attackTypeUpgrades) {
+        tower.attackTypeUpgrades = {};
+      }
+      
+      // Increase upgrade level
+      tower.attackTypeUpgrades[upgradeId] = currentLevel + 1;
+      
+      // Apply upgrade effect
+      applyAttackTypeUpgradeEffect(tower, upgradeId, tower.attackTypeUpgrades[upgradeId]);
+      
+      // Emit event for UI update
+      this.game?.eventBus?.emit('tower:upgraded', { tower, upgradeId, attackTypeUpgrade: true });
     }
     
     /**

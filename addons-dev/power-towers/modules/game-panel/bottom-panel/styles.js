@@ -747,6 +747,37 @@ function getBottomPanelStyles() {
       color: #63b3ed;
       font-size: 10px;
     }
+    
+    /* Attack Type Upgrade Separator */
+    .upgrade-separator {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 0;
+      margin: 4px 0;
+      border-top: 1px solid rgba(74, 144, 217, 0.3);
+    }
+    .upgrade-separator span {
+      font-size: 10px;
+      color: #4a90d9;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Attack Type Specific Upgrades */
+    .upgrade-card.attack-type-upgrade {
+      border-color: rgba(74, 144, 217, 0.4);
+      background: rgba(74, 144, 217, 0.1);
+    }
+    .upgrade-card.attack-type-upgrade:hover {
+      border-color: rgba(74, 144, 217, 0.8);
+      background: rgba(74, 144, 217, 0.2);
+    }
+    .upgrade-card.attack-type-upgrade .card-name {
+      color: #63b3ed;
+    }
   `;
 }
 

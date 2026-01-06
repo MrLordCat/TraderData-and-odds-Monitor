@@ -167,6 +167,9 @@ class GameControllerBase {
       panelPoison: container.querySelector('#panel-poison'),
       panelShock: container.querySelector('#panel-shock'),
       panelDrain: container.querySelector('#panel-drain'),
+      // Normal attack type stats (Combo/Focus)
+      panelCombo: container.querySelector('#panel-combo'),
+      panelFocus: container.querySelector('#panel-focus'),
       // Panel stats values (energy)
       panelStored: container.querySelector('#panel-stored'),
       panelOutput: container.querySelector('#panel-output'),

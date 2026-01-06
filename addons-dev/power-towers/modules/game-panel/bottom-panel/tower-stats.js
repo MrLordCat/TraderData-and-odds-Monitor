@@ -116,6 +116,35 @@ function TowerStatsMixin(Base) {
         if (drainRow) drainRow.style.display = 'none';
       }
       
+      // === NORMAL ATTACK TYPE - Combo & Focus Fire Stats ===
+      const comboRow = document.getElementById('stat-row-combo');
+      const focusRow = document.getElementById('stat-row-focus');
+      if (tower.attackTypeId === 'normal') {
+        const { getComboConfig, getFocusFireConfig } = require('../../towers/tower-combat');
+        const comboConfig = getComboConfig(tower);
+        const focusConfig = getFocusFireConfig(tower);
+        const comboState = tower.comboState || { stacks: 0, focusHits: 0 };
+        
+        // Combo stacks display
+        if (el.panelCombo) {
+          const comboDmgBonus = Math.round(comboState.stacks * comboConfig.dmgPerStack * 100);
+          el.panelCombo.textContent = `${comboState.stacks}/${comboConfig.maxStacks}`;
+          el.panelCombo.title = `+${comboDmgBonus}% DMG`;
+        }
+        if (comboRow) comboRow.style.display = '';
+        
+        // Focus progress display
+        if (el.panelFocus) {
+          const ready = comboState.focusHits >= focusConfig.hitsRequired;
+          el.panelFocus.textContent = ready ? 'READY!' : `${comboState.focusHits}/${focusConfig.hitsRequired}`;
+          el.panelFocus.style.color = ready ? '#ffd700' : '';
+        }
+        if (focusRow) focusRow.style.display = '';
+      } else {
+        if (comboRow) comboRow.style.display = 'none';
+        if (focusRow) focusRow.style.display = 'none';
+      }
+      
       // Update level
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${tower.level || 1}`;
       
@@ -237,6 +266,65 @@ function TowerStatsMixin(Base) {
         builder.final(formatInt(tower.energyCostPerShot || 0))
           .formula('Base × (1 - Efficiency%)');
         detailPower.innerHTML = builder.build();
+      }
+      
+      // COMBO SYSTEM (Normal Attack)
+      const detailCombo = document.getElementById('panel-detail-combo');
+      if (detailCombo && attackTypeName === 'normal') {
+        const { getComboConfig } = require('../../../modules/towers/tower-combat');
+        const config = getComboConfig(tower);
+        const attackUpg = tower.attackTypeUpgrades || {};
+        const comboDmgLv = attackUpg.comboDamage || 0;
+        const comboStacksLv = attackUpg.comboMaxStacks || 0;
+        const comboDecayLv = attackUpg.comboDecay || 0;
+        
+        const currentStacks = tower.comboStacks || 0;
+        const totalBonus = Math.round(currentStacks * config.dmgPerStack * 100);
+        
+        const builder = createDetailBuilder()
+          .base('Dmg/Stack:', `+${Math.round(config.dmgPerStack * 100)}%`);
+        if (comboDmgLv > 0) {
+          builder.line(`  Upgrades (${comboDmgLv}):`, `+${comboDmgLv}%`, 'detail-upgrade');
+        }
+        builder.line('Max Stacks:', `${config.maxStacks}`, 'detail-base');
+        if (comboStacksLv > 0) {
+          builder.line(`  Upgrades (${comboStacksLv}):`, `+${comboStacksLv * 2}`, 'detail-upgrade');
+        }
+        builder.line('Decay Time:', `${config.decayTime.toFixed(1)}s`, 'detail-base');
+        if (comboDecayLv > 0) {
+          builder.line(`  Upgrades (${comboDecayLv}):`, `+${(comboDecayLv * 0.5).toFixed(1)}s`, 'detail-upgrade');
+        }
+        builder.line('Current:', `${currentStacks}/${config.maxStacks}`, 'detail-biome')
+          .final(`+${totalBonus}%`)
+          .formula('Bonus = Stacks × Dmg/Stack');
+        detailCombo.innerHTML = builder.build();
+      }
+      
+      // FOCUS FIRE (Normal Attack)
+      const detailFocus = document.getElementById('panel-detail-focus');
+      if (detailFocus && attackTypeName === 'normal') {
+        const { getFocusFireConfig } = require('../../../modules/towers/tower-combat');
+        const config = getFocusFireConfig(tower);
+        const attackUpg = tower.attackTypeUpgrades || {};
+        const focusLv = attackUpg.focusFire || 0;
+        const focusCritLv = attackUpg.focusCritBonus || 0;
+        
+        const currentHits = tower.focusHits || 0;
+        const effectiveCrit = (tower.critDmgMod || 1.5) + config.critBonus;
+        
+        const builder = createDetailBuilder()
+          .base('Hits Required:', `${config.hitsRequired}`);
+        if (focusLv > 0) {
+          builder.line(`  Upgrades (${focusLv}):`, `-${focusLv}`, 'detail-upgrade');
+        }
+        builder.line('Crit Bonus:', `+${Math.round(config.critBonus * 100)}%`, 'detail-base');
+        if (focusCritLv > 0) {
+          builder.line(`  Upgrades (${focusCritLv}):`, `+${Math.round(focusCritLv * 0.15 * 100)}%`, 'detail-upgrade');
+        }
+        builder.line('Progress:', `${currentHits}/${config.hitsRequired}`, 'detail-biome')
+          .final(`${effectiveCrit.toFixed(1)}x`)
+          .formula('Focus = Guaranteed Crit + Bonus');
+        detailFocus.innerHTML = builder.build();
       }
       
       // Update ability stat popups

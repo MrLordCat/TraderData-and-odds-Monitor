@@ -254,6 +254,17 @@ function getBottomPanelTemplate() {
               <span class="stat-value" id="panel-drain">10%</span>
               <div class="hover-popup" id="panel-detail-drain"></div>
             </div>
+            <!-- Normal Attack Type Stats -->
+            <div class="stat-item stat-hoverable" data-stat="combo" id="stat-row-combo" style="display: none;">
+              <span class="stat-label">🎯 COMBO</span>
+              <span class="stat-value" id="panel-combo">0/10</span>
+              <div class="hover-popup" id="panel-detail-combo"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="focus" id="stat-row-focus" style="display: none;">
+              <span class="stat-label">🔥 FOCUS</span>
+              <span class="stat-value" id="panel-focus">0/5</span>
+              <div class="hover-popup" id="panel-detail-focus"></div>
+            </div>
           </div>
           <!-- Energy Stats Grid -->
           <div class="stats-grid stats-grid-energy" id="stats-grid-energy" style="display: none;">
