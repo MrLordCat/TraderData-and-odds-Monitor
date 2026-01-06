@@ -472,13 +472,14 @@ function calculateLightningChargeDamage(chargePercent, chargeConfig) {
 
 /**
  * Get upgrade cost for ability upgrade
+ * Uses individual discount stacks per upgrade
  * @param {string} elementPath - Element type
  * @param {string} upgradeId - Upgrade ID
  * @param {number} currentLevel - Current upgrade level
- * @param {number} [towerLevel=1] - Tower level for discount (5% per level, max 50%)
+ * @param {number} [discountStacks=0] - Individual discount stacks for this upgrade
  * @returns {number} Gold cost for next level
  */
-function getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, towerLevel = 1) {
+function getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, discountStacks = 0) {
   const config = ELEMENT_ABILITIES[elementPath];
   if (!config || !config.upgrades || !config.upgrades[upgradeId]) return 0;
   
@@ -487,8 +488,8 @@ function getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, towerLevel 
   
   const rawCost = Math.round(upgrade.costBase * Math.pow(upgrade.costMult, currentLevel));
   
-  // Apply tower level discount (5% per level above 1, max 50%)
-  const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
+  // Apply discount from stacks (5% per stack, max 50%)
+  const discountPercent = Math.min(0.5, discountStacks * 0.05);
   return Math.floor(rawCost * (1 - discountPercent));
 }
 

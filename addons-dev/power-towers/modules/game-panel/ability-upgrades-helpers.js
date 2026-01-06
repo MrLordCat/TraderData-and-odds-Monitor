@@ -6,6 +6,7 @@
  */
 
 const { ELEMENT_ABILITIES, getAbilityUpgradeCost, getElementAbilities } = require('../../core/element-abilities');
+const { getUpgradeDiscount } = require('../../core/tower-upgrades');
 
 /**
  * Generate HTML for ability upgrades panel
@@ -15,7 +16,6 @@ const { ELEMENT_ABILITIES, getAbilityUpgradeCost, getElementAbilities } = requir
  */
 function generateAbilityUpgradesHTML(tower, gold) {
   const elementPath = tower.elementPath;
-  const towerLevel = tower.level || 1;
   if (!elementPath || !ELEMENT_ABILITIES[elementPath]) {
     return `<div class="ability-empty">
       <p>⚠️ Choose an element first to unlock abilities</p>
@@ -39,7 +39,9 @@ function generateAbilityUpgradesHTML(tower, gold) {
   for (const [upgradeId, upgrade] of Object.entries(elementConfig.upgrades)) {
     const currentLevel = towerUpgrades[upgradeId] || 0;
     const maxLevel = upgrade.maxLevel;
-    const cost = getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, towerLevel);
+    // Get individual discount stacks for this ability
+    const discountStacks = getUpgradeDiscount(tower, `ability_${upgradeId}`);
+    const cost = getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, discountStacks);
     const canAfford = gold >= cost;
     const isMaxed = currentLevel >= maxLevel;
     

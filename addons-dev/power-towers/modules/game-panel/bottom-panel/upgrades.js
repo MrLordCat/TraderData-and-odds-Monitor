@@ -3,6 +3,10 @@
  * Tower and energy building upgrade management
  */
 
+// Import discount config at module level for all methods
+const UPGRADES_CFG = require('../../../core/config/upgrades');
+const DISCOUNT_CONFIG = UPGRADES_CFG.DISCOUNT_CONFIG;
+
 /**
  * Mixin for upgrade management in bottom panel
  * @param {Class} Base - Base class
@@ -27,7 +31,6 @@ function UpgradesMixin(Base) {
       }
       
       const gold = this.game?.getState?.().gold || 0;
-      const towerLevel = tower.level || 1;
       
       // Clear current upgrades
       el.upgradesGridPanel.innerHTML = '';
@@ -46,6 +49,9 @@ function UpgradesMixin(Base) {
         calculateAttackTypeUpgradeCost 
       } = require('../../../core/config/attacks');
       
+      // Get discount utilities
+      const { getUpgradeDiscount } = require('../../../core/tower-upgrades');
+      
       // All possible stat upgrades
       const allUpgrades = [
         'damage', 'attackSpeed', 'range', 'critChance', 'critDamage',
@@ -60,19 +66,31 @@ function UpgradesMixin(Base) {
         return available;
       });
       
-      // towerLevel gives permanent discount on upgrades (already defined above)
-      
       for (const upgradeId of availableUpgrades) {
         const upgrade = STAT_UPGRADES[upgradeId];
         if (!upgrade) continue;
         
         const currentLevel = tower.getUpgradeLevel?.(upgradeId) || 0;
-        const cost = calculateUpgradeCost(upgrade, currentLevel, towerLevel);
+        
+        // Get individual discount stacks for THIS upgrade
+        const discountStacks = getUpgradeDiscount(tower, upgradeId);
+        const cost = calculateUpgradeCost(upgrade, currentLevel, discountStacks);
         const canAfford = gold >= cost;
         
-        // Calculate discount for display
+        // DEBUG: Log discount calculation
+        if (upgradeId === 'damage') {
+          console.log('[Discount Debug]', {
+            upgradeId,
+            towerLevel: tower.level,
+            discountStacks,
+            rawCost: Math.floor(upgrade.cost.base * Math.pow(upgrade.cost.scaleFactor, currentLevel)),
+            finalCost: cost
+          });
+        }
+        
+        // Calculate discount for display using config
         const rawCost = Math.floor(upgrade.cost.base * Math.pow(upgrade.cost.scaleFactor, currentLevel));
-        const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
+        const discountPercent = Math.min(DISCOUNT_CONFIG.maxPercent, discountStacks * DISCOUNT_CONFIG.percentPerStack);
         const hasDiscount = discountPercent > 0;
         
         // Calculate bonus text
@@ -134,8 +152,8 @@ function UpgradesMixin(Base) {
           </div>
         `;
         
-        // Tooltip with discount info (based on tower level)
-        const discountInfo = hasDiscount ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (Tower Lv.${towerLevel})` : '';
+        // Tooltip with discount info (stacks reset on purchase)
+        const discountInfo = hasDiscount ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (${discountStacks} stacks)\n⚠️ Resets on purchase!` : '';
         card.title = `${upgrade.name}\nLevel ${currentLevel} → ${currentLevel + 1}\nCost: ${cost}g${discountInfo}\n${upgrade.description}`;
         
         if (canAfford) {
@@ -155,7 +173,7 @@ function UpgradesMixin(Base) {
       // === ATTACK TYPE SPECIFIC UPGRADES ===
       // Add Normal Attack upgrades (Combo/Focus Fire)
       if (tower.attackTypeId === 'normal') {
-        this.renderAttackTypeUpgrades(tower, el.upgradesGridPanel, gold, towerLevel);
+        this.renderAttackTypeUpgrades(tower, el.upgradesGridPanel, gold);
       }
       
       // Also update abilities panel
@@ -172,10 +190,10 @@ function UpgradesMixin(Base) {
       if (!el.upgradesGridPanel) return;
       
       const gold = this.game?.getState?.().gold || 0;
-      const towerLevel = tower.level || 1;
       
       const { STAT_UPGRADES, calculateUpgradeCost } = require('../../../core/tower-upgrade-list');
       const { calculateAttackTypeUpgradeCost, getAttackTypeUpgrades } = require('../../../core/config/attacks');
+      const { getUpgradeDiscount } = require('../../../core/tower-upgrades');
       
       // Update all upgrade cards
       const cards = el.upgradesGridPanel.querySelectorAll('.upgrade-card');
@@ -183,7 +201,7 @@ function UpgradesMixin(Base) {
         const upgradeId = card.dataset.upgradeId;
         const attackType = card.dataset.attackType;
         
-        let cost, rawCost, currentLevel;
+        let cost, rawCost, currentLevel, discountStacks;
         
         if (attackType) {
           // Attack type upgrade
@@ -192,7 +210,8 @@ function UpgradesMixin(Base) {
           if (!upgrade) return;
           
           currentLevel = tower.attackTypeUpgrades?.[upgradeId] || 0;
-          cost = calculateAttackTypeUpgradeCost(attackType, upgradeId, currentLevel, towerLevel);
+          discountStacks = getUpgradeDiscount(tower, `attack_${upgradeId}`);
+          cost = calculateAttackTypeUpgradeCost(attackType, upgradeId, currentLevel, discountStacks);
           rawCost = Math.floor(upgrade.cost.base * Math.pow(upgrade.cost.scaleFactor, currentLevel));
         } else {
           // Stat upgrade
@@ -200,12 +219,13 @@ function UpgradesMixin(Base) {
           if (!upgrade) return;
           
           currentLevel = tower.getUpgradeLevel?.(upgradeId) || 0;
-          cost = calculateUpgradeCost(upgrade, currentLevel, towerLevel);
+          discountStacks = getUpgradeDiscount(tower, upgradeId);
+          cost = calculateUpgradeCost(upgrade, currentLevel, discountStacks);
           rawCost = Math.floor(upgrade.cost.base * Math.pow(upgrade.cost.scaleFactor, currentLevel));
         }
         
         const canAfford = gold >= cost;
-        const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
+        const discountPercent = Math.min(DISCOUNT_CONFIG.maxPercent, discountStacks * DISCOUNT_CONFIG.percentPerStack);
         const hasDiscount = discountPercent > 0;
         
         // Update affordability
@@ -237,11 +257,12 @@ function UpgradesMixin(Base) {
     /**
      * Render attack type specific upgrades
      */
-    renderAttackTypeUpgrades(tower, container, gold, towerLevel) {
+    renderAttackTypeUpgrades(tower, container, gold) {
       const { 
         getAttackTypeUpgrades, 
         calculateAttackTypeUpgradeCost 
       } = require('../../../core/config/attacks');
+      const { getUpgradeDiscount } = require('../../../core/tower-upgrades');
       
       const upgrades = getAttackTypeUpgrades(tower.attackTypeId);
       if (!upgrades || Object.keys(upgrades).length === 0) return;
@@ -263,14 +284,17 @@ function UpgradesMixin(Base) {
       
       for (const [upgradeId, upgrade] of Object.entries(upgrades)) {
         const currentLevel = tower.attackTypeUpgrades?.[upgradeId] || 0;
-        const cost = calculateAttackTypeUpgradeCost(tower.attackTypeId, upgradeId, currentLevel, towerLevel);
+        
+        // Get individual discount stacks for THIS attack type upgrade
+        const discountStacks = getUpgradeDiscount(tower, `attack_${upgradeId}`);
+        const cost = calculateAttackTypeUpgradeCost(tower.attackTypeId, upgradeId, currentLevel, discountStacks);
         const canAfford = gold >= cost;
         
-        // Calculate discount for display (based on tower level)
+        // Calculate discount for display
         const baseCost = upgrade.cost.base;
         const scaleFactor = upgrade.cost.scaleFactor;
         const rawCost = Math.floor(baseCost * Math.pow(scaleFactor, currentLevel));
-        const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
+        const discountPercent = Math.min(DISCOUNT_CONFIG.maxPercent, discountStacks * DISCOUNT_CONFIG.percentPerStack);
         const hasDiscount = discountPercent > 0;
         
         // Calculate bonus text
@@ -311,8 +335,8 @@ function UpgradesMixin(Base) {
           </div>
         `;
         
-        // Tooltip with discount info (based on tower level)
-        const discountInfo = hasDiscount ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (Tower Lv.${towerLevel})` : '';
+        // Tooltip with discount info (stacks reset on purchase)
+        const discountInfo = hasDiscount ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (${discountStacks} stacks)\n⚠️ Resets on purchase!` : '';
         card.title = `${upgrade.name}\nLevel ${currentLevel} → ${currentLevel + 1}\nCost: ${cost}g${discountInfo}\n${upgrade.description}`;
         
         if (canAfford) {
@@ -341,15 +365,17 @@ function UpgradesMixin(Base) {
         calculateAttackTypeUpgradeCost, 
         applyAttackTypeUpgradeEffect 
       } = require('../../../core/config/attacks');
+      const { getUpgradeDiscount, resetUpgradeDiscount } = require('../../../core/tower-upgrades');
       
       const currentLevel = tower.attackTypeUpgrades?.[upgradeId] || 0;
-      const cost = calculateAttackTypeUpgradeCost(attackTypeId, upgradeId, currentLevel, tower.level || 1);
+      const discountStacks = getUpgradeDiscount(tower, `attack_${upgradeId}`);
+      const cost = calculateAttackTypeUpgradeCost(attackTypeId, upgradeId, currentLevel, discountStacks);
       
-      const state = this.game?.getState?.();
-      if (!state || state.gold < cost) return;
+      const economy = this.game?.modules?.economy;
+      if (!economy || economy.gold < cost) return;
       
       // Deduct gold
-      this.game.addGold(-cost);
+      economy.spendGold(cost);
       
       // Initialize attackTypeUpgrades if needed
       if (!tower.attackTypeUpgrades) {
@@ -358,6 +384,9 @@ function UpgradesMixin(Base) {
       
       // Increase upgrade level
       tower.attackTypeUpgrades[upgradeId] = currentLevel + 1;
+      
+      // Reset discount for THIS upgrade only
+      resetUpgradeDiscount(tower, `attack_${upgradeId}`);
       
       // Apply upgrade effect
       applyAttackTypeUpgradeEffect(tower, upgradeId, tower.attackTypeUpgrades[upgradeId]);
@@ -395,20 +424,25 @@ function UpgradesMixin(Base) {
       
       const elementConfig = ELEMENT_ABILITIES[elementPath];
       const abilityUpgrades = tower.abilityUpgrades || {};
-      const towerLevel = tower.level || 1;
       
-      // Calculate discount for display (based on tower level)
-      const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
-      const hasDiscount = discountPercent > 0;
+      // Get discount utilities
+      const { getUpgradeDiscount } = require('../../../core/tower-upgrades');
       
       // Show all upgrades for this element
       for (const [upgradeId, upgrade] of Object.entries(elementConfig.upgrades || {})) {
         const currentLevel = abilityUpgrades[upgradeId] || 0;
         const maxLevel = upgrade.maxLevel;
         const isMaxed = currentLevel >= maxLevel;
-        const cost = isMaxed ? 0 : getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, towerLevel);
+        
+        // Get individual discount stacks for THIS ability upgrade
+        const discountStacks = getUpgradeDiscount(tower, `ability_${upgradeId}`);
+        const cost = isMaxed ? 0 : getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, discountStacks);
         const rawCost = isMaxed ? 0 : Math.round(upgrade.costBase * Math.pow(upgrade.costMult, currentLevel));
         const canAfford = gold >= cost;
+        
+        // Calculate discount for display
+        const discountPercent = Math.min(DISCOUNT_CONFIG.maxPercent, discountStacks * DISCOUNT_CONFIG.percentPerStack);
+        const hasDiscount = discountPercent > 0;
         
         // Format value for display
         let bonusText = '';
@@ -453,8 +487,8 @@ function UpgradesMixin(Base) {
           </div>
         `;
         
-        // Tooltip with discount info (based on tower level)
-        const discountInfo = hasDiscount && !isMaxed ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (Tower Lv.${towerLevel})` : '';
+        // Tooltip with discount info (stacks reset on purchase)
+        const discountInfo = hasDiscount && !isMaxed ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (${discountStacks} stacks)\n⚠️ Resets on purchase!` : '';
         card.title = `${upgrade.name}\nLevel ${currentLevel}/${maxLevel}\n${isMaxed ? 'MAXED' : `Cost: ${cost}g`}${discountInfo}\n${upgrade.description.replace('{value}', bonusText)}`;
         
         if (canAfford && !isMaxed) {

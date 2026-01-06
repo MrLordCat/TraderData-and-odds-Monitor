@@ -40,7 +40,10 @@ function AbilityUpgradesUIMixin(Base) {
         return;
       }
       
-      const cost = getAbilityUpgradeCost(tower.elementPath, upgradeKey, currentLevel, tower.level || 1);
+      // Get individual discount stacks for this ability
+      const { getUpgradeDiscount } = require('../../core/tower-upgrades');
+      const discountStacks = getUpgradeDiscount(tower, `ability_${upgradeKey}`);
+      const cost = getAbilityUpgradeCost(tower.elementPath, upgradeKey, currentLevel, discountStacks);
       
       const economy = this.game?.modules?.economy;
       if (!economy || economy.gold < cost) {

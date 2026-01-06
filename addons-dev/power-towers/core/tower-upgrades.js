@@ -18,22 +18,16 @@ const {
   getUpgradeEffectValue
 } = require('./tower-upgrade-list');
 
+// Import config directly from upgrades.js to ensure proper structure
+const UPGRADES_CFG = require('./config/upgrades');
+const { TOWER_LEVEL_CONFIG, DISCOUNT_CONFIG } = UPGRADES_CFG;
+
 // =========================================
 // TOWER LEVEL SYSTEM
 // Tower level is based on total upgrades purchased
 // Higher level = cheaper upgrades
 // Uses scaled formula from CONFIG (TOWER_BASE_XP, TOWER_XP_SCALE)
 // =========================================
-const TOWER_LEVEL_CONFIG = {
-  // Points awarded per upgrade type
-  points: {
-    statUpgrade: 1,
-    abilityTier: 2,
-    passiveTier: 2,
-    attackType: 3,
-    elementPath: 3
-  }
-};
 
 // =========================================
 // ATTACK TYPE COSTS
@@ -199,10 +193,45 @@ function addUpgradePoints(tower, upgradeType) {
   const newLevel = calculateTowerLevel(tower);
   if (newLevel > (tower.level || 1)) {
     tower.level = newLevel;
+    // Discounts are now calculated dynamically based on tower.level
+    // No need to increment manually - getUpgradeDiscount handles it
     return true; // Leveled up
   }
   
   return false;
+}
+
+/**
+ * Reset discount for a specific upgrade after purchase
+ * Records the tower level at which upgrade was purchased
+ * @param {Object} tower - Tower instance
+ * @param {string} upgradeId - Upgrade ID (or prefixed key like 'attack_comboDamage')
+ */
+function resetUpgradeDiscount(tower, upgradeId) {
+  if (!tower.lastPurchaseLevel) tower.lastPurchaseLevel = {};
+  // Record current tower level as the level when this upgrade was purchased
+  tower.lastPurchaseLevel[upgradeId] = tower.level || 1;
+}
+
+/**
+ * Get discount stacks for a specific upgrade
+ * Discount = (current tower level) - (level when last purchased OR 1 if never purchased)
+ * @param {Object} tower - Tower instance
+ * @param {string} upgradeId - Upgrade ID
+ * @returns {number} Discount stacks (0 or more)
+ */
+function getUpgradeDiscount(tower, upgradeId) {
+  const currentLevel = tower.level || 1;
+  
+  // If never purchased this upgrade, discount stacks = currentLevel - 1
+  // (starts accumulating from level 1)
+  if (!tower.lastPurchaseLevel || tower.lastPurchaseLevel[upgradeId] === undefined) {
+    return Math.max(0, currentLevel - 1);
+  }
+  
+  // If purchased before, discount stacks = currentLevel - level when purchased
+  const purchasedAtLevel = tower.lastPurchaseLevel[upgradeId];
+  return Math.max(0, currentLevel - purchasedAtLevel);
 }
 
 /**
@@ -254,6 +283,9 @@ function applyStatUpgrade(tower, statId) {
     }
   }
   
+  // Reset discount for THIS upgrade only (after purchase)
+  resetUpgradeDiscount(tower, statId);
+  
   // Add upgrade points
   addUpgradePoints(tower, 'statUpgrade');
   
@@ -299,6 +331,9 @@ function applyElementAbilityUpgrade(tower, upgradeId) {
     // Recalculate element abilities with new upgrades
     tower.elementAbilities = getElementAbilities(elementPath, tower.abilityUpgrades);
     
+    // Reset discount for THIS ability upgrade only
+    resetUpgradeDiscount(tower, `ability_${upgradeId}`);
+    
     // Add upgrade points
     addUpgradePoints(tower, 'elementAbility');
     
@@ -327,8 +362,8 @@ function getElementAbilityUpgradeCost(tower, upgradeId) {
   try {
     const { getAbilityUpgradeCost: getElemAbilityCost } = require('./element-abilities');
     const currentLevel = tower.abilityUpgrades?.[upgradeId] || 0;
-    const towerLevel = tower.level || 1;
-    return getElemAbilityCost(elementPath, upgradeId, currentLevel, towerLevel);
+    const discountStacks = getUpgradeDiscount(tower, `ability_${upgradeId}`);
+    return getElemAbilityCost(elementPath, upgradeId, currentLevel, discountStacks);
   } catch (e) {
     return Infinity;
   }
@@ -508,6 +543,10 @@ module.exports = {
   getElementPathCost,
   getStatUpgradeCost,
   getElementAbilityUpgradeCost,
+  
+  // Discount system (per-upgrade, based on tower level)
+  resetUpgradeDiscount,
+  getUpgradeDiscount,
   
   // Apply functions
   applyStatUpgrade,

@@ -29,6 +29,7 @@ const ECONOMY_CONFIG = require('./economy');
 const WAVES_CONFIG = require('./waves');
 const TOWER_CONFIG = require('./tower');
 const ENERGY_CONFIG = require('./energy');
+const UPGRADES_CONFIG = require('./upgrades');
 
 // Import attack configs with helpers
 const {
@@ -54,6 +55,7 @@ const CONFIG = {
   ...WAVES_CONFIG,
   ...TOWER_CONFIG,
   ...ENERGY_CONFIG,
+  ...UPGRADES_CONFIG,
   
   // Attack type config as nested object
   ATTACK_TYPE_CONFIG,
@@ -87,6 +89,10 @@ module.exports.ECONOMY_CONFIG = ECONOMY_CONFIG;
 module.exports.WAVES_CONFIG = WAVES_CONFIG;
 module.exports.TOWER_CONFIG = TOWER_CONFIG;
 module.exports.ENERGY_CONFIG = ENERGY_CONFIG;
+module.exports.UPGRADES_CONFIG = UPGRADES_CONFIG;
+module.exports.DISCOUNT_CONFIG = UPGRADES_CONFIG.DISCOUNT_CONFIG;
+module.exports.COST_CONFIG = UPGRADES_CONFIG.COST_CONFIG;
+module.exports.TOWER_LEVEL_CONFIG = UPGRADES_CONFIG.TOWER_LEVEL_CONFIG;
 module.exports.ATTACK_TYPE_CONFIG = ATTACK_TYPE_CONFIG;
 module.exports.NORMAL_ATTACK_CONFIG = NORMAL_ATTACK_CONFIG;
 module.exports.SIEGE_ATTACK_CONFIG = SIEGE_ATTACK_CONFIG;

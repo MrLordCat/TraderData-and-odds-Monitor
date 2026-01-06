@@ -103,10 +103,31 @@ Player builds **Base Towers** and upgrades them:
 
 #### Attack Type Mechanics
 
-**🎯 Normal Attack** — Best for single-target sustained damage (bosses)
-- **Combo System**: Each hit on same target adds +5% damage stack (max 10)
-- **Focus Fire**: After 5 hits on same target → guaranteed 2.0× crit
-- **Upgrades**: 5 dedicated upgrades to enhance combo/focus
+**🎯 Normal Attack** ✅ COMPLETE — Best for single-target sustained damage (bosses)
+- **Combo System**: Each hit on same target adds damage stack (configurable)
+- **Focus Fire**: After N hits on same target → guaranteed crit with bonus
+- **5 Dedicated Upgrades** (all implemented):
+
+| Upgrade | Effect | Base Cost |
+|---------|--------|-----------|
+| Combo Damage | +1% bonus per combo stack | 25g |
+| Combo Stacks | +1 max combo stack | 35g |
+| Combo Decay | -0.1s decay time | 30g |
+| Focus Threshold | -1 hit to activate focus | 40g |
+| Focus Crit Bonus | +0.1× focus crit multiplier | 45g |
+
+**Config (in `core/config/attacks/normal.js`):**
+```javascript
+COMBO: {
+  baseDamageBonus: 0.05,  // +5% per stack base
+  maxStacks: 10,
+  decayTime: 3000         // ms before combo resets
+},
+FOCUS: {
+  hitsToActivate: 5,
+  critMultiplier: 2.0     // Guaranteed crit multiplier
+}
+```
 
 **💥 Siege Attack** — Best for crowd control (swarms)
 - **Splash Damage**: Hits multiple enemies in radius
@@ -164,7 +185,34 @@ Total XP = sum of all levels
 
 **Level Bonuses:**
 - **Stat bonus**: +1% to all stats per level
-- **Upgrade discount**: 5% per level (max 50%)
+- **Upgrade discount**: Individual per upgrade (see below)
+
+#### Upgrade Discount System ✅
+Each upgrade has its own discount stack that accumulates independently:
+
+**Discount Formula:**
+```
+discountStacks = tower.level - lastPurchaseLevel[upgradeId]
+discountPercent = min(50%, stacks × 5%)
+finalCost = rawCost × (1 - discountPercent)
+```
+
+**How it works:**
+1. When tower levels up → all unpurchased upgrades gain discount stacks
+2. When upgrade is purchased → only THAT upgrade's discount resets
+3. Other upgrades keep their accumulated discounts
+
+**Config (in `core/config/upgrades.js`):**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `percentPerStack` | 0.05 | 5% discount per stack |
+| `maxPercent` | 0.50 | Maximum 50% discount |
+
+**Example:**
+- Tower at Level 3, never bought Damage upgrade → 2 stacks → 10% discount
+- Buy Damage → Damage discount resets to 0
+- Attack Speed still has 2 stacks (10% discount)
+- Tower levels to 4 → Damage has 1 stack, Attack Speed has 3 stacks
 
 **Utils:** `core/utils/xp-utils.js`
 - `getTowerXpThreshold(level)` - cumulative XP for level

@@ -15,17 +15,14 @@ const { PASSIVE_EFFECTS } = require('./upgrades/passive-effects');
 const CONFIG = require('./config/index');
 
 // =========================================
-// COST CONFIGURATION (from CONFIG)
+// COST/DISCOUNT CONFIGURATION (from CONFIG)
 // =========================================
+const { DISCOUNT_CONFIG, COST_CONFIG: UPGRADE_COST_CONFIG } = CONFIG;
+
 const COST_CONFIG = {
-  // Base upgrade cost formula: baseCost * (scaleFactor ^ upgradeLevel)
-  // Tower level discount: cost * (1 - (towerLevel - 1) * discountPerLevel)
-  
-  discountPerTowerLevel: CONFIG.TOWER_UPGRADE_DISCOUNT_PER_LEVEL || 0.05,  // 5% discount per tower level
-  maxDiscount: CONFIG.TOWER_UPGRADE_MAX_DISCOUNT || 0.5,             // Max 50% discount
-  
-  // When upgrade is purchased, next upgrade costs more
-  // But when tower levels up, discount resets the effective price
+  // For backward compatibility with existing code
+  discountPerTowerLevel: DISCOUNT_CONFIG.percentPerStack,  // 5% discount per stack
+  maxDiscount: DISCOUNT_CONFIG.maxPercent,                 // Max 50% discount
 };
 
 // =========================================
@@ -33,24 +30,25 @@ const COST_CONFIG = {
 // =========================================
 
 /**
- * Calculate upgrade cost with tower level discount
- * Higher tower level = bigger discount on upgrades
+ * Calculate upgrade cost with individual discount stacks
+ * Each upgrade has its own discount counter that accumulates on level up
+ * and resets when that specific upgrade is purchased
  * @param {Object} upgrade - Upgrade config
  * @param {number} currentLevel - Current upgrade level
- * @param {number} towerLevel - Tower's overall level (for discount)
+ * @param {number} discountStacks - Individual discount stacks for this upgrade
  * @returns {number} Cost
  */
-function calculateUpgradeCost(upgrade, currentLevel, towerLevel = 1) {
+function calculateUpgradeCost(upgrade, currentLevel, discountStacks = 0) {
   const baseCost = upgrade.cost.base;
   const scaleFactor = upgrade.cost.scaleFactor;
   
   // Raw cost = base * scale^level
   const rawCost = baseCost * Math.pow(scaleFactor, currentLevel);
   
-  // Discount from tower level (5% per level above 1, max 50%)
+  // Discount from stacks (5% per stack, max 50%)
   const discountPercent = Math.min(
     COST_CONFIG.maxDiscount,
-    (towerLevel - 1) * COST_CONFIG.discountPerTowerLevel
+    discountStacks * COST_CONFIG.discountPerTowerLevel
   );
   
   const finalCost = rawCost * (1 - discountPercent);
