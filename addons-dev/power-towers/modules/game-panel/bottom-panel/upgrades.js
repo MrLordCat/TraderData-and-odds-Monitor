@@ -60,8 +60,7 @@ function UpgradesMixin(Base) {
         return available;
       });
       
-      // Tower level gives permanent discount on upgrades
-      const towerLevel = tower.level || 1;
+      // towerLevel gives permanent discount on upgrades (already defined above)
       
       for (const upgradeId of availableUpgrades) {
         const upgrade = STAT_UPGRADES[upgradeId];
