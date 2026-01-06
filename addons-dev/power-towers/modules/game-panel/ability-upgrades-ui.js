@@ -40,7 +40,7 @@ function AbilityUpgradesUIMixin(Base) {
         return;
       }
       
-      const cost = getAbilityUpgradeCost(tower.elementPath, upgradeKey, currentLevel);
+      const cost = getAbilityUpgradeCost(tower.elementPath, upgradeKey, currentLevel, tower.level || 1);
       
       const economy = this.game?.modules?.economy;
       if (!economy || economy.gold < cost) {

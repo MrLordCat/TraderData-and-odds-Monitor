@@ -19,6 +19,15 @@ const BUILDINGS = {
   ],
   energy: [
     {
+      id: 'debug-generator',
+      name: '🔧 Debug Gen',
+      shortName: 'DBG',
+      icon: '🔧',
+      price: 1,
+      desc: 'TEST ONLY. Unlimited power.',
+      stats: { gen: '999/s', out: '999/s', cap: 9999, rng: '99 tiles' }
+    },
+    {
       id: 'base-generator',
       name: 'Generator',
       shortName: 'Gen',

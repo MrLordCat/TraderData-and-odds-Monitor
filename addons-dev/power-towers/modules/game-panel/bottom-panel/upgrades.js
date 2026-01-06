@@ -60,6 +60,9 @@ function UpgradesMixin(Base) {
         return available;
       });
       
+      // Tower level gives permanent discount on upgrades
+      const towerLevel = tower.level || 1;
+      
       for (const upgradeId of availableUpgrades) {
         const upgrade = STAT_UPGRADES[upgradeId];
         if (!upgrade) continue;
@@ -67,6 +70,11 @@ function UpgradesMixin(Base) {
         const currentLevel = tower.getUpgradeLevel?.(upgradeId) || 0;
         const cost = calculateUpgradeCost(upgrade, currentLevel, towerLevel);
         const canAfford = gold >= cost;
+        
+        // Calculate discount for display
+        const rawCost = Math.floor(upgrade.cost.base * Math.pow(upgrade.cost.scaleFactor, currentLevel));
+        const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
+        const hasDiscount = discountPercent > 0;
         
         // Calculate bonus text
         let bonusText = '';
@@ -101,18 +109,35 @@ function UpgradesMixin(Base) {
         card.className = `upgrade-card${!canAfford ? ' disabled' : ''}`;
         card.dataset.upgradeId = upgradeId;
         card.dataset.category = upgrade.category || 'offense';
+        
+        // Show discounted price with better visibility
+        let costHtml2;
+        if (hasDiscount) {
+          const discountPct = Math.round(discountPercent * 100);
+          costHtml2 = `
+            <span class="original-price">${rawCost}g</span>
+            <span class="discounted-price">${cost}g</span>
+            <span class="discount-badge">-${discountPct}%</span>
+          `;
+        } else {
+          costHtml2 = `${cost}g`;
+        }
+        
         card.innerHTML = `
           <div class="card-top">
             <span class="card-icon">${upgrade.emoji}</span>
             <span class="card-name">${shortNames[upgradeId] || upgrade.name.slice(0, 4)}</span>
           </div>
           <div class="card-bottom">
-            <span class="card-cost">${cost}g</span>
+            <span class="card-cost">${costHtml2}</span>
             <span class="card-level">Lv.${currentLevel}</span>
             <span class="card-bonus">${bonusText}</span>
           </div>
         `;
-        card.title = `${upgrade.name}\nLevel ${currentLevel} → ${currentLevel + 1}\nCost: ${cost}g\n${upgrade.description}`;
+        
+        // Tooltip with discount info (based on tower level)
+        const discountInfo = hasDiscount ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (Tower Lv.${towerLevel})` : '';
+        card.title = `${upgrade.name}\nLevel ${currentLevel} → ${currentLevel + 1}\nCost: ${cost}g${discountInfo}\n${upgrade.description}`;
         
         if (canAfford) {
           card.addEventListener('click', (e) => {
@@ -136,6 +161,78 @@ function UpgradesMixin(Base) {
       
       // Also update abilities panel
       this.updateTowerAbilitiesInPanel(tower);
+    }
+    
+    /**
+     * Update upgrade prices in real-time (without rebuilding UI)
+     * Called on gold change, tower level up, etc.
+     */
+    updateUpgradePrices(tower) {
+      if (!tower) return;
+      const el = this.elements;
+      if (!el.upgradesGridPanel) return;
+      
+      const gold = this.game?.getState?.().gold || 0;
+      const towerLevel = tower.level || 1;
+      
+      const { STAT_UPGRADES, calculateUpgradeCost } = require('../../../core/tower-upgrade-list');
+      const { calculateAttackTypeUpgradeCost, getAttackTypeUpgrades } = require('../../../core/config/attacks');
+      
+      // Update all upgrade cards
+      const cards = el.upgradesGridPanel.querySelectorAll('.upgrade-card');
+      cards.forEach(card => {
+        const upgradeId = card.dataset.upgradeId;
+        const attackType = card.dataset.attackType;
+        
+        let cost, rawCost, currentLevel;
+        
+        if (attackType) {
+          // Attack type upgrade
+          const upgrades = getAttackTypeUpgrades(attackType);
+          const upgrade = upgrades?.[upgradeId];
+          if (!upgrade) return;
+          
+          currentLevel = tower.attackTypeUpgrades?.[upgradeId] || 0;
+          cost = calculateAttackTypeUpgradeCost(attackType, upgradeId, currentLevel, towerLevel);
+          rawCost = Math.floor(upgrade.cost.base * Math.pow(upgrade.cost.scaleFactor, currentLevel));
+        } else {
+          // Stat upgrade
+          const upgrade = STAT_UPGRADES[upgradeId];
+          if (!upgrade) return;
+          
+          currentLevel = tower.getUpgradeLevel?.(upgradeId) || 0;
+          cost = calculateUpgradeCost(upgrade, currentLevel, towerLevel);
+          rawCost = Math.floor(upgrade.cost.base * Math.pow(upgrade.cost.scaleFactor, currentLevel));
+        }
+        
+        const canAfford = gold >= cost;
+        const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
+        const hasDiscount = discountPercent > 0;
+        
+        // Update affordability
+        card.classList.toggle('disabled', !canAfford);
+        
+        // Update cost display
+        const costEl = card.querySelector('.card-cost');
+        if (costEl) {
+          if (hasDiscount) {
+            const discountPct = Math.round(discountPercent * 100);
+            costEl.innerHTML = `
+              <span class="original-price">${rawCost}g</span>
+              <span class="discounted-price">${cost}g</span>
+              <span class="discount-badge">-${discountPct}%</span>
+            `;
+          } else {
+            costEl.innerHTML = `${cost}g`;
+          }
+        }
+        
+        // Update level display
+        const levelEl = card.querySelector('.card-level');
+        if (levelEl) {
+          levelEl.textContent = `Lv.${currentLevel}`;
+        }
+      });
     }
     
     /**
@@ -170,6 +267,13 @@ function UpgradesMixin(Base) {
         const cost = calculateAttackTypeUpgradeCost(tower.attackTypeId, upgradeId, currentLevel, towerLevel);
         const canAfford = gold >= cost;
         
+        // Calculate discount for display (based on tower level)
+        const baseCost = upgrade.cost.base;
+        const scaleFactor = upgrade.cost.scaleFactor;
+        const rawCost = Math.floor(baseCost * Math.pow(scaleFactor, currentLevel));
+        const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
+        const hasDiscount = discountPercent > 0;
+        
         // Calculate bonus text
         let bonusText = '';
         const val = upgrade.effect.valuePerLevel;
@@ -177,6 +281,19 @@ function UpgradesMixin(Base) {
           bonusText = val > 0 ? `+${Math.round(val * 100)}%` : `${Math.round(val * 100)}%`;
         } else {
           bonusText = val > 0 ? `+${val}` : `${val}`;
+        }
+        
+        // Show discounted price with better visibility
+        let costHtml;
+        if (hasDiscount) {
+          const discountPct = Math.round(discountPercent * 100);
+          costHtml = `
+            <span class="original-price">${rawCost}g</span>
+            <span class="discounted-price">${cost}g</span>
+            <span class="discount-badge">-${discountPct}%</span>
+          `;
+        } else {
+          costHtml = `${cost}g`;
         }
         
         const card = document.createElement('div');
@@ -189,12 +306,15 @@ function UpgradesMixin(Base) {
             <span class="card-name">${shortNames[upgradeId] || upgrade.name.slice(0, 5)}</span>
           </div>
           <div class="card-bottom">
-            <span class="card-cost">${cost}g</span>
+            <span class="card-cost">${costHtml}</span>
             <span class="card-level">Lv.${currentLevel}</span>
             <span class="card-bonus">${bonusText}</span>
           </div>
         `;
-        card.title = `${upgrade.name}\nLevel ${currentLevel} → ${currentLevel + 1}\nCost: ${cost}g\n${upgrade.description}`;
+        
+        // Tooltip with discount info (based on tower level)
+        const discountInfo = hasDiscount ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (Tower Lv.${towerLevel})` : '';
+        card.title = `${upgrade.name}\nLevel ${currentLevel} → ${currentLevel + 1}\nCost: ${cost}g${discountInfo}\n${upgrade.description}`;
         
         if (canAfford) {
           card.addEventListener('click', (e) => {
@@ -276,13 +396,19 @@ function UpgradesMixin(Base) {
       
       const elementConfig = ELEMENT_ABILITIES[elementPath];
       const abilityUpgrades = tower.abilityUpgrades || {};
+      const towerLevel = tower.level || 1;
+      
+      // Calculate discount for display (based on tower level)
+      const discountPercent = Math.min(0.5, (towerLevel - 1) * 0.05);
+      const hasDiscount = discountPercent > 0;
       
       // Show all upgrades for this element
       for (const [upgradeId, upgrade] of Object.entries(elementConfig.upgrades || {})) {
         const currentLevel = abilityUpgrades[upgradeId] || 0;
         const maxLevel = upgrade.maxLevel;
         const isMaxed = currentLevel >= maxLevel;
-        const cost = isMaxed ? 0 : getAbilityUpgradeCost(elementPath, upgradeId, currentLevel);
+        const cost = isMaxed ? 0 : getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, towerLevel);
+        const rawCost = isMaxed ? 0 : Math.round(upgrade.costBase * Math.pow(upgrade.costMult, currentLevel));
         const canAfford = gold >= cost;
         
         // Format value for display
@@ -297,6 +423,21 @@ function UpgradesMixin(Base) {
           bonusText = value < 1 ? `+${Math.round(value * 100)}%` : `+${value}`;
         }
         
+        // Show discounted price with better visibility
+        let costHtml;
+        if (isMaxed) {
+          costHtml = 'MAX';
+        } else if (hasDiscount) {
+          const discountPct = Math.round(discountPercent * 100);
+          costHtml = `
+            <span class="original-price">${rawCost}g</span>
+            <span class="discounted-price">${cost}g</span>
+            <span class="discount-badge">-${discountPct}%</span>
+          `;
+        } else {
+          costHtml = `${cost}g`;
+        }
+        
         const card = document.createElement('div');
         card.className = `upgrade-card${isMaxed ? ' maxed' : ''}${!canAfford && !isMaxed ? ' disabled' : ''}`;
         card.dataset.upgradeId = upgradeId;
@@ -307,12 +448,15 @@ function UpgradesMixin(Base) {
             <span class="card-name">${upgrade.name.slice(0, 6)}</span>
           </div>
           <div class="card-bottom">
-            <span class="card-cost">${isMaxed ? 'MAX' : `${cost}g`}</span>
+            <span class="card-cost">${costHtml}</span>
             <span class="card-level">${currentLevel}/${maxLevel}</span>
             <span class="card-bonus">${bonusText}</span>
           </div>
         `;
-        card.title = `${upgrade.name}\nLevel ${currentLevel}/${maxLevel}\n${isMaxed ? 'MAXED' : `Cost: ${cost}g`}\n${upgrade.description.replace('{value}', bonusText)}`;
+        
+        // Tooltip with discount info (based on tower level)
+        const discountInfo = hasDiscount && !isMaxed ? `\n💰 Discount: -${Math.round(discountPercent * 100)}% (Tower Lv.${towerLevel})` : '';
+        card.title = `${upgrade.name}\nLevel ${currentLevel}/${maxLevel}\n${isMaxed ? 'MAXED' : `Cost: ${cost}g`}${discountInfo}\n${upgrade.description.replace('{value}', bonusText)}`;
         
         if (canAfford && !isMaxed) {
           card.addEventListener('click', (e) => {

@@ -79,8 +79,8 @@ const BASE_CONFIG = {
     y: 0.5
   },
   
-  // Combat
-  PROJECTILE_SPEED: 5,
+  // Combat - Individual attack types define their own speeds in attack-types.js (200-500 px/s)
+  PROJECTILE_SPEED: 300,
 };
 
 // Computed getters (added to object after creation)

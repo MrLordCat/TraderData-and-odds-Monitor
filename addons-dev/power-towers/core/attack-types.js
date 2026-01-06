@@ -59,7 +59,7 @@ const ATTACK_TYPES = {
     color: '#888888',
     projectileColor: '#cccccc',
     projectileSize: 4,
-    projectileSpeed: 5
+    projectileSpeed: 300
   },
 
   // =========================================
@@ -106,7 +106,7 @@ const ATTACK_TYPES = {
     color: '#ff6b35',
     projectileColor: '#ff4500',
     projectileSize: 8,
-    projectileSpeed: 3
+    projectileSpeed: 200
   },
 
   // =========================================
@@ -166,7 +166,7 @@ const ATTACK_TYPES = {
     color: '#4a90d9',
     projectileColor: '#87ceeb',
     projectileSize: 4,
-    projectileSpeed: 7,
+    projectileSpeed: 400,
     
     // Combo visual colors (projectile changes color with stacks)
     comboColors: [
@@ -223,7 +223,7 @@ const ATTACK_TYPES = {
     color: '#9b59b6',
     projectileColor: '#e056fd',
     projectileSize: 6,
-    projectileSpeed: 6
+    projectileSpeed: 350
   },
 
   // =========================================
@@ -269,7 +269,7 @@ const ATTACK_TYPES = {
     color: '#e74c3c',
     projectileColor: '#ff6b6b',
     projectileSize: 3,
-    projectileSpeed: 10
+    projectileSpeed: 500
   }
 };
 

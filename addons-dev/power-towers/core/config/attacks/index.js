@@ -37,10 +37,11 @@ function getAttackTypeUpgrades(attackTypeId) {
 
 /**
  * Calculate upgrade cost for attack type upgrade
+ * Discount based on tower level (5% per level above 1, max 50%)
  * @param {string} attackTypeId - Attack type ID
  * @param {string} upgradeId - Upgrade ID
  * @param {number} currentLevel - Current upgrade level
- * @param {number} towerLevel - Tower level for discount
+ * @param {number} towerLevel - Tower level for discount calculation
  * @returns {number} Cost
  */
 function calculateAttackTypeUpgradeCost(attackTypeId, upgradeId, currentLevel, towerLevel = 1) {
@@ -55,8 +56,8 @@ function calculateAttackTypeUpgradeCost(attackTypeId, upgradeId, currentLevel, t
   // Raw cost = base * scale^level
   const rawCost = baseCost * Math.pow(scaleFactor, currentLevel);
   
-  // Tower level discount (same as stat upgrades)
-  const discountPerLevel = 0.05;  // 5% per tower level
+  // Discount from tower level (5% per level above 1, max 50%)
+  const discountPerLevel = 0.05;  // 5% per level
   const maxDiscount = 0.5;        // Max 50%
   const discountPercent = Math.min(maxDiscount, (towerLevel - 1) * discountPerLevel);
   

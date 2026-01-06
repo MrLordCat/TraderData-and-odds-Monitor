@@ -738,6 +738,28 @@ function getBottomPanelStyles() {
       color: #ffd700;
       font-weight: 600;
       font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.2;
+    }
+    .upgrade-card .card-cost .original-price {
+      color: #888;
+      font-size: 9px;
+      text-decoration: line-through;
+    }
+    .upgrade-card .card-cost .discounted-price {
+      color: #4ade80;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .upgrade-card .card-cost .discount-badge {
+      color: #4ade80;
+      font-size: 8px;
+      background: rgba(74, 222, 128, 0.2);
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-top: 1px;
     }
     .upgrade-card .card-level {
       color: #68d391;

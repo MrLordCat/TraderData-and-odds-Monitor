@@ -15,6 +15,7 @@ const { ELEMENT_ABILITIES, getAbilityUpgradeCost, getElementAbilities } = requir
  */
 function generateAbilityUpgradesHTML(tower, gold) {
   const elementPath = tower.elementPath;
+  const towerLevel = tower.level || 1;
   if (!elementPath || !ELEMENT_ABILITIES[elementPath]) {
     return `<div class="ability-empty">
       <p>⚠️ Choose an element first to unlock abilities</p>
@@ -38,7 +39,7 @@ function generateAbilityUpgradesHTML(tower, gold) {
   for (const [upgradeId, upgrade] of Object.entries(elementConfig.upgrades)) {
     const currentLevel = towerUpgrades[upgradeId] || 0;
     const maxLevel = upgrade.maxLevel;
-    const cost = getAbilityUpgradeCost(elementPath, upgradeId, currentLevel);
+    const cost = getAbilityUpgradeCost(elementPath, upgradeId, currentLevel, towerLevel);
     const canAfford = gold >= cost;
     const isMaxed = currentLevel >= maxLevel;
     

@@ -10,25 +10,31 @@
  */
 
 const { PowerNode } = require('./power-node');
+const { ENERGY_BUILDINGS } = require('./building-defs');
 
 // ============================================
 // BASE GENERATOR (Basic stable power)
 // ============================================
 class BaseGenerator extends PowerNode {
   constructor(options = {}) {
+    // Get definition from ENERGY_BUILDINGS (supports debug-generator, base-generator, etc.)
+    const buildingType = options.type || 'base-generator';
+    const def = ENERGY_BUILDINGS[buildingType] || ENERGY_BUILDINGS['base-generator'];
+    const stats = def.stats || {};
+    
     super({
       ...options,
-      type: 'base-generator',
+      type: buildingType,
       nodeType: 'generator',
-      inputChannels: 0,        // Generators don't receive power
-      outputChannels: 1,
+      inputChannels: stats.inputChannels || 0,
+      outputChannels: stats.outputChannels || 1,
       inputRate: 0,
-      outputRate: 20,          // Increased from 15
-      capacity: 100,           // Increased from 50
-      range: 4
+      outputRate: stats.outputRate || 20,
+      capacity: stats.capacity || 100,
+      range: stats.range || 4
     });
     
-    this.baseGeneration = options.generation || 15; // Increased from 5
+    this.baseGeneration = stats.generation || options.generation || 15;
     this.generation = this.baseGeneration;
   }
 

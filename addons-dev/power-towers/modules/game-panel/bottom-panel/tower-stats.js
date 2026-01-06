@@ -17,8 +17,28 @@ function TowerStatsMixin(Base) {
       if (!tower) return;
       const el = this.elements;
       
+      // Calculate effective damage (including combo bonus for Normal attack)
+      let effectiveDamage = tower.damage || 0;
+      let comboMultiplier = 1;
+      if (tower.attackTypeId === 'normal' && tower.comboState) {
+        const { getComboConfig } = require('../../towers/tower-combat');
+        const comboConfig = getComboConfig(tower);
+        comboMultiplier = 1 + (tower.comboState.stacks * comboConfig.dmgPerStack);
+        effectiveDamage = (tower.damage || 0) * comboMultiplier;
+      }
+      
       // Update stats values only (no layout changes)
-      if (el.panelDmg) el.panelDmg.textContent = Math.floor(tower.damage || 0);
+      if (el.panelDmg) {
+        el.panelDmg.textContent = Math.floor(effectiveDamage);
+        // Highlight if combo is active
+        if (comboMultiplier > 1) {
+          el.panelDmg.style.color = '#4da6ff'; // Blue tint for combo
+          el.panelDmg.title = `Base: ${Math.floor(tower.damage)} (+${Math.round((comboMultiplier - 1) * 100)}% combo)`;
+        } else {
+          el.panelDmg.style.color = '';
+          el.panelDmg.title = '';
+        }
+      }
       if (el.panelRng) el.panelRng.textContent = Math.floor(tower.range || 0);
       if (el.panelSpd) el.panelSpd.textContent = (tower.attackSpeed || tower.fireRate || 1).toFixed(1);
       if (el.panelCrit) el.panelCrit.textContent = `${Math.floor((tower.critChance || 0) * 100)}%`;
@@ -185,6 +205,7 @@ function TowerStatsMixin(Base) {
       const { formatInt } = require('./utils/format-helpers');
       
       const attackType = tower.attackTypeConfig || { dmgMod: 1, rangeMod: 1, atkSpdMod: 1 };
+      const attackTypeName = tower.attackTypeId || 'normal';
       const level = tower.level || 1;
       const levelBonus = 1 + (level - 1) * 0.01;
       const upgrades = tower.upgradeLevels || {};
@@ -206,8 +227,20 @@ function TowerStatsMixin(Base) {
         if (dmgBiomeBonus !== 1) {
           builder.biome('', dmgBiomeBonus, formatInt(tower.damage));
         }
-        builder.final(formatInt(tower.damage || 0))
-          .formula('Base × Lvl% × Type × Upg%');
+        
+        // Add combo bonus for Normal attack type
+        let effectiveDamage = tower.damage || 0;
+        if (tower.attackTypeId === 'normal' && tower.comboState && tower.comboState.stacks > 0) {
+          const { getComboConfig } = require('../../towers/tower-combat');
+          const comboConfig = getComboConfig(tower);
+          const comboMultiplier = 1 + (tower.comboState.stacks * comboConfig.dmgPerStack);
+          const comboPercent = Math.round((comboMultiplier - 1) * 100);
+          effectiveDamage = (tower.damage || 0) * comboMultiplier;
+          builder.custom(`🔥 Combo (${tower.comboState.stacks}):`, `+${comboPercent}%`, formatInt(effectiveDamage), '#4da6ff');
+        }
+        
+        builder.final(formatInt(effectiveDamage))
+          .formula('Base × Lvl% × Type × Upg%' + (tower.attackTypeId === 'normal' ? ' × Combo%' : ''));
         detailDmg.innerHTML = builder.build();
       }
       

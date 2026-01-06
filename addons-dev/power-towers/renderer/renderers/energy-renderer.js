@@ -8,6 +8,7 @@ const CONFIG = require('../../core/config/index');
 
 // Pre-allocated building type colors (avoid object creation in hot path)
 const BUILDING_TYPE_COLORS = {
+  'debug-generator': { base: '#5c1a5c', accent: '#9c27b0', glow: '#e040fb' },
   'base-generator': { base: '#2d5a27', accent: '#4CAF50', glow: '#7fff7f' },
   'bio-generator': { base: '#1a4a1a', accent: '#2e7d32', glow: '#81c784' },
   'wind-generator': { base: '#37474f', accent: '#78909c', glow: '#b0bec5' },

@@ -5,7 +5,7 @@
  */
 
 const { getAttackType } = require('../../core/attack-types');
-const { BASE_TOWER, calculateTowerLevel } = require('../../core/tower-upgrades');
+const { BASE_TOWER, calculateTowerLevel, applyStatUpgrade: coreApplyStatUpgrade } = require('../../core/tower-upgrades');
 
 /**
  * Create a new BASE tower instance
@@ -155,38 +155,21 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     
     /**
      * Apply a stat upgrade
-     * NEW SYSTEM: Just increment upgradeLevels, tower-stats.js handles % bonuses
+     * Delegates to centralized function in tower-upgrades.js
      * @param {string} upgradeId - Upgrade ID (e.g., 'damage', 'range')
      * @param {Object} upgradeConfig - Upgrade config (unused, kept for compatibility)
      * @returns {boolean} Success
      */
     applyStatUpgrade(upgradeId, upgradeConfig) {
-      // Increment upgrade level
-      if (!this.upgradeLevels[upgradeId]) {
-        this.upgradeLevels[upgradeId] = 0;
-      }
-      this.upgradeLevels[upgradeId]++;
-      
-      // HP Regen is additive (not percentage based)
-      if (upgradeId === 'hpRegen' && upgradeConfig?.effect?.valuePerLevel) {
-        this.hpRegen = (this.hpRegen || 0) + upgradeConfig.effect.valuePerLevel;
-      }
-      
-      // Add upgrade points for level calculation
-      this.upgradePoints = (this.upgradePoints || 0) + 1;
-      
-      // Check for level up using centralized function
-      const newLevel = calculateTowerLevel(this);
-      if (newLevel > (this.level || 1)) {
-        this.level = newLevel;
-      }
+      // Use centralized upgrade function
+      const result = coreApplyStatUpgrade(this, upgradeId);
       
       // Recalculate effective stats with new upgradeLevels
-      if (this.recalculateStats) {
+      if (result && this.recalculateStats) {
         this.recalculateStats();
       }
       
-      return true;
+      return result;
     },
     
     /**

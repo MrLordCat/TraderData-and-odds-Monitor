@@ -82,6 +82,18 @@ class DetailBuilder {
   }
   
   /**
+   * Add custom modifier line with color
+   * @param {string} label - Label text (e.g., "🔥 Combo (5):")
+   * @param {string} modifier - Modifier text (e.g., "+25%")
+   * @param {string|number} resultValue - Resulting value
+   * @param {string} color - Custom color (default: green)
+   */
+  custom(label, modifier, resultValue, color = '#4caf50') {
+    this.lines.push(`<div class="detail-line"><span class="detail-label">${label}</span><span class="detail-value" style="color:${color}">${modifier} → ${resultValue}</span></div>`);
+    return this;
+  }
+  
+  /**
    * Add final value line
    */
   final(value) {

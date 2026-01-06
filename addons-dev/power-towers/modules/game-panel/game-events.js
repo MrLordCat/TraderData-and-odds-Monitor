@@ -78,6 +78,10 @@ function GameEventsMixin(Base) {
           if (this.updateBottomPanelStats) {
             this.updateBottomPanelStats(data.tower);
           }
+          // Also refresh upgrade prices (tower level may have changed)
+          if (this.updateUpgradePrices) {
+            this.updateUpgradePrices(data.tower);
+          }
         }
         this.updateTowerAffordability();
       });
@@ -89,11 +93,20 @@ function GameEventsMixin(Base) {
         this.updateTowerAffordability();
         this.updateEnergyAffordability();
         this.updateBuildItemStates?.();
+        // Also update upgrade prices when gold changes (affordability)
+        if (this.game?.selectedTower && this.updateUpgradePrices) {
+          this.updateUpgradePrices(this.game.selectedTower);
+        }
       });
       
-      // Tower level up notification
+      // Tower level up notification - refresh upgrade panel
       this.game.on('tower:level-up', (data) => {
-        // Could show toast notification here
+        // Refresh upgrade prices when tower levels up (discounts change!)
+        if (data?.tower && this.game?.selectedTower?.id === data.tower.id) {
+          if (this.updateUpgradePrices) {
+            this.updateUpgradePrices(data.tower);
+          }
+        }
       });
       
       this.game.on(this.GameEvents.WAVE_COMPLETE, () => {

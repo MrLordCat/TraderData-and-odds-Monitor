@@ -6,6 +6,31 @@
 
 const ENERGY_BUILDINGS = {
   // ============================================
+  // DEBUG / TEST GENERATORS
+  // ============================================
+  'debug-generator': {
+    id: 'debug-generator',
+    name: '🔧 Debug Generator',
+    description: 'TEST ONLY. Unlimited power. Will be removed.',
+    icon: '🔧',
+    category: 'generator',
+    
+    cost: 1,  // Almost free
+    buildTime: 0,
+    
+    stats: {
+      generation: 999,
+      outputRate: 999,
+      capacity: 9999,
+      range: 99,
+      inputChannels: 0,
+      outputChannels: 99
+    },
+    
+    upgrades: []  // No upgrades needed
+  },
+
+  // ============================================
   // GENERATORS
   // ============================================
   'base-generator': {
@@ -242,6 +267,7 @@ const CATEGORY_COLORS = {
 
 // Icons by building type
 const BUILDING_ICONS = {
+  'debug-generator': '🔧',
   'base-generator': '⚡',
   'bio-generator': '🌳',
   'wind-generator': '💨',

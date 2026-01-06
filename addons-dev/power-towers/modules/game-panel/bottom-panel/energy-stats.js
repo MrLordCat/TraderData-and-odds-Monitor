@@ -286,6 +286,7 @@ function EnergyStatsMixin(Base) {
      */
     getEnergyBuildingEmoji(building) {
       const emojis = {
+        'debug-generator': '🔧',
         'base-generator': '⚡',
         'bio-generator': '🌳',
         'wind-generator': '💨',
@@ -302,6 +303,7 @@ function EnergyStatsMixin(Base) {
      */
     getEnergyBuildingName(building) {
       const names = {
+        'debug-generator': 'Debug',
         'base-generator': 'Generator',
         'bio-generator': 'Bio Gen',
         'wind-generator': 'Wind',

@@ -174,6 +174,9 @@ class EnergyBuildingManager {
    */
   createBuildingInstance(type, options) {
     switch (type) {
+      case 'debug-generator':
+        // Debug generator uses BaseGenerator with overridden stats
+        return new BaseGenerator({ ...options, type: 'debug-generator' });
       case 'base-generator':
         return new BaseGenerator(options);
       case 'bio-generator':

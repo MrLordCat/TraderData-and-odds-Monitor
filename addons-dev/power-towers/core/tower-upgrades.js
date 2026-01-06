@@ -327,7 +327,8 @@ function getElementAbilityUpgradeCost(tower, upgradeId) {
   try {
     const { getAbilityUpgradeCost: getElemAbilityCost } = require('./element-abilities');
     const currentLevel = tower.abilityUpgrades?.[upgradeId] || 0;
-    return getElemAbilityCost(elementPath, upgradeId, currentLevel);
+    const towerLevel = tower.level || 1;
+    return getElemAbilityCost(elementPath, upgradeId, currentLevel, towerLevel);
   } catch (e) {
     return Infinity;
   }

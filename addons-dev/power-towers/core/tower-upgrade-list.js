@@ -34,9 +34,10 @@ const COST_CONFIG = {
 
 /**
  * Calculate upgrade cost with tower level discount
+ * Higher tower level = bigger discount on upgrades
  * @param {Object} upgrade - Upgrade config
  * @param {number} currentLevel - Current upgrade level
- * @param {number} towerLevel - Tower's overall level
+ * @param {number} towerLevel - Tower's overall level (for discount)
  * @returns {number} Cost
  */
 function calculateUpgradeCost(upgrade, currentLevel, towerLevel = 1) {
@@ -46,7 +47,7 @@ function calculateUpgradeCost(upgrade, currentLevel, towerLevel = 1) {
   // Raw cost = base * scale^level
   const rawCost = baseCost * Math.pow(scaleFactor, currentLevel);
   
-  // Tower level discount
+  // Discount from tower level (5% per level above 1, max 50%)
   const discountPercent = Math.min(
     COST_CONFIG.maxDiscount,
     (towerLevel - 1) * COST_CONFIG.discountPerTowerLevel
