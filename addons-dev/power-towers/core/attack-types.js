@@ -111,12 +111,13 @@ const ATTACK_TYPES = {
 
   // =========================================
   // NORMAL - Single target, faster attack
+  // Best against bosses (Combo + Focus Fire)
   // =========================================
   normal: {
     id: 'normal',
     name: 'Normal Attack',
     emoji: '🎯',
-    description: 'Fast single-target attacks',
+    description: 'Fast single-target attacks. Combo stacks increase damage, Focus Fire guarantees crits',
     
     // Damage modifiers
     dmgMod: 0.9,           // 90% base damage
@@ -142,6 +143,19 @@ const ATTACK_TYPES = {
     chainCount: 0,
     chainDmgFalloff: 0,
     
+    // === COMBO SYSTEM (Normal unique) ===
+    // Each consecutive hit on SAME target increases damage
+    comboEnabled: true,
+    comboDmgPerStack: 0.05,    // +5% damage per stack
+    comboMaxStacks: 10,        // Max 10 stacks (+50% damage)
+    comboDecayTime: 2.0,       // Lose 1 stack every 2 sec if not attacking same target
+    
+    // === FOCUS FIRE (Normal unique) ===
+    // After X hits on same target, next hit is guaranteed crit
+    focusFireEnabled: true,
+    focusFireHitsRequired: 5,  // 5 hits to trigger
+    focusFireCritBonus: 0.5,   // +50% crit damage on focus fire
+    
     // Magic system
     powerScaling: 0,
     minPowerDraw: 0,
@@ -152,7 +166,18 @@ const ATTACK_TYPES = {
     color: '#4a90d9',
     projectileColor: '#87ceeb',
     projectileSize: 4,
-    projectileSpeed: 7
+    projectileSpeed: 7,
+    
+    // Combo visual colors (projectile changes color with stacks)
+    comboColors: [
+      '#87ceeb',  // 0 stacks - light blue
+      '#6ab0e8',  // 1-2 stacks
+      '#4d96e1',  // 3-4 stacks
+      '#3080d9',  // 5-6 stacks
+      '#1a6ad1',  // 7-8 stacks
+      '#0055c9'   // 9-10 stacks - deep blue
+    ],
+    focusFireColor: '#ffd700'  // Gold color for focus fire shot
   },
 
   // =========================================

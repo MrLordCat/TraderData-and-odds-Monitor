@@ -528,6 +528,18 @@ function EntityRendererMixin(Base) {
             this.shapeRenderer.circle(effect.x, effect.y, expandedRadius * 0.6, color.r, color.g, 0, alpha * 0.8);
             this.shapeRenderer.circle(effect.x, effect.y, expandedRadius * 0.3, 1, 1, 0.8, alpha);
             break;
+          
+          // === FOCUS FIRE BURST (Normal Attack) ===
+          case 'focus-fire-burst':
+            const burstSize = effect.size * (0.3 + progress * 0.7);
+            const burstColor = this._parseColor(effect.color || '#ffd700');
+            // Outer golden ring
+            this.shapeRenderer.circle(effect.x, effect.y, burstSize, burstColor.r, burstColor.g, burstColor.b, alpha * 0.3);
+            // Inner bright core
+            this.shapeRenderer.circle(effect.x, effect.y, burstSize * 0.5, 1, 1, 0.8, alpha * 0.6);
+            // Center flash
+            this.shapeRenderer.circle(effect.x, effect.y, burstSize * 0.2, 1, 1, 1, alpha);
+            break;
             
           case 'lightning':
             if (effect.target) {

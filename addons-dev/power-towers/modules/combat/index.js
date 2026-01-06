@@ -104,7 +104,11 @@ class CombatModule {
     // Chain params  
     chainCount, chainDmgFalloff, chainCanCrit,
     // Attack type
-    attackTypeId
+    attackTypeId,
+    // Combo system (Normal attack)
+    isFocusFire, comboStacks,
+    // Projectile visuals (can be overridden by combo colors)
+    projectileColor, projectileSize, projectileSpeed
   }) {
     // Determine tower type from element path or legacy towerType
     const effectiveTowerType = elementPath || towerType || 'fire';
@@ -120,14 +124,16 @@ class CombatModule {
       targetId,
       damage,
       isCrit: isCrit || false,
+      isFocusFire: isFocusFire || false,  // NEW: Focus fire indicator
+      comboStacks: comboStacks || 0,       // NEW: Combo stacks
       critMultiplier: critMultiplier || 1.5, // For secondary crit calculations
       x: position.x,
       y: position.y,
       targetX: targetPosition.x,
       targetY: targetPosition.y,
-      speed: projectileDef.speed,
-      color: projectileDef.color,
-      size: projectileDef.size,
+      speed: projectileSpeed || projectileDef.speed,
+      color: projectileColor || projectileDef.color,  // Use provided color (combo colors)
+      size: isFocusFire ? (projectileSize || projectileDef.size) * 1.5 : (projectileSize || projectileDef.size),  // Bigger for focus fire
       chain: projectileDef.chain,
       trail: projectileDef.trail,
       // AoE (siege)
@@ -287,6 +293,7 @@ class CombatModule {
       enemyId: projectile.targetId,
       damage: projectile.damage,
       isCrit: projectile.isCrit,
+      isFocusFire: projectile.isFocusFire,  // NEW: Focus fire indicator
       towerId: projectile.towerId,
       effects: this.getEffectsForType(projectile.towerType),
       // NEW: Element effects
@@ -305,6 +312,19 @@ class CombatModule {
       color: projectile.color,
       size: projectile.size * 2
     });
+    
+    // === FOCUS FIRE EFFECT (Normal attack) ===
+    if (projectile.isFocusFire) {
+      // Add golden burst effect for focus fire
+      this.addEffect({
+        type: 'focus-fire-burst',
+        x: projectile.targetX,
+        y: projectile.targetY,
+        duration: 0.4,
+        color: '#ffd700',
+        size: 30
+      });
+    }
     
     // =========================================
     // SPLASH DAMAGE (Siege attack type)
