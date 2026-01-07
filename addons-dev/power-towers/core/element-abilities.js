@@ -19,6 +19,7 @@ const EFFECT_TYPES = {
   OVERLOAD: 'overload',   // Lightning chain damage
   DRAIN: 'drain',         // Dark life steal
   CURSE: 'curse',         // Dark damage amplify
+  ARMOR_SHRED: 'armorShred', // Siege armor reduction (stacking)
 };
 
 /**

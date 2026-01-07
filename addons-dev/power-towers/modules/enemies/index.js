@@ -53,6 +53,8 @@ class EnemiesModule {
     this.eventBus.on('map:generated', (data) => this.onMapGenerated(data));
     this.eventBus.on('wave:start', () => this.startNextWave());
     this.eventBus.on('enemy:damage', (data) => this.damageEnemy(data));
+    this.eventBus.on('enemy:apply-debuff', (data) => this.applyDebuff(data));
+    this.eventBus.on('enemies:get-nearby', (data) => this.getNearbyEnemies(data));
   }
 
   /**
@@ -547,6 +549,77 @@ class EnemiesModule {
         // Drain is handled in combat module (returns energy)
         break;
     }
+  }
+
+  /**
+   * Apply a debuff directly to an enemy (used by Siege Armor Shred)
+   * @param {Object} data - Debuff data
+   * @param {number} data.enemyId - Target enemy ID
+   * @param {string} data.debuffType - Type of debuff (armorShred, etc.)
+   * @param {number} data.amount - Amount per stack
+   * @param {number} data.maxStacks - Maximum stacks
+   * @param {number} data.duration - Duration in ms
+   * @param {number} data.towerId - Tower that applied this
+   */
+  applyDebuff({ enemyId, debuffType, amount, maxStacks, duration, towerId }) {
+    const enemy = this.enemies.find(e => e.id === enemyId);
+    if (!enemy) return;
+    
+    // Convert debuff type to EFFECT_TYPE
+    let effectType;
+    switch (debuffType) {
+      case 'armorShred':
+        effectType = EFFECT_TYPES.ARMOR_SHRED;
+        break;
+      case 'slow':
+        effectType = EFFECT_TYPES.SLOW;
+        break;
+      default:
+        console.warn(`[EnemiesModule] Unknown debuff type: ${debuffType}`);
+        return;
+    }
+    
+    // Apply via status effects system
+    StatusEffects.applyStatusEffect(enemy, effectType, {
+      value: amount,
+      duration: duration / 1000, // Convert ms to seconds
+      stackable: true,
+      maxStacks: maxStacks,
+    }, towerId);
+  }
+
+  /**
+   * Get enemies near a position (used for splash damage, ground zones)
+   * @param {Object} data - Search parameters
+   * @param {number} data.x - Center X
+   * @param {number} data.y - Center Y  
+   * @param {number} data.radius - Search radius
+   * @param {number} [data.excludeId] - Enemy ID to exclude
+   * @param {number} [data.maxCount] - Max enemies to return
+   * @param {Function} data.callback - Callback with results
+   */
+  getNearbyEnemies({ x, y, radius, excludeId, maxCount, callback }) {
+    const nearby = [];
+    
+    for (const enemy of this.enemies) {
+      if (excludeId && enemy.id === excludeId) continue;
+      
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist <= radius) {
+        nearby.push({ ...enemy, distance: dist });
+      }
+      
+      if (maxCount && nearby.length >= maxCount) break;
+    }
+    
+    // Sort by distance
+    nearby.sort((a, b) => a.distance - b.distance);
+    
+    if (callback) callback(nearby);
+    return nearby;
   }
 
   /**

@@ -162,6 +162,7 @@ function getTotalSlowPercent(enemy) {
 
 /**
  * Get total armor reduction on enemy
+ * Combines WEAKEN (Nature) and ARMOR_SHRED (Siege)
  */
 function getTotalArmorReduction(enemy) {
   if (!enemy.statusEffects) return 0;
@@ -170,6 +171,10 @@ function getTotalArmorReduction(enemy) {
   
   for (const effect of enemy.statusEffects) {
     if (effect.type === EFFECT_TYPES.WEAKEN) {
+      totalReduction += getEffectValue(effect);
+    }
+    // Armor Shred (Siege) - stacking debuff
+    if (effect.type === EFFECT_TYPES.ARMOR_SHRED) {
       totalReduction += getEffectValue(effect);
     }
   }

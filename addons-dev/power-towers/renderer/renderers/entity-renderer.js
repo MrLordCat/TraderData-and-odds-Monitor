@@ -569,7 +569,55 @@ function EntityRendererMixin(Base) {
             const natureRadius = effect.radius || 25;
             this.shapeRenderer.circle(effect.x, effect.y, natureRadius, 0.2, 0.7, 0.3, alpha * 0.4);
             break;
+            
+          // === ARMOR SHRED (Siege) ===
+          case 'armor-shred':
+            const shredRadius = effect.radius || 30;
+            const shredColor = this._parseColor(effect.color || '#ff4444');
+            // Red pulse indicating armor break
+            this.shapeRenderer.circle(effect.x, effect.y, shredRadius * (0.5 + progress * 0.5), shredColor.r, shredColor.g * 0.3, shredColor.b * 0.3, alpha * 0.4);
+            break;
+            
+          // === GROUND ZONE SPAWN (Siege) ===
+          case 'ground-zone-spawn':
+            const spawnRadius = effect.radius * (progress * 1.2);
+            const spawnColor = this._parseColor(effect.color || '#8B4513');
+            // Expanding ring effect
+            this.shapeRenderer.circle(effect.x, effect.y, spawnRadius, spawnColor.r, spawnColor.g, spawnColor.b, alpha * 0.5);
+            break;
         }
+      }
+      
+      this.shapeRenderer.end();
+    }
+    
+    /**
+     * Render ground zones (Siege craters)
+     */
+    _renderGroundZones(data) {
+      if (!data.groundZones || data.groundZones.length === 0) return;
+      
+      this.shapeRenderer.begin('triangles', this.camera);
+      
+      for (const zone of data.groundZones) {
+        const progress = 1 - (zone.duration / zone.maxDuration);
+        const alpha = 0.3 * (1 - progress * 0.5); // Fade as expires
+        
+        const color = this._parseColor(zone.color || '#8B4513');
+        
+        // Main crater circle
+        this.shapeRenderer.circle(zone.x, zone.y, zone.radius, color.r * 0.6, color.g * 0.5, color.b * 0.3, alpha);
+        
+        // Inner dark center
+        this.shapeRenderer.circle(zone.x, zone.y, zone.radius * 0.5, color.r * 0.3, color.g * 0.2, color.b * 0.1, alpha * 1.5);
+        
+        // Edge highlight
+        this.shapeRenderer.circle(zone.x, zone.y, zone.radius * 0.9, color.r * 0.7, color.g * 0.6, color.b * 0.4, alpha * 0.3);
+        
+        // Pulsing slow indicator
+        const pulsePhase = (this.time * 3) % 1;
+        const pulseRadius = zone.radius * (0.3 + pulsePhase * 0.2);
+        this.shapeRenderer.circle(zone.x, zone.y, pulseRadius, 0.2, 0.4, 0.6, (1 - pulsePhase) * 0.3);
       }
       
       this.shapeRenderer.end();

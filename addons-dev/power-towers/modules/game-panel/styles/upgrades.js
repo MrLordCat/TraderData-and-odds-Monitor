@@ -10,7 +10,7 @@ function getUpgradesStyles() {
       max-height: 200px;
       overflow-y: auto;
     }
-    .upgrades-grid {
+    .tooltip-upgrades-grid {
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -99,7 +99,7 @@ function getUpgradesStyles() {
       background: linear-gradient(135deg, #a855f7 0%, #8b5cf6 100%);
       color: white;
     }
-    .abilities-grid {
+    .tooltip-abilities-grid {
       display: flex;
       flex-direction: column;
       gap: 4px;

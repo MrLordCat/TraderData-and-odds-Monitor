@@ -232,7 +232,7 @@ function getGameTemplate() {
             <!-- Stat Upgrades Section -->
             <div class="tooltip-section tooltip-upgrades" id="tooltip-upgrades-section" style="display: none;">
               <div class="section-title">Stat Upgrades:</div>
-              <div class="upgrades-grid" id="upgrades-grid">
+              <div class="tooltip-upgrades-grid" id="upgrades-grid">
                 <!-- Dynamically populated -->
               </div>
             </div>
@@ -253,7 +253,7 @@ function getGameTemplate() {
                   <span>Damage: <b id="lightning-charge-damage">1.0x</b></span>
                 </div>
               </div>
-              <div class="abilities-grid" id="abilities-grid">
+              <div class="tooltip-abilities-grid" id="abilities-grid">
                 <!-- Dynamically populated -->
               </div>
             </div>

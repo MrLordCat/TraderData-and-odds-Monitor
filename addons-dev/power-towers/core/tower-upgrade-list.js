@@ -98,6 +98,16 @@ function isUpgradeAvailable(upgrade, tower) {
     }
   }
   
+  // Check if required upgrades are purchased
+  if (upgrade.requires.upgrades) {
+    const towerUpgrades = tower.upgradeLevels || {};
+    for (const reqUpgradeId of upgrade.requires.upgrades) {
+      if (!towerUpgrades[reqUpgradeId] || towerUpgrades[reqUpgradeId] < 1) {
+        return false;
+      }
+    }
+  }
+  
   return true;
 }
 

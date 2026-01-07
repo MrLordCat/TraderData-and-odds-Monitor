@@ -18,7 +18,17 @@ const BASE_UPGRADES = [
 
 // Attack type specific upgrades
 const ATTACK_TYPE_UPGRADES = {
-  siege: ['splashRadius'],
+  siege: [
+    'splashRadius', 
+    'splashFalloff',
+    'shredAmount', 
+    'shredStacks', 
+    'shredDuration',
+    'groundZoneUnlock',
+    'groundZoneSlow',
+    'groundZoneDuration',
+    'groundZoneRadius'
+  ],
   magic: ['powerScaling'],
   piercing: ['critChance', 'critDamage'],
   normal: ['attackSpeed']

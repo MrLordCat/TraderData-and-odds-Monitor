@@ -56,6 +56,10 @@ class CombatModule {
     
     // Visual effects
     this.effects = [];
+    
+    // Ground zones (Siege craters)
+    this.groundZones = [];
+    this.nextZoneId = 1;
   }
 
   /**
@@ -64,6 +68,7 @@ class CombatModule {
   init() {
     this.eventBus.on(GameEvents.GAME_START, () => this.reset());
     this.eventBus.on('combat:tower-attack', (data) => this.handleTowerAttack(data));
+    this.eventBus.on('combat:create-ground-zone', (data) => this.createGroundZone(data));
   }
 
   /**
@@ -72,6 +77,7 @@ class CombatModule {
   update(deltaTime, enemies) {
     this.updateProjectiles(deltaTime, enemies);
     this.updateEffects(deltaTime);
+    this.updateGroundZones(deltaTime, enemies);
   }
 
   /**
@@ -81,6 +87,8 @@ class CombatModule {
     this.projectiles = [];
     this.nextProjectileId = 1;
     this.effects = [];
+    this.groundZones = [];
+    this.nextZoneId = 1;
   }
 
   /**
@@ -107,6 +115,10 @@ class CombatModule {
     attackTypeId,
     // Combo system (Normal attack)
     isFocusFire, comboStacks,
+    // Armor Shred (Siege)
+    armorShredEnabled, armorShredAmount, armorShredMaxStacks, armorShredDuration,
+    // Ground Zone (Siege)
+    groundZoneEnabled, groundZoneRadius, groundZoneDuration, groundZoneSlow,
     // Projectile visuals (can be overridden by combo colors)
     projectileColor, projectileSize, projectileSpeed
   }) {
@@ -144,6 +156,16 @@ class CombatModule {
       chainCount: chainCount || 0,
       chainDmgFalloff: chainDmgFalloff || 0.5,
       chainCanCrit: chainCanCrit || false,   // Unlockable via cards
+      // Armor Shred (Siege)
+      armorShredEnabled: armorShredEnabled || false,
+      armorShredAmount: armorShredAmount || 0,
+      armorShredMaxStacks: armorShredMaxStacks || 0,
+      armorShredDuration: armorShredDuration || 0,
+      // Ground Zone (Siege)
+      groundZoneEnabled: groundZoneEnabled || false,
+      groundZoneRadius: groundZoneRadius || 0,
+      groundZoneDuration: groundZoneDuration || 0,
+      groundZoneSlow: groundZoneSlow || 0,
       // Element system (NEW)
       elementPath: effectiveTowerType,
       elementAbilities: elementAbilities || null,
@@ -387,6 +409,79 @@ class CombatModule {
         color: '#ff6600',
         isSplash: true
       });
+      
+      // =========================================
+      // ARMOR SHRED (Siege unique)
+      // Apply to all enemies in splash zone
+      // =========================================
+      if (projectile.armorShredEnabled) {
+        // Apply shred to main target
+        this.eventBus.emit('enemy:apply-debuff', {
+          enemyId: projectile.targetId,
+          debuffType: 'armorShred',
+          amount: projectile.armorShredAmount,
+          maxStacks: projectile.armorShredMaxStacks,
+          duration: projectile.armorShredDuration,
+          towerId: projectile.towerId
+        });
+        
+        // Apply shred to all nearby enemies
+        this.eventBus.emit('enemies:get-nearby', {
+          x: projectile.targetX,
+          y: projectile.targetY,
+          radius: projectile.splashRadius,
+          excludeId: projectile.targetId,
+          maxCount: 20,
+          callback: (nearbyEnemies) => {
+            for (const enemy of nearbyEnemies) {
+              this.eventBus.emit('enemy:apply-debuff', {
+                enemyId: enemy.id,
+                debuffType: 'armorShred',
+                amount: projectile.armorShredAmount,
+                maxStacks: projectile.armorShredMaxStacks,
+                duration: projectile.armorShredDuration,
+                towerId: projectile.towerId
+              });
+            }
+          }
+        });
+        
+        // Visual armor shred effect
+        this.addEffect({
+          type: 'armor-shred',
+          x: projectile.targetX,
+          y: projectile.targetY,
+          duration: 0.3,
+          radius: projectile.splashRadius * 0.7,
+          color: '#ff4444'
+        });
+      }
+      
+      // =========================================
+      // GROUND ZONE (Siege unique)
+      // Leave slowing crater after explosion
+      // =========================================
+      if (projectile.groundZoneEnabled) {
+        this.eventBus.emit('combat:create-ground-zone', {
+          x: projectile.targetX,
+          y: projectile.targetY,
+          radius: projectile.groundZoneRadius,
+          duration: projectile.groundZoneDuration,
+          slowPercent: projectile.groundZoneSlow,
+          towerId: projectile.towerId,
+          color: '#8B4513' // Brown crater
+        });
+        
+        // Visual ground zone effect
+        this.addEffect({
+          type: 'ground-zone-spawn',
+          x: projectile.targetX,
+          y: projectile.targetY,
+          duration: 0.5,
+          radius: projectile.groundZoneRadius,
+          color: '#8B4513'
+        });
+      }
     }
     
     // Tower-specific effects (fire without splash)
@@ -442,13 +537,81 @@ class CombatModule {
     }
   }
 
+  // =========================================
+  // GROUND ZONES (Siege craters)
+  // =========================================
+  
+  /**
+   * Create a ground zone (crater) that slows enemies
+   * @param {Object} data - Zone parameters
+   */
+  createGroundZone({ x, y, radius, duration, slowPercent, towerId, color }) {
+    const zone = {
+      id: this.nextZoneId++,
+      x,
+      y,
+      radius: radius || 40,
+      duration: duration / 1000, // Convert ms to seconds
+      maxDuration: duration / 1000,
+      slowPercent: slowPercent || 0.25,
+      towerId,
+      color: color || '#8B4513',
+      affectedEnemies: new Set() // Track who we've slowed this tick
+    };
+    
+    this.groundZones.push(zone);
+  }
+  
+  /**
+   * Update ground zones - apply slow to enemies inside
+   */
+  updateGroundZones(deltaTime, enemies) {
+    for (let i = this.groundZones.length - 1; i >= 0; i--) {
+      const zone = this.groundZones[i];
+      
+      // Decrease duration
+      zone.duration -= deltaTime;
+      
+      if (zone.duration <= 0) {
+        // Zone expired
+        this.groundZones.splice(i, 1);
+        continue;
+      }
+      
+      // Clear affected set for this tick
+      zone.affectedEnemies.clear();
+      
+      // Find enemies in zone and apply slow
+      for (const enemy of enemies) {
+        const dx = enemy.x - zone.x;
+        const dy = enemy.y - zone.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist <= zone.radius) {
+          zone.affectedEnemies.add(enemy.id);
+          
+          // Apply ground zone slow via debuff system
+          this.eventBus.emit('enemy:apply-debuff', {
+            enemyId: enemy.id,
+            debuffType: 'slow',
+            amount: zone.slowPercent,
+            maxStacks: 1,
+            duration: 500, // Short duration, refreshed each tick
+            towerId: zone.towerId
+          });
+        }
+      }
+    }
+  }
+
   /**
    * Get render data
    */
   getRenderData() {
     return {
       projectiles: this.projectiles,
-      effects: this.effects
+      effects: this.effects,
+      groundZones: this.groundZones
     };
   }
 }

@@ -36,10 +36,19 @@ const TOWER_CONFIG = {
     critChance: 0.01,       // +1% per level (additive)
     critDamage: 0.1,        // +10% per level (additive to multiplier)
     splashRadius: 0.08,     // +8% per level
+    splashFalloff: -0.05,   // -5% falloff per level (additive, negative)
     chainCount: 1,          // +1 per level (flat)
     powerScaling: 0.10,     // +10% per level
     energyStorage: 0.10,    // +10% per level
     powerEfficiency: 0.03,  // -3% energy cost per level
+    // Siege Armor Shred
+    shredAmount: 0.02,      // +2% armor reduction per level
+    shredStacks: 1,         // +1 max stack per level
+    shredDuration: 1000,    // +1s duration per level (in ms)
+    // Siege Ground Zone
+    groundZoneRadius: 5,    // +5 radius per level
+    groundZoneDuration: 500, // +0.5s duration per level (in ms)
+    groundZoneSlow: 0.05,   // +5% slow per level
   },
   
   // ╔════════════════════════════════════════════════════════════════════════╗

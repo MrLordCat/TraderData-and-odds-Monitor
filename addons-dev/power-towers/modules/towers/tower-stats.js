@@ -155,8 +155,69 @@ function recalculateTowerStats(tower) {
     splashRadius *= (1 + upgradeLevels.splashRadius * (bonuses.splashRadius || 0.08));
   }
   tower.splashRadius = splashRadius;
-  tower.splashDmgFalloff = attackType.splashDmgFalloff;
+  
+  // Splash Damage Falloff (can be reduced by upgrade)
+  let splashFalloff = attackType.splashDmgFalloff || 0.5;
+  if (upgradeLevels.splashFalloff) {
+    splashFalloff += upgradeLevels.splashFalloff * (bonuses.splashFalloff || -0.05);
+    splashFalloff = Math.max(0.1, splashFalloff); // Min 10% falloff
+  }
+  tower.splashDmgFalloff = splashFalloff;
   tower.splashCanCrit = attackType.splashCanCrit || false;
+  
+  // === ARMOR SHRED (Siege unique) ===
+  // Each hit in splash zone reduces enemy armor
+  if (attackType.armorShredEnabled) {
+    let shredAmount = attackType.armorShredAmount || 0.05;  // Base 5%
+    let shredMaxStacks = attackType.armorShredMaxStacks || 5;
+    let shredDuration = attackType.armorShredDuration || 4000;
+    
+    // Apply upgrades
+    if (upgradeLevels.shredAmount) {
+      shredAmount += upgradeLevels.shredAmount * (bonuses.shredAmount || 0.02);
+    }
+    if (upgradeLevels.shredStacks) {
+      shredMaxStacks += upgradeLevels.shredStacks * (bonuses.shredStacks || 1);
+    }
+    if (upgradeLevels.shredDuration) {
+      shredDuration += upgradeLevels.shredDuration * (bonuses.shredDuration || 1000);
+    }
+    
+    tower.armorShredEnabled = true;
+    tower.armorShredAmount = shredAmount;
+    tower.armorShredMaxStacks = shredMaxStacks;
+    tower.armorShredDuration = shredDuration;
+  } else {
+    tower.armorShredEnabled = false;
+  }
+  
+  // === GROUND ZONE (Siege unique) ===
+  // Leaves slowing crater after splash explosion
+  const groundZoneUnlocked = upgradeLevels.groundZoneUnlock > 0 || attackType.groundZoneEnabled;
+  if (groundZoneUnlocked) {
+    let zoneRadius = attackType.groundZoneRadius || 40;
+    let zoneDuration = attackType.groundZoneDuration || 2000;
+    let zoneSlow = attackType.groundZoneSlow || 0.25;
+    
+    // Apply upgrades
+    if (upgradeLevels.groundZoneRadius) {
+      zoneRadius += upgradeLevels.groundZoneRadius * (bonuses.groundZoneRadius || 5);
+    }
+    if (upgradeLevels.groundZoneDuration) {
+      zoneDuration += upgradeLevels.groundZoneDuration * (bonuses.groundZoneDuration || 500);
+    }
+    if (upgradeLevels.groundZoneSlow) {
+      zoneSlow += upgradeLevels.groundZoneSlow * (bonuses.groundZoneSlow || 0.05);
+      zoneSlow = Math.min(0.8, zoneSlow); // Cap at 80% slow
+    }
+    
+    tower.groundZoneEnabled = true;
+    tower.groundZoneRadius = zoneRadius;
+    tower.groundZoneDuration = zoneDuration;
+    tower.groundZoneSlow = zoneSlow;
+  } else {
+    tower.groundZoneEnabled = false;
+  }
   
   // Chain Count (flat bonus, capped)
   let chainCount = tower.baseChainCount || attackType.chainCount || 0;

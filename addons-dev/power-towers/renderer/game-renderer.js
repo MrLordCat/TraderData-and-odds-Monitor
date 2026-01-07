@@ -226,28 +226,31 @@ class GameRenderer {
     // 12. Towers
     this._renderTowers(data);
     
-    // 13. Enemies
+    // 13. Ground zones (Siege craters - render under enemies)
+    this._renderGroundZones(data);
+    
+    // 14. Enemies
     this._renderEnemies(data);
     
-    // 14. Projectiles
+    // 15. Projectiles
     this._renderProjectiles(data);
     
-    // 15. Particles (GPU)
+    // 16. Particles (GPU)
     this.particles.render(this.camera);
     
-    // 16. Effects (explosions, etc.)
+    // 17. Effects (explosions, etc.)
     this._renderEffects(data);
     
-    // 17. Damage numbers
+    // 18. Damage numbers
     this._renderDamageNumbers(data);
     
-    // 18. Loot numbers (gold from kills)
+    // 19. Loot numbers (gold from kills)
     this._renderLootNumbers(data);
     
-    // 19. Hover indicator
+    // 20. Hover indicator
     this._renderHoverIndicator();
     
-    // 20. Range indicator
+    // 21. Range indicator
     this._renderRangeIndicator(data);
     
     // 21. Connection range (when connecting buildings)

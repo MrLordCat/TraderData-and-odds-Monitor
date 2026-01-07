@@ -64,18 +64,19 @@ const ATTACK_TYPES = {
 
   // =========================================
   // SIEGE - Area damage, slower attack
+  // Unique: Armor Shred + Ground Zone
   // =========================================
   siege: {
     id: 'siege',
     name: 'Siege Attack',
     emoji: '💥',
-    description: 'Devastating area damage with slower rate of fire',
+    description: 'Devastating area damage. Shreds armor and leaves slowing craters',
     
     // Damage modifiers
     dmgMod: 1.2,           // 120% base damage
     atkSpdMod: 0.5,        // 50% attack speed (slower)
     rangeMod: 1.1,         // 110% range
-    energyCostMod: 1.5,  // Energy cost multiplier
+    energyCostMod: 1.5,    // Energy cost multiplier
     
     // Power Hit Cost: Siege costs 40% more energy per shot
     powerHitCostMod: 1.4,  // 140% power cost
@@ -92,11 +93,26 @@ const ATTACK_TYPES = {
     splashDmgFalloff: 0.5, // 50% damage at edge
     splashCanCrit: false,  // Can splash damage crit? (unlockable via cards)
     
-    // Special mechanics
+    // === ARMOR SHRED (Siege unique) ===
+    // Each hit reduces enemy armor, stacks up
+    armorShredEnabled: true,
+    armorShredAmount: 0.05,      // -5% armor per hit
+    armorShredMaxStacks: 5,      // Max stacks = -25% armor
+    armorShredDuration: 4000,    // 4 seconds
+    armorShredStackable: true,
+    
+    // === GROUND ZONE (Siege unique) ===
+    // Leaves slowing crater after explosion
+    groundZoneEnabled: false,    // Unlocked via upgrade
+    groundZoneRadius: 40,
+    groundZoneDuration: 2000,    // 2 seconds
+    groundZoneSlow: 0.25,        // 25% slow
+    
+    // Special mechanics (unused by Siege)
     chainCount: 0,
     chainDmgFalloff: 0,
     
-    // Magic system
+    // Magic system (unused by Siege)
     powerScaling: 0,
     minPowerDraw: 0,
     maxPowerDraw: 100,

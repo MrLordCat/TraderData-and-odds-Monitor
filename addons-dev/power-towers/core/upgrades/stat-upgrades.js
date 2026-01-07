@@ -333,6 +333,238 @@ const STAT_UPGRADES = {
     
     color: '#a29bfe'
   },
+
+  // =========================================
+  // ARMOR SHRED - SUNDER (+2% per level, Siege only)
+  // =========================================
+  shredAmount: {
+    id: 'shredAmount',
+    name: 'Sunder',
+    emoji: '🔨',
+    category: 'offense',
+    description: '+2% armor shred per hit per level',
+    
+    effect: {
+      type: 'additive',
+      stat: 'armorShredAmount',
+      valuePerLevel: 0.02,
+    },
+    
+    requires: {
+      attackTypes: ['siege']
+    },
+    
+    cost: {
+      base: 40,
+      scaleFactor: 1.18,
+    },
+    
+    color: '#e74c3c'
+  },
+
+  // =========================================
+  // ARMOR SHRED - MAX STACKS (+1 per level, Siege only)
+  // =========================================
+  shredStacks: {
+    id: 'shredStacks',
+    name: 'Deep Wounds',
+    emoji: '🩸',
+    category: 'offense',
+    description: '+1 max armor shred stack per level',
+    
+    effect: {
+      type: 'additive',
+      stat: 'armorShredMaxStacks',
+      valuePerLevel: 1,
+      maxValue: 10,
+    },
+    
+    requires: {
+      attackTypes: ['siege']
+    },
+    
+    cost: {
+      base: 50,
+      scaleFactor: 1.22,
+    },
+    
+    color: '#c0392b'
+  },
+
+  // =========================================
+  // ARMOR SHRED - DURATION (+1s per level, Siege only)
+  // =========================================
+  shredDuration: {
+    id: 'shredDuration',
+    name: 'Lasting Impact',
+    emoji: '⏱️',
+    category: 'offense',
+    description: '+1s armor shred duration per level',
+    
+    effect: {
+      type: 'additive',
+      stat: 'armorShredDuration',
+      valuePerLevel: 1000, // 1 second in ms
+    },
+    
+    requires: {
+      attackTypes: ['siege']
+    },
+    
+    cost: {
+      base: 35,
+      scaleFactor: 1.15,
+    },
+    
+    color: '#d35400'
+  },
+
+  // =========================================
+  // GROUND ZONE UNLOCK (one-time, Siege only)
+  // =========================================
+  groundZoneUnlock: {
+    id: 'groundZoneUnlock',
+    name: 'Crater Zone',
+    emoji: '🕳️',
+    category: 'offense',
+    description: 'Explosions leave slowing craters',
+    
+    effect: {
+      type: 'unlock',
+      stat: 'groundZoneEnabled',
+      valuePerLevel: 1,
+      maxValue: 1, // One-time unlock
+    },
+    
+    requires: {
+      attackTypes: ['siege']
+    },
+    
+    cost: {
+      base: 75,
+      scaleFactor: 1.0, // No scaling (one-time)
+    },
+    
+    color: '#8B4513'
+  },
+
+  // =========================================
+  // GROUND ZONE - SLOW (+5% per level, requires unlock)
+  // =========================================
+  groundZoneSlow: {
+    id: 'groundZoneSlow',
+    name: 'Tar Pit',
+    emoji: '🐢',
+    category: 'offense',
+    description: '+5% crater slow per level',
+    
+    effect: {
+      type: 'additive',
+      stat: 'groundZoneSlow',
+      valuePerLevel: 0.05,
+      maxValue: 0.80, // Cap at 80% slow
+    },
+    
+    requires: {
+      attackTypes: ['siege'],
+      upgrades: ['groundZoneUnlock'] // Requires unlock first
+    },
+    
+    cost: {
+      base: 40,
+      scaleFactor: 1.16,
+    },
+    
+    color: '#5d4037'
+  },
+
+  // =========================================
+  // GROUND ZONE - DURATION (+0.5s per level)
+  // =========================================
+  groundZoneDuration: {
+    id: 'groundZoneDuration',
+    name: 'Lingering',
+    emoji: '⌛',
+    category: 'offense',
+    description: '+0.5s crater duration per level',
+    
+    effect: {
+      type: 'additive',
+      stat: 'groundZoneDuration',
+      valuePerLevel: 500, // 0.5 seconds in ms
+    },
+    
+    requires: {
+      attackTypes: ['siege'],
+      upgrades: ['groundZoneUnlock']
+    },
+    
+    cost: {
+      base: 35,
+      scaleFactor: 1.14,
+    },
+    
+    color: '#795548'
+  },
+
+  // =========================================
+  // GROUND ZONE - RADIUS (+5 per level)
+  // =========================================
+  groundZoneRadius: {
+    id: 'groundZoneRadius',
+    name: 'Wide Crater',
+    emoji: '⭕',
+    category: 'offense',
+    description: '+5 crater radius per level',
+    
+    effect: {
+      type: 'additive',
+      stat: 'groundZoneRadius',
+      valuePerLevel: 5,
+    },
+    
+    requires: {
+      attackTypes: ['siege'],
+      upgrades: ['groundZoneUnlock']
+    },
+    
+    cost: {
+      base: 45,
+      scaleFactor: 1.17,
+    },
+    
+    color: '#6d4c41'
+  },
+
+  // =========================================
+  // SPLASH FALLOFF (-5% per level, Siege only)
+  // Reduces damage dropoff at edge of splash
+  // =========================================
+  splashFalloff: {
+    id: 'splashFalloff',
+    name: 'Concentrated Blast',
+    emoji: '💫',
+    category: 'offense',
+    description: '-5% splash damage falloff per level',
+    
+    effect: {
+      type: 'additive',
+      stat: 'splashDmgFalloff',
+      valuePerLevel: -0.05,
+      minValue: 0.1, // Min 10% falloff
+    },
+    
+    requires: {
+      attackTypes: ['siege']
+    },
+    
+    cost: {
+      base: 35,
+      scaleFactor: 1.15,
+    },
+    
+    color: '#ff6347'
+  },
 };
 
 module.exports = { STAT_UPGRADES };

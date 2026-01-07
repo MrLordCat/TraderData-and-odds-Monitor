@@ -9,8 +9,8 @@ const { TowerStatsMixin } = require('./tower-stats');
 const { EnergyStatsMixin } = require('./energy-stats');
 const { UpgradesMixin } = require('./upgrades');
 
-// Re-export styles and templates
-const { getBottomPanelStyles } = require('./styles');
+// Re-export styles and templates (styles now from styles/ folder)
+const { getBottomPanelStyles } = require('./styles/index');
 const { getBottomPanelTemplate } = require('./templates');
 
 /**

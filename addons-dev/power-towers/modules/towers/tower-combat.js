@@ -407,6 +407,18 @@ function performAttack(tower, eventBus, currentTime = Date.now() / 1000) {
     chainDmgFalloff: tower.chainDmgFalloff,
     chainCanCrit: tower.chainCanCrit || false,
     
+    // Armor Shred (Siege)
+    armorShredEnabled: tower.armorShredEnabled || false,
+    armorShredAmount: tower.armorShredAmount || 0,
+    armorShredMaxStacks: tower.armorShredMaxStacks || 0,
+    armorShredDuration: tower.armorShredDuration || 0,
+    
+    // Ground Zone (Siege)
+    groundZoneEnabled: tower.groundZoneEnabled || false,
+    groundZoneRadius: tower.groundZoneRadius || 0,
+    groundZoneDuration: tower.groundZoneDuration || 0,
+    groundZoneSlow: tower.groundZoneSlow || 0,
+    
     // Costs
     energyCost,
     powerCost,
