@@ -61,10 +61,11 @@ Final Damage = DMG + (Shot Cost / efficiency)
 - [x] Integrate magic charge into performAttack()
 - [x] Handle overflow on enemy death (event emitted, needs combat module listener)
 
-### Step 5: Renderer - Charge Bar ⬜
-- [ ] Add charge bar rendering under Magic towers
-- [ ] Blue/purple color, distinct from HP/energy bars
-- [ ] Glow/particle effect at high charge levels
+### Step 5: Renderer - Charge Bar ✅
+- [x] Add charge bar rendering under Magic towers
+- [x] Purple/violet color theme
+- [x] Glow effect when nearly full
+- [x] Sparkle particles when charged
 
 ### Step 6: UI Panel ✅
 - [x] Create charge control panel (in avatar-actions)

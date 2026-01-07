@@ -159,6 +159,70 @@ function EntityRendererMixin(Base) {
         type: 'consumer',
         showEmptyWarning: true
       });
+      
+      // === MAGIC CHARGE BAR (below energy bar) ===
+      if (attackType === 'magic' && tower.magicState) {
+        this._renderMagicChargeBar({
+          x: x,
+          y: y + baseSize * 0.7 + 8, // Below energy bar
+          width: baseSize * 1.2,
+          current: tower.magicState.currentCharge || 0,
+          max: tower.magicState.shotCost || 1,
+          isCharging: tower.magicState.isCharging,
+        });
+      }
+    }
+    
+    /**
+     * Render magic charge bar with purple theme
+     */
+    _renderMagicChargeBar(opts) {
+      const { x, y, width, current, max, isCharging } = opts;
+      const camera = this.camera;
+      const fillPct = max > 0 ? Math.min(1, current / max) : 0;
+      
+      const barHeight = 4;
+      const barX = x - width / 2;
+      const barY = y;
+      
+      // Background (darker purple tint)
+      this.shapeRenderer.rect(barX - 1, barY - 1, width + 2, barHeight + 2, 0, 0, 0, 0.7);
+      this.shapeRenderer.rect(barX, barY, width, barHeight, 0.15, 0.1, 0.2, 1);
+      
+      if (fillPct > 0) {
+        // Purple charge fill
+        const pulse = isCharging ? Math.sin(this.time * 0.015) * 0.2 + 0.8 : 1;
+        const intensity = fillPct;
+        
+        // Gradient from blue-purple (empty) to bright purple (full)
+        const r = 0.55 + fillPct * 0.35;  // 0.55 -> 0.9
+        const g = 0.25 + fillPct * 0.25;  // 0.25 -> 0.5
+        const b = 0.9 + fillPct * 0.1;    // 0.9 -> 1.0
+        
+        this.shapeRenderer.rect(barX, barY, width * fillPct, barHeight, 
+          r * pulse, g * pulse, b * pulse, 1);
+        
+        // Glow effect when nearly full
+        if (fillPct >= 0.8) {
+          const glow = Math.sin(this.time * 0.01) * 0.3 + 0.5;
+          this.shapeRenderer.rect(barX, barY, width * fillPct, barHeight,
+            1, 0.8, 1, glow * 0.3);
+        }
+      }
+      
+      // Border (purple tint)
+      this.shapeRenderer.rectOutline(barX, barY, width, barHeight, 1 / camera.zoom, 0.4, 0.2, 0.5, 0.8);
+      
+      // "Charged" indicator when ready
+      if (fillPct >= 1.0) {
+        // Sparkle particles
+        for (let i = 0; i < 2; i++) {
+          const sparkleX = barX + width * (0.3 + i * 0.4) + Math.sin(this.time * 0.02 + i) * 3;
+          const sparkleY = barY + barHeight / 2 + Math.cos(this.time * 0.02 + i) * 2;
+          const sparkleAlpha = Math.sin(this.time * 0.015 + i * Math.PI) * 0.3 + 0.5;
+          this.shapeRenderer.circle(sparkleX, sparkleY, 2 / camera.zoom, 1, 0.8, 1, sparkleAlpha);
+        }
+      }
     }
     
     /**
