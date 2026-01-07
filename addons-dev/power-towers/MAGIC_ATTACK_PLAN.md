@@ -66,11 +66,13 @@ Final Damage = DMG + (Shot Cost / efficiency)
 - [ ] Blue/purple color, distinct from HP/energy bars
 - [ ] Glow/particle effect at high charge levels
 
-### Step 6: UI Panel ⬜
-- [ ] Create charge control panel (above right side of bottom panel)
-- [ ] Slider 1-100% for charge setting
-- [ ] Display: shot cost, bonus damage, efficiency
-- [ ] Only visible when Magic tower selected
+### Step 6: UI Panel ✅
+- [x] Create charge control panel (in avatar-actions)
+- [x] Slider 1-100% for charge setting
+- [x] Display: shot cost, bonus damage, final damage
+- [x] Progress bar showing charge accumulation
+- [x] Only visible when Magic tower selected
+- [x] Real-time updates in updateBottomPanelStats
 
 ### Step 7: Upgrades ✅
 - [x] Add to tower-upgrade-list.js display

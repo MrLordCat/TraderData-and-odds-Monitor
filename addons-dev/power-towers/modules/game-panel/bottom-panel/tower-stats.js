@@ -190,6 +190,20 @@ function TowerStatsMixin(Base) {
         if (focusRow) focusRow.style.display = 'none';
       }
       
+      // === MAGIC ATTACK TYPE - Charge stats (real-time update) ===
+      const chargeRow = document.getElementById('stat-row-charge');
+      const magicbonusRow = document.getElementById('stat-row-magicbonus');
+      const overflowRow = document.getElementById('stat-row-overflow');
+      if (tower.attackTypeId === 'magic') {
+        // Update real-time magic stats via updateMagicChargeUI
+        this.updateMagicChargeUI(tower);
+      } else {
+        // Hide magic rows for non-magic towers
+        if (chargeRow) chargeRow.style.display = 'none';
+        if (magicbonusRow) magicbonusRow.style.display = 'none';
+        if (overflowRow) overflowRow.style.display = 'none';
+      }
+      
       // Update level
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${tower.level || 1}`;
       
@@ -710,6 +724,29 @@ function TowerStatsMixin(Base) {
         }
       }
       
+      // Show/hide Magic charge control panel
+      const magicChargePanel = el.actionMagicCharge || el.bottomPanel?.querySelector('#action-magic-charge');
+      if (magicChargePanel) {
+        magicChargePanel.style.display = tower.attackTypeId === 'magic' ? 'flex' : 'none';
+        
+        // Initialize magic charge slider if not done
+        if (tower.attackTypeId === 'magic' && !magicChargePanel._eventsAttached) {
+          magicChargePanel._eventsAttached = true;
+          const slider = magicChargePanel.querySelector('#magic-charge-slider');
+          if (slider) {
+            slider.addEventListener('input', (e) => {
+              const percent = parseInt(e.target.value, 10);
+              this.setMagicChargePercent(percent);
+            });
+          }
+        }
+        
+        // Update magic charge UI
+        if (tower.attackTypeId === 'magic') {
+          this.updateMagicChargeUI(tower);
+        }
+      }
+      
       // Always show tower actions panel when tower is selected
       if (el.actionsTower) {
         el.actionsTower.style.display = 'flex';
@@ -869,6 +906,93 @@ function TowerStatsMixin(Base) {
       }
       
       return parts.length > 0 ? parts.join('') : '<span style="color: #a0aec0">No effects</span>';
+    }
+    
+    // =========================================
+    // MAGIC CHARGE CONTROL
+    // =========================================
+    
+    /**
+     * Set magic charge percent from UI slider
+     * @param {number} percent - Charge percent (1-100)
+     */
+    setMagicChargePercent(percent) {
+      const tower = this.game?.selectedTower;
+      if (!tower || tower.attackTypeId !== 'magic') return;
+      
+      // Import setMagicChargePercent from tower-combat
+      const { setMagicChargePercent } = require('../../towers/tower-combat');
+      setMagicChargePercent(tower, percent);
+      
+      // Update UI immediately
+      this.updateMagicChargeUI(tower);
+    }
+    
+    /**
+     * Update Magic charge UI elements
+     * @param {Object} tower - Tower instance
+     */
+    updateMagicChargeUI(tower) {
+      if (!tower || tower.attackTypeId !== 'magic') return;
+      if (!tower.magicState) return;
+      
+      const el = this.elements;
+      const state = tower.magicState;
+      
+      // Update slider position
+      const slider = document.getElementById('magic-charge-slider');
+      if (slider && slider.value != state.chargePercent) {
+        slider.value = state.chargePercent;
+      }
+      
+      // Update percent label
+      const percentLabel = document.getElementById('charge-percent-label');
+      if (percentLabel) percentLabel.textContent = `${state.chargePercent}%`;
+      
+      // Update shot cost
+      const shotCostEl = document.getElementById('magic-shot-cost');
+      if (shotCostEl) shotCostEl.textContent = `${Math.floor(state.shotCost)} ⚡`;
+      
+      // Update bonus damage
+      const bonusDmgEl = document.getElementById('magic-bonus-damage');
+      if (bonusDmgEl) bonusDmgEl.textContent = `+${Math.floor(state.bonusDamage)}`;
+      
+      // Update final damage
+      const finalDmgEl = document.getElementById('magic-final-damage');
+      const finalDamage = (tower.damage || 10) + state.bonusDamage;
+      if (finalDmgEl) finalDmgEl.textContent = Math.floor(finalDamage);
+      
+      // Update progress bar
+      const progressFill = document.getElementById('magic-charge-progress');
+      const progressText = document.getElementById('magic-charge-text');
+      const progress = state.shotCost > 0 ? (state.currentCharge / state.shotCost) * 100 : 0;
+      if (progressFill) progressFill.style.width = `${Math.min(100, progress)}%`;
+      if (progressText) progressText.textContent = `${Math.floor(state.currentCharge)}/${Math.floor(state.shotCost)} ⚡`;
+      
+      // Update stats panel magic-specific rows
+      const chargeRow = document.getElementById('stat-row-charge');
+      const bonusRow = document.getElementById('stat-row-magicbonus');
+      const overflowRow = document.getElementById('stat-row-overflow');
+      
+      if (chargeRow) {
+        chargeRow.style.display = '';
+        const chargeEl = document.getElementById('panel-charge');
+        if (chargeEl) chargeEl.textContent = `${Math.floor(state.currentCharge)}/${Math.floor(state.shotCost)}`;
+      }
+      
+      if (bonusRow) {
+        bonusRow.style.display = '';
+        const bonusEl = document.getElementById('panel-magicbonus');
+        if (bonusEl) bonusEl.textContent = `+${Math.floor(state.bonusDamage)}`;
+      }
+      
+      if (overflowRow) {
+        overflowRow.style.display = '';
+        const { getMagicConfig } = require('../../towers/tower-combat');
+        const config = getMagicConfig(tower);
+        const overflowEl = document.getElementById('panel-overflow');
+        if (overflowEl) overflowEl.textContent = `${Math.round(config.overflowTransfer * 100)}%`;
+      }
     }
     
     /**

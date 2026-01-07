@@ -285,6 +285,22 @@ function getBottomPanelTemplate() {
               <span class="stat-value" id="panel-focus">0/5</span>
               <div class="hover-popup" id="panel-detail-focus"></div>
             </div>
+            <!-- Magic Attack Type Stats -->
+            <div class="stat-item stat-hoverable" data-stat="charge" id="stat-row-charge" style="display: none;">
+              <span class="stat-label">✨ CHARGE</span>
+              <span class="stat-value" id="panel-charge">0/50</span>
+              <div class="hover-popup" id="panel-detail-charge"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="magicbonus" id="stat-row-magicbonus" style="display: none;">
+              <span class="stat-label">🔮 BONUS</span>
+              <span class="stat-value" id="panel-magicbonus">+25</span>
+              <div class="hover-popup" id="panel-detail-magicbonus"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="overflow" id="stat-row-overflow" style="display: none;">
+              <span class="stat-label">🌀 OVERFLOW</span>
+              <span class="stat-value" id="panel-overflow">75%</span>
+              <div class="hover-popup" id="panel-detail-overflow"></div>
+            </div>
           </div>
           <!-- Energy Stats Grid -->
           <div class="stats-grid stats-grid-energy" id="stats-grid-energy" style="display: none;">
@@ -409,6 +425,41 @@ function getBottomPanelTemplate() {
                   <span class="card-icon">💀</span>
                   <span class="card-label">Dark</span>
                 </button>
+              </div>
+            </div>
+            
+            <!-- Magic Charge Control (only for Magic towers) -->
+            <div class="avatar-subsection magic-charge-control" id="action-magic-charge" style="display: none;">
+              <div class="avatar-subtitle">✨ Magic Charge</div>
+              <div class="magic-charge-row">
+                <div class="charge-slider-container">
+                  <input type="range" id="magic-charge-slider" min="1" max="100" value="50" class="charge-slider">
+                  <div class="charge-labels">
+                    <span>1%</span>
+                    <span id="charge-percent-label">50%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+                <div class="charge-info">
+                  <div class="charge-info-row">
+                    <span class="charge-info-label">Shot Cost:</span>
+                    <span class="charge-info-value" id="magic-shot-cost">26 ⚡</span>
+                  </div>
+                  <div class="charge-info-row">
+                    <span class="charge-info-label">Bonus DMG:</span>
+                    <span class="charge-info-value" id="magic-bonus-damage">+13</span>
+                  </div>
+                  <div class="charge-info-row">
+                    <span class="charge-info-label">Final DMG:</span>
+                    <span class="charge-info-value" id="magic-final-damage">23</span>
+                  </div>
+                </div>
+              </div>
+              <div class="charge-progress-row">
+                <div class="charge-progress-bar">
+                  <div class="charge-progress-fill" id="magic-charge-progress" style="width: 0%"></div>
+                </div>
+                <span class="charge-progress-text" id="magic-charge-text">0/26 ⚡</span>
               </div>
             </div>
           </div>

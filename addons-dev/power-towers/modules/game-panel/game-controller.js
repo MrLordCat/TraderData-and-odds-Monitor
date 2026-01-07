@@ -172,6 +172,14 @@ class GameControllerBase {
       // Normal attack type stats (Combo/Focus)
       panelCombo: container.querySelector('#panel-combo'),
       panelFocus: container.querySelector('#panel-focus'),
+      // Magic attack type stats (Charge/Overflow)
+      panelCharge: container.querySelector('#panel-charge'),
+      panelMagicbonus: container.querySelector('#panel-magicbonus'),
+      panelOverflow: container.querySelector('#panel-overflow'),
+      // Magic charge control panel
+      actionMagicCharge: container.querySelector('#action-magic-charge'),
+      magicChargeSlider: container.querySelector('#magic-charge-slider'),
+      magicChargeProgress: container.querySelector('#magic-charge-progress'),
       // Panel stats values (energy)
       panelStored: container.querySelector('#panel-stored'),
       panelOutput: container.querySelector('#panel-output'),

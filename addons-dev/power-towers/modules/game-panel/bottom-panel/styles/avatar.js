@@ -281,6 +281,116 @@ function getAvatarStyles() {
     }
     .avatar-action-card .card-icon { font-size: 16px; }
     .avatar-action-card .card-label { font-size: 10px; font-weight: 500; }
+    
+    /* ========================================
+       Magic Charge Control Panel
+       ======================================== */
+    .magic-charge-control {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(124, 58, 237, 0.05)) !important;
+      border-color: rgba(139, 92, 246, 0.3) !important;
+    }
+    .magic-charge-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .charge-slider-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .charge-slider {
+      width: 100%;
+      height: 8px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(139, 92, 246, 0.2);
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+    }
+    .charge-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(139, 92, 246, 0.5);
+    }
+    .charge-slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 6px rgba(139, 92, 246, 0.5);
+    }
+    .charge-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 8px;
+      color: #a0aec0;
+    }
+    #charge-percent-label {
+      color: #a78bfa;
+      font-weight: 600;
+      font-size: 10px;
+    }
+    .charge-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 80px;
+    }
+    .charge-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+    }
+    .charge-info-label {
+      color: #a0aec0;
+    }
+    .charge-info-value {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+    #magic-bonus-damage {
+      color: #68d391;
+    }
+    #magic-final-damage {
+      color: #ffd700;
+    }
+    .charge-progress-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .charge-progress-bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(139, 92, 246, 0.15);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .charge-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+      transition: width 0.1s ease-out;
+      box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+    }
+    .charge-progress-text {
+      font-size: 9px;
+      color: #a78bfa;
+      font-weight: 600;
+      min-width: 55px;
+      text-align: right;
+    }
   `;
 }
 
