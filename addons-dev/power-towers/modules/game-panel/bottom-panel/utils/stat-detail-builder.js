@@ -198,23 +198,23 @@ function buildStatDetail(options) {
   const fmt = (v) => isFloat ? formatNumber(v, 2) : formatInt(v);
   
   const levelBonus = 1 + (level - 1) * (levelBonusPercent / 100);
-  const afterLevel = baseValue * levelBonus;
-  const afterType = afterLevel * typeMod;
+  const afterType = baseValue * typeMod;
+  const afterLevel = afterType * levelBonus;
   const upgradeBonus = upgradeLevel * upgradePercent;
-  const afterUpgrade = afterType * (1 + upgradeBonus);
+  const afterUpgrade = afterLevel * (1 + upgradeBonus);
   const afterBiome = afterUpgrade * biomeBonus;
   
   const builder = createDetailBuilder()
     .base('Base:', fmt(baseValue))
-    .level(level, Math.round((levelBonus - 1) * 100), fmt(afterLevel))
     .type('Type', typeMod, fmt(afterType))
+    .level(level, Math.round((levelBonus - 1) * 100), fmt(afterLevel))
     .upgrade(upgradeLevel, Math.round(upgradeBonus * 100), fmt(afterUpgrade));
   
   if (biomeBonus !== 1) {
     builder.biome('', biomeBonus, fmt(afterBiome));
   }
   
-  let formula = `(Base × Lvl%) × Type × Upg%`;
+  let formula = `(Base × Type) × Lvl% × Upg%`;
   if (biomeBonus !== 1) {
     formula += ' × Biome';
   }

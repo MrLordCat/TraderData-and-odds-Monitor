@@ -370,7 +370,47 @@ function getGameTemplate() {
           </div>
         </div>
         
-
+        <!-- Floating Magic Charge Control Panel (above Build/Upgrades section) -->
+        <div class="magic-charge-floating" id="magic-charge-panel" style="display: none;">
+          <div class="magic-charge-header">
+            <span class="magic-charge-title">✨ Magic Charge Control</span>
+            <span class="magic-charge-status" id="magic-charge-status">Charging...</span>
+          </div>
+          <div class="magic-charge-body">
+            <div class="charge-main-row">
+              <div class="charge-slider-section">
+                <div class="slider-label">Charge Level</div>
+                <input type="range" id="magic-charge-slider" min="1" max="100" value="50" class="charge-slider">
+                <div class="charge-labels">
+                  <span>1%</span>
+                  <span class="charge-percent" id="charge-percent-label">50%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+              <div class="charge-stats-section">
+                <div class="charge-stat">
+                  <span class="stat-label">Shot Cost</span>
+                  <span class="stat-value" id="magic-shot-cost">26 ⚡</span>
+                </div>
+                <div class="charge-stat">
+                  <span class="stat-label">Bonus DMG</span>
+                  <span class="stat-value bonus" id="magic-bonus-damage">+38</span>
+                </div>
+                <div class="charge-stat">
+                  <span class="stat-label">Final DMG</span>
+                  <span class="stat-value final" id="magic-final-damage">48</span>
+                </div>
+              </div>
+            </div>
+            <div class="charge-bar-section">
+              <span class="charge-bar-label">Energy:</span>
+              <div class="charge-bar">
+                <div class="charge-bar-fill" id="magic-charge-progress" style="width: 0%"></div>
+              </div>
+              <span class="charge-bar-text" id="magic-charge-text">0 / 76 ⚡</span>
+            </div>
+          </div>
+        </div>
         
         <!-- Bottom Panel (3-section layout) -->
         ${getBottomPanelTemplate()}

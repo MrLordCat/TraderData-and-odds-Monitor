@@ -234,6 +234,7 @@ class CombatModule {
       damage: projectile.damage,
       isCrit: projectile.isCrit,
       towerId: projectile.towerId,
+      attackType: projectile.attackTypeId,  // NEW: Attack type for cascade
       effects: this.getEffectsForType(projectile.towerType),
       // NEW: Element effects
       elementEffects: projectile.elementAbilities ? {
@@ -317,6 +318,7 @@ class CombatModule {
       isCrit: projectile.isCrit,
       isFocusFire: projectile.isFocusFire,  // NEW: Focus fire indicator
       towerId: projectile.towerId,
+      attackType: projectile.attackTypeId,  // NEW: Attack type for cascade
       effects: this.getEffectsForType(projectile.towerType),
       // NEW: Element effects
       elementEffects: projectile.elementAbilities ? {

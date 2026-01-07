@@ -427,41 +427,6 @@ function getBottomPanelTemplate() {
                 </button>
               </div>
             </div>
-            
-            <!-- Magic Charge Control (only for Magic towers) -->
-            <div class="avatar-subsection magic-charge-control" id="action-magic-charge" style="display: none;">
-              <div class="avatar-subtitle">✨ Magic Charge</div>
-              <div class="magic-charge-row">
-                <div class="charge-slider-container">
-                  <input type="range" id="magic-charge-slider" min="1" max="100" value="50" class="charge-slider">
-                  <div class="charge-labels">
-                    <span>1%</span>
-                    <span id="charge-percent-label">50%</span>
-                    <span>100%</span>
-                  </div>
-                </div>
-                <div class="charge-info">
-                  <div class="charge-info-row">
-                    <span class="charge-info-label">Shot Cost:</span>
-                    <span class="charge-info-value" id="magic-shot-cost">26 ⚡</span>
-                  </div>
-                  <div class="charge-info-row">
-                    <span class="charge-info-label">Bonus DMG:</span>
-                    <span class="charge-info-value" id="magic-bonus-damage">+13</span>
-                  </div>
-                  <div class="charge-info-row">
-                    <span class="charge-info-label">Final DMG:</span>
-                    <span class="charge-info-value" id="magic-final-damage">23</span>
-                  </div>
-                </div>
-              </div>
-              <div class="charge-progress-row">
-                <div class="charge-progress-bar">
-                  <div class="charge-progress-fill" id="magic-charge-progress" style="width: 0%"></div>
-                </div>
-                <span class="charge-progress-text" id="magic-charge-text">0/26 ⚡</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>

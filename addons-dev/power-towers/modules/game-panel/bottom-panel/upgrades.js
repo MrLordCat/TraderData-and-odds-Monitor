@@ -52,7 +52,7 @@ function UpgradesMixin(Base) {
       // Get discount utilities
       const { getUpgradeDiscount } = require('../../../core/tower-upgrades');
       
-      // All possible stat upgrades
+      // All possible stat upgrades (general stats only, attack-type specific are handled separately)
       const allUpgrades = [
         'damage', 'attackSpeed', 'range', 'critChance', 'critDamage',
         'powerEfficiency', 'hp', 'hpRegen', 'energyStorage',
@@ -119,7 +119,15 @@ function UpgradesMixin(Base) {
           energyStorage: 'STOR',
           splashRadius: 'SPLASH',
           chainCount: 'CHAIN',
-          powerScaling: 'SCALE'
+          powerScaling: 'SCALE',
+          // Magic upgrades
+          magicEfficiency: 'EFF',
+          overflowRange: 'OVR',
+          overflowDamage: 'CASC',
+          chargeSpeed: 'CHRG',
+          // Siege upgrades  
+          shredAmount: 'SHRD',
+          shredStacks: 'STCK'
         };
         
         const card = document.createElement('div');
@@ -171,8 +179,9 @@ function UpgradesMixin(Base) {
       }
       
       // === ATTACK TYPE SPECIFIC UPGRADES ===
-      // Add Normal Attack upgrades (Combo/Focus Fire)
-      if (tower.attackTypeId === 'normal') {
+      // Add attack type upgrades for types that have them
+      const typesWithUpgrades = ['normal', 'magic', 'siege', 'piercing'];
+      if (typesWithUpgrades.includes(tower.attackTypeId)) {
         this.renderAttackTypeUpgrades(tower, el.upgradesGridPanel, gold);
       }
       
@@ -267,19 +276,46 @@ function UpgradesMixin(Base) {
       const upgrades = getAttackTypeUpgrades(tower.attackTypeId);
       if (!upgrades || Object.keys(upgrades).length === 0) return;
       
+      // Attack type labels
+      const attackTypeLabels = {
+        normal: '🎯 NORMAL ATTACK',
+        magic: '✨ MAGIC ATTACK',
+        siege: '💥 SIEGE ATTACK',
+        piercing: '🗡️ PIERCING ATTACK'
+      };
+      
       // Add separator
       const separator = document.createElement('div');
       separator.className = 'upgrade-separator';
-      separator.innerHTML = `<span>🎯 Normal Attack</span>`;
+      separator.innerHTML = `<span>${attackTypeLabels[tower.attackTypeId] || 'ATTACK'}</span>`;
       container.appendChild(separator);
       
-      // Short names for attack type upgrades
+      // Short names for all attack type upgrades
       const shortNames = {
+        // Normal
         comboDamage: 'COMBO',
         comboMaxStacks: 'STACK',
         comboDecay: 'DECAY',
         focusFire: 'FOCUS',
-        focusCritBonus: 'FCRIT'
+        focusCritBonus: 'FCRIT',
+        // Magic
+        energyEfficiency: 'EFF',
+        overflowRange: 'OVRNG',
+        overflowDamage: 'OVDMG',
+        chargeSpeed: 'CHRG',
+        // Siege
+        splashRadius: 'SPLSH',
+        splashFalloff: 'FALL',
+        shredAmount: 'SHRED',
+        shredStacks: 'SHSTK',
+        shredDuration: 'SHDUR',
+        groundZoneSlow: 'GZSLO',
+        groundZoneDuration: 'GZDUR',
+        groundZoneRadius: 'GZRAD',
+        // Piercing
+        armorPen: 'PEN',
+        critChance: 'CRIT',
+        critDamage: 'CDMG'
       };
       
       for (const [upgradeId, upgrade] of Object.entries(upgrades)) {

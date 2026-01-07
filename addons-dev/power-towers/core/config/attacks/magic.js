@@ -22,8 +22,8 @@ const MAGIC_ATTACK_CONFIG = {
   // ╚════════════════════════════════════════════════════════════════════════╝
   
   charge: {
-    // Shot Cost = (DMG / dmgDivisor) + chargePercent + (chargePercent² / 100)
-    dmgDivisor: 50,              // Divisor for damage component
+    // New Formula: Shot Cost = DMG × multiplier × (1 + charge%)²
+    dmgMultiplier: 1.2,          // Multiplier for damage component
     minChargePercent: 1,         // Minimum charge setting (%)
     maxChargePercent: 100,       // Maximum charge setting (%)
     defaultChargePercent: 50,    // Default charge setting (%)
@@ -75,6 +75,7 @@ const MAGIC_ATTACK_CONFIG = {
     energyEfficiency: {
       id: 'energyEfficiency',
       name: 'Arcane Efficiency',
+      emoji: '⚡',
       description: 'Improves energy to damage conversion',
       maxLevel: 10,
       cost: { base: 40, scaleFactor: 1.25 },
@@ -89,6 +90,7 @@ const MAGIC_ATTACK_CONFIG = {
     overflowRange: {
       id: 'overflowRange',
       name: 'Overflow Reach',
+      emoji: '🔮',
       description: 'Increases Arcane Overflow target range',
       maxLevel: 5,
       cost: { base: 35, scaleFactor: 1.3 },
@@ -103,6 +105,7 @@ const MAGIC_ATTACK_CONFIG = {
     overflowDamage: {
       id: 'overflowDamage',
       name: 'Arcane Cascade',
+      emoji: '💫',
       description: 'Increases overflow damage transfer',
       maxLevel: 5,
       cost: { base: 45, scaleFactor: 1.35 },
@@ -117,6 +120,7 @@ const MAGIC_ATTACK_CONFIG = {
     chargeSpeed: {
       id: 'chargeSpeed',
       name: 'Quick Charge',
+      emoji: '🔋',
       description: 'Faster energy charging',
       maxLevel: 5,
       cost: { base: 30, scaleFactor: 1.25 },

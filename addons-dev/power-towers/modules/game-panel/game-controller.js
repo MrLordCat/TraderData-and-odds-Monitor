@@ -176,8 +176,8 @@ class GameControllerBase {
       panelCharge: container.querySelector('#panel-charge'),
       panelMagicbonus: container.querySelector('#panel-magicbonus'),
       panelOverflow: container.querySelector('#panel-overflow'),
-      // Magic charge control panel
-      actionMagicCharge: container.querySelector('#action-magic-charge'),
+      // Magic charge floating panel
+      magicChargePanel: container.querySelector('#magic-charge-panel'),
       magicChargeSlider: container.querySelector('#magic-charge-slider'),
       magicChargeProgress: container.querySelector('#magic-charge-progress'),
       // Panel stats values (energy)

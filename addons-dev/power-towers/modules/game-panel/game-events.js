@@ -63,6 +63,16 @@ function GameEventsMixin(Base) {
         data?.tower ? this.showTowerInfo(data.tower) : this.hideTowerInfo();
       });
       
+      // Handle tower deselection - hide Magic charge panel
+      this.game.on('tower:deselected', () => {
+        this.hideTowerInfo();
+        // Hide floating Magic charge panel
+        const magicChargePanel = document.getElementById('magic-charge-panel');
+        if (magicChargePanel) {
+          magicChargePanel.style.display = 'none';
+        }
+      });
+      
       // Listen for tower updates (attack type set, element set, XP gain, etc.)
       this.game.on('tower:updated', (data) => {
         // Only update bottom panel if:

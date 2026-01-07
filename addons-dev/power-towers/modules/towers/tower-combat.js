@@ -507,7 +507,7 @@ function getMagicConfig(tower) {
   const upgrades = tower.attackTypeUpgrades || {};
   
   // Base values
-  const dmgDivisor = chargeConfig.dmgDivisor || 50;
+  const dmgMultiplier = chargeConfig.dmgMultiplier || 1.2;
   let efficiencyDivisor = efficiencyConfig.baseDivisor || 2.0;
   const minDivisor = efficiencyConfig.minDivisor || 0.5;
   let chargeRate = chargeConfig.chargeRate || 1.0;
@@ -533,7 +533,8 @@ function getMagicConfig(tower) {
   }
   
   return {
-    dmgDivisor,
+    dmgMultiplier,
+    baseDivisor: efficiencyConfig.baseDivisor || 2.0,
     efficiencyDivisor,
     chargeRate,
     overflowEnabled: overflowConfig.enabled !== false,
@@ -566,7 +567,10 @@ function initMagicState(tower) {
 
 /**
  * Calculate shot cost based on current charge percent setting
- * Shot Cost = (DMG / dmgDivisor) + charge% + (charge%² / 100)
+ * New Formula: DMG × multiplier × (1 + charge%)²
+ * - DMG Component = DMG × multiplier
+ * - Linear = DMG Component × (1 + charge%/100)
+ * - Quadratic = Linear × (1 + charge%/100)
  * @param {Object} tower - Tower instance
  */
 function updateMagicShotCost(tower) {
@@ -576,12 +580,18 @@ function updateMagicShotCost(tower) {
   const chargePercent = tower.magicState.chargePercent;
   const dmg = tower.damage || 10;
   
-  // Formula: (DMG / divisor) + charge% + (charge%² / 100)
-  const baseCost = dmg / config.dmgDivisor;
-  const linearCost = chargePercent;
-  const expCost = (chargePercent * chargePercent) / 100;
+  // New Formula: DMG × multiplier × (1 + charge%)²
+  const dmgComponent = dmg * config.dmgMultiplier;
+  const chargeMultiplier = 1 + chargePercent / 100;
+  const afterLinear = dmgComponent * chargeMultiplier;
+  const afterQuadratic = afterLinear * chargeMultiplier;
   
-  tower.magicState.shotCost = Math.ceil(baseCost + linearCost + expCost);
+  tower.magicState.shotCost = Math.ceil(afterQuadratic);
+  
+  // Store intermediate values for UI display
+  tower.magicState.dmgComponent = dmgComponent;
+  tower.magicState.afterLinear = afterLinear;
+  tower.magicState.afterQuadratic = afterQuadratic;
   
   // Bonus Damage = shotCost / efficiencyDivisor
   tower.magicState.bonusDamage = Math.floor(tower.magicState.shotCost / config.efficiencyDivisor);
@@ -606,6 +616,7 @@ function setMagicChargePercent(tower, percent) {
 
 /**
  * Update magic charge accumulation (call every frame)
+ * INSTANT CHARGING: If tower has energy in storage, charge instantly
  * @param {Object} tower - Tower instance
  * @param {number} deltaTime - Time since last update
  * @param {number} energyAvailable - Energy available for charging
@@ -615,7 +626,6 @@ function updateMagicCharge(tower, deltaTime, energyAvailable) {
   if (tower.attackTypeId !== 'magic') return 0;
   if (!tower.magicState) initMagicState(tower);
   
-  const config = getMagicConfig(tower);
   const shotCost = tower.magicState.shotCost;
   const currentCharge = tower.magicState.currentCharge;
   
@@ -626,10 +636,10 @@ function updateMagicCharge(tower, deltaTime, energyAvailable) {
     return 0;
   }
   
-  // Calculate how much energy to draw this frame
+  // INSTANT CHARGE: Draw as much energy as needed (up to available)
+  // No rate limit - if tower has energy, it charges instantly
   const chargeNeeded = shotCost - currentCharge;
-  const maxChargeThisFrame = config.chargeRate * deltaTime * 60; // Base rate per frame (60fps normalized)
-  const chargeThisFrame = Math.min(chargeNeeded, maxChargeThisFrame, energyAvailable);
+  const chargeThisFrame = Math.min(chargeNeeded, energyAvailable);
   
   if (chargeThisFrame > 0) {
     tower.magicState.currentCharge += chargeThisFrame;
@@ -730,7 +740,7 @@ function processArcaneOverflow(tower, killedEnemy, overkillDamage, enemies, even
   
   return {
     targetEnemy: nearestEnemy,
-    damage: overflowDamage,
+    overflowDamage: overflowDamage,
   };
 }
 

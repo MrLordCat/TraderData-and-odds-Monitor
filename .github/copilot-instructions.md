@@ -137,10 +137,10 @@ Player builds **Base Tower** and upgrades it:
 
 | Type | Emoji | Purpose | Mechanics |
 |------|-------|---------|-----------|
-| **Normal** | ЁЯОп | Single-target, bosses | Combo System (stacks), Focus Fire (guaranteed crit) |
-| **Siege** | ЁЯТе | AoE, swarms | Splash Damage, Armor Shred, Ground Zone (craters) |
-| **Magic** | тЬи | With energy | Power Scaling 1.5├Ч, Overdrive |
-| **Piercing** | ЁЯЧбя╕П | Crits | 15% base crit, 20% armor pen |
+| **Normal** | 🎯 | Single-target, bosses | Combo System (stacks), Focus Fire (guaranteed crit) |
+| **Siege** | 💥 | AoE, swarms | Splash Damage, Armor Shred, Ground Zone (craters) |
+| **Magic** | ✨ | Energy-based burst | Charge System, Arcane Overflow (cascade) |
+| **Piercing** | 🗡️ | Crits | 15% base crit, 20% armor pen |
 
 ### 3.3 Tower Base Stats
 | Stat | Base Value | Upgrade Bonus |
@@ -215,11 +215,43 @@ Towers gain XP from upgrades. Level provides stat bonuses and upgrade discounts.
 
 **Files:**
 - Config: `core/config/attacks/siege.js`
-- Handler: `core/attack-types.js` тЖТ `processSiegeAttack()`
-- Shred effect: `modules/enemies/status-effects.js` тЖТ `ARMOR_SHRED`
-- Combat logic: `modules/towers/tower-combat.js` тЖТ `getSiegeConfig()`, `processSiegeHit()`
+- Handler: `core/attack-types.js` → `processSiegeAttack()`
+- Shred effect: `modules/enemies/status-effects.js` → `ARMOR_SHRED`
+- Combat logic: `modules/towers/tower-combat.js` → `getSiegeConfig()`, `processSiegeHit()`
 
-### 3.7 Energy System
+### 3.7 Magic Attack (implemented)
+
+**Charge System:**
+- Tower charges energy before firing
+- **Formula:** `Shot Cost = DMG × 1.2 × (1 + charge%)²`
+- Higher charge% = more damage but higher energy cost
+- Instant charging from tower's energy storage
+
+**Arcane Overflow (Cascade):**
+- Overkill damage transfers to nearest enemy
+- Base transfer: 75% of overkill damage
+- Search radius: 80px (upgradeable)
+
+**Stat Modifiers:**
+- Attack Speed: ×0.7 (slower)
+- Damage: ×0.9 (slightly lower base)
+- Range: ×1.2 (extended)
+- Energy Storage: ×1.2 (more capacity)
+
+**Upgrades:**
+| ID | Name | Emoji | Effect |
+|----|------|-------|--------|
+| `energyEfficiency` | Arcane Efficiency | ⚡ | -0.1 efficiency divisor per level |
+| `overflowRange` | Overflow Reach | 🔮 | +20px cascade search radius |
+| `overflowDamage` | Arcane Cascade | 💫 | +10% cascade damage transfer |
+| `chargeSpeed` | Quick Charge | 🔋 | +15% charge rate |
+
+**Files:**
+- Config: `core/config/attacks/magic.js`
+- Combat logic: `modules/towers/tower-combat.js` → `getMagicConfig()`, `updateMagicCharge()`, `processArcaneOverflow()`
+- UI: `modules/game-panel/bottom-panel/tower-stats.js` → Magic charge popup
+
+### 3.8 Energy System
 
 | Building | Cost | Size | Gen/tick | Special |
 |----------|------|------|----------|---------|
@@ -389,12 +421,43 @@ panelMystat: container.querySelector('#panel-mystat'),
 
 ## 8. Development Status
 
-### тЬЕ Implemented
+### ✅ Implemented
 - Modular architecture with EventBus
 - Map generation with spiral path
 - Biome system (6 types)
 - Tower system with attack types
-- **Normal Attack** (Combo System, Focus Fire) тАФ complete
+- **Normal Attack** (Combo System, Focus Fire) — complete
+- **Siege Attack** (Splash, Armor Shred, Ground Zone) — complete
+- **Magic Attack** (Charge System, Arcane Overflow) — complete
+- 5 elemental paths
+- XP system for towers and buildings
+- 5 enemy types with wave scaling
+- Status effects (burn, slow, freeze, poison, armor_shred)
+- Complete energy system
+- WebGL rendering
+
+### 🚧 Planned
+- Piercing Attack mechanics (crit upgrades)
+- Card system (every 10 waves)
+- More enemy types (flying, magic-immune)
+- Boss mechanics
+- Sound effects
+- Save/Load system
+
+---
+
+## 9. Common Mistakes
+
+- **Forgot to cache element** — add to `game-controller.js`
+- **Empty popup** — check that `getElementById` finds the element
+- **Upgrade not applying** — check that you're reading from `tower.attackTypeUpgrades`
+- **Stat not updating** — ensure `updateBottomPanelStats()` is being called
+- **CSS class not working** — check `styles/tooltips.js`
+
+---
+
+*Document version: 07.01.2026*
+*Game version: 0.6.0 (Magic Complete)*
 - **Siege Attack** (Splash, Armor Shred, Ground Zone) тАФ complete
 - 5 elemental paths
 - XP system for towers and buildings

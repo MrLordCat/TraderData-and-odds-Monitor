@@ -409,8 +409,9 @@ class EnemiesModule {
    * @param {number} data.towerId - Source tower ID
    * @param {Object} data.elementEffects - Element effects config
    * @param {boolean} data.isCrit - Was critical hit
+   * @param {string} data.attackType - Attack type (normal, magic, siege, piercing)
    */
-  damageEnemy({ enemyId, damage, towerId, elementEffects, isCrit }) {
+  damageEnemy({ enemyId, damage, towerId, elementEffects, isCrit, attackType }) {
     const enemy = this.enemies.find(e => e.id === enemyId);
     if (!enemy) {
       console.warn(`[EnemiesModule] damageEnemy: enemy ${enemyId} not found! Current enemies:`, 
@@ -426,9 +427,20 @@ class EnemiesModule {
     // Store if last hit was a crit (for bonus gold on kill)
     enemy.lastHitWasCrit = isCrit || false;
     
+    // Store attack type for cascade/overflow handling
+    enemy.lastAttackType = attackType || 'normal';
+    
     // Calculate damage with status effect modifiers (curse, weaken)
     const { finalDamage, modifiers } = StatusEffects.calculateDamageWithEffects(enemy, damage);
+    
+    // Calculate overkill damage for magic cascade
+    const healthBeforeDamage = enemy.health;
     enemy.health -= finalDamage;
+    
+    // Store overkill for cascade processing
+    if (enemy.health <= 0) {
+      enemy.overkillDamage = Math.abs(enemy.health);
+    }
     
     // Apply element effects
     if (elementEffects) {
@@ -643,11 +655,62 @@ class EnemiesModule {
       reward: enemy.reward,
       killerTowerId: enemy.lastDamagedByTowerId,
       isCrit: enemy.lastHitWasCrit || false,
-      critBonus
+      critBonus,
+      overkillDamage: enemy.overkillDamage || 0,
+      attackType: enemy.lastAttackType || 'normal'
     });
+    
+    // Process Magic Cascade (Arcane Overflow)
+    if (enemy.lastAttackType === 'magic' && enemy.overkillDamage > 0 && enemy.lastDamagedByTowerId) {
+      this.processMagicCascade(enemy);
+    }
     
     // Add base reward + any crit bonus
     this.eventBus.emit('economy:gain', enemy.reward + critBonus);
+  }
+  
+  /**
+   * Process Magic Cascade (Arcane Overflow)
+   * Transfers overkill damage to nearest enemy
+   */
+  processMagicCascade(killedEnemy) {
+    const { processArcaneOverflow } = require('../towers/tower-combat');
+    
+    // Get the tower that killed this enemy
+    this.eventBus.emit('towers:get-by-id', {
+      towerId: killedEnemy.lastDamagedByTowerId,
+      callback: (tower) => {
+        if (!tower || tower.attackTypeId !== 'magic') return;
+        
+        const result = processArcaneOverflow(
+          tower,
+          killedEnemy,
+          killedEnemy.overkillDamage,
+          this.enemies,
+          this.eventBus
+        );
+        
+        if (result && result.targetEnemy) {
+          // Apply cascade damage
+          this.damageEnemy({
+            enemyId: result.targetEnemy.id,
+            damage: result.overflowDamage,
+            towerId: tower.id,
+            attackType: 'magic',
+            isCrit: false
+          });
+          
+          // Visual effect for cascade
+          this.eventBus.emit('effect:magic-cascade', {
+            sourceX: killedEnemy.x,
+            sourceY: killedEnemy.y,
+            targetX: result.targetEnemy.x,
+            targetY: result.targetEnemy.y,
+            damage: result.overflowDamage
+          });
+        }
+      }
+    });
   }
 
   /**

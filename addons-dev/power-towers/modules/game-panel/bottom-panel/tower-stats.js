@@ -221,7 +221,7 @@ function TowerStatsMixin(Base) {
       }
       
       // Update Energy bar and value
-      const energy = tower.energy || 0;
+      const energy = tower.currentEnergy || 0;
       const maxEnergy = tower.maxEnergy || tower.energyStorage || 100;
       const energyPercent = Math.min(100, (energy / maxEnergy) * 100);
       
@@ -255,10 +255,13 @@ function TowerStatsMixin(Base) {
       const detailDmg = document.getElementById('panel-detail-dmg');
       if (detailDmg) {
         const baseDmg = tower.baseDamage || 10;
+        const typeMod = attackType.dmgMod || 1;
+        const afterType = baseDmg * typeMod;
+        const afterLevel = afterType * levelBonus;
         const builder = createDetailBuilder()
           .base('Base:', formatInt(baseDmg))
-          .level(level, Math.round((levelBonus - 1) * 100), formatInt(baseDmg * levelBonus))
-          .type('Type', attackType.dmgMod || 1, formatInt(baseDmg * levelBonus * (attackType.dmgMod || 1)));
+          .type('Type', typeMod, formatInt(afterType))
+          .level(level, Math.round((levelBonus - 1) * 100), formatInt(afterLevel));
         
         if (upgrades.damage) {
           builder.upgrade(upgrades.damage, upgrades.damage * 5, formatInt(tower.damage));
@@ -279,7 +282,7 @@ function TowerStatsMixin(Base) {
         }
         
         builder.final(formatInt(effectiveDamage))
-          .formula('Base × Lvl% × Type × Upg%' + (tower.attackTypeId === 'normal' ? ' × Combo%' : ''));
+          .formula('(Base × Type) × Lvl% × Upg%' + (tower.attackTypeId === 'normal' ? ' × Combo%' : ''));
         detailDmg.innerHTML = builder.build();
       }
       
@@ -496,6 +499,86 @@ function TowerStatsMixin(Base) {
           .final(`${effectiveCrit.toFixed(1)}x`)
           .formula('Focus = Guaranteed Crit + Bonus');
         detailFocus.innerHTML = builder.build();
+      }
+      
+      // MAGIC CHARGE stat popup
+      const detailCharge = document.getElementById('panel-detail-charge');
+      if (detailCharge && attackTypeName === 'magic') {
+        const { getMagicConfig } = require('../../../modules/towers/tower-combat');
+        const config = getMagicConfig(tower);
+        const magicState = tower.magicState || {};
+        const shotCost = magicState.shotCost || 0;
+        const currentCharge = magicState.currentCharge || 0;
+        const chargePercent = magicState.chargePercent || 50;
+        
+        // New formula values from magicState
+        const dmgComponent = magicState.dmgComponent || (tower.damage || 10) * (config.dmgMultiplier || 1.2);
+        const afterLinear = magicState.afterLinear || dmgComponent * (1 + chargePercent / 100);
+        const afterQuadratic = magicState.afterQuadratic || afterLinear * (1 + chargePercent / 100);
+        
+        const builder = createDetailBuilder()
+          .base('Charge %:', `${chargePercent}%`)
+          .line('Formula:', `DMG×${config.dmgMultiplier} × (1+%)²`, 'detail-base')
+          .line('DMG Component:', `${Math.round(dmgComponent)}⚡`, 'detail-level')
+          .line(`Linear (+${chargePercent}%):`, `${Math.round(afterLinear)}⚡`, 'detail-upgrade')
+          .line(`Quadratic (+${chargePercent}%):`, `${Math.round(afterQuadratic)}⚡`, 'detail-upgrade')
+          .line('Current:', `${Math.round(currentCharge)}/${Math.round(shotCost)}⚡`, 'detail-biome')
+          .final(`${Math.round(shotCost)}⚡`)
+          .formula('Higher % = more damage but slower');
+        detailCharge.innerHTML = builder.build();
+      }
+      
+      // MAGIC BONUS stat popup
+      const detailMagicBonus = document.getElementById('panel-detail-magicbonus');
+      if (detailMagicBonus && attackTypeName === 'magic') {
+        const { getMagicConfig } = require('../../../modules/towers/tower-combat');
+        const config = getMagicConfig(tower);
+        const magicState = tower.magicState || {};
+        const shotCost = magicState.shotCost || 0;
+        const bonusDamage = magicState.bonusDamage || 0;
+        const upgrades = tower.upgradeLevels || {};
+        const efficiencyLv = upgrades.magicEfficiency || 0;
+        
+        const builder = createDetailBuilder()
+          .base('Base Divisor:', `${config.baseDivisor}`);
+        if (efficiencyLv > 0) {
+          builder.line(`Upgrades (${efficiencyLv}):`, `-${(efficiencyLv * 0.1).toFixed(1)}`, 'detail-upgrade');
+        }
+        builder.line('Current Divisor:', `${config.efficiencyDivisor.toFixed(1)}`, 'detail-level')
+          .line('Shot Cost:', `${Math.round(shotCost)}⚡`, 'detail-base')
+          .line('Formula:', `Cost / Divisor`, 'detail-base')
+          .final(`+${Math.round(bonusDamage)}`)
+          .formula('Energy invested → bonus damage');
+        detailMagicBonus.innerHTML = builder.build();
+      }
+      
+      // OVERFLOW stat popup
+      const detailOverflow = document.getElementById('panel-detail-overflow');
+      if (detailOverflow && attackTypeName === 'magic') {
+        const { getMagicConfig } = require('../../../modules/towers/tower-combat');
+        const config = getMagicConfig(tower);
+        const upgrades = tower.upgradeLevels || {};
+        const overflowRangeLv = upgrades.overflowRange || 0;
+        const overflowDmgLv = upgrades.overflowDamage || 0;
+        
+        const baseTransfer = 0.75;
+        const finalTransfer = config.overflowTransfer;
+        const baseRadius = 80;
+        const finalRadius = config.overflowRadius;
+        
+        const builder = createDetailBuilder()
+          .base('Base Transfer:', `${Math.round(baseTransfer * 100)}%`);
+        if (overflowDmgLv > 0) {
+          builder.line(`Cascade (${overflowDmgLv}):`, `+${overflowDmgLv * 10}%`, 'detail-upgrade');
+        }
+        builder.line('Base Radius:', `${baseRadius}px`, 'detail-base');
+        if (overflowRangeLv > 0) {
+          builder.line(`Reach (${overflowRangeLv}):`, `+${overflowRangeLv * 20}px`, 'detail-upgrade');
+        }
+        builder.line('Search Radius:', `${Math.round(finalRadius)}px`, 'detail-level')
+          .final(`${Math.round(finalTransfer * 100)}%`)
+          .formula('Overkill damage → nearest enemy');
+        detailOverflow.innerHTML = builder.build();
       }
       
       // Update ability stat popups
@@ -724,10 +807,10 @@ function TowerStatsMixin(Base) {
         }
       }
       
-      // Show/hide Magic charge control panel
-      const magicChargePanel = el.actionMagicCharge || el.bottomPanel?.querySelector('#action-magic-charge');
+      // Show/hide floating Magic charge control panel
+      const magicChargePanel = el.magicChargePanel || el.bottomPanel?.querySelector('#magic-charge-panel');
       if (magicChargePanel) {
-        magicChargePanel.style.display = tower.attackTypeId === 'magic' ? 'flex' : 'none';
+        magicChargePanel.style.display = tower.attackTypeId === 'magic' ? 'block' : 'none';
         
         // Initialize magic charge slider if not done
         if (tower.attackTypeId === 'magic' && !magicChargePanel._eventsAttached) {
@@ -938,6 +1021,7 @@ function TowerStatsMixin(Base) {
       
       const el = this.elements;
       const state = tower.magicState;
+      const isReady = state.currentCharge >= state.shotCost;
       
       // Update slider position
       const slider = document.getElementById('magic-charge-slider');
@@ -968,6 +1052,21 @@ function TowerStatsMixin(Base) {
       const progress = state.shotCost > 0 ? (state.currentCharge / state.shotCost) * 100 : 0;
       if (progressFill) progressFill.style.width = `${Math.min(100, progress)}%`;
       if (progressText) progressText.textContent = `${Math.floor(state.currentCharge)}/${Math.floor(state.shotCost)} ⚡`;
+      
+      // Update status text (Ready/Charging/No Energy)
+      const statusEl = document.getElementById('magic-charge-status');
+      if (statusEl) {
+        if (isReady) {
+          statusEl.textContent = '✓ Ready';
+          statusEl.style.color = '#86efac';
+        } else if (tower.currentEnergy > 0) {
+          statusEl.textContent = 'Charging...';
+          statusEl.style.color = '#a78bfa';
+        } else {
+          statusEl.textContent = 'No Energy';
+          statusEl.style.color = '#fc8181';
+        }
+      }
       
       // Update stats panel magic-specific rows
       const chargeRow = document.getElementById('stat-row-charge');

@@ -43,10 +43,11 @@ function createTowerInstance(gridX, gridY, gridSize, towerId) {
     isDestroyed: false,
     
     // Tower Energy
-    maxEnergy: 100,
+    baseEnergyStorage: 100,  // Base energy capacity (used for calculations)
+    maxEnergy: 100,          // Effective max (updated by tower-stats)
     currentEnergy: 100,
-    energyRegen: 0,        // disabled - use energy buildings
-    energyCostPerShot: 5,  // energy cost per attack
+    energyRegen: 0,          // disabled - use energy buildings
+    energyCostPerShot: 5,    // energy cost per attack
     
     // =========================================
     // ATTACK TYPE

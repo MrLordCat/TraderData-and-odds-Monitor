@@ -86,6 +86,11 @@ class TowersModule {
       this.upgradeHandlers.handleSetPowerDraw(data));
     this.eventBus.on('tower:damage', (data) => 
       this.upgradeHandlers.handleTowerDamage(data, (id) => this.checkDeselect(id)));
+    
+    // Get tower by ID (for cascade/overflow system)
+    this.eventBus.on('towers:get-by-id', ({ towerId, callback }) => {
+      if (callback) callback(this.towers.get(towerId));
+    });
   }
 
   /**

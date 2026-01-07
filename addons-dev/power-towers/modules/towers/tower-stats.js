@@ -271,6 +271,9 @@ function recalculateTowerStats(tower) {
       energyStorage *= (1 + upgradeLevels.energyStorage * (bonuses.energyStorage || 0.10));
     }
     tower.energyStorage = energyStorage;
+    
+    // Update maxEnergy for renderer (sync with energyStorage)
+    tower.maxEnergy = Math.ceil(energyStorage);
   }
   
   // =========================================
