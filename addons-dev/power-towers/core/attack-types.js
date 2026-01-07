@@ -197,49 +197,68 @@ const ATTACK_TYPES = {
   },
 
   // =========================================
-  // MAGIC - Power-based scaling damage
+  // MAGIC - Energy charging system + Arcane Overflow
+  // Charges energy for powerful shots, overkill transfers to nearby enemies
   // =========================================
   magic: {
     id: 'magic',
     name: 'Magic Attack',
     emoji: '✨',
-    description: 'Consumes Power to amplify damage. Overdrive allows exceeding 100%',
+    description: 'Charges energy for powerful shots. Overkill damage chains to nearby enemies',
     
-    // Damage modifiers
-    dmgMod: 0.6,           // 60% base damage (before power scaling)
-    atkSpdMod: 0.9,        // 90% attack speed
-    rangeMod: 1.2,         // 120% range
-    energyCostMod: 0.5,  // Energy cost multiplier
+    // Damage modifiers (applied via config/attacks/magic.js statModifiers)
+    // These are kept for backwards compatibility but actual values come from config
+    dmgMod: 0.9,           // 90% base damage (before charge bonus)
+    atkSpdMod: 0.7,        // 70% attack speed (slower - needs time to charge)
+    rangeMod: 1.2,         // 120% range (magic reach)
+    energyCostMod: 0.5,    // Lower base cost (main cost is from charging)
     
-    // Power Hit Cost: Magic uses power differently (via powerScaling)
-    powerHitCostMod: 0.6,  // 60% base power cost (but power scaling adds more)
+    // Power Hit Cost: Magic uses charge system instead
+    powerHitCostMod: 0.5,  // Low base (charge system handles cost)
     
     // Critical hit
     critChance: 0.05,      // Standard crit chance
     critDmgMod: 1.5,       // Standard crit multiplier
     
-    // Energy storage
-    energyStorageMod: 1.5, // 150% storage - mages need more energy!
+    // Energy storage - Magic towers store more
+    energyStorageMod: 1.2, // 120% storage
     
     // AoE / Splash
-    splashRadius: 0,       // Single target by default
+    splashRadius: 0,       // Single target (but has Arcane Overflow)
     splashDmgFalloff: 0,
     
     // Special mechanics
     chainCount: 0,
     chainDmgFalloff: 0,
     
-    // Magic system - THIS IS THE KEY FEATURE
-    powerScaling: 1.5,     // +150% damage per 100% power used
-    minPowerDraw: 0,       // Can attack without power
-    maxPowerDraw: 100,     // Normal max
-    overdriveEfficiency: 0.5, // 50% efficiency above 100% (diminishing returns)
+    // === CHARGE SYSTEM (Magic unique) ===
+    // Configured in core/config/attacks/magic.js
+    chargeEnabled: true,
+    
+    // === ARCANE OVERFLOW (Magic unique) ===
+    // Overkill damage transfers to nearest enemy
+    arcaneOverflowEnabled: true,
+    
+    // Legacy magic system (kept for compatibility, not used)
+    powerScaling: 0,
+    minPowerDraw: 0,
+    maxPowerDraw: 100,
+    overdriveEfficiency: 0,
     
     // Visual
     color: '#9b59b6',
-    projectileColor: '#e056fd',
+    projectileColor: '#9f7aea',
     projectileSize: 6,
-    projectileSpeed: 350
+    projectileSpeed: 350,
+    
+    // Charge visual colors (glow intensity based on charge)
+    chargeColors: [
+      '#805ad5',  // 0-25% - dim purple
+      '#9f7aea',  // 25-50%
+      '#b794f4',  // 50-75%
+      '#d6bcfa',  // 75-100% - bright purple
+    ],
+    overflowArcColor: '#e9d8fd'  // Arc to overflow target
   },
 
   // =========================================

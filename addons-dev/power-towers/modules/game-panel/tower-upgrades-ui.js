@@ -29,9 +29,20 @@ const ATTACK_TYPE_UPGRADES = {
     'groundZoneDuration',
     'groundZoneRadius'
   ],
-  magic: ['powerScaling'],
+  magic: [
+    'magicEfficiency',    // Reduces efficiency divisor (more damage per energy)
+    'overflowRange',      // Increases Arcane Overflow radius
+    'overflowDamage',     // Increases overkill damage transfer %
+    'chargeSpeed'         // Faster charge accumulation
+  ],
   piercing: ['critChance', 'critDamage'],
-  normal: ['attackSpeed']
+  normal: [
+    'comboDamage',
+    'comboMaxStacks',
+    'comboDecay',
+    'focusFire',
+    'focusCritBonus'
+  ]
 };
 
 // Element path specific upgrades

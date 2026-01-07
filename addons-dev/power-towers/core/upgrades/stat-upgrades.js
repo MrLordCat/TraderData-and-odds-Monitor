@@ -308,6 +308,7 @@ const STAT_UPGRADES = {
 
   // =========================================
   // POWER SCALING (+10% per level, Magic only)
+  // DEPRECATED - Use charge system upgrades below
   // =========================================
   powerScaling: {
     id: 'powerScaling',
@@ -322,8 +323,9 @@ const STAT_UPGRADES = {
       percentPerLevel: 0.10,
     },
     
+    // Disabled - using new charge system
     requires: {
-      attackTypes: ['magic']
+      attackTypes: []
     },
     
     cost: {
@@ -332,6 +334,121 @@ const STAT_UPGRADES = {
     },
     
     color: '#a29bfe'
+  },
+
+  // =========================================
+  // MAGIC EFFICIENCY (-0.1 divisor per level)
+  // Lower divisor = more damage per energy spent
+  // =========================================
+  magicEfficiency: {
+    id: 'magicEfficiency',
+    name: 'Arcane Efficiency',
+    emoji: '✨',
+    category: 'utility',
+    description: 'More damage per energy spent',
+    
+    effect: {
+      type: 'custom',
+      stat: 'magicEfficiencyDivisor',
+      valuePerLevel: -0.1,
+      minValue: 0.5, // Min divisor (max efficiency)
+    },
+    
+    requires: {
+      attackTypes: ['magic']
+    },
+    
+    cost: {
+      base: 30,
+      scaleFactor: 1.20,
+    },
+    
+    color: '#a29bfe'
+  },
+
+  // =========================================
+  // OVERFLOW RANGE (+20px per level)
+  // =========================================
+  overflowRange: {
+    id: 'overflowRange',
+    name: 'Arcane Reach',
+    emoji: '🌀',
+    category: 'offense',
+    description: '+20px overflow radius per level',
+    
+    effect: {
+      type: 'additive',
+      stat: 'magicOverflowRadius',
+      valuePerLevel: 20,
+    },
+    
+    requires: {
+      attackTypes: ['magic']
+    },
+    
+    cost: {
+      base: 35,
+      scaleFactor: 1.16,
+    },
+    
+    color: '#9b59b6'
+  },
+
+  // =========================================
+  // OVERFLOW DAMAGE (+10% transfer per level)
+  // =========================================
+  overflowDamage: {
+    id: 'overflowDamage',
+    name: 'Arcane Cascade',
+    emoji: '⚡',
+    category: 'offense',
+    description: '+10% overkill damage transfer',
+    
+    effect: {
+      type: 'additive',
+      stat: 'magicOverflowTransfer',
+      valuePerLevel: 0.10,
+      maxValue: 1.0, // Cap at 100% transfer
+    },
+    
+    requires: {
+      attackTypes: ['magic']
+    },
+    
+    cost: {
+      base: 45,
+      scaleFactor: 1.22,
+    },
+    
+    color: '#8e44ad'
+  },
+
+  // =========================================
+  // CHARGE SPEED (+15% per level)
+  // =========================================
+  chargeSpeed: {
+    id: 'chargeSpeed',
+    name: 'Quick Charge',
+    emoji: '⏩',
+    category: 'utility',
+    description: '+15% charge rate per level',
+    
+    effect: {
+      type: 'percentage',
+      stat: 'magicChargeRate',
+      percentPerLevel: 0.15,
+    },
+    
+    requires: {
+      attackTypes: ['magic']
+    },
+    
+    cost: {
+      base: 25,
+      scaleFactor: 1.14,
+    },
+    
+    color: '#6c5ce7'
   },
 
   // =========================================

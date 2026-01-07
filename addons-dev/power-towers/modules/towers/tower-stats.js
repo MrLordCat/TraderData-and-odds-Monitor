@@ -66,6 +66,23 @@ function recalculateTowerStats(tower) {
   let energyCost = leveledBaseEnergyCost * attackType.energyCostMod;
   
   // =========================================
+  // STEP 2b: Apply Magic type stat modifiers
+  // =========================================
+  if (tower.attackTypeId === 'magic') {
+    const { ATTACK_TYPE_CONFIG } = require('../../core/config/attacks');
+    const magicModifiers = ATTACK_TYPE_CONFIG.magic?.statModifiers || {};
+    
+    damage *= magicModifiers.damage || 0.9;           // 0.9x base damage
+    fireRate *= magicModifiers.attackSpeed || 0.7;   // 0.7x attack speed (slower)
+    range *= magicModifiers.range || 1.2;            // 1.2x range (extended)
+    
+    // Store energy storage modifier for later
+    tower.magicEnergyStorageMod = magicModifiers.energyStorage || 1.2;
+  } else {
+    tower.magicEnergyStorageMod = 1.0;
+  }
+  
+  // =========================================
   // STEP 3: Apply stat upgrades as % bonus
   // Each upgrade level gives configurable % bonus
   // =========================================
@@ -244,6 +261,12 @@ function recalculateTowerStats(tower) {
   // =========================================
   if (tower.baseEnergyStorage) {
     let energyStorage = tower.baseEnergyStorage * levelBonus;
+    
+    // Apply Magic type energy storage modifier
+    if (tower.magicEnergyStorageMod) {
+      energyStorage *= tower.magicEnergyStorageMod;
+    }
+    
     if (upgradeLevels.energyStorage) {
       energyStorage *= (1 + upgradeLevels.energyStorage * (bonuses.energyStorage || 0.10));
     }

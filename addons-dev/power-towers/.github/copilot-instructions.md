@@ -1,4 +1,4 @@
-# Power Towers TD - Copilot Instructions
+﻿# Power Towers TD - Copilot Instructions
 
 AI assistant instructions for working on the Power Towers TD addon.
 
@@ -10,7 +10,7 @@ AI assistant instructions for working on the Power Towers TD addon.
 ## 1. About the Game
 
 ### Concept
-Tower Defense with a unique **energy system mechanic** — towers require energy to operate, player balances between defense and energy production.
+Tower Defense with a unique **energy system mechanic** тАФ towers require energy to operate, player balances between defense and energy production.
 
 ### Roguelike Elements
 - Procedural map generation (spiral path with 2 loops, biome system)
@@ -23,8 +23,8 @@ WebGL 2D graphics with Warcraft 3-inspired visuals and particle animations.
 ### Map & Terrain
 | Property | Value | Notes |
 |----------|-------|-------|
-| Map Size | 2000×2000 px | Configurable via CONFIG |
-| Grid Cell | 20×20 px | Tower/building placement unit |
+| Map Size | 2000├Ч2000 px | Configurable via CONFIG |
+| Grid Cell | 20├Ч20 px | Tower/building placement unit |
 | Visual Padding | 10% | Wall boundary around playable area |
 | Path Type | Spiral | 2 loops, tightening toward center |
 
@@ -41,17 +41,17 @@ WebGL 2D graphics with Warcraft 3-inspired visuals and particle animations.
 ### Enemy System
 | Type | Emoji | Health | Speed | Reward | XP |
 |------|-------|--------|-------|--------|-----|
-| Minion | 👾 | 20 | 40 px/s | 10g | 1 |
-| Scout | 🦎 | 20 | 80 px/s | 15g | 2 |
-| Brute | 🐗 | 100 | 25 px/s | 30g | 3 |
-| Swarmling | 🐜 | 15 | 60 px/s | 5g | 1 |
-| Boss | 👹 | 1000 | 20 px/s | 200g | 10 |
+| Minion | ЁЯС╛ | 20 | 40 px/s | 10g | 1 |
+| Scout | ЁЯжО | 20 | 80 px/s | 15g | 2 |
+| Brute | ЁЯРЧ | 100 | 25 px/s | 30g | 3 |
+| Swarmling | ЁЯРЬ | 15 | 60 px/s | 5g | 1 |
+| Boss | ЁЯС╣ | 1000 | 20 px/s | 200g | 10 |
 
 ### Wave System
 - **Wave delay**: 3000ms between waves
 - **Spawn interval**: 800ms between enemies
-- **HP scaling**: ×1.05 per wave
-- **Speed scaling**: ×1.02 per wave
+- **HP scaling**: ├Ч1.05 per wave
+- **Speed scaling**: ├Ч1.02 per wave
 - **Boss waves**: Every 10 waves
 
 ---
@@ -60,52 +60,52 @@ WebGL 2D graphics with Warcraft 3-inspired visuals and particle animations.
 
 ```
 addons-dev/power-towers/
-├── manifest.json              # Addon manifest
-├── index.js                   # Entry point
-│
-├── core/                      # Core systems
-│   ├── config/                # ⭐ Modular configuration
-│   │   ├── index.js           # Aggregates all configs
-│   │   ├── base.js            # Map, visuals, colors
-│   │   ├── economy.js         # Gold, costs
-│   │   ├── waves.js           # Waves, enemy types
-│   │   ├── tower.js           # Tower stats, XP
-│   │   ├── energy.js          # Energy buildings
-│   │   └── attacks/           # Attack type configs
-│   │       ├── index.js       # Aggregator + helpers
-│   │       ├── normal.js      # Combo System, Focus Fire
-│   │       ├── siege.js       # Splash + Armor Shred + Ground Zone
-│   │       ├── magic.js       # Power scaling
-│   │       └── piercing.js    # Critical mechanics
-│   │
-│   ├── event-bus.js           # EventBus communication
-│   ├── game-core-modular.js   # Main orchestrator
-│   ├── attack-types.js        # Attack handlers (Siege/Normal/Magic/Piercing)
-│   ├── biomes.js              # Biome definitions
-│   ├── element-abilities.js   # Elemental abilities
-│   └── tower-upgrade-list.js  # Upgrade system
-│
-├── modules/                   # Feature modules
-│   ├── map/                   # Map generation
-│   ├── placement/             # Placement system
-│   ├── towers/                # Tower system
-│   │   ├── tower-factory.js   # Tower creation
-│   │   ├── tower-stats.js     # Stat calculation (uses CONFIG)
-│   │   ├── tower-combat.js    # Combo/Focus/Siege logic
-│   │   └── tower-upgrade-handlers.js
-│   ├── enemies/               # Enemy system
-│   │   ├── index.js
-│   │   └── status-effects.js  # DoT, slow, freeze, shred
-│   ├── combat/                # Combat system and projectiles
-│   ├── economy/               # Gold management
-│   ├── energy/                # Energy system
-│   ├── player/                # Player state
-│   ├── menu/                  # Menu and meta-upgrades
-│   └── game-panel/            # UI Module (see section 5)
-│
-└── renderer/                  # WebGL Rendering
-    ├── game-renderer.js       # Main renderer
-    └── engine/                # WebGL infrastructure
+тФЬтФАтФА manifest.json              # Addon manifest
+тФЬтФАтФА index.js                   # Entry point
+тФВ
+тФЬтФАтФА core/                      # Core systems
+тФВ   тФЬтФАтФА config/                # тнР Modular configuration
+тФВ   тФВ   тФЬтФАтФА index.js           # Aggregates all configs
+тФВ   тФВ   тФЬтФАтФА base.js            # Map, visuals, colors
+тФВ   тФВ   тФЬтФАтФА economy.js         # Gold, costs
+тФВ   тФВ   тФЬтФАтФА waves.js           # Waves, enemy types
+тФВ   тФВ   тФЬтФАтФА tower.js           # Tower stats, XP
+тФВ   тФВ   тФЬтФАтФА energy.js          # Energy buildings
+тФВ   тФВ   тФФтФАтФА attacks/           # Attack type configs
+тФВ   тФВ       тФЬтФАтФА index.js       # Aggregator + helpers
+тФВ   тФВ       тФЬтФАтФА normal.js      # Combo System, Focus Fire
+тФВ   тФВ       тФЬтФАтФА siege.js       # Splash + Armor Shred + Ground Zone
+тФВ   тФВ       тФЬтФАтФА magic.js       # Power scaling
+тФВ   тФВ       тФФтФАтФА piercing.js    # Critical mechanics
+тФВ   тФВ
+тФВ   тФЬтФАтФА event-bus.js           # EventBus communication
+тФВ   тФЬтФАтФА game-core-modular.js   # Main orchestrator
+тФВ   тФЬтФАтФА attack-types.js        # Attack handlers (Siege/Normal/Magic/Piercing)
+тФВ   тФЬтФАтФА biomes.js              # Biome definitions
+тФВ   тФЬтФАтФА element-abilities.js   # Elemental abilities
+тФВ   тФФтФАтФА tower-upgrade-list.js  # Upgrade system
+тФВ
+тФЬтФАтФА modules/                   # Feature modules
+тФВ   тФЬтФАтФА map/                   # Map generation
+тФВ   тФЬтФАтФА placement/             # Placement system
+тФВ   тФЬтФАтФА towers/                # Tower system
+тФВ   тФВ   тФЬтФАтФА tower-factory.js   # Tower creation
+тФВ   тФВ   тФЬтФАтФА tower-stats.js     # Stat calculation (uses CONFIG)
+тФВ   тФВ   тФЬтФАтФА tower-combat.js    # Combo/Focus/Siege logic
+тФВ   тФВ   тФФтФАтФА tower-upgrade-handlers.js
+тФВ   тФЬтФАтФА enemies/               # Enemy system
+тФВ   тФВ   тФЬтФАтФА index.js
+тФВ   тФВ   тФФтФАтФА status-effects.js  # DoT, slow, freeze, shred
+тФВ   тФЬтФАтФА combat/                # Combat system and projectiles
+тФВ   тФЬтФАтФА economy/               # Gold management
+тФВ   тФЬтФАтФА energy/                # Energy system
+тФВ   тФЬтФАтФА player/                # Player state
+тФВ   тФЬтФАтФА menu/                  # Menu and meta-upgrades
+тФВ   тФФтФАтФА game-panel/            # UI Module (see section 5)
+тФВ
+тФФтФАтФА renderer/                  # WebGL Rendering
+    тФЬтФАтФА game-renderer.js       # Main renderer
+    тФФтФАтФА engine/                # WebGL infrastructure
 ```
 
 ---
@@ -117,30 +117,30 @@ addons-dev/power-towers/
 Player builds **Base Tower** and upgrades it:
 
 ```
-🗼 Base Tower (30 gold)
-├── 1️⃣ Choose Attack Type (required first)
-│     ├── 🎯 Normal  (combo stacks → best vs bosses)
-│     ├── 💥 Siege   (splash damage → best vs swarms)
-│     ├── ✨ Magic   (power scaling → best with energy)
-│     └── 🗡️ Piercing (armor pen, high crit)
-│
-├── 2️⃣ Stat Upgrades (infinite levels)
-│     Damage, AttackSpeed, Range, HP, CritChance, CritDamage, PowerEfficiency
-│
-├── 2️⃣b Attack Type Upgrades (type-specific)
-│
-└── 3️⃣ Element Path (unlocks abilities)
-      🔥 Fire, ❄️ Ice, ⚡ Lightning, 🌿 Nature, 💀 Dark
+ЁЯЧ╝ Base Tower (30 gold)
+тФЬтФАтФА 1я╕ПтГг Choose Attack Type (required first)
+тФВ     тФЬтФАтФА ЁЯОп Normal  (combo stacks тЖТ best vs bosses)
+тФВ     тФЬтФАтФА ЁЯТе Siege   (splash damage тЖТ best vs swarms)
+тФВ     тФЬтФАтФА тЬи Magic   (power scaling тЖТ best with energy)
+тФВ     тФФтФАтФА ЁЯЧбя╕П Piercing (armor pen, high crit)
+тФВ
+тФЬтФАтФА 2я╕ПтГг Stat Upgrades (infinite levels)
+тФВ     Damage, AttackSpeed, Range, HP, CritChance, CritDamage, PowerEfficiency
+тФВ
+тФЬтФАтФА 2я╕ПтГгb Attack Type Upgrades (type-specific)
+тФВ
+тФФтФАтФА 3я╕ПтГг Element Path (unlocks abilities)
+      ЁЯФе Fire, тЭДя╕П Ice, тЪб Lightning, ЁЯМ┐ Nature, ЁЯТА Dark
 ```
 
 ### 3.2 Attack Types
 
 | Type | Emoji | Purpose | Mechanics |
 |------|-------|---------|-----------|
-| **Normal** | 🎯 | Single-target, bosses | Combo System (stacks), Focus Fire (guaranteed crit) |
-| **Siege** | 💥 | AoE, swarms | Splash Damage, Armor Shred, Ground Zone (craters) |
-| **Magic** | ✨ | With energy | Power Scaling 1.5×, Overdrive |
-| **Piercing** | 🗡️ | Crits | 15% base crit, 20% armor pen |
+| **Normal** | ЁЯОп | Single-target, bosses | Combo System (stacks), Focus Fire (guaranteed crit) |
+| **Siege** | ЁЯТе | AoE, swarms | Splash Damage, Armor Shred, Ground Zone (craters) |
+| **Magic** | тЬи | With energy | Power Scaling 1.5├Ч, Overdrive |
+| **Piercing** | ЁЯЧбя╕П | Crits | 15% base crit, 20% armor pen |
 
 ### 3.3 Tower Base Stats
 | Stat | Base Value | Upgrade Bonus |
@@ -151,12 +151,12 @@ Player builds **Base Tower** and upgrades it:
 | Energy Cost | 2 | -3% per level |
 | HP | 100 | +8% per level |
 | Crit Chance | 5% | +1% per level (cap 75%) |
-| Crit Damage | 1.5× | +10% per level |
+| Crit Damage | 1.5├Ч | +10% per level |
 
 ### 3.4 Tower XP & Level System
 Towers gain XP from upgrades. Level provides stat bonuses and upgrade discounts.
 
-**XP Formula:** `XP_needed = BASE_XP × SCALE^(level-2)`
+**XP Formula:** `XP_needed = BASE_XP ├Ч SCALE^(level-2)`
 - `TOWER_BASE_XP` = 3
 - `TOWER_XP_SCALE` = 1.5
 - `TOWER_MAX_LEVEL` = 10
@@ -173,8 +173,8 @@ Towers gain XP from upgrades. Level provides stat bonuses and upgrade discounts.
 - Decay: 3 seconds without hitting
 
 **Focus Fire:**
-- After 5 hits on same target → guaranteed crit
-- Base crit multiplier: 2.0×
+- After 5 hits on same target тЖТ guaranteed crit
+- Base crit multiplier: 2.0├Ч
 
 **Upgrades:**
 | ID | Name | Effect | Cost |
@@ -215,21 +215,21 @@ Towers gain XP from upgrades. Level provides stat bonuses and upgrade discounts.
 
 **Files:**
 - Config: `core/config/attacks/siege.js`
-- Handler: `core/attack-types.js` → `processSiegeAttack()`
-- Shred effect: `modules/enemies/status-effects.js` → `ARMOR_SHRED`
-- Combat logic: `modules/towers/tower-combat.js` → `getSiegeConfig()`, `processSiegeHit()`
+- Handler: `core/attack-types.js` тЖТ `processSiegeAttack()`
+- Shred effect: `modules/enemies/status-effects.js` тЖТ `ARMOR_SHRED`
+- Combat logic: `modules/towers/tower-combat.js` тЖТ `getSiegeConfig()`, `processSiegeHit()`
 
 ### 3.7 Energy System
 
 | Building | Cost | Size | Gen/tick | Special |
 |----------|------|------|----------|---------|
-| Generator ⚡ | 50g | 1×1 | 5 | Stable |
-| Bio Generator 🌳 | 80g | 2×2 | 8 | Nature bonus |
-| Wind Turbine 💨 | 100g | 1×1 | 12 | Fluctuating |
-| Solar Panel ☀️ | 90g | 1×1 | 10 | Biome-dependent |
-| Hydro 💧 | 120g | 1×1 | 15 | Needs water |
-| Geothermal 🌋 | 150g | 1×1 | 20 | Needs burned terrain |
-| Battery 🔋 | 60g | 2×2 | 0 | Storage: 200 |
+| Generator тЪб | 50g | 1├Ч1 | 5 | Stable |
+| Bio Generator ЁЯМ│ | 80g | 2├Ч2 | 8 | Nature bonus |
+| Wind Turbine ЁЯТи | 100g | 1├Ч1 | 12 | Fluctuating |
+| Solar Panel тШАя╕П | 90g | 1├Ч1 | 10 | Biome-dependent |
+| Hydro ЁЯТз | 120g | 1├Ч1 | 15 | Needs water |
+| Geothermal ЁЯМЛ | 150g | 1├Ч1 | 20 | Needs burned terrain |
+| Battery ЁЯФЛ | 60g | 2├Ч2 | 0 | Storage: 200 |
 
 **Power Network:**
 - Towers connect to energy buildings via channels
@@ -241,11 +241,11 @@ Each element path unlocks unique abilities:
 
 | Element | Emoji | Abilities |
 |---------|-------|-----------|
-| Fire | 🔥 | Burn DoT → Inferno (AoE) → Meteor |
-| Ice | ❄️ | Slow → Freeze → Shatter |
-| Lightning | ⚡ | Chain Lightning → Charge Shot → Overload |
-| Nature | 🌿 | Poison → Thorns → Entangle (root) |
-| Dark | 💀 | Soul Siphon → Void → Death Mark |
+| Fire | ЁЯФе | Burn DoT тЖТ Inferno (AoE) тЖТ Meteor |
+| Ice | тЭДя╕П | Slow тЖТ Freeze тЖТ Shatter |
+| Lightning | тЪб | Chain Lightning тЖТ Charge Shot тЖТ Overload |
+| Nature | ЁЯМ┐ | Poison тЖТ Thorns тЖТ Entangle (root) |
+| Dark | ЁЯТА | Soul Siphon тЖТ Void тЖТ Death Mark |
 
 ---
 
@@ -272,18 +272,18 @@ const SIEGE = require('./config/attacks/siege');
 
 ```
 game-panel/
-├── index.js               # Main SidebarModule
-├── templates.js           # HTML templates
-├── styles.js              # CSS styles (including tooltip styles)
-├── game-controller.js     # Game control, element caching
-└── bottom-panel/          # ⭐ Mixins for BottomPanel
-    ├── index.js           # BottomPanelMixin (composition)
-    ├── events.js          # BottomPanelEventsMixin
-    ├── tower-stats.js     # TowerStatsMixin (tower stats + popups)
-    ├── energy-stats.js    # EnergyStatsMixin
-    ├── upgrades.js        # UpgradesMixin
-    └── utils/
-        └── stat-detail-builder.js  # Popup content builder
+тФЬтФАтФА index.js               # Main SidebarModule
+тФЬтФАтФА templates.js           # HTML templates
+тФЬтФАтФА styles.js              # CSS styles (including tooltip styles)
+тФЬтФАтФА game-controller.js     # Game control, element caching
+тФФтФАтФА bottom-panel/          # тнР Mixins for BottomPanel
+    тФЬтФАтФА index.js           # BottomPanelMixin (composition)
+    тФЬтФАтФА events.js          # BottomPanelEventsMixin
+    тФЬтФАтФА tower-stats.js     # TowerStatsMixin (tower stats + popups)
+    тФЬтФАтФА energy-stats.js    # EnergyStatsMixin
+    тФЬтФАтФА upgrades.js        # UpgradesMixin
+    тФФтФАтФА utils/
+        тФФтФАтФА stat-detail-builder.js  # Popup content builder
 ```
 
 ### Element Caching Pattern
@@ -307,7 +307,7 @@ const { createDetailBuilder } = require('./utils/stat-detail-builder');
 const builder = createDetailBuilder()
   .base('Base:', '60px')                          // Base value
   .line('Upgrades (3):', '+24%', 'detail-upgrade') // Upgrade bonus
-  .line('Status:', '🔒 Locked', 'detail-locked')  // Locked state
+  .line('Status:', 'ЁЯФТ Locked', 'detail-locked')  // Locked state
   .final('74px')                                   // Final value
   .formula('AoE damage');                          // Description
 
@@ -374,7 +374,7 @@ upgrades: {
 5. **HTML template** (`game-panel/bottom-panel/templates.js`):
 ```html
 <div class="stat-item stat-hoverable" data-stat="mystat" id="stat-row-mystat">
-  <span class="stat-label">🔧 MY STAT</span>
+  <span class="stat-label">ЁЯФз MY STAT</span>
   <span class="stat-value" id="panel-mystat">-</span>
   <div class="hover-popup" id="panel-detail-mystat"></div>
 </div>
@@ -389,13 +389,13 @@ panelMystat: container.querySelector('#panel-mystat'),
 
 ## 8. Development Status
 
-### ✅ Implemented
+### тЬЕ Implemented
 - Modular architecture with EventBus
 - Map generation with spiral path
 - Biome system (6 types)
 - Tower system with attack types
-- **Normal Attack** (Combo System, Focus Fire) — complete
-- **Siege Attack** (Splash, Armor Shred, Ground Zone) — complete
+- **Normal Attack** (Combo System, Focus Fire) тАФ complete
+- **Siege Attack** (Splash, Armor Shred, Ground Zone) тАФ complete
 - 5 elemental paths
 - XP system for towers and buildings
 - 5 enemy types with wave scaling
@@ -403,7 +403,7 @@ panelMystat: container.querySelector('#panel-mystat'),
 - Complete energy system
 - WebGL rendering
 
-### 🚧 Planned
+### ЁЯЪз Planned
 - Magic Attack mechanics (power scaling upgrades)
 - Piercing Attack mechanics (crit upgrades)
 - Card system (every 10 waves)
@@ -416,11 +416,11 @@ panelMystat: container.querySelector('#panel-mystat'),
 
 ## 9. Common Mistakes
 
-- **Forgot to cache element** — add to `game-controller.js`
-- **Empty popup** — check that `getElementById` finds the element
-- **Upgrade not applying** — check that you're reading from `tower.attackTypeUpgrades`
-- **Stat not updating** — ensure `updateBottomPanelStats()` is being called
-- **CSS class not working** — check `styles/tooltips.js`
+- **Forgot to cache element** тАФ add to `game-controller.js`
+- **Empty popup** тАФ check that `getElementById` finds the element
+- **Upgrade not applying** тАФ check that you're reading from `tower.attackTypeUpgrades`
+- **Stat not updating** тАФ ensure `updateBottomPanelStats()` is being called
+- **CSS class not working** тАФ check `styles/tooltips.js`
 
 ---
 

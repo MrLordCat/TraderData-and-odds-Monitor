@@ -23,7 +23,7 @@ const {
 const { createTowerInstance } = require('./tower-factory');
 const { recalculateTowerStats } = require('./tower-stats');
 const { createUpgradeHandlers } = require('./tower-upgrade-handlers');
-const { isValidTarget, findTarget, performAttack, updateLightningCharge } = require('./tower-combat');
+const { isValidTarget, findTarget, performAttack, updateLightningCharge, updateMagicCharge, isMagicReady } = require('./tower-combat');
 
 class TowersModule {
   /**
@@ -276,6 +276,16 @@ class TowersModule {
       updateLightningCharge(tower, deltaTime, energyInputRate);
     }
     
+    // Update magic charge for magic towers
+    if (tower.attackTypeId === 'magic') {
+      // Magic towers consume energy from their pool to charge
+      const energyAvailable = tower.currentEnergy;
+      const energyConsumed = updateMagicCharge(tower, deltaTime, energyAvailable);
+      if (energyConsumed > 0) {
+        tower.currentEnergy -= energyConsumed;
+      }
+    }
+    
     // Reduce cooldown
     if (tower.attackCooldown > 0) {
       tower.attackCooldown -= deltaTime;
@@ -293,8 +303,14 @@ class TowersModule {
       tower.rotation = Math.atan2(dy, dx);
     }
 
-    // Attack if target, ready, and has enough energy
-    if (tower.target && tower.attackCooldown <= 0 && tower.currentEnergy >= tower.energyCostPerShot) {
+    // Attack if ready
+    // Magic towers: check charge instead of energy
+    // Other towers: check energy
+    const canAttack = tower.attackTypeId === 'magic' 
+      ? (tower.target && tower.attackCooldown <= 0 && isMagicReady(tower))
+      : (tower.target && tower.attackCooldown <= 0 && tower.currentEnergy >= tower.energyCostPerShot);
+    
+    if (canAttack) {
       performAttack(tower, this.eventBus);
     }
   }

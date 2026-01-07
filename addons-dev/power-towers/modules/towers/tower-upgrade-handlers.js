@@ -18,6 +18,10 @@ const {
   applyElementAbilityUpgrade,
   getElementAbilityUpgradeCost
 } = require('../../core/tower-upgrades');
+const {
+  initMagicState,
+  initComboState
+} = require('./tower-combat');
 
 /**
  * Create upgrade handlers for tower module
@@ -55,6 +59,14 @@ function createUpgradeHandlers(context) {
         // Apply attack type
         tower.attackTypeId = attackTypeId;
         tower.attackTypeConfig = getAttackType(attackTypeId);
+        
+        // Initialize attack-type specific state
+        if (attackTypeId === 'magic') {
+          initMagicState(tower);
+        } else if (attackTypeId === 'normal') {
+          initComboState(tower);
+        }
+        
         tower.recalculateStats();
         
         eventBus.emit('economy:spend', cost);
