@@ -158,6 +158,8 @@ class GameControllerBase {
       panelPower: container.querySelector('#panel-power'),
       panelHp: container.querySelector('#panel-hp'),
       panelSplash: container.querySelector('#panel-splash'),
+      panelShred: container.querySelector('#panel-shred'),
+      panelCrater: container.querySelector('#panel-crater'),
       panelChain: container.querySelector('#panel-chain'),
       // Element ability stats
       panelBurn: container.querySelector('#panel-burn'),

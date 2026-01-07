@@ -222,6 +222,17 @@ function getBottomPanelTemplate() {
               <span class="stat-value" id="panel-splash">60</span>
               <div class="hover-popup" id="panel-detail-splash"></div>
             </div>
+            <!-- Siege Attack Type Stats -->
+            <div class="stat-item stat-hoverable" data-stat="shred" id="stat-row-shred" style="display: none;">
+              <span class="stat-label">🔨 SHRED</span>
+              <span class="stat-value" id="panel-shred">-5%</span>
+              <div class="hover-popup" id="panel-detail-shred"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="crater" id="stat-row-crater" style="display: none;">
+              <span class="stat-label">🕳️ CRATER</span>
+              <span class="stat-value" id="panel-crater">OFF</span>
+              <div class="hover-popup" id="panel-detail-crater"></div>
+            </div>
             <div class="stat-item stat-hoverable" data-stat="chain" id="stat-row-chain" style="display: none;">
               <span class="stat-label">⛓️ CHAIN</span>
               <span class="stat-value" id="panel-chain">3</span>

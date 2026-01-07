@@ -194,6 +194,7 @@ function getTooltipStyles() {
     .detail-level { color: #f6ad55; }
     .detail-upgrade { color: #fc8181; }
     .detail-upgrade.bonus { color: #48bb78; }
+    .detail-locked { color: #718096; font-style: italic; }
     .detail-final { color: #ffd700; font-weight: 700; }
     .detail-formula {
       margin-top: 6px;

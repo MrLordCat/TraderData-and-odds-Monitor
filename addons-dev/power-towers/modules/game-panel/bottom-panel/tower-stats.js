@@ -63,6 +63,31 @@ function TowerStatsMixin(Base) {
         splashRow.style.display = 'none';
       }
       
+      // Armor Shred for Siege attack type
+      const shredRow = document.getElementById('stat-row-shred');
+      if (tower.attackTypeId === 'siege' && tower.armorShredEnabled) {
+        const shredPct = Math.round((tower.armorShredAmount || 0.05) * 100);
+        const maxPct = shredPct * (tower.armorShredMaxStacks || 5);
+        if (el.panelShred) el.panelShred.textContent = `-${shredPct}%`;
+        if (shredRow) shredRow.style.display = '';
+      } else if (shredRow) {
+        shredRow.style.display = 'none';
+      }
+      
+      // Ground Zone (Crater) for Siege attack type
+      const craterRow = document.getElementById('stat-row-crater');
+      if (tower.attackTypeId === 'siege') {
+        if (tower.groundZoneEnabled) {
+          const slowPct = Math.round((tower.groundZoneSlow || 0.25) * 100);
+          if (el.panelCrater) el.panelCrater.textContent = `${slowPct}%`;
+        } else {
+          if (el.panelCrater) el.panelCrater.textContent = 'OFF';
+        }
+        if (craterRow) craterRow.style.display = '';
+      } else if (craterRow) {
+        craterRow.style.display = 'none';
+      }
+      
       // Chain for Lightning attack type
       const chainRow = document.getElementById('stat-row-chain');
       if (tower.attackTypeId === 'lightning' || tower.chainTargets > 0) {
@@ -299,6 +324,105 @@ function TowerStatsMixin(Base) {
         builder.final(formatInt(tower.energyCostPerShot || 0))
           .formula('Base × (1 - Efficiency%)');
         detailPower.innerHTML = builder.build();
+      }
+      
+      // =========================================
+      // SIEGE ATTACK TYPE STATS
+      // =========================================
+      
+      // SPLASH RADIUS (Siege)
+      const detailSplash = document.getElementById('panel-detail-splash');
+      if (detailSplash && (attackTypeName === 'siege' || tower.splashRadius > 0)) {
+        const baseSplash = attackType.splashRadius || 60;
+        const splashUpg = upgrades.splashRadius || 0;
+        const falloffUpg = upgrades.splashFalloff || 0;
+        const falloffPct = Math.round((tower.splashDmgFalloff || 0.5) * 100);
+        
+        const builder = createDetailBuilder()
+          .base('Base Radius:', `${baseSplash}px`);
+        if (splashUpg > 0) {
+          builder.line(`Blast Radius (${splashUpg}):`, `+${splashUpg * 8}%`, 'detail-upgrade');
+        }
+        builder.line('Final Radius:', `${formatInt(tower.splashRadius)}px`, 'detail-final')
+          .line('Falloff:', `${falloffPct}%`, 'detail-base');
+        if (falloffUpg > 0) {
+          builder.line(`Concentrated (${falloffUpg}):`, `-${falloffUpg * 5}%`, 'detail-upgrade');
+        }
+        builder.final(`${formatInt(tower.splashRadius)}px`)
+          .formula('AoE damage with edge falloff');
+        detailSplash.innerHTML = builder.build();
+      }
+      
+      // ARMOR SHRED (Siege)
+      const detailShred = document.getElementById('panel-detail-shred');
+      if (detailShred && attackTypeName === 'siege' && tower.armorShredEnabled) {
+        const baseShred = 5; // 5% base
+        const shredAmountUpg = upgrades.shredAmount || 0;
+        const shredStacksUpg = upgrades.shredStacks || 0;
+        const shredDurUpg = upgrades.shredDuration || 0;
+        
+        const shredPct = Math.round((tower.armorShredAmount || 0.05) * 100);
+        const maxStacks = tower.armorShredMaxStacks || 5;
+        const maxShred = shredPct * maxStacks;
+        const duration = (tower.armorShredDuration || 4000) / 1000;
+        
+        const builder = createDetailBuilder()
+          .base('Armor Reduction:', `-${shredPct}%/hit`);
+        if (shredAmountUpg > 0) {
+          builder.line(`Sunder (${shredAmountUpg}):`, `+${shredAmountUpg * 2}%`, 'detail-upgrade');
+        }
+        builder.line('Max Stacks:', `${maxStacks}`, 'detail-base');
+        if (shredStacksUpg > 0) {
+          builder.line(`Deep Wounds (${shredStacksUpg}):`, `+${shredStacksUpg}`, 'detail-upgrade');
+        }
+        builder.line('Duration:', `${duration.toFixed(1)}s`, 'detail-base');
+        if (shredDurUpg > 0) {
+          builder.line(`Lasting (${shredDurUpg}):`, `+${shredDurUpg}s`, 'detail-upgrade');
+        }
+        builder.line('Max Reduction:', `-${maxShred}%`, 'detail-biome')
+          .final(`-${maxShred}%`)
+          .formula('Stacking armor debuff');
+        detailShred.innerHTML = builder.build();
+      }
+      
+      // GROUND ZONE / CRATER (Siege)
+      const detailCrater = document.getElementById('panel-detail-crater');
+      if (detailCrater && attackTypeName === 'siege') {
+        const craterUnlocked = tower.groundZoneEnabled;
+        const craterUnlockUpg = upgrades.groundZoneUnlock || 0;
+        const slowUpg = upgrades.groundZoneSlow || 0;
+        const durUpg = upgrades.groundZoneDuration || 0;
+        const radiusUpg = upgrades.groundZoneRadius || 0;
+        
+        const builder = createDetailBuilder();
+        
+        if (craterUnlocked) {
+          const slowPct = Math.round((tower.groundZoneSlow || 0.25) * 100);
+          const duration = (tower.groundZoneDuration || 2000) / 1000;
+          const radius = tower.groundZoneRadius || 40;
+          
+          builder.base('Status:', '✅ Unlocked', 'detail-upgrade')
+            .line('Slow:', `${slowPct}%`, 'detail-base');
+          if (slowUpg > 0) {
+            builder.line(`Tar Pit (${slowUpg}):`, `+${slowUpg * 5}%`, 'detail-upgrade');
+          }
+          builder.line('Duration:', `${duration.toFixed(1)}s`, 'detail-base');
+          if (durUpg > 0) {
+            builder.line(`Lingering (${durUpg}):`, `+${(durUpg * 0.5).toFixed(1)}s`, 'detail-upgrade');
+          }
+          builder.line('Radius:', `${radius}px`, 'detail-base');
+          if (radiusUpg > 0) {
+            builder.line(`Wide (${radiusUpg}):`, `+${radiusUpg * 5}px`, 'detail-upgrade');
+          }
+          builder.final(`${slowPct}% slow`)
+            .formula('Explosions leave slowing craters');
+        } else {
+          builder.base('Status:', '🔒 Locked', 'detail-locked')
+            .line('Unlock:', 'Crater Zone upgrade', 'detail-base')
+            .final('OFF')
+            .formula('Purchase Crater Zone to unlock');
+        }
+        detailCrater.innerHTML = builder.build();
       }
       
       // COMBO SYSTEM (Normal Attack)
