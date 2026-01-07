@@ -108,17 +108,47 @@ function EntityRendererMixin(Base) {
       const orbPulse = Math.sin(this.time * 0.005) * 0.2 + 0.8;
       
       if (attackType === 'magic') {
-        const magicPulse = Math.sin(this.time * 0.004) * 0.3 + 0.7;
-        this.shapeRenderer.circle(x, y, bodySize * 0.4, glowColor.r * magicPulse, glowColor.g * magicPulse, glowColor.b * magicPulse, 0.9);
+        // Get charge progress for visual intensity
+        const chargeProgress = tower.magicState?.chargeProgress || 0;
+        const isCharging = tower.magicState?.isCharging || false;
+        const isReady = chargeProgress >= 1.0;
+        
+        // Central orb pulse - intensifies with charge
+        const basePulse = Math.sin(this.time * 0.004) * 0.3 + 0.7;
+        const chargePulse = isCharging ? Math.sin(this.time * 0.02) * 0.2 + 0.8 : 1;
+        const magicPulse = basePulse * (0.7 + chargeProgress * 0.3) * chargePulse;
+        
+        // Orb size grows with charge
+        const orbSize = bodySize * (0.4 + chargeProgress * 0.15);
+        this.shapeRenderer.circle(x, y, orbSize, glowColor.r * magicPulse, glowColor.g * magicPulse, glowColor.b * magicPulse, 0.9);
         this.shapeRenderer.circle(x, y, bodySize * 0.25, 1, 1, 1, 0.7);
         
-        // Orbiting particles
-        for (let i = 0; i < 3; i++) {
-          const orbitAngle = this.time * 0.006 + (i * Math.PI * 2 / 3);
-          const orbitDist = bodySize * 0.9;
+        // Orbiting particles - speed and count based on charge
+        const orbitSpeed = 0.004 + chargeProgress * 0.006; // 0.004 -> 0.01
+        const particleCount = 3 + Math.floor(chargeProgress * 3); // 3 -> 6
+        for (let i = 0; i < particleCount; i++) {
+          const orbitAngle = this.time * orbitSpeed + (i * Math.PI * 2 / particleCount);
+          const orbitDist = bodySize * (0.8 + chargeProgress * 0.2);
           const px = x + Math.cos(orbitAngle) * orbitDist;
           const py = y + Math.sin(orbitAngle) * orbitDist;
-          this.shapeRenderer.circle(px, py, 2.5 / camera.zoom, accentColor.r, accentColor.g, accentColor.b, 0.8);
+          const particleSize = (2 + chargeProgress * 1.5) / camera.zoom;
+          const particleAlpha = 0.6 + chargeProgress * 0.4;
+          this.shapeRenderer.circle(px, py, particleSize, accentColor.r, accentColor.g, accentColor.b, particleAlpha);
+        }
+        
+        // Charge glow ring when charging
+        if (isCharging || chargeProgress > 0.5) {
+          const ringAlpha = chargeProgress * 0.4;
+          const ringSize = bodySize * 0.7 + Math.sin(this.time * 0.01) * 2;
+          this.shapeRenderer.circleOutline(x, y, ringSize, 2 / camera.zoom, 
+            accentColor.r, accentColor.g, accentColor.b, ringAlpha);
+        }
+        
+        // Ready to fire visual (pulsing outer ring)
+        if (isReady) {
+          const readyPulse = Math.sin(this.time * 0.015) * 0.3 + 0.7;
+          this.shapeRenderer.circleOutline(x, y, bodySize * 1.1, 3 / camera.zoom,
+            1, 0.8, 1, readyPulse * 0.6);
         }
       } else {
         this.shapeRenderer.circle(x, y, bodySize * 0.3, glowColor.r * orbPulse, glowColor.g * orbPulse, glowColor.b * orbPulse, 1);

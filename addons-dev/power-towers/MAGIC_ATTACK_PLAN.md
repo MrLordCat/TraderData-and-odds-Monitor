@@ -80,10 +80,13 @@ Final Damage = DMG + (Shot Cost / efficiency)
 - [x] Add upgrade definitions to stat-upgrades.js
 - [x] Wire up upgrade handlers (via getMagicConfig)
 
-### Step 8: Visual Effects ⬜
-- [ ] Charging animation on tower (particles/glow)
-- [ ] Intensity increases with charge level
-- [ ] Overflow visual (arc to next target)
+### Step 8: Visual Effects ✅
+- [x] Charging animation on tower (particles/glow)
+- [x] Intensity increases with charge level
+- [x] Orb size grows, orbit speed increases
+- [x] Particle count 3->6 based on charge
+- [x] Ready-to-fire pulsing ring
+- [ ] Overflow visual (arc to next target) - TODO when combat connected
 
 ---
 
