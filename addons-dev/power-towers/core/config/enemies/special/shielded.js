@@ -15,11 +15,23 @@ const SHIELDED = {
   emoji: '🔮',
   prefix: '🔮',
   
-  // Wave availability
-  availableFromWave: 25,
+  // Wave availability - randomized first appearance
+  availability: {
+    firstAppearanceRange: [20, 28],  // First appears between waves 20-28
+    guaranteedBy: 30,                // Guaranteed to appear by wave 30 if not yet
+  },
+  
+  // Legacy field (minimum possible)
+  availableFromWave: 20,
   
   // Base spawn chance when available
   baseSpawnChance: 0.08,  // 8% chance to replace applicable enemies
+  
+  // Chance scaling after first appearance
+  spawnChanceScaling: {
+    perWaveAfterFirst: 0.01,   // +1% per wave after first appearance
+    maxChance: 0.18,           // Cap at 18%
+  },
   
   // Which base types can become shielded
   applicableTo: ['minion', 'scout', 'brute'],

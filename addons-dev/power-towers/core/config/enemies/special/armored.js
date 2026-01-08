@@ -14,11 +14,23 @@ const ARMORED = {
   emoji: '🛡️',
   prefix: '🛡️',
   
-  // Wave availability
-  availableFromWave: 12,
+  // Wave availability - randomized first appearance
+  availability: {
+    firstAppearanceRange: [8, 14],   // First appears between waves 8-14
+    guaranteedBy: 16,                // Guaranteed to appear by wave 16 if not yet
+  },
+  
+  // Legacy field (minimum possible)
+  availableFromWave: 8,
   
   // Base spawn chance when available
   baseSpawnChance: 0.12,  // 12% chance to replace brute/minion
+  
+  // Chance scaling after first appearance
+  spawnChanceScaling: {
+    perWaveAfterFirst: 0.015,  // +1.5% per wave after first appearance
+    maxChance: 0.25,           // Cap at 25%
+  },
   
   // Which base types can become armored
   applicableTo: ['brute', 'minion'],  // Tanky or standard enemies

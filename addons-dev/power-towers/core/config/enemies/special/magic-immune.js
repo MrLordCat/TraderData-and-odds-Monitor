@@ -16,11 +16,23 @@ const MAGIC_IMMUNE = {
   emoji: '✨',
   prefix: '✨',
   
-  // Wave availability
-  availableFromWave: 15,
+  // Wave availability - randomized first appearance
+  availability: {
+    firstAppearanceRange: [12, 18],  // First appears between waves 12-18
+    guaranteedBy: 20,                // Guaranteed to appear by wave 20 if not yet
+  },
+  
+  // Legacy field (minimum possible)
+  availableFromWave: 12,
   
   // Base spawn chance when available
   baseSpawnChance: 0.12,  // 12% chance to replace applicable enemies
+  
+  // Chance scaling after first appearance
+  spawnChanceScaling: {
+    perWaveAfterFirst: 0.01,   // +1% per wave after first appearance
+    maxChance: 0.20,           // Cap at 20%
+  },
   
   // Which base types can become magic-immune
   applicableTo: ['minion', 'brute'],  // Standard and tank enemies

@@ -14,11 +14,23 @@ const REGENERATING = {
   emoji: '🩹',
   prefix: '🩹',
   
-  // Wave availability
-  availableFromWave: 20,
+  // Wave availability - randomized first appearance
+  availability: {
+    firstAppearanceRange: [15, 22],  // First appears between waves 15-22
+    guaranteedBy: 24,                // Guaranteed to appear by wave 24 if not yet
+  },
+  
+  // Legacy field (minimum possible)
+  availableFromWave: 15,
   
   // Base spawn chance when available
   baseSpawnChance: 0.10,  // 10% chance to replace applicable enemies
+  
+  // Chance scaling after first appearance
+  spawnChanceScaling: {
+    perWaveAfterFirst: 0.012,  // +1.2% per wave after first appearance
+    maxChance: 0.22,           // Cap at 22%
+  },
   
   // Which base types can become regenerating
   applicableTo: ['minion', 'brute', 'scout'],

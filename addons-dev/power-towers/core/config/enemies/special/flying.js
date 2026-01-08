@@ -15,11 +15,23 @@ const FLYING = {
   emoji: '🦅',
   prefix: '🦅',
   
-  // Wave availability
-  availableFromWave: 8,
+  // Wave availability - randomized first appearance
+  availability: {
+    firstAppearanceRange: [4, 8],   // First appears between waves 4-8
+    guaranteedBy: 10,               // Guaranteed to appear by wave 10 if not yet
+  },
+  
+  // Legacy field (computed at runtime or for backwards compatibility)
+  availableFromWave: 4,  // Minimum possible
   
   // Base spawn chance when available (can be overridden per wave)
   baseSpawnChance: 0.15,  // 15% chance to replace scout/minion
+  
+  // Chance scaling after first appearance
+  spawnChanceScaling: {
+    perWaveAfterFirst: 0.02,  // +2% per wave after first appearance
+    maxChance: 0.30,          // Cap at 30%
+  },
   
   // Which base types can become flying
   applicableTo: ['scout', 'minion'],  // Only fast/light enemies
