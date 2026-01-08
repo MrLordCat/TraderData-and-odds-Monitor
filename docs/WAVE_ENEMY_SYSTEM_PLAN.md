@@ -32,27 +32,64 @@ core/config/
 │
 ├── enemies/                    # Враги
 │   ├── index.js               # Агрегатор врагов
-│   ├── base-types.js          # Базовые: Minion, Scout, Brute, Swarmling (~100 строк)
-│   ├── special-types.js       # Спец: Flying, Armored, Shielded, etc. (~150 строк)
-│   ├── elite-modifiers.js     # Elite модификаторы (~80 строк)
-│   └── bosses/                # Боссы (отдельная папка)
+│   ├── base/                  # Базовые типы (каждый в своём файле)
+│   │   ├── index.js           # Агрегатор базовых
+│   │   ├── minion.js          # Minion (~30 строк)
+│   │   ├── scout.js           # Scout (~30 строк)
+│   │   ├── brute.js           # Brute (~30 строк)
+│   │   └── swarmling.js       # Swarmling (~30 строк)
+│   │
+│   ├── special/               # Специальные типы (каждый в своём файле)
+│   │   ├── index.js           # Агрегатор специальных
+│   │   ├── flying.js          # Flying (~50 строк)
+│   │   ├── armored.js         # Armored (~50 строк)
+│   │   ├── magic-immune.js    # Magic-Immune (~50 строк)
+│   │   ├── phasing.js         # Phasing (~80 строк)
+│   │   ├── regenerating.js    # Regenerating (~50 строк)
+│   │   ├── undead.js          # Undead (~80 строк)
+│   │   ├── shielded.js        # Shielded (~60 строк)
+│   │   └── splitter.js        # Splitter (~80 строк)
+│   │
+│   ├── elite.js               # Elite модификаторы (~80 строк)
+│   │
+│   └── bosses/                # Боссы (каждый в своём файле)
 │       ├── index.js           # Агрегатор боссов
-│       ├── mini-bosses.js     # Мини-боссы (волны 5, 15, 25, 35)
-│       └── main-bosses.js     # Главные боссы (волны 10, 20, 30, 40)
+│       ├── mini/              # Мини-боссы
+│       │   ├── index.js
+│       │   ├── brood-mother.js    # Волна 5
+│       │   ├── war-chief.js       # Волна 15
+│       │   ├── necromancer.js     # Волна 25
+│       │   └── titan.js           # Волна 35
+│       └── main/              # Главные боссы
+│           ├── index.js
+│           ├── wyvern.js          # Волна 10
+│           ├── golem.js           # Волна 20
+│           ├── lich.js            # Волна 30
+│           └── death-knight.js    # Волна 40
 │
 ├── waves/                      # Волны
 │   ├── index.js               # Агрегатор волн
 │   ├── compositions.js        # Составы волн 1-40 (~200 строк)
-│   ├── auras.js               # Wave modifiers/ауры (~100 строк)
 │   ├── scaling.js             # HP/Speed/Reward scaling (~50 строк)
-│   └── generation.js          # Логика генерации волны (~150 строк)
+│   ├── generation.js          # Логика генерации волны (~150 строк)
+│   │
+│   └── auras/                 # Ауры (каждая в своём файле)
+│       ├── index.js           # Агрегатор аур + логика выбора
+│       ├── haste.js           # Haste (~40 строк)
+│       ├── fortified.js       # Fortified (~40 строк)
+│       ├── regeneration.js    # Regeneration (~50 строк)
+│       ├── energized.js       # Energized (~40 строк)
+│       ├── ethereal.js        # Ethereal (~50 строк)
+│       ├── berserker.js       # Berserker (~60 строк)
+│       └── swarm-mind.js      # Swarm Mind (~60 строк)
 ```
 
 ### Принципы модульности
-- Каждый файл ≤ 300 строк (идеально)
-- Максимум 500 строк (жёсткий лимит)
-- Один файл = одна ответственность
-- Агрегаторы (index.js) только экспортируют, без логики
+- **Один файл = один тип/босс/аура** (максимальная гибкость)
+- Каждый файл ≤ 100 строк (идеально для врагов/аур)
+- Агрегаторы ≤ 150 строк
+- Логика в отдельных файлах (generation.js, etc.)
+- Легко добавлять новые типы - просто создать файл и добавить в агрегатор
 
 ---
 

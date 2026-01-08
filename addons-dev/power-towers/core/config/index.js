@@ -12,21 +12,26 @@
  *   ├── index.js      <- THIS FILE (entry point)
  *   ├── base.js       <- Map, display, visuals
  *   ├── economy.js    <- Gold, costs
- *   ├── waves.js      <- Enemies, spawning
+ *   ├── waves.js      <- Enemies, spawning (legacy)
  *   ├── tower.js      <- Tower stats, upgrades
  *   ├── energy.js     <- Energy system
- *   └── attacks/
- *       ├── index.js  <- Attack type aggregator
- *       ├── normal.js <- Normal attack
- *       ├── siege.js  <- Siege attack
- *       ├── magic.js  <- Magic attack
- *       └── piercing.js <- Piercing attack
+ *   ├── attacks/      <- Attack type configs
+ *   ├── enemies/      <- Enemy configs (NEW)
+ *   │   ├── base/     <- Base enemy types
+ *   │   ├── special/  <- Special enemy types
+ *   │   ├── bosses/   <- Boss configs
+ *   │   └── elite.js  <- Elite system
+ *   └── waves/        <- Wave system (NEW)
+ *       ├── auras/    <- Wave auras
+ *       ├── scaling.js
+ *       ├── compositions.js
+ *       └── generation.js
  */
 
 // Import all config modules
 const BASE_CONFIG = require('./base');
 const ECONOMY_CONFIG = require('./economy');
-const WAVES_CONFIG = require('./waves');
+const WAVES_LEGACY_CONFIG = require('./waves-legacy');  // Legacy wave config
 const TOWER_CONFIG = require('./tower');
 const ENERGY_CONFIG = require('./energy');
 const UPGRADES_CONFIG = require('./upgrades');
@@ -44,6 +49,34 @@ const {
   getNormalAttackStats,
 } = require('./attacks');
 
+// Import new modular enemy system
+const {
+  BASE_ENEMIES,
+  SPECIAL_MODIFIERS,
+  ELITE_CONFIG,
+  BOSSES,
+  BOSS_WAVES,
+  ENEMY_TYPES,
+  createEnemyData,
+  rollForElite,
+  applyEliteModifiers,
+  isBossWave,
+  getBossConfig,
+} = require('./enemies');
+
+// Import new modular wave system
+const {
+  WAVE_CONFIG,
+  AURAS,
+  SCALING,
+  WAVE_COMPOSITIONS,
+  SPAWN_PATTERNS,
+  generateWave,
+  getWavePreview,
+  selectAurasForWave,
+  applyAurasToEnemy,
+} = require('./waves');
+
 // ╔════════════════════════════════════════════════════════════════════════════╗
 // ║                        UNIFIED CONFIG OBJECT                               ║
 // ╚════════════════════════════════════════════════════════════════════════════╝
@@ -52,13 +85,29 @@ const CONFIG = {
   // Spread all configs into one flat object for backwards compatibility
   ...BASE_CONFIG,
   ...ECONOMY_CONFIG,
-  ...WAVES_CONFIG,
+  ...WAVES_LEGACY_CONFIG,
   ...TOWER_CONFIG,
   ...ENERGY_CONFIG,
   ...UPGRADES_CONFIG,
   
   // Attack type config as nested object
   ATTACK_TYPE_CONFIG,
+  
+  // New modular systems (nested for organization)
+  enemies: {
+    BASE_ENEMIES,
+    SPECIAL_MODIFIERS,
+    ELITE_CONFIG,
+    BOSSES,
+    BOSS_WAVES,
+  },
+  waves: {
+    WAVE_CONFIG,
+    AURAS,
+    SCALING,
+    WAVE_COMPOSITIONS,
+    SPAWN_PATTERNS,
+  },
 };
 
 // Copy computed properties (getters)
@@ -86,7 +135,7 @@ module.exports = CONFIG;
 // Also export individual configs and helpers for direct access
 module.exports.BASE_CONFIG = BASE_CONFIG;
 module.exports.ECONOMY_CONFIG = ECONOMY_CONFIG;
-module.exports.WAVES_CONFIG = WAVES_CONFIG;
+module.exports.WAVES_LEGACY_CONFIG = WAVES_LEGACY_CONFIG;
 module.exports.TOWER_CONFIG = TOWER_CONFIG;
 module.exports.ENERGY_CONFIG = ENERGY_CONFIG;
 module.exports.UPGRADES_CONFIG = UPGRADES_CONFIG;
@@ -104,3 +153,24 @@ module.exports.getAttackTypeUpgrades = getAttackTypeUpgrades;
 module.exports.calculateAttackTypeUpgradeCost = calculateAttackTypeUpgradeCost;
 module.exports.applyAttackTypeUpgradeEffect = applyAttackTypeUpgradeEffect;
 module.exports.getNormalAttackStats = getNormalAttackStats;
+
+// New enemy system helpers
+module.exports.BASE_ENEMIES = BASE_ENEMIES;
+module.exports.ENEMY_TYPES = ENEMY_TYPES;
+module.exports.BOSSES = BOSSES;
+module.exports.BOSS_WAVES = BOSS_WAVES;
+module.exports.createEnemyData = createEnemyData;
+module.exports.rollForElite = rollForElite;
+module.exports.applyEliteModifiers = applyEliteModifiers;
+module.exports.isBossWave = isBossWave;
+module.exports.getBossConfig = getBossConfig;
+
+// New wave system helpers
+module.exports.WAVE_CONFIG = WAVE_CONFIG;
+module.exports.AURAS = AURAS;
+module.exports.SCALING = SCALING;
+module.exports.WAVE_COMPOSITIONS = WAVE_COMPOSITIONS;
+module.exports.generateWave = generateWave;
+module.exports.getWavePreview = getWavePreview;
+module.exports.selectAurasForWave = selectAurasForWave;
+module.exports.applyAurasToEnemy = applyAurasToEnemy;
