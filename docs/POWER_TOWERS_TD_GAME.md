@@ -89,9 +89,9 @@ Player builds **Base Towers** and upgrades them:
       ├──2️⃣b Attack Type Upgrades (type-specific)
       │      ├── 🎯 Normal: Combo Power, Combo Mastery, 
       │      │            Combo Persistence, Focus Training, Lethal Focus
-      │      ├── 💥 Siege: Splash Radius, Splash Falloff (TODO)
-      │      ├── ✨ Magic: Power Scaling, Overdrive (TODO)
-      │      └── 🗡️ Piercing: Crit Chance, Crit Damage (TODO)
+      │      ├── 💥 Siege: Splash Radius, Armor Shred, Ground Zone
+      │      ├── ✨ Magic: Arcane Efficiency, Overflow Reach/Damage, Quick Charge
+      │      └── 🗡️ Piercing: Precision, Momentum, Execute, Bleed, Armor Pen
       │
       └──3️⃣ Choose Element Path (unlocks abilities)
              ├── 🔥 Fire    - Burn DoT, AoE damage, Inferno
@@ -129,17 +129,25 @@ FOCUS: {
 }
 ```
 
-**💥 Siege Attack** — Best for crowd control (swarms)
-- **Splash Damage**: Hits multiple enemies in radius
-- **Falloff**: Damage decreases at edge of splash
+**💥 Siege Attack** ✅ COMPLETE — Best for crowd control (swarms)
+- **Splash Damage**: AoE with 60px base radius, 50% edge falloff
+- **Armor Shred**: Stacking armor debuff (-5% per hit, max 5 stacks)
+- **Ground Zone**: Explosions leave slowing craters (25% slow, 2s duration)
+- **10 Dedicated Upgrades** (all implemented)
 
-**✨ Magic Attack** — Best with energy investment
-- **Power Scaling**: Damage scales 1.5× with energy supply
-- **Overdrive**: Can consume extra power for burst damage
+**✨ Magic Attack** ✅ COMPLETE — Best with energy investment
+- **Charge System**: Tower charges energy before firing, `Cost = DMG × 1.2 × (1 + charge%)²`
+- **Arcane Overflow**: Overkill damage transfers to nearby enemies (75% base, 80px radius)
+- **Stat Modifiers**: ×0.7 attack speed, ×0.9 damage, ×1.2 range, ×1.2 energy storage
+- **4 Dedicated Upgrades** (all implemented)
 
-**🗡️ Piercing Attack** — Best for critical hits
-- **High Crit**: 15% base crit chance (vs 5% normal)
-- **Armor Penetration**: Ignores 20% enemy armor
+**🗡️ Piercing Attack** ✅ COMPLETE — Best for critical hits
+- **Precision System**: Guaranteed crit after 8 hits with +25% bonus damage
+- **Deadly Momentum**: Each crit adds +3% crit chance (max 5 stacks, 3s decay)
+- **Execute**: +50% damage to enemies below 15% HP, +25% extra on crit
+- **Bleed**: Crits apply DoT (3 DPS, 3s duration, up to 5 stacks) - requires unlock
+- **Armor Penetration**: 20% base (upgradeable to 50%)
+- **12 Dedicated Upgrades** (all implemented)
 
 #### Tower Base Stats (from CONFIG)
 | Stat | Base Value | Notes |
@@ -453,9 +461,9 @@ const NORMAL = require('./config/attacks/normal');
 | `tower.js` | TOWER_BASE_*, TOWER_UPGRADE_BONUSES, XP settings |
 | `energy.js` | ENERGY_UPGRADE_*, TOWER_POWER_BONUSES |
 | `attacks/normal.js` | Combo System, Focus Fire, 5 upgrades |
-| `attacks/siege.js` | Splash radius, falloff (TODO) |
-| `attacks/magic.js` | Power scaling, overdrive (TODO) |
-| `attacks/piercing.js` | Crit chance/damage bonuses (TODO) |
+| `attacks/siege.js` | Splash, Armor Shred, Ground Zone, 10 upgrades |
+| `attacks/magic.js` | Charge System, Arcane Overflow, 4 upgrades |
+| `attacks/piercing.js` | Precision, Momentum, Execute, Bleed, 12 upgrades |
 
 **Attack Type Configs:**
 
@@ -517,13 +525,15 @@ normal: {
 - [x] Map generation with spiral path
 - [x] Biome system (6 types)
 - [x] Single tower system with attack types
-- [x] **Normal Attack mechanics** (Combo System, Focus Fire)
-- [x] **Attack type upgrades** (5 upgrades for Normal)
+- [x] **Normal Attack mechanics** (Combo System, Focus Fire) - 5 upgrades
+- [x] **Siege Attack mechanics** (Splash, Armor Shred, Ground Zone) - 10 upgrades
+- [x] **Magic Attack mechanics** (Charge System, Arcane Overflow) - 4 upgrades
+- [x] **Piercing Attack mechanics** (Precision, Momentum, Execute, Bleed) - 12 upgrades
 - [x] 5 Element paths with unique abilities
 - [x] Tower XP and level system
 - [x] Tower stat upgrades (infinite)
 - [x] 5 enemy types with wave scaling
-- [x] Status effects (burn, slow, freeze, poison)
+- [x] Status effects (burn, slow, freeze, poison, armor_shred, bleed)
 - [x] Combat system with projectiles
 - [x] Damage numbers
 - [x] Complete energy system
@@ -542,9 +552,6 @@ normal: {
 - [x] **Modular CONFIG system** (split into domain files)
 
 ### 🚧 Planned
-- [ ] Siege Attack mechanics (splash upgrades)
-- [ ] Magic Attack mechanics (power scaling upgrades)
-- [ ] Piercing Attack mechanics (crit upgrades)
 - [ ] Card system (every 10 waves)
 - [ ] More enemy types (flying, magic-immune)
 - [ ] Boss mechanics (special attacks)
@@ -554,5 +561,5 @@ normal: {
 
 ---
 
-*Document updated: 06.01.2026*
-*Game Version: 0.4.0*
+*Document updated: 08.01.2026*
+*Game Version: 0.7.0 (All Attack Types Complete)*
