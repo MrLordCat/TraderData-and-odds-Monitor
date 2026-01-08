@@ -314,8 +314,17 @@ function UpgradesMixin(Base) {
         groundZoneRadius: 'GZRAD',
         // Piercing
         armorPen: 'PEN',
-        critChance: 'CRIT',
-        critDamage: 'CDMG'
+        precisionHits: 'PREC',
+        precisionDamage: 'PDMG',
+        momentumStacks: 'MSTK',
+        momentumDecay: 'MDEC',
+        executeThreshold: 'EXEC',
+        executeDamage: 'EDMG',
+        executeCrit: 'ECRT',
+        bleedUnlock: 'BLEED',
+        bleedDamage: 'BDMG',
+        bleedDuration: 'BDUR',
+        bleedStacks: 'BSTK'
       };
       
       for (const [upgradeId, upgrade] of Object.entries(upgrades)) {

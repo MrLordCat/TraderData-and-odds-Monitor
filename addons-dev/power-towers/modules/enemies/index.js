@@ -410,8 +410,10 @@ class EnemiesModule {
    * @param {Object} data.elementEffects - Element effects config
    * @param {boolean} data.isCrit - Was critical hit
    * @param {string} data.attackType - Attack type (normal, magic, siege, piercing)
+   * @param {number} data.armorPenetration - Armor penetration (0-1)
+   * @param {Object} data.bleedConfig - Bleed config if should apply
    */
-  damageEnemy({ enemyId, damage, towerId, elementEffects, isCrit, attackType }) {
+  damageEnemy({ enemyId, damage, towerId, elementEffects, isCrit, attackType, armorPenetration, bleedConfig }) {
     const enemy = this.enemies.find(e => e.id === enemyId);
     if (!enemy) {
       console.warn(`[EnemiesModule] damageEnemy: enemy ${enemyId} not found! Current enemies:`, 
@@ -431,7 +433,16 @@ class EnemiesModule {
     enemy.lastAttackType = attackType || 'normal';
     
     // Calculate damage with status effect modifiers (curse, weaken)
-    const { finalDamage, modifiers } = StatusEffects.calculateDamageWithEffects(enemy, damage);
+    let { finalDamage, modifiers } = StatusEffects.calculateDamageWithEffects(enemy, damage);
+    
+    // Apply armor penetration (Piercing attack)
+    // Armor pen reduces the effectiveness of enemy armor
+    if (armorPenetration > 0 && enemy.armor) {
+      const armorReduction = enemy.armor * (1 - armorPenetration);
+      const armorBonus = damage * (armorPenetration * 0.5); // 20% pen = +10% damage
+      finalDamage += armorBonus;
+      modifiers.push({ type: 'armorPen', bonus: armorBonus });
+    }
     
     // Calculate overkill damage for magic cascade
     const healthBeforeDamage = enemy.health;
@@ -445,6 +456,17 @@ class EnemiesModule {
     // Apply element effects
     if (elementEffects) {
       this.applyElementEffects(enemy, elementEffects, towerId, isCrit);
+    }
+    
+    // Apply Bleed (Piercing attack - only on crits)
+    if (bleedConfig && enemy.health > 0) {
+      StatusEffects.applyStatusEffect(enemy, EFFECT_TYPES.BLEED, {
+        damage: bleedConfig.damage,
+        duration: bleedConfig.duration,
+        tickRate: bleedConfig.tickRate,
+        stackable: bleedConfig.stackable,
+        maxStacks: bleedConfig.maxStacks,
+      }, towerId);
     }
 
     this.eventBus.emit('enemy:damaged', { 

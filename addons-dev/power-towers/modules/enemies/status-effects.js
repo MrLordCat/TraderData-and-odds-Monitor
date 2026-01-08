@@ -201,6 +201,22 @@ function getTotalDamageAmplify(enemy) {
 }
 
 /**
+ * Get total bleed damage per tick on enemy
+ * @param {Object} enemy - Target enemy
+ * @returns {number} Total bleed DPS (considering stacks)
+ */
+function getTotalBleedDPS(enemy) {
+  if (!enemy.statusEffects) return 0;
+  
+  const bleed = enemy.statusEffects.find(e => e.type === EFFECT_TYPES.BLEED);
+  if (!bleed) return 0;
+  
+  // damage is stored as damage-per-tick, convert back to DPS
+  const damagePerTick = getEffectDamage(bleed);
+  return damagePerTick / bleed.tickRate;
+}
+
+/**
  * Check if enemy is frozen (stunned)
  */
 function isFrozen(enemy) {
@@ -344,4 +360,5 @@ module.exports = {
   isStunned,
   updateStatusEffects,
   calculateDamageWithEffects,
+  getTotalBleedDPS,
 };

@@ -176,6 +176,12 @@ class GameControllerBase {
       panelCharge: container.querySelector('#panel-charge'),
       panelMagicbonus: container.querySelector('#panel-magicbonus'),
       panelOverflow: container.querySelector('#panel-overflow'),
+      // Piercing attack type stats
+      panelPrecision: container.querySelector('#panel-precision'),
+      panelMomentum: container.querySelector('#panel-momentum'),
+      panelExecute: container.querySelector('#panel-execute'),
+      panelBleed: container.querySelector('#panel-bleed'),
+      panelArmorpen: container.querySelector('#panel-armorpen'),
       // Magic charge floating panel
       magicChargePanel: container.querySelector('#magic-charge-panel'),
       magicChargeSlider: container.querySelector('#magic-charge-slider'),

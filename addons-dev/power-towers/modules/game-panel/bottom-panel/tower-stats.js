@@ -204,6 +204,73 @@ function TowerStatsMixin(Base) {
         if (overflowRow) overflowRow.style.display = 'none';
       }
       
+      // === PIERCING ATTACK TYPE - Precision, Momentum, Execute, Bleed ===
+      const precisionRow = document.getElementById('stat-row-precision');
+      const momentumRow = document.getElementById('stat-row-momentum');
+      const executeRow = document.getElementById('stat-row-execute');
+      const bleedRow = document.getElementById('stat-row-bleed');
+      if (tower.attackTypeId === 'piercing') {
+        const { getPiercingConfig } = require('../../towers/tower-combat');
+        const piercingConfig = getPiercingConfig(tower);
+        const piercingState = tower.piercingState || { precisionHits: 0, momentumStacks: 0 };
+        
+        // Precision progress
+        if (el.panelPrecision) {
+          const ready = piercingState.precisionHits >= piercingConfig.precisionHitsRequired;
+          el.panelPrecision.textContent = ready ? 'READY!' : `${piercingState.precisionHits}/${piercingConfig.precisionHitsRequired}`;
+          el.panelPrecision.style.color = ready ? '#ffd700' : '';
+        }
+        if (precisionRow) precisionRow.style.display = '';
+        
+        // Momentum stacks
+        if (el.panelMomentum) {
+          const momentumBonus = Math.round(piercingState.momentumStacks * piercingConfig.momentumChancePerStack * 100);
+          el.panelMomentum.textContent = `${piercingState.momentumStacks}/${piercingConfig.momentumMaxStacks}`;
+          el.panelMomentum.title = `+${momentumBonus}% Crit Chance`;
+          el.panelMomentum.style.color = piercingState.momentumStacks > 0 ? '#f59e0b' : '';
+        }
+        if (momentumRow) momentumRow.style.display = '';
+        
+        // Execute threshold
+        if (el.panelExecute) {
+          const threshold = Math.round(piercingConfig.executeThreshold * 100);
+          const bonus = Math.round(piercingConfig.executeBonusDamage * 100);
+          el.panelExecute.textContent = `<${threshold}%`;
+          el.panelExecute.title = `+${bonus}% DMG vs targets below ${threshold}% HP`;
+        }
+        if (executeRow) executeRow.style.display = '';
+        
+        // Bleed status
+        if (el.panelBleed) {
+          if (piercingConfig.bleedEnabled) {
+            const dps = piercingConfig.bleedDamage;
+            el.panelBleed.textContent = `${dps}/s`;
+            el.panelBleed.title = `${dps} DPS × ${piercingConfig.bleedMaxStacks} max stacks for ${piercingConfig.bleedDuration}s`;
+          } else {
+            el.panelBleed.textContent = 'OFF';
+            el.panelBleed.title = 'Purchase Hemorrhage upgrade to enable';
+          }
+        }
+        if (bleedRow) bleedRow.style.display = '';
+        
+        // Armor Penetration
+        const armorpenRow = document.getElementById('stat-row-armorpen');
+        if (el.panelArmorpen) {
+          const armorPen = Math.round(piercingConfig.armorPenetration * 100);
+          el.panelArmorpen.textContent = `${armorPen}%`;
+          el.panelArmorpen.title = `Ignores ${armorPen}% of enemy armor`;
+        }
+        if (armorpenRow) armorpenRow.style.display = '';
+      } else {
+        // Hide piercing rows for non-piercing towers
+        if (precisionRow) precisionRow.style.display = 'none';
+        if (momentumRow) momentumRow.style.display = 'none';
+        if (executeRow) executeRow.style.display = 'none';
+        if (bleedRow) bleedRow.style.display = 'none';
+        const armorpenRow = document.getElementById('stat-row-armorpen');
+        if (armorpenRow) armorpenRow.style.display = 'none';
+      }
+      
       // Update level
       if (el.avatarLevel) el.avatarLevel.textContent = `Lvl ${tower.level || 1}`;
       
@@ -579,6 +646,169 @@ function TowerStatsMixin(Base) {
           .final(`${Math.round(finalTransfer * 100)}%`)
           .formula('Overkill damage → nearest enemy');
         detailOverflow.innerHTML = builder.build();
+      }
+      
+      // =========================================
+      // PIERCING ATTACK TYPE STATS
+      // =========================================
+      
+      // PRECISION (Piercing)
+      const detailPrecision = document.getElementById('panel-detail-precision');
+      if (detailPrecision && attackTypeName === 'piercing') {
+        const { getPiercingConfig } = require('../../../modules/towers/tower-combat');
+        const config = getPiercingConfig(tower);
+        const piercingState = tower.piercingState || {};
+        const attackUpg = tower.attackTypeUpgrades || {};
+        const precHitsLv = attackUpg.precisionHits || 0;
+        const precDmgLv = attackUpg.precisionDamage || 0;
+        
+        const currentHits = piercingState.precisionHits || 0;
+        const hitsRequired = config.precisionHitsRequired;
+        const bonusDmg = Math.round(config.precisionBonusDamage * 100);
+        const ready = currentHits >= hitsRequired;
+        
+        const builder = createDetailBuilder()
+          .base('Hits Required:', `${hitsRequired}`);
+        if (precHitsLv > 0) {
+          builder.line(`Deadly Precision (${precHitsLv}):`, `-${precHitsLv}`, 'detail-upgrade');
+        }
+        builder.line('Crit Bonus:', `+${bonusDmg}%`, 'detail-base');
+        if (precDmgLv > 0) {
+          builder.line(`Perfect Strike (${precDmgLv}):`, `+${precDmgLv * 10}%`, 'detail-upgrade');
+        }
+        builder.line('Progress:', `${currentHits}/${hitsRequired}`, ready ? 'detail-biome' : 'detail-level')
+          .final(ready ? '🎯 READY!' : `${currentHits}/${hitsRequired}`)
+          .formula('Guaranteed crit after N hits');
+        detailPrecision.innerHTML = builder.build();
+      }
+      
+      // MOMENTUM (Piercing)
+      const detailMomentum = document.getElementById('panel-detail-momentum');
+      if (detailMomentum && attackTypeName === 'piercing') {
+        const { getPiercingConfig, getMomentumCritBonus } = require('../../../modules/towers/tower-combat');
+        const config = getPiercingConfig(tower);
+        const piercingState = tower.piercingState || {};
+        const attackUpg = tower.attackTypeUpgrades || {};
+        const stacksLv = attackUpg.momentumStacks || 0;
+        const decayLv = attackUpg.momentumDecay || 0;
+        
+        const currentStacks = piercingState.momentumStacks || 0;
+        const maxStacks = config.momentumMaxStacks;
+        const critBonus = Math.round(getMomentumCritBonus(tower) * 100);
+        const chancePerStack = Math.round(config.momentumChancePerStack * 100);
+        const decay = config.momentumDecayTime;
+        
+        const builder = createDetailBuilder()
+          .base('Per Stack:', `+${chancePerStack}% Crit`);
+        builder.line('Max Stacks:', `${maxStacks}`, 'detail-base');
+        if (stacksLv > 0) {
+          builder.line(`Killing Spree (${stacksLv}):`, `+${stacksLv}`, 'detail-upgrade');
+        }
+        builder.line('Decay Time:', `${decay.toFixed(1)}s`, 'detail-base');
+        if (decayLv > 0) {
+          builder.line(`Sustained Fury (${decayLv}):`, `+${(decayLv * 0.5).toFixed(1)}s`, 'detail-upgrade');
+        }
+        builder.line('Current:', `${currentStacks}/${maxStacks}`, currentStacks > 0 ? 'detail-biome' : 'detail-level')
+          .final(`+${critBonus}% Crit`)
+          .formula('Each crit adds stack, decays over time');
+        detailMomentum.innerHTML = builder.build();
+      }
+      
+      // EXECUTE (Piercing)
+      const detailExecute = document.getElementById('panel-detail-execute');
+      if (detailExecute && attackTypeName === 'piercing') {
+        const { getPiercingConfig } = require('../../../modules/towers/tower-combat');
+        const config = getPiercingConfig(tower);
+        const attackUpg = tower.attackTypeUpgrades || {};
+        const thresholdLv = attackUpg.executeThreshold || 0;
+        const damageLv = attackUpg.executeDamage || 0;
+        const critLv = attackUpg.executeCrit || 0;
+        
+        const threshold = Math.round(config.executeThreshold * 100);
+        const bonus = Math.round(config.executeBonusDamage * 100);
+        const critBonus = Math.round(config.executeCritBonus * 100);
+        
+        const builder = createDetailBuilder()
+          .base('HP Threshold:', `<${threshold}%`);
+        if (thresholdLv > 0) {
+          builder.line(`Executioner (${thresholdLv}):`, `+${thresholdLv * 5}%`, 'detail-upgrade');
+        }
+        builder.line('Damage Bonus:', `+${bonus}%`, 'detail-base');
+        if (damageLv > 0) {
+          builder.line(`Coup de Grace (${damageLv}):`, `+${damageLv * 15}%`, 'detail-upgrade');
+        }
+        builder.line('Crit vs Execute:', `+${critBonus}%`, 'detail-base');
+        if (critLv > 0) {
+          builder.line(`Merciless (${critLv}):`, `+${critLv * 10}%`, 'detail-upgrade');
+        }
+        builder.final(`+${bonus}% DMG`)
+          .formula('Bonus damage to low HP enemies');
+        detailExecute.innerHTML = builder.build();
+      }
+      
+      // BLEED (Piercing)
+      const detailBleed = document.getElementById('panel-detail-bleed');
+      if (detailBleed && attackTypeName === 'piercing') {
+        const { getPiercingConfig } = require('../../../modules/towers/tower-combat');
+        const config = getPiercingConfig(tower);
+        const attackUpg = tower.attackTypeUpgrades || {};
+        const damageLv = attackUpg.bleedDamage || 0;
+        const durationLv = attackUpg.bleedDuration || 0;
+        const stacksLv = attackUpg.bleedStacks || 0;
+        const unlocked = config.bleedEnabled;
+        
+        const builder = createDetailBuilder();
+        
+        if (unlocked) {
+          const dps = config.bleedDamage;
+          const duration = config.bleedDuration;
+          const maxStacks = config.bleedMaxStacks;
+          const totalDmg = dps * duration * maxStacks;
+          
+          builder.base('Status:', '✅ Unlocked', 'detail-upgrade')
+            .line('DPS:', `${dps}/s`, 'detail-base');
+          if (damageLv > 0) {
+            builder.line(`Deep Cuts (${damageLv}):`, `+${damageLv}`, 'detail-upgrade');
+          }
+          builder.line('Duration:', `${duration}s`, 'detail-base');
+          if (durationLv > 0) {
+            builder.line(`Lingering (${durationLv}):`, `+${durationLv}s`, 'detail-upgrade');
+          }
+          builder.line('Max Stacks:', `${maxStacks}`, 'detail-base');
+          if (stacksLv > 0) {
+            builder.line(`Arterial (${stacksLv}):`, `+${stacksLv}`, 'detail-upgrade');
+          }
+          builder.line('Max Total DMG:', `${totalDmg}`, 'detail-biome')
+            .final(`${dps}/s`)
+            .formula('Crits apply bleeding DoT');
+        } else {
+          builder.base('Status:', '🔒 Locked', 'detail-locked')
+            .line('Unlock:', 'Hemorrhage upgrade', 'detail-base')
+            .final('OFF')
+            .formula('Purchase Hemorrhage to unlock');
+        }
+        detailBleed.innerHTML = builder.build();
+      }
+      
+      // ARMOR PENETRATION (Piercing)
+      const detailArmorpen = document.getElementById('panel-detail-armorpen');
+      if (detailArmorpen && attackTypeName === 'piercing') {
+        const { getPiercingConfig } = require('../../../modules/towers/tower-combat');
+        const config = getPiercingConfig(tower);
+        const attackUpg = tower.attackTypeUpgrades || {};
+        const armorPenLv = attackUpg.armorPen || 0;
+        
+        const baseArmorPen = 20; // 20% base
+        const armorPen = Math.round(config.armorPenetration * 100);
+        
+        const builder = createDetailBuilder()
+          .base('Base:', `${baseArmorPen}%`);
+        if (armorPenLv > 0) {
+          builder.line(`Armor Piercing (${armorPenLv}):`, `+${armorPenLv * 5}%`, 'detail-upgrade');
+        }
+        builder.final(`${armorPen}%`)
+          .formula('Ignores % of enemy armor');
+        detailArmorpen.innerHTML = builder.build();
       }
       
       // Update ability stat popups

@@ -140,7 +140,7 @@ Player builds **Base Tower** and upgrades it:
 | **Normal** | 🎯 | Single-target, bosses | Combo System (stacks), Focus Fire (guaranteed crit) |
 | **Siege** | 💥 | AoE, swarms | Splash Damage, Armor Shred, Ground Zone (craters) |
 | **Magic** | ✨ | Energy-based burst | Charge System, Arcane Overflow (cascade) |
-| **Piercing** | 🗡️ | Crits | 15% base crit, 20% armor pen |
+| **Piercing** | 🗡️ | Crit-focused, execute | Precision System, Deadly Momentum, Execute, Bleed |
 
 ### 3.3 Tower Base Stats
 | Stat | Base Value | Upgrade Bonus |
@@ -251,33 +251,82 @@ Towers gain XP from upgrades. Level provides stat bonuses and upgrade discounts.
 - Combat logic: `modules/towers/tower-combat.js` → `getMagicConfig()`, `updateMagicCharge()`, `processArcaneOverflow()`
 - UI: `modules/game-panel/bottom-panel/tower-stats.js` → Magic charge popup
 
-### 3.8 Energy System
+### 3.8 Piercing Attack (implemented)
+
+**Precision System:**
+- Guaranteed critical hit after N hits (default: 8)
+- Precision crit deals +25% bonus damage
+- Counter does NOT reset on target switch
+
+**Deadly Momentum:**
+- Each crit adds +3% crit chance (stacking)
+- Max 5 stacks (+15% crit chance)
+- Decays after 3 seconds without critting
+
+**Execute:**
+- +50% damage to enemies below 15% HP
+- Crits vs execute targets: additional +25% damage
+
+**Bleed (unlockable):**
+- Crits apply bleeding DoT
+- 3 DPS, 3s duration, stacks up to 5
+
+**Stat Modifiers:**
+- Damage: ×0.85 (lower base, offset by crits)
+- Attack Speed: ×1.1 (faster)
+- Range: ×0.9 (precision weapon)
+- Crit Chance: 15% (vs 5% base)
+- Crit Damage: 250% (vs 150% base)
+- Armor Penetration: 20% (always)
+
+**Upgrades:**
+| ID | Name | Emoji | Effect |
+|----|------|-------|--------|
+| `precisionHits` | Deadly Precision | 🎯 | -1 hit for guaranteed crit |
+| `precisionDamage` | Perfect Strike | 💫 | +10% precision crit bonus |
+| `momentumStacks` | Killing Spree | ⚡ | +1 max momentum stack |
+| `momentumDecay` | Sustained Fury | 🔥 | +0.5s decay time |
+| `executeThreshold` | Executioner | 💀 | +5% HP threshold |
+| `executeDamage` | Coup de Grace | ⚔️ | +15% execute damage |
+| `executeCrit` | Merciless | ☠️ | +10% crit vs execute |
+| `bleedUnlock` | Hemorrhage | 🩸 | Unlocks bleed on crit |
+| `bleedDamage` | Deep Cuts | 🗡️ | +1 DPS |
+| `bleedDuration` | Lingering Wounds | ⏱️ | +1s duration |
+| `bleedStacks` | Arterial Strike | 💉 | +1 max stack |
+| `armorPen` | Armor Piercing | 🛡️ | +5% armor pen |
+
+**Files:**
+- Config: `core/config/attacks/piercing.js`
+- Combat logic: `modules/towers/tower-combat.js` → `getPiercingConfig()`, `initPiercingState()`, `processPiercingHit()`
+- Status effect: `modules/enemies/status-effects.js` → BLEED type
+
+### 3.9 Energy System
 
 | Building | Cost | Size | Gen/tick | Special |
 |----------|------|------|----------|---------|
-| Generator тЪб | 50g | 1├Ч1 | 5 | Stable |
-| Bio Generator ЁЯМ│ | 80g | 2├Ч2 | 8 | Nature bonus |
-| Wind Turbine ЁЯТи | 100g | 1├Ч1 | 12 | Fluctuating |
-| Solar Panel тШАя╕П | 90g | 1├Ч1 | 10 | Biome-dependent |
-| Hydro ЁЯТз | 120g | 1├Ч1 | 15 | Needs water |
-| Geothermal ЁЯМЛ | 150g | 1├Ч1 | 20 | Needs burned terrain |
-| Battery ЁЯФЛ | 60g | 2├Ч2 | 0 | Storage: 200 |
+| Generator ⚡ | 50g | 1×1 | 5 | Stable |
+| Bio Generator 🌳 | 80g | 2×2 | 8 | Nature bonus |
+| Wind Turbine 💨 | 100g | 1×1 | 12 | Fluctuating |
+| Solar Panel ☀️ | 90g | 1×1 | 10 | Biome-dependent |
+| Hydro 💧 | 120g | 1×1 | 15 | Needs water |
+| Geothermal 🌋 | 150g | 1×1 | 20 | Needs burned terrain |
+| Battery 🔋 | 60g | 2×2 | 0 | Storage: 200 |
 
 **Power Network:**
 - Towers connect to energy buildings via channels
 - **Powered bonus**: +10% damage, +15% fire rate
 - **Unpowered penalty**: -10% damage, -20% fire rate
 
-### 3.8 Element Abilities
+### 3.10 Element Abilities
 Each element path unlocks unique abilities:
 
 | Element | Emoji | Abilities |
 |---------|-------|-----------|
-| Fire | ЁЯФе | Burn DoT тЖТ Inferno (AoE) тЖТ Meteor |
-| Ice | тЭДя╕П | Slow тЖТ Freeze тЖТ Shatter |
-| Lightning | тЪб | Chain Lightning тЖТ Charge Shot тЖТ Overload |
-| Nature | ЁЯМ┐ | Poison тЖТ Thorns тЖТ Entangle (root) |
-| Dark | ЁЯТА | Soul Siphon тЖТ Void тЖТ Death Mark |
+| Fire | 🔥 | Burn DoT → Inferno (AoE) → Meteor |
+| Ice | ❄️ | Slow → Freeze → Shatter |
+| Lightning | ⚡ | Chain Lightning → Charge Shot → Overload |
+| Nature | 🌿 | Poison → Thorns → Entangle (root) |
+| Dark | 💀 | Soul Siphon → Void → Death Mark |
 
 ---
 
@@ -429,15 +478,15 @@ panelMystat: container.querySelector('#panel-mystat'),
 - **Normal Attack** (Combo System, Focus Fire) — complete
 - **Siege Attack** (Splash, Armor Shred, Ground Zone) — complete
 - **Magic Attack** (Charge System, Arcane Overflow) — complete
+- **Piercing Attack** (Precision, Momentum, Execute, Bleed) — complete
 - 5 elemental paths
 - XP system for towers and buildings
 - 5 enemy types with wave scaling
-- Status effects (burn, slow, freeze, poison, armor_shred)
+- Status effects (burn, slow, freeze, poison, armor_shred, bleed)
 - Complete energy system
 - WebGL rendering
 
 ### 🚧 Planned
-- Piercing Attack mechanics (crit upgrades)
 - Card system (every 10 waves)
 - More enemy types (flying, magic-immune)
 - Boss mechanics
@@ -457,35 +506,4 @@ panelMystat: container.querySelector('#panel-mystat'),
 ---
 
 *Document version: 07.01.2026*
-*Game version: 0.6.0 (Magic Complete)*
-- **Siege Attack** (Splash, Armor Shred, Ground Zone) тАФ complete
-- 5 elemental paths
-- XP system for towers and buildings
-- 5 enemy types with wave scaling
-- Status effects (burn, slow, freeze, poison, armor_shred)
-- Complete energy system
-- WebGL rendering
-
-### ЁЯЪз Planned
-- Magic Attack mechanics (power scaling upgrades)
-- Piercing Attack mechanics (crit upgrades)
-- Card system (every 10 waves)
-- More enemy types (flying, magic-immune)
-- Boss mechanics
-- Sound effects
-- Save/Load system
-
----
-
-## 9. Common Mistakes
-
-- **Forgot to cache element** тАФ add to `game-controller.js`
-- **Empty popup** тАФ check that `getElementById` finds the element
-- **Upgrade not applying** тАФ check that you're reading from `tower.attackTypeUpgrades`
-- **Stat not updating** тАФ ensure `updateBottomPanelStats()` is being called
-- **CSS class not working** тАФ check `styles/tooltips.js`
-
----
-
-*Document version: 07.01.2026*
-*Game version: 0.5.0 (Siege Complete)*
+*Game version: 0.7.0 (All Attack Types Complete)*

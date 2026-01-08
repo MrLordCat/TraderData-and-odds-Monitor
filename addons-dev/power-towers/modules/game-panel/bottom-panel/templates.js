@@ -301,6 +301,32 @@ function getBottomPanelTemplate() {
               <span class="stat-value" id="panel-overflow">75%</span>
               <div class="hover-popup" id="panel-detail-overflow"></div>
             </div>
+            <!-- Piercing Attack Type Stats -->
+            <div class="stat-item stat-hoverable" data-stat="precision" id="stat-row-precision" style="display: none;">
+              <span class="stat-label">🎯 PREC</span>
+              <span class="stat-value" id="panel-precision">0/8</span>
+              <div class="hover-popup" id="panel-detail-precision"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="momentum" id="stat-row-momentum" style="display: none;">
+              <span class="stat-label">⚡ MOMT</span>
+              <span class="stat-value" id="panel-momentum">0/5</span>
+              <div class="hover-popup" id="panel-detail-momentum"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="execute" id="stat-row-execute" style="display: none;">
+              <span class="stat-label">💀 EXEC</span>
+              <span class="stat-value" id="panel-execute">&lt;15%</span>
+              <div class="hover-popup" id="panel-detail-execute"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="bleed" id="stat-row-bleed" style="display: none;">
+              <span class="stat-label">🩸 BLEED</span>
+              <span class="stat-value" id="panel-bleed">OFF</span>
+              <div class="hover-popup" id="panel-detail-bleed"></div>
+            </div>
+            <div class="stat-item stat-hoverable" data-stat="armorpen" id="stat-row-armorpen" style="display: none;">
+              <span class="stat-label">🛡️ ARMPEN</span>
+              <span class="stat-value" id="panel-armorpen">20%</span>
+              <div class="hover-popup" id="panel-detail-armorpen"></div>
+            </div>
           </div>
           <!-- Energy Stats Grid -->
           <div class="stats-grid stats-grid-energy" id="stats-grid-energy" style="display: none;">

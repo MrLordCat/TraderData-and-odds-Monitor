@@ -20,7 +20,8 @@ const {
 } = require('../../core/tower-upgrades');
 const {
   initMagicState,
-  initComboState
+  initComboState,
+  initPiercingState
 } = require('./tower-combat');
 
 /**
@@ -65,6 +66,8 @@ function createUpgradeHandlers(context) {
           initMagicState(tower);
         } else if (attackTypeId === 'normal') {
           initComboState(tower);
+        } else if (attackTypeId === 'piercing') {
+          initPiercingState(tower);
         }
         
         tower.recalculateStats();

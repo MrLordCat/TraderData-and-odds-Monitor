@@ -201,6 +201,11 @@ function updateTowerCombat(tower, deltaTime, enemies, context, currentTime = Dat
     updateComboDecay(tower, deltaTime, currentTime);
   }
   
+  // Update piercing momentum decay
+  if (tower.attackTypeId === 'piercing') {
+    updatePiercingDecay(tower, deltaTime, currentTime);
+  }
+  
   // Reduce cooldown
   if (tower.attackCooldown > 0) {
     tower.attackCooldown -= deltaTime;
@@ -348,6 +353,12 @@ function performAttack(tower, eventBus, currentTime = Date.now() / 1000) {
   let isFocusFire = false;
   let magicBonusDamage = 0;
   
+  // Piercing-specific variables
+  let isPrecision = false;
+  let isExecute = false;
+  let applyBleed = false;
+  let momentumStacks = 0;
+  
   // === MAGIC DAMAGE (Charge System) ===
   if (tower.attackTypeId === 'magic' && tower._magicAttackData) {
     finalDamage = tower._magicAttackData.totalDamage * damageMultiplier;
@@ -364,6 +375,33 @@ function performAttack(tower, eventBus, currentTime = Date.now() / 1000) {
     isFocusFire = comboResult.isFocusFire;
   }
   
+  // === PIERCING ATTACK SYSTEM ===
+  if (tower.attackTypeId === 'piercing') {
+    // Get momentum crit bonus before rolling
+    const momentumBonus = getMomentumCritBonus(tower);
+    
+    // Roll crit with momentum bonus
+    const piercingCritChance = (tower.attackTypeConfig?.critChance || 0.15) + momentumBonus;
+    const wasNaturalCrit = Math.random() < piercingCritChance;
+    
+    // Process piercing hit (precision, execute, momentum, bleed)
+    const piercingResult = processPiercingHit(tower, tower.target, currentTime, wasNaturalCrit);
+    
+    finalDamage *= piercingResult.damageMultiplier;
+    isCrit = piercingResult.isCrit;
+    isPrecision = piercingResult.isPrecision;
+    isExecute = piercingResult.isExecute;
+    applyBleed = piercingResult.applyBleed;
+    momentumStacks = piercingResult.momentumStacks;
+    
+    // Apply crit multiplier
+    if (isCrit) {
+      const critMult = tower.attackTypeConfig?.critDmgMod || 2.5;
+      finalDamage *= critMult;
+      tower.totalCrits++;
+    }
+  }
+  
   // === FOCUS FIRE (Guaranteed Crit) ===
   if (isFocusFire) {
     // Focus Fire: Guaranteed critical with bonus damage from config
@@ -375,8 +413,8 @@ function performAttack(tower, eventBus, currentTime = Date.now() / 1000) {
     finalDamage *= focusCritMult;
     isCrit = true;
     tower.totalCrits++;
-  } else {
-    // Regular critical hit roll
+  } else if (tower.attackTypeId !== 'piercing') {
+    // Regular critical hit roll (skip for Piercing - handled above)
     const critResult = rollCritical(tower.attackTypeConfig);
     if (critResult.isCrit) {
       finalDamage *= critResult.multiplier;
@@ -402,7 +440,12 @@ function performAttack(tower, eventBus, currentTime = Date.now() / 1000) {
     } else {
       projectileColor = '#6a5acd'; // Slate blue
     }
+  } else if (tower.attackTypeId === 'piercing') {
+    projectileColor = getPiercingProjectileColor(tower, isPrecision, isExecute);
   }
+
+  // Get piercing config for bleed data
+  const piercingConfig = tower.attackTypeId === 'piercing' ? getPiercingConfig(tower) : null;
 
   // Emit attack event for combat module
   eventBus.emit('combat:tower-attack', {
@@ -417,7 +460,21 @@ function performAttack(tower, eventBus, currentTime = Date.now() / 1000) {
     isFocusFire,     // Focus fire indicator (Normal)
     comboStacks,     // Current combo stacks (Normal)
     magicBonusDamage, // Bonus damage from charge (Magic)
-    critMultiplier: isFocusFire ? 2.0 : 1.5,
+    critMultiplier: isFocusFire ? 2.0 : (tower.attackTypeId === 'piercing' ? 2.5 : 1.5),
+    
+    // Piercing-specific data
+    isPrecision,              // Precision strike (Piercing)
+    isExecute,                // Execute target (Piercing)
+    applyBleed,               // Should apply bleed (Piercing)
+    momentumStacks,           // Current momentum stacks (Piercing)
+    bleedConfig: applyBleed && piercingConfig ? {
+      damage: piercingConfig.bleedDamage,
+      duration: piercingConfig.bleedDuration,
+      tickRate: piercingConfig.bleedTickRate,
+      maxStacks: piercingConfig.bleedMaxStacks,
+      stackable: true,
+    } : null,
+    armorPenetration: piercingConfig?.armorPenetration || 0,
     
     // Attack type
     attackTypeId: tower.attackTypeId,
@@ -744,6 +801,303 @@ function processArcaneOverflow(tower, killedEnemy, overkillDamage, enemies, even
   };
 }
 
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║                        PIERCING ATTACK SYSTEM                              ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+/**
+ * Get piercing config for tower (considers upgrades)
+ * @param {Object} tower - Tower instance
+ * @returns {Object} Piercing configuration
+ */
+function getPiercingConfig(tower) {
+  const baseConfig = ATTACK_TYPE_CONFIG.piercing || {};
+  const precisionConfig = baseConfig.precision || {};
+  const momentumConfig = baseConfig.momentum || {};
+  const executeConfig = baseConfig.execute || {};
+  const bleedConfig = baseConfig.bleed || {};
+  const critConfig = baseConfig.critical || {};
+  const upgrades = tower.attackTypeUpgrades || {};
+  
+  // Precision values
+  let precisionHitsRequired = precisionConfig.baseHitsRequired || 8;
+  let precisionBonusDamage = precisionConfig.baseBonusDamage || 0.25;
+  
+  // Momentum values
+  let momentumMaxStacks = momentumConfig.maxStacks || 5;
+  let momentumDecayTime = momentumConfig.decayTime || 3.0;
+  const momentumChancePerStack = momentumConfig.baseChancePerStack || 0.03;
+  
+  // Execute values
+  let executeThreshold = executeConfig.baseThreshold || 0.15;
+  let executeBonusDamage = executeConfig.baseBonusDamage || 0.50;
+  let executeCritBonus = executeConfig.critExecuteBonus || 0.25;
+  
+  // Bleed values
+  let bleedEnabled = bleedConfig.enabled || false;
+  let bleedDamage = bleedConfig.baseDamage || 3;
+  let bleedDuration = bleedConfig.baseDuration || 3;
+  let bleedMaxStacks = bleedConfig.maxStacks || 5;
+  
+  // Armor pen
+  let armorPenetration = critConfig.armorPenetration || 0.2;
+  
+  // Apply upgrades
+  if (upgrades.precisionHits) {
+    const upgrade = baseConfig.upgrades?.precisionHits;
+    const value = (upgrade?.effect?.valuePerLevel || -1) * upgrades.precisionHits;
+    precisionHitsRequired = Math.max(upgrade?.effect?.minValue || 3, precisionHitsRequired + value);
+  }
+  if (upgrades.precisionDamage) {
+    const upgrade = baseConfig.upgrades?.precisionDamage;
+    precisionBonusDamage += (upgrade?.effect?.valuePerLevel || 0.10) * upgrades.precisionDamage;
+  }
+  if (upgrades.momentumStacks) {
+    const upgrade = baseConfig.upgrades?.momentumStacks;
+    momentumMaxStacks += (upgrade?.effect?.valuePerLevel || 1) * upgrades.momentumStacks;
+  }
+  if (upgrades.momentumDecay) {
+    const upgrade = baseConfig.upgrades?.momentumDecay;
+    momentumDecayTime += (upgrade?.effect?.valuePerLevel || 0.5) * upgrades.momentumDecay;
+  }
+  if (upgrades.executeThreshold) {
+    const upgrade = baseConfig.upgrades?.executeThreshold;
+    const maxValue = upgrade?.effect?.maxValue || 0.40;
+    executeThreshold = Math.min(maxValue, executeThreshold + (upgrade?.effect?.valuePerLevel || 0.05) * upgrades.executeThreshold);
+  }
+  if (upgrades.executeDamage) {
+    const upgrade = baseConfig.upgrades?.executeDamage;
+    executeBonusDamage += (upgrade?.effect?.valuePerLevel || 0.15) * upgrades.executeDamage;
+  }
+  if (upgrades.executeCrit) {
+    const upgrade = baseConfig.upgrades?.executeCrit;
+    executeCritBonus += (upgrade?.effect?.valuePerLevel || 0.10) * upgrades.executeCrit;
+  }
+  if (upgrades.bleedUnlock) {
+    bleedEnabled = true;
+  }
+  if (upgrades.bleedDamage) {
+    const upgrade = baseConfig.upgrades?.bleedDamage;
+    bleedDamage += (upgrade?.effect?.valuePerLevel || 1) * upgrades.bleedDamage;
+  }
+  if (upgrades.bleedDuration) {
+    const upgrade = baseConfig.upgrades?.bleedDuration;
+    bleedDuration += (upgrade?.effect?.valuePerLevel || 1) * upgrades.bleedDuration;
+  }
+  if (upgrades.bleedStacks) {
+    const upgrade = baseConfig.upgrades?.bleedStacks;
+    bleedMaxStacks += (upgrade?.effect?.valuePerLevel || 1) * upgrades.bleedStacks;
+  }
+  if (upgrades.armorPen) {
+    const upgrade = baseConfig.upgrades?.armorPen;
+    const maxValue = upgrade?.effect?.maxValue || 0.50;
+    armorPenetration = Math.min(maxValue, armorPenetration + (upgrade?.effect?.valuePerLevel || 0.05) * upgrades.armorPen);
+  }
+  
+  return {
+    // Precision
+    precisionEnabled: precisionConfig.enabled !== false,
+    precisionHitsRequired,
+    precisionBonusDamage,
+    precisionResetOnNewTarget: precisionConfig.resetOnNewTarget ?? false,
+    
+    // Momentum
+    momentumEnabled: momentumConfig.enabled !== false,
+    momentumChancePerStack,
+    momentumMaxStacks,
+    momentumDecayTime,
+    momentumDecayRate: momentumConfig.decayRate || 1,
+    
+    // Execute
+    executeEnabled: executeConfig.enabled !== false,
+    executeThreshold,
+    executeBonusDamage,
+    executeCritBonus,
+    
+    // Bleed
+    bleedEnabled,
+    bleedDamage,
+    bleedDuration,
+    bleedTickRate: bleedConfig.tickRate || 0.5,
+    bleedMaxStacks,
+    bleedAppliedOnCrit: bleedConfig.appliedOnCrit !== false,
+    
+    // Armor penetration
+    armorPenetration,
+  };
+}
+
+/**
+ * Initialize piercing state for a tower
+ * @param {Object} tower - Tower instance
+ */
+function initPiercingState(tower) {
+  tower.piercingState = {
+    // Precision tracking
+    precisionHits: 0,
+    precisionReady: false,
+    
+    // Momentum tracking
+    momentumStacks: 0,
+    lastCritTime: 0,
+    
+    // Stats
+    totalPrecisionStrikes: 0,
+    totalExecutes: 0,
+    totalBleedApplied: 0,
+  };
+}
+
+/**
+ * Update piercing momentum decay (call every frame)
+ * @param {Object} tower - Tower instance
+ * @param {number} deltaTime - Time since last update
+ * @param {number} currentTime - Current game time
+ */
+function updatePiercingDecay(tower, deltaTime, currentTime) {
+  if (!tower.piercingState) return;
+  if (tower.attackTypeId !== 'piercing') return;
+  
+  const config = getPiercingConfig(tower);
+  if (!config.momentumEnabled) return;
+  
+  const timeSinceCrit = currentTime - tower.piercingState.lastCritTime;
+  
+  // Decay momentum stacks if no crit for a while
+  if (timeSinceCrit > config.momentumDecayTime && tower.piercingState.momentumStacks > 0) {
+    const stacksToLose = Math.floor(timeSinceCrit / config.momentumDecayTime) * config.momentumDecayRate;
+    tower.piercingState.momentumStacks = Math.max(0, tower.piercingState.momentumStacks - stacksToLose);
+    tower.piercingState.lastCritTime = currentTime - (timeSinceCrit % config.momentumDecayTime);
+  }
+}
+
+/**
+ * Process piercing hit - handles precision, execute, momentum
+ * @param {Object} tower - Tower instance
+ * @param {Object} target - Target enemy
+ * @param {number} currentTime - Current game time
+ * @param {boolean} wasNaturalCrit - Whether this was a natural crit roll
+ * @returns {Object} Hit result { damageMultiplier, isCrit, isPrecision, isExecute, applyBleed, momentumStacks }
+ */
+function processPiercingHit(tower, target, currentTime, wasNaturalCrit = false) {
+  if (!tower.piercingState) {
+    initPiercingState(tower);
+  }
+  
+  const config = getPiercingConfig(tower);
+  let damageMultiplier = 1;
+  let isCrit = wasNaturalCrit;
+  let isPrecision = false;
+  let isExecute = false;
+  let applyBleed = false;
+  
+  // === PRECISION SYSTEM ===
+  if (config.precisionEnabled) {
+    tower.piercingState.precisionHits++;
+    
+    // Check for guaranteed crit
+    if (tower.piercingState.precisionHits >= config.precisionHitsRequired) {
+      isPrecision = true;
+      isCrit = true;
+      tower.piercingState.precisionHits = 0;
+      tower.piercingState.totalPrecisionStrikes++;
+      
+      // Precision bonus damage
+      damageMultiplier *= (1 + config.precisionBonusDamage);
+    }
+  }
+  
+  // === EXECUTE CHECK ===
+  if (config.executeEnabled && target) {
+    const hpPercent = target.health / target.maxHealth;
+    
+    if (hpPercent <= config.executeThreshold) {
+      isExecute = true;
+      tower.piercingState.totalExecutes++;
+      
+      // Execute bonus damage
+      damageMultiplier *= (1 + config.executeBonusDamage);
+      
+      // Extra damage on crit vs execute target
+      if (isCrit) {
+        damageMultiplier *= (1 + config.executeCritBonus);
+      }
+    }
+  }
+  
+  // === MOMENTUM UPDATE ===
+  if (config.momentumEnabled && isCrit) {
+    tower.piercingState.momentumStacks = Math.min(
+      tower.piercingState.momentumStacks + 1,
+      config.momentumMaxStacks
+    );
+    tower.piercingState.lastCritTime = currentTime;
+  }
+  
+  // === BLEED APPLICATION ===
+  if (config.bleedEnabled && config.bleedAppliedOnCrit && isCrit) {
+    applyBleed = true;
+    tower.piercingState.totalBleedApplied++;
+  }
+  
+  return {
+    damageMultiplier,
+    isCrit,
+    isPrecision,
+    isExecute,
+    applyBleed,
+    momentumStacks: tower.piercingState.momentumStacks,
+    precisionHits: tower.piercingState.precisionHits,
+    precisionRequired: config.precisionHitsRequired,
+  };
+}
+
+/**
+ * Get current momentum crit bonus
+ * @param {Object} tower - Tower instance
+ * @returns {number} Bonus crit chance from momentum (0-1)
+ */
+function getMomentumCritBonus(tower) {
+  if (!tower.piercingState) return 0;
+  if (tower.attackTypeId !== 'piercing') return 0;
+  
+  const config = getPiercingConfig(tower);
+  if (!config.momentumEnabled) return 0;
+  
+  return tower.piercingState.momentumStacks * config.momentumChancePerStack;
+}
+
+/**
+ * Get projectile color based on piercing state
+ * @param {Object} tower - Tower instance
+ * @param {boolean} isPrecision - Is this a precision strike
+ * @param {boolean} isExecute - Is this an execute
+ * @returns {string} Hex color
+ */
+function getPiercingProjectileColor(tower, isPrecision, isExecute) {
+  const visuals = ATTACK_TYPE_CONFIG.piercing?.visuals || {};
+  
+  // Precision strike = gold
+  if (isPrecision) {
+    return visuals.precisionColor || '#ffd700';
+  }
+  
+  // Execute = dark red
+  if (isExecute) {
+    return visuals.executeColor || '#8b0000';
+  }
+  
+  // Momentum-based color
+  const momentumColors = visuals.momentumColors || ['#e74c3c'];
+  if (tower.piercingState) {
+    const stacks = tower.piercingState.momentumStacks || 0;
+    const colorIndex = Math.min(stacks, momentumColors.length - 1);
+    return momentumColors[colorIndex];
+  }
+  
+  return visuals.baseColor || '#e74c3c';
+}
+
 module.exports = { 
   updateTowerCombat, 
   isValidTarget, 
@@ -767,4 +1121,11 @@ module.exports = {
   isMagicReady,
   consumeMagicCharge,
   processArcaneOverflow,
+  // Piercing system exports
+  getPiercingConfig,
+  initPiercingState,
+  updatePiercingDecay,
+  processPiercingHit,
+  getPiercingProjectileColor,
+  getMomentumCritBonus,
 };

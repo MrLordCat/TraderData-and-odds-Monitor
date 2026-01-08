@@ -20,6 +20,7 @@ const EFFECT_TYPES = {
   DRAIN: 'drain',         // Dark life steal
   CURSE: 'curse',         // Dark damage amplify
   ARMOR_SHRED: 'armorShred', // Siege armor reduction (stacking)
+  BLEED: 'bleed',         // Piercing DoT from crits (stacking)
 };
 
 /**

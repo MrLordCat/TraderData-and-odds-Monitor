@@ -119,6 +119,8 @@ class CombatModule {
     armorShredEnabled, armorShredAmount, armorShredMaxStacks, armorShredDuration,
     // Ground Zone (Siege)
     groundZoneEnabled, groundZoneRadius, groundZoneDuration, groundZoneSlow,
+    // Piercing-specific
+    isPrecision, isExecute, applyBleed, momentumStacks, bleedConfig, armorPenetration,
     // Projectile visuals (can be overridden by combo colors)
     projectileColor, projectileSize, projectileSpeed
   }) {
@@ -166,6 +168,13 @@ class CombatModule {
       groundZoneRadius: groundZoneRadius || 0,
       groundZoneDuration: groundZoneDuration || 0,
       groundZoneSlow: groundZoneSlow || 0,
+      // Piercing (NEW)
+      isPrecision: isPrecision || false,
+      isExecute: isExecute || false,
+      applyBleed: applyBleed || false,
+      momentumStacks: momentumStacks || 0,
+      bleedConfig: bleedConfig || null,
+      armorPenetration: armorPenetration || 0,
       // Element system (NEW)
       elementPath: effectiveTowerType,
       elementAbilities: elementAbilities || null,
@@ -316,15 +325,20 @@ class CombatModule {
       enemyId: projectile.targetId,
       damage: projectile.damage,
       isCrit: projectile.isCrit,
-      isFocusFire: projectile.isFocusFire,  // NEW: Focus fire indicator
+      isFocusFire: projectile.isFocusFire,  // Focus fire indicator
+      isPrecision: projectile.isPrecision,   // Piercing precision strike
+      isExecute: projectile.isExecute,       // Piercing execute
       towerId: projectile.towerId,
-      attackType: projectile.attackTypeId,  // NEW: Attack type for cascade
+      attackType: projectile.attackTypeId,  // Attack type for cascade
+      armorPenetration: projectile.armorPenetration || 0, // Piercing armor pen
       effects: this.getEffectsForType(projectile.towerType),
-      // NEW: Element effects
+      // Element effects
       elementEffects: projectile.elementAbilities ? {
         elementPath: projectile.elementPath,
         abilities: projectile.elementAbilities,
       } : null,
+      // Bleed effect (Piercing)
+      bleedConfig: projectile.applyBleed ? projectile.bleedConfig : null,
     });
     
     // Impact effect
@@ -347,6 +361,42 @@ class CombatModule {
         duration: 0.4,
         color: '#ffd700',
         size: 30
+      });
+    }
+    
+    // === PRECISION STRIKE EFFECT (Piercing attack) ===
+    if (projectile.isPrecision) {
+      this.addEffect({
+        type: 'precision-strike',
+        x: projectile.targetX,
+        y: projectile.targetY,
+        duration: 0.5,
+        color: '#ffd700',
+        size: 35
+      });
+    }
+    
+    // === EXECUTE EFFECT (Piercing attack) ===
+    if (projectile.isExecute) {
+      this.addEffect({
+        type: 'execute',
+        x: projectile.targetX,
+        y: projectile.targetY,
+        duration: 0.4,
+        color: '#8b0000',
+        size: 25
+      });
+    }
+    
+    // === BLEED EFFECT VISUAL (Piercing attack) ===
+    if (projectile.applyBleed && projectile.bleedConfig) {
+      this.addEffect({
+        type: 'bleed-apply',
+        x: projectile.targetX,
+        y: projectile.targetY,
+        duration: 0.3,
+        color: '#dc143c',
+        size: 15
       });
     }
     
