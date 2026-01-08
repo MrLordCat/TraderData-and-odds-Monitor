@@ -38,14 +38,41 @@ WebGL 2D graphics with Warcraft 3-inspired visuals and particle animations.
 | Mountains | Enemy slow +20% | Gray rocks |
 | Burned | Fire bonus | Dark charred |
 
-### Enemy System
+### Base Enemy Types
 | Type | Emoji | Health | Speed | Reward | XP |
 |------|-------|--------|-------|--------|-----|
-| Minion | ЁЯС╛ | 20 | 40 px/s | 10g | 1 |
-| Scout | ЁЯжО | 20 | 80 px/s | 15g | 2 |
-| Brute | ЁЯРЧ | 100 | 25 px/s | 30g | 3 |
-| Swarmling | ЁЯРЬ | 15 | 60 px/s | 5g | 1 |
-| Boss | ЁЯС╣ | 1000 | 20 px/s | 200g | 10 |
+| Minion | 👾 | 20 | 40 px/s | 10g | 1 |
+| Scout | 🦎 | 20 | 80 px/s | 15g | 2 |
+| Brute | 🐗 | 100 | 25 px/s | 30g | 3 |
+| Swarmling | 🐜 | 15 | 60 px/s | 5g | 1 |
+| Boss | 👹 | 1000 | 20 px/s | 200g | 10 |
+
+### Special Enemy Types (8 types)
+| Type | Emoji | Wave | Mechanic |
+|------|-------|------|----------|
+| Flying | 🦅 | 8 | Hovers, needs anti-air |
+| Armored | 🛡️ | 12 | High armor |
+| Magic-Immune | 🔮 | 16 | Immune to Magic attacks |
+| Regenerating | 💚 | 15 | Heals over time |
+| Shielded | 🔷 | 21 | Absorbs damage |
+| Phasing | 👻 | 21 | Periodic invulnerability |
+| Undead | 💀 | 23 | Resurrects once |
+| Splitter | 👥 | 25 | Splits on death |
+
+### Elite Enemies
+- Gold tint, ×2 HP, ×2.5 reward
+- Chance: 1% + 0.5%/wave (max 15%)
+
+### Wave Auras (7 types)
+| Aura | Effect |
+|------|--------|
+| Haste ⚡ | +25% speed |
+| Fortified 🛡️ | +30% HP |
+| Regeneration 💚 | 2% HP/sec |
+| Energized ⚡ | Slow immune |
+| Ethereal 👻 | -20% damage |
+| Berserker 🔥 | +50% speed <30% HP |
+| Swarm Mind 🧠 | Share damage |
 
 ### Wave System
 - **Wave delay**: 3000ms between waves
@@ -77,6 +104,25 @@ addons-dev/power-towers/
 тФВ   тФВ       тФЬтФАтФА siege.js       # Splash + Armor Shred + Ground Zone
 тФВ   тФВ       тФЬтФАтФА magic.js       # Power scaling
 тФВ   тФВ       тФФтФАтФА piercing.js    # Critical mechanics
+тФВ   тФВ
+тФВ   тФЬтФАтФА enemies/               # ⭐ Enemy configuration
+тФВ   тФВ   тФЬтФАтФА index.js           # Enemy types aggregator
+тФВ   тФВ   тФЬтФАтФА special/           # Special enemy types
+тФВ   тФВ   тФВ   тФЬтФАтФА index.js       # Special types aggregator
+тФВ   тФВ   тФВ   тФЬтФАтФА flying.js      # Flying enemies
+тФВ   тФВ   тФВ   тФЬтФАтФА armored.js     # High armor enemies
+тФВ   тФВ   тФВ   тФЬтФАтФА magic-immune.js # Magic immunity
+тФВ   тФВ   тФВ   тФЬтФАтФА regenerating.js # HP regen
+тФВ   тФВ   тФВ   тФЬтФАтФА shielded.js    # Damage shields
+тФВ   тФВ   тФВ   тФЬтФАтФА phasing.js     # Invulnerability phases
+тФВ   тФВ   тФВ   тФЬтФАтФА undead.js      # Resurrection
+тФВ   тФВ   тФВ   тФФтФАтФА splitter.js    # Split on death
+тФВ   тФВ   тФЬтФАтФА elite.js           # Elite enemy system
+тФВ   тФВ   тФФтФАтФА auras.js           # Wave aura system
+тФВ   тФВ
+тФВ   тФЬтФАтФА waves/                 # Wave compositions
+тФВ   тФВ   тФЬтФАтФА index.js           # Wave system aggregator
+тФВ   тФВ   тФФтФАтФА compositions.js    # 40 wave definitions
 тФВ   тФВ
 тФВ   тФЬтФАтФА event-bus.js           # EventBus communication
 тФВ   тФЬтФАтФА game-core-modular.js   # Main orchestrator
@@ -481,14 +527,16 @@ panelMystat: container.querySelector('#panel-mystat'),
 - **Piercing Attack** (Precision, Momentum, Execute, Bleed) — complete
 - 5 elemental paths
 - XP system for towers and buildings
-- 5 enemy types with wave scaling
+- 5 base enemy types + **8 special types** (Flying, Armored, Magic-Immune, Regenerating, Shielded, Phasing, Undead, Splitter)
+- **Elite enemy system** (gold enemies with bonuses)
+- **7 wave auras** (Haste, Fortified, Regeneration, Energized, Ethereal, Berserker, Swarm Mind)
 - Status effects (burn, slow, freeze, poison, armor_shred, bleed)
 - Complete energy system
 - WebGL rendering
+- **40 wave compositions** with all special types
 
 ### 🚧 Planned
 - Card system (every 10 waves)
-- More enemy types (flying, magic-immune)
 - Boss mechanics
 - Sound effects
 - Save/Load system
@@ -505,5 +553,5 @@ panelMystat: container.querySelector('#panel-mystat'),
 
 ---
 
-*Document version: 07.01.2026*
-*Game version: 0.7.0 (All Attack Types Complete)*
+*Document version: 08.01.2026*
+*Game version: 0.8.0 (Enemy System Complete)*

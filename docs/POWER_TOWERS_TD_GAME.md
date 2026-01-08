@@ -47,7 +47,7 @@ Biome Types:
 
 ### Enemy System
 
-#### Enemy Types (from CONFIG)
+#### Base Enemy Types
 | Type | Emoji | Health | Speed | Reward | XP |
 |------|-------|--------|-------|--------|-----|
 | Minion | 👾 | 20 | 40 px/s | 10g | 1 |
@@ -55,6 +55,38 @@ Biome Types:
 | Brute | 🐗 | 100 | 25 px/s | 30g | 3 |
 | Swarmling | 🐜 | 15 | 60 px/s | 5g | 1 |
 | Boss | 👹 | 1000 | 20 px/s | 200g | 10 |
+
+#### Special Enemy Types (8 types) ✅
+Special modifiers can be applied to base types:
+
+| Type | Emoji | First Wave | Mechanic |
+|------|-------|------------|----------|
+| **Flying** | 🦅 | 8 | Hovers over ground, requires anti-air |
+| **Armored** | 🛡️ | 12 | High armor, reduced damage |
+| **Magic-Immune** | 🔮 | 16 | Immune to Magic attack type |
+| **Regenerating** | 💚 | 15 | Heals over time, pause on damage |
+| **Shielded** | 🔷 | 21 | Absorbs damage with shield |
+| **Phasing** | 👻 | 21 | Periodically invulnerable |
+| **Undead** | 💀 | 23 | Resurrects once, fire prevents |
+| **Splitter** | 👥 | 25 | Splits into children on death |
+
+#### Elite Enemies ⭐
+- Any base enemy can become Elite (gold tint, larger)
+- Chance scales with wave: 1% base + 0.5% per wave (max 15%)
+- Elite bonus: ×2 HP, ×1.1 speed, ×2.5 reward, ×3 XP
+
+#### Wave Aura System (7 auras) ✅
+Waves can have auras that affect all enemies:
+
+| Aura | Emoji | Effect |
+|------|-------|--------|
+| **Haste** | ⚡ | +25% movement speed |
+| **Fortified** | 🛡️ | +30% HP |
+| **Regeneration** | 💚 | Heal 2% HP/sec |
+| **Energized** | ⚡ | Immune to slow |
+| **Ethereal** | 👻 | 50% transparency, -20% damage taken |
+| **Berserker** | 🔥 | +50% speed when below 30% HP |
+| **Swarm Mind** | 🧠 | Connected enemies share damage |
 
 #### Wave System
 - **Wave delay**: 3000ms between waves
@@ -532,7 +564,10 @@ normal: {
 - [x] 5 Element paths with unique abilities
 - [x] Tower XP and level system
 - [x] Tower stat upgrades (infinite)
-- [x] 5 enemy types with wave scaling
+- [x] 5 base enemy types with wave scaling
+- [x] **8 Special enemy types** (Flying, Armored, Magic-Immune, Regenerating, Shielded, Phasing, Undead, Splitter)
+- [x] **Elite enemy system** (gold enemies with bonuses)
+- [x] **7 Wave auras** (Haste, Fortified, Regeneration, Energized, Ethereal, Berserker, Swarm Mind)
 - [x] Status effects (burn, slow, freeze, poison, armor_shred, bleed)
 - [x] Combat system with projectiles
 - [x] Damage numbers
@@ -550,10 +585,10 @@ normal: {
 - [x] Camera with zoom/pan
 - [x] WebGL rendering engine
 - [x] **Modular CONFIG system** (split into domain files)
+- [x] **40 wave compositions** with progressive difficulty
 
 ### 🚧 Planned
 - [ ] Card system (every 10 waves)
-- [ ] More enemy types (flying, magic-immune)
 - [ ] Boss mechanics (special attacks)
 - [ ] Sound effects
 - [ ] Achievement system
@@ -562,4 +597,4 @@ normal: {
 ---
 
 *Document updated: 08.01.2026*
-*Game Version: 0.7.0 (All Attack Types Complete)*
+*Game Version: 0.8.0 (Enemy System Complete - All 8 Special Types)*
