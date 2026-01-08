@@ -31,13 +31,13 @@ const WAVE_COMPOSITIONS = {
     enemies: [{ type: 'minion', count: 5 }],
     pattern: 'standard',
     auraChance: 0,  // No auras wave 1
-    description: 'Начало - только миньоны',
+    description: 'Beginning - minions only',
   },
   
   2: {
     enemies: [{ type: 'minion', count: 7 }],
     pattern: 'standard',
-    description: 'Больше миньонов',
+    description: 'More minions',
   },
   
   3: {
@@ -46,7 +46,7 @@ const WAVE_COMPOSITIONS = {
       { type: 'scout', count: 2 },
     ],
     pattern: 'standard',
-    description: 'Первые скауты',
+    description: 'First scouts',
   },
   
   4: {
@@ -55,7 +55,7 @@ const WAVE_COMPOSITIONS = {
       { type: 'scout', count: 3 },
     ],
     pattern: 'rush',
-    description: 'Быстрая волна',
+    description: 'Fast wave',
   },
   
   5: {
@@ -65,7 +65,7 @@ const WAVE_COMPOSITIONS = {
     ],
     pattern: 'boss',
     boss: { type: 'mini', id: 'iron_guardian' },
-    description: 'Первый мини-босс: Железный Страж',
+    description: 'First mini-boss: Iron Guardian',
   },
   
   6: {
@@ -74,7 +74,7 @@ const WAVE_COMPOSITIONS = {
       { type: 'swarmling', count: 8 },
     ],
     pattern: 'swarm',
-    description: 'Первый рой',
+    description: 'First swarm',
   },
   
   7: {
@@ -84,7 +84,7 @@ const WAVE_COMPOSITIONS = {
       { type: 'brute', count: 1 },
     ],
     pattern: 'mixed',
-    description: 'Смешанная волна',
+    description: 'Mixed wave',
   },
   
   8: {
@@ -93,7 +93,7 @@ const WAVE_COMPOSITIONS = {
       { type: 'scout', count: 2, special: 'flying' },
     ],
     pattern: 'rush',
-    description: 'Скоростной натиск + первые летуны',
+    description: 'Speed rush + first Flying enemies',
   },
   
   9: {
@@ -103,7 +103,7 @@ const WAVE_COMPOSITIONS = {
       { type: 'swarmling', count: 6 },
     ],
     pattern: 'siege',
-    description: 'Подготовка к боссу',
+    description: 'Preparation for boss',
   },
   
   10: {
@@ -112,7 +112,7 @@ const WAVE_COMPOSITIONS = {
     ],
     pattern: 'boss',
     boss: { type: 'main', id: 'golem_king' },
-    description: 'Босс Tier 1: Король Големов',
+    description: 'Boss Tier 1: Golem King',
   },
   
   // === TIER 2: Expansion (Waves 11-20) ===
@@ -123,7 +123,7 @@ const WAVE_COMPOSITIONS = {
     ],
     pattern: 'standard',
     auraChance: 0.3,
-    description: 'Начало второго уровня',
+    description: 'Tier 2 begins',
   },
   
   12: {
@@ -133,7 +133,7 @@ const WAVE_COMPOSITIONS = {
       { type: 'minion', count: 6 },
     ],
     pattern: 'siege',
-    description: 'Танковый напор + первые бронированные',
+    description: 'Tank push + first Armored enemies',
   },
   
   13: {
@@ -142,7 +142,7 @@ const WAVE_COMPOSITIONS = {
       { type: 'scout', count: 3 },
     ],
     pattern: 'swarm',
-    description: 'Массовый рой',
+    description: 'Mass swarm',
   },
   
   14: {
@@ -154,36 +154,39 @@ const WAVE_COMPOSITIONS = {
     ],
     pattern: 'mixed',
     auraChance: 0.5,
-    description: 'Смешанный натиск с летунами',
+    description: 'Mixed assault with flying',
   },
   
   15: {
     enemies: [
       { type: 'scout', count: 4 },
       { type: 'brute', count: 2 },
+      { type: 'minion', count: 2, special: 'regenerating' },
     ],
     pattern: 'boss',
     boss: { type: 'mini', id: 'storm_herald' },
-    description: 'Мини-босс: Вестник Бури',
+    description: 'Mini-boss: Storm Herald + first Regenerating',
   },
   
   16: {
     enemies: [
       { type: 'minion', count: 10 },
       { type: 'swarmling', count: 10 },
+      { type: 'minion', count: 2, special: 'magic_immune' },
     ],
     pattern: 'standard',
-    description: 'Волна толпы',
+    description: 'Crowd wave + first Magic-Immune',
   },
   
   17: {
     enemies: [
       { type: 'scout', count: 6 },
       { type: 'scout', count: 4, special: 'flying' },
+      { type: 'minion', count: 2, special: 'regenerating' },
     ],
     pattern: 'rush',
     auraChance: 0.7,
-    description: 'Воздушный блиц',
+    description: 'Air blitz + Regenerating',
   },
   
   18: {
@@ -191,9 +194,10 @@ const WAVE_COMPOSITIONS = {
       { type: 'brute', count: 3, special: 'armored' },
       { type: 'brute', count: 2 },
       { type: 'minion', count: 5 },
+      { type: 'brute', count: 1, special: 'magic_immune' },
     ],
     pattern: 'siege',
-    description: 'Бронированная осада',
+    description: 'Armored siege + Magic-Immune brute',
   },
   
   19: {
@@ -202,20 +206,22 @@ const WAVE_COMPOSITIONS = {
       { type: 'scout', count: 6 },
       { type: 'brute', count: 3 },
       { type: 'swarmling', count: 8 },
+      { type: 'brute', count: 2, special: 'regenerating' },
     ],
     pattern: 'mixed',
     auraChance: 0.8,
-    description: 'Полный хаос',
+    description: 'Total chaos + Regenerating brutes',
   },
   
   20: {
     enemies: [
       { type: 'brute', count: 2 },
       { type: 'minion', count: 4 },
+      { type: 'brute', count: 1, special: 'magic_immune' },
     ],
     pattern: 'boss',
     boss: { type: 'main', id: 'shadow_lord' },
-    description: 'Босс Tier 2: Повелитель Теней',
+    description: 'Boss Tier 2: Shadow Lord',
   },
   
   // === TIER 3: Challenge (Waves 21-30) ===
@@ -224,48 +230,52 @@ const WAVE_COMPOSITIONS = {
       { type: 'minion', count: 12 },
       { type: 'scout', count: 6 },
       { type: 'brute', count: 3 },
+      { type: 'minion', count: 2, special: 'shielded' },
     ],
     pattern: 'standard',
     auraChance: 0.6,
-    description: 'Усиленное начало',
+    description: 'Enhanced start + first Shielded',
   },
   
   22: {
     enemies: [
       { type: 'swarmling', count: 20 },
       { type: 'scout', count: 5 },
+      { type: 'scout', count: 2, special: 'regenerating' },
     ],
     pattern: 'swarm',
-    description: 'Огромный рой',
+    description: 'Huge swarm + Regenerating scouts',
   },
   
   23: {
     enemies: [
-      { type: 'brute', count: 6 },
+      { type: 'brute', count: 4, special: 'armored' },
+      { type: 'brute', count: 2, special: 'magic_immune' },
       { type: 'minion', count: 8 },
     ],
     pattern: 'siege',
     auraChance: 0.7,
-    description: 'Бронированная волна',
+    description: 'Armored wave + Magic-Immune',
   },
   
   24: {
     enemies: [
       { type: 'scout', count: 12 },
       { type: 'swarmling', count: 10 },
+      { type: 'scout', count: 3, special: 'shielded' },
     ],
     pattern: 'rush',
-    description: 'Скоростной рой',
+    description: 'Speed swarm + Shielded scouts',
   },
   
   25: {
     enemies: [
-      { type: 'brute', count: 3 },
+      { type: 'brute', count: 3, special: 'shielded' },
       { type: 'scout', count: 4 },
     ],
     pattern: 'boss',
     boss: { type: 'mini', id: 'crystal_wyrm' },
-    description: 'Мини-босс: Кристальный Змей',
+    description: 'Mini-boss: Crystal Wyrm + Shielded brutes',
   },
   
   26: {
@@ -273,28 +283,34 @@ const WAVE_COMPOSITIONS = {
       { type: 'minion', count: 10 },
       { type: 'brute', count: 4 },
       { type: 'swarmling', count: 12 },
+      { type: 'minion', count: 3, special: 'regenerating' },
+      { type: 'brute', count: 2, special: 'magic_immune' },
     ],
     pattern: 'mixed',
     auraChance: 0.8,
-    description: 'Хаотичная волна',
+    description: 'Chaotic wave with all specials',
   },
   
   27: {
     enemies: [
-      { type: 'scout', count: 15 },
+      { type: 'scout', count: 10 },
+      { type: 'scout', count: 3, special: 'flying' },
+      { type: 'scout', count: 2, special: 'shielded' },
     ],
     pattern: 'rush',
     auraChance: 0.9,
-    description: 'Массовый блиц',
+    description: 'Mass blitz with specials',
   },
   
   28: {
     enemies: [
-      { type: 'brute', count: 8 },
+      { type: 'brute', count: 4, special: 'armored' },
+      { type: 'brute', count: 2, special: 'regenerating' },
+      { type: 'brute', count: 2, special: 'shielded' },
       { type: 'minion', count: 6 },
     ],
     pattern: 'siege',
-    description: 'Тяжёлая осада',
+    description: 'Heavy siege - armored, regenerating, shielded',
   },
   
   29: {
@@ -303,20 +319,22 @@ const WAVE_COMPOSITIONS = {
       { type: 'scout', count: 8 },
       { type: 'brute', count: 5 },
       { type: 'swarmling', count: 15 },
+      { type: 'minion', count: 3, special: 'magic_immune' },
     ],
     pattern: 'mixed',
     auraChance: 1.0,
-    description: 'Преддверие босса',
+    description: 'Pre-boss chaos',
   },
   
   30: {
     enemies: [
-      { type: 'brute', count: 4 },
-      { type: 'scout', count: 3 },
+      { type: 'brute', count: 2, special: 'shielded' },
+      { type: 'brute', count: 2 },
+      { type: 'minion', count: 4 },
     ],
     pattern: 'boss',
     boss: { type: 'main', id: 'inferno_titan' },
-    description: 'Босс Tier 3: Инферно Титан',
+    description: 'Boss Tier 3: Inferno Titan',
   },
   
   // === TIER 4: Final Challenge (Waves 31-40) ===
@@ -324,104 +342,120 @@ const WAVE_COMPOSITIONS = {
     enemies: [
       { type: 'minion', count: 15 },
       { type: 'scout', count: 8 },
-      { type: 'brute', count: 5 },
+      { type: 'brute', count: 5, special: 'armored' },
+      { type: 'minion', count: 3, special: 'regenerating' },
     ],
     pattern: 'standard',
     auraChance: 0.8,
-    description: 'Финальный уровень',
+    description: 'Final tier begins',
   },
   
   32: {
     enemies: [
       { type: 'swarmling', count: 25 },
-      { type: 'scout', count: 8 },
+      { type: 'scout', count: 8, special: 'flying' },
+      { type: 'scout', count: 4, special: 'shielded' },
     ],
     pattern: 'swarm',
     auraChance: 0.9,
-    description: 'Мега-рой',
+    description: 'Mega-swarm with flying and shielded',
   },
   
   33: {
     enemies: [
-      { type: 'brute', count: 10 },
+      { type: 'brute', count: 6, special: 'armored' },
+      { type: 'brute', count: 4, special: 'magic_immune' },
       { type: 'minion', count: 10 },
     ],
     pattern: 'siege',
-    description: 'Непробиваемая стена',
+    description: 'Impenetrable wall',
   },
   
   34: {
     enemies: [
-      { type: 'scout', count: 18 },
+      { type: 'scout', count: 12 },
+      { type: 'scout', count: 6, special: 'flying' },
       { type: 'swarmling', count: 15 },
+      { type: 'scout', count: 3, special: 'regenerating' },
     ],
     pattern: 'rush',
     auraChance: 1.0,
-    description: 'Скоростной шторм',
+    description: 'Speed storm with specials',
   },
   
   35: {
     enemies: [
-      { type: 'brute', count: 5 },
-      { type: 'scout', count: 6 },
+      { type: 'brute', count: 3, special: 'shielded' },
+      { type: 'brute', count: 2, special: 'magic_immune' },
+      { type: 'scout', count: 6, special: 'flying' },
       { type: 'minion', count: 5 },
     ],
     pattern: 'boss',
     boss: { type: 'mini', id: 'void_sentinel' },
-    description: 'Мини-босс: Страж Пустоты',
+    description: 'Mini-boss: Void Sentinel + elite specials',
   },
   
   36: {
     enemies: [
-      { type: 'minion', count: 12 },
-      { type: 'brute', count: 6 },
+      { type: 'minion', count: 8 },
+      { type: 'brute', count: 4, special: 'armored' },
+      { type: 'brute', count: 3, special: 'regenerating' },
       { type: 'swarmling', count: 18 },
+      { type: 'minion', count: 4, special: 'shielded' },
     ],
     pattern: 'mixed',
     auraChance: 1.0,
-    description: 'Волна хаоса',
+    description: 'Wave of chaos - all special types',
   },
   
   37: {
     enemies: [
-      { type: 'scout', count: 20 },
+      { type: 'scout', count: 15 },
+      { type: 'scout', count: 5, special: 'flying' },
+      { type: 'scout', count: 4, special: 'shielded' },
+      { type: 'scout', count: 3, special: 'regenerating' },
     ],
     pattern: 'rush',
     auraChance: 1.0,
-    description: 'Ультра-блиц',
+    description: 'Ultra-blitz with all scouts',
   },
   
   38: {
     enemies: [
-      { type: 'brute', count: 12 },
+      { type: 'brute', count: 6, special: 'armored' },
+      { type: 'brute', count: 4, special: 'magic_immune' },
+      { type: 'brute', count: 2, special: 'shielded' },
       { type: 'minion', count: 8 },
     ],
     pattern: 'siege',
     auraChance: 1.0,
-    description: 'Осада крепости',
+    description: 'Fortress siege - elite brutes',
   },
   
   39: {
     enemies: [
-      { type: 'minion', count: 15 },
-      { type: 'scout', count: 12 },
-      { type: 'brute', count: 8 },
+      { type: 'minion', count: 10, special: 'magic_immune' },
+      { type: 'scout', count: 8, special: 'flying' },
+      { type: 'brute', count: 6, special: 'armored' },
       { type: 'swarmling', count: 20 },
+      { type: 'brute', count: 4, special: 'regenerating' },
+      { type: 'scout', count: 4, special: 'shielded' },
     ],
     pattern: 'mixed',
     auraChance: 1.0,
-    description: 'Последняя волна',
+    description: 'The final wave - everything at once',
   },
   
   40: {
     enemies: [
-      { type: 'brute', count: 6 },
-      { type: 'scout', count: 4 },
+      { type: 'brute', count: 4, special: 'shielded' },
+      { type: 'brute', count: 3, special: 'magic_immune' },
+      { type: 'scout', count: 4, special: 'flying' },
       { type: 'minion', count: 4 },
     ],
     pattern: 'boss',
     boss: { type: 'final', id: 'ancient_destroyer' },
-    description: 'ФИНАЛЬНЫЙ БОСС: Древний Разрушитель',
+    description: 'FINAL BOSS: Ancient Destroyer',
   },
 };
 

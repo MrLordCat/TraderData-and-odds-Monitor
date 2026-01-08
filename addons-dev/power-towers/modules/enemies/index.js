@@ -12,6 +12,9 @@ const CONFIG = require('../../core/config/index');
 const { EFFECT_TYPES } = require('../../core/element-abilities');
 const StatusEffects = require('./status-effects');
 const { calculateArmoredDamage, applyArmorShred } = require('../../core/config/enemies/special/armored');
+const { isMagicImmune, calculateMagicImmuneDamage } = require('../../core/config/enemies/special/magic-immune');
+const { isRegenerating, applyRegeneration } = require('../../core/config/enemies/special/regenerating');
+const { isShielded, hasActiveShield, applyShieldedDamage } = require('../../core/config/enemies/special/shielded');
 
 // Get enemy types from config (single source of truth)
 const ENEMY_TYPES = CONFIG.ENEMY_TYPES;
@@ -334,9 +337,23 @@ class EnemiesModule {
       isFlying: enemyData.isFlying || false,
       isArmored: enemyData.isArmored || false,
       isMagicImmune: enemyData.isMagicImmune || false,
+      isRegenerating: enemyData.isRegenerating || false,
+      isShielded: enemyData.isShielded || false,
       specialType: enemyData.specialType || null,
       auras: enemyData.auras || this.activeAuras || [],
       wave: enemyData.wave || this.currentWave,
+      
+      // Armored-specific
+      armor: enemyData.armor || 0,
+      maxArmor: enemyData.maxArmor || 0,
+      
+      // Shielded-specific
+      shieldHealth: enemyData.shieldHealth || 0,
+      maxShieldHealth: enemyData.maxShieldHealth || 0,
+      
+      // Regenerating-specific
+      lastDamageTime: enemyData.lastDamageTime || null,
+      lastRegenTime: enemyData.lastRegenTime || null,
       
       // Elite visual properties
       eliteGlow: enemyData.eliteGlow || null,
@@ -399,7 +416,16 @@ class EnemiesModule {
       isBoss: type === 'boss',
       isFlying: false,
       isArmored: false,
+      isMagicImmune: false,
+      isRegenerating: false,
+      isShielded: false,
+      specialType: null,
       auras: this.activeAuras || [],
+      armor: 0,
+      maxArmor: 0,
+      shieldHealth: 0,
+      maxShieldHealth: 0,
+      lastDamageTime: null,
     };
 
     this.enemies.push(enemy);
@@ -415,8 +441,37 @@ class EnemiesModule {
     // Update status effects
     this.updateEffects(enemy, deltaTime);
     
+    // Apply regeneration for regenerating enemies
+    if (isRegenerating(enemy)) {
+      const healthBefore = enemy.health;
+      applyRegeneration(enemy, deltaTime, this.currentWave);
+      
+      // Emit regen event for visual feedback if healed
+      if (enemy.health > healthBefore) {
+        this.eventBus.emit('enemy:regenerated', {
+          enemyId: enemy.id,
+          amount: enemy.health - healthBefore,
+          x: enemy.x,
+          y: enemy.y,
+        });
+      }
+    }
+    
+    // Handle stun from shield break
+    if (enemy.isStunned && enemy.stunEndTime) {
+      if (Date.now() >= enemy.stunEndTime) {
+        enemy.isStunned = false;
+        enemy.stunEndTime = null;
+      }
+    }
+    
     // Calculate effective speed
     const effectiveSpeed = enemy.speed * enemy.slowMultiplier;
+    
+    // If stunned, can't move
+    if (enemy.isStunned) {
+      return;
+    }
     
     // Move along path
     this.moveAlongPath(enemy, effectiveSpeed * deltaTime);
@@ -539,8 +594,9 @@ class EnemiesModule {
    * @param {string} data.attackType - Attack type (normal, magic, siege, piercing)
    * @param {number} data.armorPenetration - Armor penetration (0-1)
    * @param {Object} data.bleedConfig - Bleed config if should apply
+   * @param {string} data.element - Element type if any (fire, ice, etc.)
    */
-  damageEnemy({ enemyId, damage, towerId, elementEffects, isCrit, attackType, armorPenetration, bleedConfig }) {
+  damageEnemy({ enemyId, damage, towerId, elementEffects, isCrit, attackType, armorPenetration, bleedConfig, element }) {
     const enemy = this.enemies.find(e => e.id === enemyId);
     if (!enemy) {
       console.warn(`[EnemiesModule] damageEnemy: enemy ${enemyId} not found! Current enemies:`, 
@@ -559,8 +615,62 @@ class EnemiesModule {
     // Store attack type for cascade/overflow handling
     enemy.lastAttackType = attackType || 'normal';
     
+    // Track last damage time (for regeneration pause)
+    enemy.lastDamageTime = Date.now();
+    
+    // === MAGIC-IMMUNE CHECK ===
+    // Magic-immune enemies are completely immune to Magic attack type
+    if (isMagicImmune(enemy)) {
+      const modifiedDamage = calculateMagicImmuneDamage(damage, attackType, element, enemy);
+      
+      // If immune (0 damage), emit immune event and return
+      if (modifiedDamage === 0) {
+        this.eventBus.emit('enemy:immune', {
+          enemy,
+          attackType,
+          x: enemy.x,
+          y: enemy.y,
+        });
+        return;
+      }
+      
+      // Apply damage modifier for elements against magic-immune
+      damage = modifiedDamage;
+    }
+    
     // Calculate damage with status effect modifiers (curse, weaken)
     let { finalDamage, modifiers } = StatusEffects.calculateDamageWithEffects(enemy, damage);
+    
+    // === SHIELDED ENEMY HANDLING ===
+    // Shielded enemies absorb damage with their shield first
+    if (isShielded(enemy) && hasActiveShield(enemy)) {
+      const shieldResult = applyShieldedDamage(enemy, finalDamage, attackType);
+      
+      // Emit shield damage event
+      if (shieldResult.shieldDamage > 0) {
+        this.eventBus.emit('enemy:shield-hit', {
+          enemy,
+          shieldDamage: shieldResult.shieldDamage,
+          remainingShield: enemy.shieldHealth,
+          x: enemy.x,
+          y: enemy.y,
+        });
+        modifiers.push({ type: 'shieldAbsorb', value: shieldResult.shieldDamage });
+      }
+      
+      // Emit shield break event
+      if (shieldResult.shieldBroken) {
+        this.eventBus.emit('enemy:shield-broken', {
+          enemy,
+          x: enemy.x,
+          y: enemy.y,
+        });
+        modifiers.push({ type: 'shieldBroken' });
+      }
+      
+      // Only health damage passes through
+      finalDamage = shieldResult.healthDamage;
+    }
     
     // === ARMORED ENEMY DAMAGE REDUCTION ===
     if (enemy.isArmored && enemy.armor > 0) {
