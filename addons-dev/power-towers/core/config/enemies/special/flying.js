@@ -144,11 +144,12 @@ function applyFlyingModifier(baseEnemy) {
 /**
  * Check if tower can target flying enemy
  * @param {Object} tower - Tower data
- * @param {Object} enemy - Enemy data (must have isFlying: true)
- * @returns {boolean} True if tower can target this flying enemy
+ * @param {Object} enemy - Enemy data (optional - if provided, checks if flying)
+ * @returns {boolean} True if tower can target flying enemies
  */
 function canTargetFlying(tower, enemy) {
-  if (!enemy.isFlying) return true;  // Not flying, can always target
+  // If enemy not provided or not flying, tower can always target
+  if (!enemy || !enemy.isFlying) return true;
   
   const { combat } = FLYING;
   const attackType = tower.attackTypeId || 'normal';

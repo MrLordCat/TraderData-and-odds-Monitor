@@ -261,7 +261,7 @@ function findTarget(tower, enemies) {
     if (enemy.health <= 0) continue;
 
     // Flying check - can this tower target flying enemies?
-    if (enemy.isFlying && !canTargetFlying(tower)) {
+    if (!canTargetFlying(tower, enemy)) {
       continue;
     }
 

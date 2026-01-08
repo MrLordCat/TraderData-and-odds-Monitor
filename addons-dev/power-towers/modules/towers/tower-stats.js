@@ -210,7 +210,9 @@ function recalculateTowerStats(tower) {
   
   // === GROUND ZONE (Siege unique) ===
   // Leaves slowing crater after splash explosion
-  const groundZoneUnlocked = upgradeLevels.groundZoneUnlock > 0 || attackType.groundZoneEnabled;
+  // Only available for Siege attack type, unlocked via groundZoneUnlock upgrade
+  const isSiegeType = tower.attackTypeId === 'siege';
+  const groundZoneUnlocked = isSiegeType && upgradeLevels.groundZoneUnlock > 0;
   if (groundZoneUnlocked) {
     let zoneRadius = attackType.groundZoneRadius || 40;
     let zoneDuration = attackType.groundZoneDuration || 2000;
