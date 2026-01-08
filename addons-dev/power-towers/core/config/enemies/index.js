@@ -5,7 +5,8 @@
  */
 
 const { 
-  BASE_ENEMY_TYPES, 
+  BASE_ENEMY_TYPES,
+  BASE_ENEMIES,
   getBaseEnemyType, 
   getBaseEnemyTypeIds,
   isBaseEnemyType,
@@ -64,13 +65,7 @@ const ENEMY_TYPES = {
   // Boss is now fetched via getBossConfig()
 };
 
-// Alias for new code
-const BASE_ENEMIES = {
-  minion: MINION,
-  scout: SCOUT,
-  brute: BRUTE,
-  swarmling: SWARMLING,
-};
+// Note: BASE_ENEMIES is imported from ./base
 
 /**
  * Get enemy config by type id

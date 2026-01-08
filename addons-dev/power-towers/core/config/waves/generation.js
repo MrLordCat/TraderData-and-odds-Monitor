@@ -6,6 +6,7 @@
  * - Enemy scaling
  * - Aura selection
  * - Elite rolls
+ * - Special enemy types (flying, armored)
  */
 
 const { applyScaling, getEnemyCount } = require('./scaling');
@@ -14,6 +15,7 @@ const { selectAurasForWave, applyAurasToEnemy, AURAS } = require('./auras');
 const { rollForElite, applyEliteModifiers } = require('../enemies/elite');
 const { BOSS_WAVES, getBossConfig } = require('../enemies/bosses');
 const { BASE_ENEMIES } = require('../enemies/base');
+const { applySpecialModifier, SPECIAL_TYPES } = require('../enemies/special');
 
 /**
  * Generate spawn queue for a wave
@@ -48,6 +50,11 @@ function generateWave(wave) {
     for (let i = 0; i < entry.count; i++) {
       // Create enemy instance
       let enemy = createEnemyInstance(baseEnemy, wave, selectedAuras);
+      
+      // Apply special modifier (flying, armored, etc.)
+      if (entry.special) {
+        enemy = applySpecialModifier(enemy, entry.special);
+      }
       
       // Roll for elite
       if (rollForElite(wave)) {

@@ -100,6 +100,11 @@ const CONFIG = {
     ELITE_CONFIG,
     BOSSES,
     BOSS_WAVES,
+    createEnemyData,
+    rollForElite,
+    applyEliteModifiers,
+    isBossWave,
+    getBossConfig,
   },
   waves: {
     WAVE_CONFIG,
@@ -107,6 +112,11 @@ const CONFIG = {
     SCALING,
     WAVE_COMPOSITIONS,
     SPAWN_PATTERNS,
+    // Functions
+    generateWave,
+    getWavePreview,
+    selectAurasForWave,
+    applyAurasToEnemy,
   },
 };
 

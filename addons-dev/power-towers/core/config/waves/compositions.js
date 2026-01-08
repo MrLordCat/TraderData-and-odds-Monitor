@@ -89,10 +89,11 @@ const WAVE_COMPOSITIONS = {
   
   8: {
     enemies: [
-      { type: 'scout', count: 8 },
+      { type: 'scout', count: 6 },
+      { type: 'scout', count: 2, special: 'flying' },
     ],
     pattern: 'rush',
-    description: 'Скоростной натиск',
+    description: 'Скоростной натиск + первые летуны',
   },
   
   9: {
@@ -127,11 +128,12 @@ const WAVE_COMPOSITIONS = {
   
   12: {
     enemies: [
-      { type: 'brute', count: 4 },
+      { type: 'brute', count: 2, special: 'armored' },
+      { type: 'brute', count: 2 },
       { type: 'minion', count: 6 },
     ],
     pattern: 'siege',
-    description: 'Танковый напор',
+    description: 'Танковый напор + первые бронированные',
   },
   
   13: {
@@ -146,12 +148,13 @@ const WAVE_COMPOSITIONS = {
   14: {
     enemies: [
       { type: 'minion', count: 6 },
-      { type: 'scout', count: 5 },
+      { type: 'scout', count: 3, special: 'flying' },
+      { type: 'scout', count: 2 },
       { type: 'brute', count: 2 },
     ],
     pattern: 'mixed',
     auraChance: 0.5,
-    description: 'Смешанный натиск',
+    description: 'Смешанный натиск с летунами',
   },
   
   15: {
@@ -175,20 +178,22 @@ const WAVE_COMPOSITIONS = {
   
   17: {
     enemies: [
-      { type: 'scout', count: 10 },
+      { type: 'scout', count: 6 },
+      { type: 'scout', count: 4, special: 'flying' },
     ],
     pattern: 'rush',
     auraChance: 0.7,
-    description: 'Скоростной блиц',
+    description: 'Воздушный блиц',
   },
   
   18: {
     enemies: [
-      { type: 'brute', count: 5 },
+      { type: 'brute', count: 3, special: 'armored' },
+      { type: 'brute', count: 2 },
       { type: 'minion', count: 5 },
     ],
     pattern: 'siege',
-    description: 'Тяжёлая осада',
+    description: 'Бронированная осада',
   },
   
   19: {

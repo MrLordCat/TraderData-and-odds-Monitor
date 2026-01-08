@@ -8,6 +8,7 @@
 const { rollCritical, calculateMagicDamage, getAttackType } = require('../../core/attack-types');
 const { getElementAbilities, calculateLightningChargeCost, calculateLightningChargeDamage } = require('../../core/element-abilities');
 const { ATTACK_TYPE_CONFIG } = require('../../core/config/attacks');
+const { canTargetFlying } = require('../../core/config/enemies/special/flying');
 
 /**
  * Get combo config for tower (considers upgrades)
@@ -258,6 +259,11 @@ function findTarget(tower, enemies) {
 
   for (const enemy of enemies) {
     if (enemy.health <= 0) continue;
+
+    // Flying check - can this tower target flying enemies?
+    if (enemy.isFlying && !canTargetFlying(tower)) {
+      continue;
+    }
 
     const dist = Math.sqrt(
       Math.pow(enemy.x - tower.x, 2) + Math.pow(enemy.y - tower.y, 2)

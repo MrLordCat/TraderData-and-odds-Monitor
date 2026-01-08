@@ -45,8 +45,12 @@ function isBaseEnemyType(typeId) {
   return typeId in BASE_ENEMY_TYPES;
 }
 
+// Alias for backwards compatibility
+const BASE_ENEMIES = BASE_ENEMY_TYPES;
+
 module.exports = {
   BASE_ENEMY_TYPES,
+  BASE_ENEMIES,  // Alias
   MINION,
   SCOUT,
   BRUTE,

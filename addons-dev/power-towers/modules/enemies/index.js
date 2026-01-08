@@ -3,15 +3,22 @@
  * 
  * Manages enemy spawning, movement along path, and death.
  * Handles wave composition and difficulty scaling.
+ * 
+ * Uses new modular wave/enemy system from core/config/waves/ and core/config/enemies/
  */
 
 const { GameEvents } = require('../../core/event-bus');
 const CONFIG = require('../../core/config/index');
 const { EFFECT_TYPES } = require('../../core/element-abilities');
 const StatusEffects = require('./status-effects');
+const { calculateArmoredDamage, applyArmorShred } = require('../../core/config/enemies/special/armored');
 
 // Get enemy types from config (single source of truth)
 const ENEMY_TYPES = CONFIG.ENEMY_TYPES;
+
+// New modular wave generation system
+const { generateWave, getWavePreview } = CONFIG.waves || {};
+const { applyAurasToEnemy, AURAS } = CONFIG.waves || {};
 
 class EnemiesModule {
   /**
@@ -33,7 +40,12 @@ class EnemiesModule {
     this.currentWave = 0;
     this.spawnQueue = [];
     this.spawnTimer = 0;
+    this.waveStartTime = 0;      // Absolute time when wave started (for new spawn system)
     this.waveInProgress = false;
+    
+    // Current wave data (from new generation system)
+    this.currentWaveData = null;
+    this.activeAuras = [];       // Auras active for current wave
     
     // Stats
     this.totalKills = 0;
@@ -97,9 +109,13 @@ class EnemiesModule {
     this.currentWave = 0;
     this.spawnQueue = [];
     this.spawnTimer = 0;
+    this.waveStartTime = 0;
     this.waveInProgress = false;
     this.totalKills = 0;
     this.escapedEnemies = 0;
+    // New wave system
+    this.currentWaveData = null;
+    this.activeAuras = [];
   }
 
   /**
@@ -119,9 +135,13 @@ class EnemiesModule {
     this.enemies = [];
     this.spawnQueue = [];
     this.spawnTimer = 0;
+    this.waveStartTime = 0;
     this.waveInProgress = false;
     // Keep currentWave at 0 for fresh start
     this.currentWave = 0;
+    // New wave system
+    this.currentWaveData = null;
+    this.activeAuras = [];
   }
 
   /**
@@ -132,7 +152,7 @@ class EnemiesModule {
   }
 
   /**
-   * Start next wave
+   * Start next wave - uses new modular wave generation system
    */
   startNextWave() {
     // Don't block if wave is in progress - allow overlapping waves
@@ -146,18 +166,45 @@ class EnemiesModule {
     this.currentWave++;
     this.waveInProgress = true;
     
-    // Reset spawn timer for new wave
+    // Reset timers for new wave
     this.spawnTimer = 0;
+    this.waveStartTime = Date.now();
     
-    // Generate wave composition
-    const waveEnemies = this.generateWaveComposition(this.currentWave);
+    // Try new wave generation system first
+    let waveData = null;
+    let waveEnemies = [];
+    
+    if (typeof generateWave === 'function') {
+      // Use new modular system
+      waveData = generateWave(this.currentWave);
+      this.currentWaveData = waveData;
+      this.activeAuras = waveData.auras || [];
+      
+      // Convert new format spawnQueue to module format
+      waveEnemies = waveData.spawnQueue.map((entry, index) => ({
+        enemyData: entry.enemy,           // Pre-built enemy data
+        delay: index === 0 ? 0.5 : (entry.spawnTime - (waveData.spawnQueue[index - 1]?.spawnTime || 0)) / 1000,
+        isBoss: entry.isBoss || false,
+      }));
+      
+      console.log(`[EnemiesModule] Wave ${this.currentWave} generated:`, {
+        enemies: waveData.totalEnemies,
+        auras: waveData.aurasInfo?.map(a => a.emoji + ' ' + a.name).join(', ') || 'none',
+        boss: waveData.boss?.id || 'none',
+      });
+    } else {
+      // Fallback to legacy system
+      waveEnemies = this.generateWaveComposition(this.currentWave);
+    }
     
     // Add to spawn queue (don't replace - append for overlapping waves)
     this.spawnQueue.push(...waveEnemies);
     
     this.eventBus.emit('wave:started', { 
       wave: this.currentWave, 
-      enemyCount: waveEnemies.length 
+      enemyCount: waveEnemies.length,
+      auras: this.activeAuras,
+      aurasInfo: waveData?.aurasInfo || [],
     });
   }
 
@@ -212,7 +259,9 @@ class EnemiesModule {
   }
 
   /**
-   * Process spawn queue - uses relative delays between spawns
+   * Process spawn queue - supports both old and new formats
+   * Old format: { type, delay }
+   * New format: { enemyData, delay, isBoss }
    */
   processSpawnQueue(deltaTime) {
     if (this.spawnQueue.length === 0) return;
@@ -222,14 +271,86 @@ class EnemiesModule {
     // Only spawn one enemy at a time when delay is reached
     if (this.spawnTimer >= this.spawnQueue[0].delay) {
       const spawn = this.spawnQueue.shift();
-      this.spawnEnemy(spawn.type);
+      
+      // Check format and spawn accordingly
+      if (spawn.enemyData) {
+        // New format - pre-built enemy data from generation.js
+        this.spawnEnemyFromData(spawn.enemyData, spawn.isBoss);
+      } else {
+        // Legacy format - just type string
+        this.spawnEnemy(spawn.type);
+      }
+      
       // Reset timer for next spawn (relative delay system)
       this.spawnTimer = 0;
     }
   }
 
   /**
-   * Spawn an enemy
+   * Spawn enemy from pre-built data (new system)
+   * @param {Object} enemyData - Enemy data from generation.js
+   * @param {boolean} isBoss - Whether this is a boss
+   */
+  spawnEnemyFromData(enemyData, isBoss = false) {
+    if (!enemyData || this.waypoints.length === 0) return;
+    
+    const spawnPoint = this.waypoints[0];
+    
+    const enemy = {
+      // Core identity
+      id: this.nextEnemyId++,
+      type: enemyData.type || enemyData.id || 'minion',
+      
+      // Position
+      x: spawnPoint.x,
+      y: spawnPoint.y,
+      
+      // Stats (already scaled by generation.js)
+      health: enemyData.currentHealth || enemyData.health || enemyData.maxHealth,
+      maxHealth: enemyData.maxHealth || enemyData.health,
+      speed: enemyData.speed || enemyData.baseSpeed || 40,
+      baseSpeed: enemyData.baseSpeed || enemyData.speed || 40,
+      reward: enemyData.reward || 10,
+      xp: enemyData.xp || 1,
+      
+      // Path
+      pathProgress: 0,
+      waypointIndex: 0,
+      
+      // Visual
+      size: enemyData.size || (isBoss ? 16 : 10),
+      emoji: enemyData.emoji || '👾',
+      color: enemyData.color || '#ff6b6b',
+      displayName: enemyData.displayName || enemyData.name,
+      
+      // Status effects
+      statusEffects: enemyData.statusEffects || [],
+      slowMultiplier: 1,
+      freezeImmunityTimer: 0,
+      
+      // New fields from modular system
+      isElite: enemyData.isElite || false,
+      isBoss: isBoss || enemyData.isBoss || false,
+      isFlying: enemyData.isFlying || false,
+      isArmored: enemyData.isArmored || false,
+      isMagicImmune: enemyData.isMagicImmune || false,
+      specialType: enemyData.specialType || null,
+      auras: enemyData.auras || this.activeAuras || [],
+      wave: enemyData.wave || this.currentWave,
+      
+      // Elite visual properties
+      eliteGlow: enemyData.eliteGlow || null,
+      eliteParticles: enemyData.eliteParticles || null,
+    };
+    
+    this.enemies.push(enemy);
+    this.eventBus.emit('enemy:spawned', { enemy, isBoss, isElite: enemy.isElite });
+    
+    return enemy;
+  }
+
+  /**
+   * Spawn an enemy (legacy method - still used for fallback)
    */
   spawnEnemy(type) {
     const enemyDef = ENEMY_TYPES[type];
@@ -273,6 +394,12 @@ class EnemiesModule {
       slowMultiplier: 1,
       // Freeze immunity cooldown
       freezeImmunityTimer: 0,
+      // New fields (defaults for legacy)
+      isElite: false,
+      isBoss: type === 'boss',
+      isFlying: false,
+      isArmored: false,
+      auras: this.activeAuras || [],
     };
 
     this.enemies.push(enemy);
@@ -435,7 +562,24 @@ class EnemiesModule {
     // Calculate damage with status effect modifiers (curse, weaken)
     let { finalDamage, modifiers } = StatusEffects.calculateDamageWithEffects(enemy, damage);
     
-    // Apply armor penetration (Piercing attack)
+    // === ARMORED ENEMY DAMAGE REDUCTION ===
+    if (enemy.isArmored && enemy.armor > 0) {
+      const armoredResult = calculateArmoredDamage(enemy, finalDamage, attackType, armorPenetration);
+      finalDamage = armoredResult.finalDamage;
+      
+      // Apply armor damage (if attack damages armor)
+      if (armoredResult.armorDamage > 0) {
+        enemy.armor = Math.max(0, enemy.armor - armoredResult.armorDamage);
+        modifiers.push({ type: 'armorDamage', value: armoredResult.armorDamage });
+      }
+      
+      // Track damage reduction
+      if (armoredResult.damageReduction > 0) {
+        modifiers.push({ type: 'armorBlock', reduction: armoredResult.damageReduction });
+      }
+    }
+    
+    // Apply armor penetration (Piercing attack) - additional bonus on top of armored calculation
     // Armor pen reduces the effectiveness of enemy armor
     if (armorPenetration > 0 && enemy.armor) {
       const armorReduction = enemy.armor * (1 - armorPenetration);
@@ -766,7 +910,28 @@ class EnemiesModule {
       waveInProgress: this.waveInProgress,
       spawnQueueSize: this.spawnQueue.length,
       totalKills: this.totalKills,
-      escapedEnemies: this.escapedEnemies
+      escapedEnemies: this.escapedEnemies,
+      // New wave system data
+      activeAuras: this.activeAuras,
+      waveData: this.currentWaveData ? {
+        boss: this.currentWaveData.boss,
+        aurasInfo: this.currentWaveData.aurasInfo,
+        totalEnemies: this.currentWaveData.totalEnemies,
+      } : null,
+    };
+  }
+  
+  /**
+   * Get current wave info for UI
+   */
+  getWaveInfo() {
+    return {
+      wave: this.currentWave,
+      inProgress: this.waveInProgress,
+      auras: this.activeAuras,
+      aurasInfo: this.currentWaveData?.aurasInfo || [],
+      boss: this.currentWaveData?.boss || null,
+      remainingEnemies: this.spawnQueue.length + this.enemies.length,
     };
   }
 }
