@@ -2,7 +2,6 @@
 // ...existing code...
 // inject-stats.js (per-game with team-level tower/inhib)
 (() => {
-  
 
   const RX_GAME_START = /^Game\s+(\d+)\s+started$/i;
   const RX_KILL       = /\bkilled\b/i;

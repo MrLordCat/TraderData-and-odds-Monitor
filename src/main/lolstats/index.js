@@ -35,7 +35,7 @@ function createLolStatsModule(persist={}){
   // CDN fallback loader ensures real pako present even if local file truncated
   const pakoLoader = `(()=>{try{if(!window.pako){const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js';s.onload=()=>console.log('[lol] pako loaded from CDN');document.head.appendChild(s);}else{console.log('[lol] pako local present');}}catch(e){console.warn('[lol] pako loader err',e);}})();`;
   // Order: (1) fallback loader, (2) local pako, (3) map+netWorth, (4) live log, (5) stats (includes multi), (6) spa url watcher
-  return `${pakoLoader}\n(() => {\n${pako}\n})();\n(() => {\n${injectMap}\n})();\n(() => {\n${injectLive}\n})();\n(() => {\n${injectStats}\n})();\n(() => {\n${injectSpaWatch}\n})();`;
+  return `console.log('[lol-bundle] Injection started at', new Date().toISOString());\n${pakoLoader}\n(() => {\n${pako}\n})();\n(() => {\n${injectMap}\n})();\n(() => {\n${injectLive}\n})();\n(() => {\n${injectStats}\n})();\n(() => {\n${injectSpaWatch}\n})();\nconsole.log('[lol-bundle] Injection complete');`;
   }
 
   function init(view, slot, emit){

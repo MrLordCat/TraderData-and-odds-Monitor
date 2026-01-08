@@ -1,4 +1,4 @@
-// Enhanced inject-map.js with broader extraction + debug
+// Enhanced inject-map.js with broader extraction
 (() => {
   const playerToTeam = new Map();
   const pending = []; // queue of { service, seg }
@@ -129,7 +129,7 @@
       if(!(typeof pako !== 'undefined' && pako.inflate)) { pending.push({ type:'score', seg }); continue; }
       const inner = inflateBase64ToJSON(seg.data); if(!inner) continue; if(tryExtract(inner)) updated = true;
         }
-        if(updated) publishMapping();
+        if(updated){ publishMapping(); }
       }
     });
     return ws;

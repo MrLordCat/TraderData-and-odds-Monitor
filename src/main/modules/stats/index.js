@@ -245,7 +245,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   let lolStats = null; const lastPortal = { A:null,B:null }; const portalInjectedOnce=new WeakSet(); const slotInit={ A:false,B:false }; let ipcLolRegistered=false;
   function ensureLolStats(){
     if(lolStats) return;
-    const { createLolStatsModule } = require('../lolstats');
+    const { createLolStatsModule } = require('../../lolstats');
     lolStats = createLolStatsModule({
       loadHistory: () => {
         try { return store.get('lolStatsHistory') || []; } catch(_) { return []; }
@@ -257,8 +257,31 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     registerLolIpc();
   }
   function broadcast(snapshot){ if(views.panel) try { views.panel.webContents.send('lol-stats-update', snapshot); } catch(_){ } ['A','B'].forEach(s=>{ if(urls[s]==='embed:lolstats'){ const v=views[s]; if(v){ try { v.webContents.executeJavaScript(`window.postMessage({ __lolStatsPayload: ${JSON.stringify(snapshot)} }, '*');`).catch(()=>{}); } catch(_){ } } } }); }
-  function registerLolIpc(){ if(ipcLolRegistered) return; ipcLolRegistered=true; const { ipcMain } = require('electron'); ipcMain.on('lol-stats-raw',(_e,{ slot,data })=>{ if(!lolStats) return; if(data && data.source==='lol-reset-trigger'){ lolStats.reset(); broadcast(lolStats.snapshot()); return; } lolStats.handleRaw(data); broadcast(lolStats.snapshot()); }); ipcMain.on('lol-stats-reset',()=>{ if(lolStats){ lolStats.reset(); broadcast(lolStats.snapshot()); } }); }
+  function registerLolIpc(){ 
+    if(ipcLolRegistered) return; 
+    ipcLolRegistered=true; 
+    const { ipcMain } = require('electron'); 
+    ipcMain.on('lol-stats-raw',(_e,{ slot,data })=>{ 
+      if(!lolStats) return; 
+      if(data && data.source==='lol-reset-trigger'){ lolStats.reset(); broadcast(lolStats.snapshot()); return; } 
+      lolStats.handleRaw(data); 
+      broadcast(lolStats.snapshot()); 
+    }); 
+    ipcMain.on('lol-stats-reset',()=>{ if(lolStats){ lolStats.reset(); broadcast(lolStats.snapshot()); } }); 
+  }
   function maybeAutoReset(slot,url){ if(!lolStats) return; if(!/portal\.grid\.gg/i.test(url)) return; if(lastPortal[slot] && lastPortal[slot]!==url){ try { lolStats.reset(); lolStats.reinject && lolStats.reinject(views[slot]); views[slot].webContents.executeJavaScript(`window.postMessage({ type:'restart_data_collection', reason:'url-change' }, '*');`).catch(()=>{}); broadcast(lolStats.snapshot()); } catch(_){ } } lastPortal[slot]=url; }
+  
+  // Early injection on dom-ready to intercept WebSocket before page creates connections
+  function maybeEarlyInject(slot, view, url){
+    if(!url || !/portal\.grid\.gg/i.test(url)) return;
+    ensureLolStats();
+    try { view.webContents.send('identify-slot', slot); } catch(_){ }
+    try {
+      lolStats.init(view, slot, (snap)=> broadcast(snap));
+      lolStats.reinject && lolStats.reinject(view);
+    } catch(e){ console.error('[stats] Injection error:', e); }
+  }
+  
   function attachNavTracking(slot, view){
     if(!view || slotInit[slot]) return;
     slotInit[slot] = true;
@@ -271,8 +294,17 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
         if(views.panel) views.panel.webContents.send('stats-url-update',{ slot, url:u });
       } catch(_){}
     };
-    view.webContents.on('did-navigate', (_e,u)=> update(u));
-    view.webContents.on('did-navigate-in-page', (_e,u)=> update(u));
+    view.webContents.on('did-navigate', (_e,u)=>{ update(u); });
+    view.webContents.on('did-navigate-in-page', (_e,u)=>{ update(u); });
+    
+    // CRITICAL: Inject on dom-ready (BEFORE did-finish-load) to intercept WebSocket
+    view.webContents.on('dom-ready', ()=>{
+      try {
+        const cur = view.webContents.getURL();
+        maybeEarlyInject(slot, view, cur);
+      } catch(e){ console.error('[stats] dom-ready error:', e); }
+    });
+    
     view.webContents.on('did-finish-load', ()=>{
       try {
         const cur = view.webContents.getURL();
@@ -296,15 +328,12 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
         }).catch(()=>{});
         if(/portal\.grid\.gg/.test(cur)){
           ensureLolStats();
+          // Note: main injection happens on dom-ready now for earlier WebSocket interception
+          // Here we just mark as initialized and broadcast current state
           try { view.webContents.send('identify-slot', slot); } catch(_){ }
-          try {
-            if(!portalInjectedOnce.has(view)){
-              lolStats.init(view, slot,(snap)=> broadcast(snap));
-              portalInjectedOnce.add(view);
-            } else {
-              lolStats.reinject && lolStats.reinject(view);
-            }
-          } catch(_){ }
+          if(!portalInjectedOnce.has(view)){
+            portalInjectedOnce.add(view);
+          }
           maybeAutoReset(slot, cur);
           broadcast(lolStats.snapshot());
         }

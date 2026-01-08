@@ -506,7 +506,6 @@ function bindBasic(){
   } catch(_){ }
 }
 
-
 function bindReset(){
   const btn = document.getElementById('lolReset');
   if(!btn) return;

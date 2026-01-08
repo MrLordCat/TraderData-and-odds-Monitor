@@ -251,9 +251,31 @@ function extractGg(mapNum=1, game='lol'){
 }
 
 function extractThunder(mapNum=1, game='lol'){
-  const mapRe=new RegExp(`Map\\s*${mapNum}\\s+Winner`,'i'); const matchRe=/Match\\s+Winner/i; const markets=[...document.querySelectorAll("div[data-testid^='market-']")];
-  let t=markets.find(m=>mapRe.test(m.textContent)); if(!t) t=markets.find(m=>matchRe.test(m.textContent)); if(!t) return {odds:['-','-'],frozen:false};
-  const odds=[...t.querySelectorAll('span.odds-button__odds')].map(e=>e.textContent.trim()).slice(0,2); return {odds:odds.length===2?odds:['-','-'],frozen:false};
+  const markets=[...document.querySelectorAll("div[data-testid^='market-']")];
+  let t=null;
+  if(mapNum<=0){
+    // Last button: look for Match Winner only
+    const matchRe=/Match\s+Winner/i;
+    t=markets.find(m=>{
+      const header=m.querySelector('.text-gray-light, .mr-auto');
+      return header && matchRe.test(header.textContent);
+    });
+  } else {
+    // Specific map
+    const mapRe=new RegExp(`Map\\s*${mapNum}\\s+Winner`,'i');
+    t=markets.find(m=>mapRe.test(m.textContent));
+    // Fallback to match winner if map not found
+    if(!t){
+      const matchRe=/Match\s+Winner/i;
+      t=markets.find(m=>{
+        const header=m.querySelector('.text-gray-light, .mr-auto');
+        return header && matchRe.test(header.textContent);
+      });
+    }
+  }
+  if(!t) return {odds:['-','-'],frozen:false};
+  const odds=[...t.querySelectorAll('span.odds-button__odds')].map(e=>e.textContent.trim()).slice(0,2);
+  return {odds:odds.length===2?odds:['-','-'],frozen:false};
 }
 
 function extractBetboom(mapNum=1, game='lol'){
