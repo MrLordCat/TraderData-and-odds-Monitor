@@ -483,7 +483,9 @@ class GameCore {
       firstWaveStarted: this.firstWaveStarted,
       autoWaveTimer: this.autoWaveTimer,
       autoWaveInterval: this.autoWaveInterval,
-      nextWaveIn: Math.max(0, this.autoWaveInterval - this.autoWaveTimer)
+      nextWaveIn: Math.max(0, this.autoWaveInterval - this.autoWaveTimer),
+      // Current wave auras
+      currentWaveAuras: this.modules.enemies.activeAuras || []
     };
   }
 

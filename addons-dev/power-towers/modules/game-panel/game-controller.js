@@ -142,6 +142,9 @@ class GameControllerBase {
       pauseBtnResume: container.querySelector('#pause-btn-resume'),
       pauseBtnSettings: container.querySelector('#pause-btn-settings'),
       pauseBtnQuit: container.querySelector('#pause-btn-quit'),
+      // Wave auras display
+      waveAurasContainer: container.querySelector('#wave-auras-container'),
+      waveAuras: container.querySelector('#wave-auras'),
       // Bottom panel
       bottomPanel: container.querySelector('#bottom-panel'),
       panelStats: container.querySelector('#panel-stats'),
@@ -922,8 +925,56 @@ class GameControllerBase {
       }
     }
     
+    // Update wave auras display
+    this.updateWaveAurasDisplay(state);
+    
     // Update tower affordability (has its own optimization)
     this.updateTowerAffordability();
+  }
+  
+  /**
+   * Update wave auras display in HUD
+   * Shows current wave's active auras
+   */
+  updateWaveAurasDisplay(state) {
+    const el = this.elements;
+    if (!el.waveAurasContainer || !el.waveAuras) return;
+    
+    // Get current wave auras from game state
+    const currentAuras = state.currentWaveAuras || [];
+    
+    // Cache comparison
+    const aurasKey = currentAuras.join(',');
+    if (this._lastWaveAuras === aurasKey) return;
+    this._lastWaveAuras = aurasKey;
+    
+    // Hide container if no auras
+    if (currentAuras.length === 0) {
+      el.waveAurasContainer.style.display = 'none';
+      return;
+    }
+    
+    // Show container and populate
+    el.waveAurasContainer.style.display = 'block';
+    
+    // Get aura info from config
+    const { getAuraInfo } = require('../../core/config/waves/auras');
+    
+    // Build aura items HTML
+    const aurasHtml = currentAuras.map(auraId => {
+      const info = getAuraInfo(auraId);
+      if (!info) return '';
+      
+      return `
+        <div class="wave-aura-item" data-aura="${auraId}">
+          <span class="wave-aura-icon">${info.emoji || info.icon}</span>
+          <span class="wave-aura-name">${info.name}</span>
+          <div class="aura-tooltip">${info.description}</div>
+        </div>
+      `;
+    }).join('');
+    
+    el.waveAuras.innerHTML = aurasHtml;
   }
 
   /**

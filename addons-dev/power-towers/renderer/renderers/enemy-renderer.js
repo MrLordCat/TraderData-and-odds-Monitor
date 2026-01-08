@@ -82,8 +82,11 @@ function EnemyRendererMixin(Base) {
           bodyB = bodyB * 0.8;
         }
         
+        // Ethereal aura transparency modifier
+        const etherealAlpha = this._getEtherealAlpha(enemy);
+        
         // === RENDER ENEMY BODY BY TYPE ===
-        this._renderEnemyBody(enemy, enemy.x, renderY, size, bodyR, bodyG, bodyB, type, time);
+        this._renderEnemyBody(enemy, enemy.x, renderY, size, bodyR, bodyG, bodyB, type, time, etherealAlpha);
         
         // === SPECIAL TYPE EFFECTS ===
         
@@ -122,6 +125,9 @@ function EnemyRendererMixin(Base) {
           this._renderBossIndicator(enemy, enemy.x, renderY, size, time);
         }
         
+        // === WAVE AURA EFFECTS ===
+        this._renderAuraEffects(enemy, enemy.x, renderY, size, time);
+        
         // Render status effect visuals
         this._renderEnemyStatusEffects(enemy, size, time, hasBurn, hasPoison, hasSlow, hasFreeze, hasShock, hasCurse);
         
@@ -134,6 +140,11 @@ function EnemyRendererMixin(Base) {
         this._renderEnemyHealthBar(enemy, renderY, size);
       }
       
+      this.shapeRenderer.end();
+      
+      // === SWARM MIND CONNECTIONS (after all enemies) ===
+      this.shapeRenderer.begin('triangles', camera);
+      this._renderSwarmMindConnections(data.enemies, time);
       this.shapeRenderer.end();
     }
     
@@ -181,118 +192,119 @@ function EnemyRendererMixin(Base) {
     
     /**
      * Render enemy body based on type
+     * @param {number} alpha - Transparency multiplier (1 = opaque, 0.5 = ethereal)
      */
-    _renderEnemyBody(enemy, x, y, size, r, g, b, type, time) {
+    _renderEnemyBody(enemy, x, y, size, r, g, b, type, time, alpha = 1) {
       const camera = this.camera;
       
       switch (type) {
         case 'minion':
         case 'basic':
-          this._renderMinionBody(x, y, size, r, g, b, camera);
+          this._renderMinionBody(x, y, size, r, g, b, camera, alpha);
           break;
         case 'scout':
         case 'fast':
-          this._renderScoutBody(enemy, x, y, size, r, g, b, time, camera);
+          this._renderScoutBody(enemy, x, y, size, r, g, b, time, camera, alpha);
           break;
         case 'brute':
         case 'tank':
-          this._renderBruteBody(x, y, size, r, g, b, camera);
+          this._renderBruteBody(x, y, size, r, g, b, camera, alpha);
           break;
         case 'swarmling':
         case 'swarm':
-          this._renderSwarmlingBody(x, y, size, r, g, b, camera);
+          this._renderSwarmlingBody(x, y, size, r, g, b, camera, alpha);
           break;
         case 'boss':
-          this._renderBossBody(x, y, size, r, g, b, time, camera);
+          this._renderBossBody(x, y, size, r, g, b, time, camera, alpha);
           break;
         default:
-          this.shapeRenderer.circle(x, y, size, r, g, b, 1);
-          this.shapeRenderer.circleOutline(x, y, size, 1 / camera.zoom, 0, 0, 0, 0.4);
+          this.shapeRenderer.circle(x, y, size, r, g, b, alpha);
+          this.shapeRenderer.circleOutline(x, y, size, 1 / camera.zoom, 0, 0, 0, 0.4 * alpha);
       }
     }
     
-    _renderMinionBody(x, y, size, r, g, b, camera) {
-      this.shapeRenderer.circle(x, y, size, r, g, b, 1);
-      this.shapeRenderer.circle(x, y, size * 0.7, r * 1.2, g * 1.2, b * 1.2, 1);
-      this.shapeRenderer.circleOutline(x, y, size, 1 / camera.zoom, 0, 0, 0, 0.5);
+    _renderMinionBody(x, y, size, r, g, b, camera, alpha = 1) {
+      this.shapeRenderer.circle(x, y, size, r, g, b, alpha);
+      this.shapeRenderer.circle(x, y, size * 0.7, r * 1.2, g * 1.2, b * 1.2, alpha);
+      this.shapeRenderer.circleOutline(x, y, size, 1 / camera.zoom, 0, 0, 0, 0.5 * alpha);
       // Antenna
-      this.shapeRenderer.circle(x, y - size * 0.9, size * 0.25, r * 0.8, g * 0.8, b * 0.8, 1);
+      this.shapeRenderer.circle(x, y - size * 0.9, size * 0.25, r * 0.8, g * 0.8, b * 0.8, alpha);
       // Eyes
-      this.shapeRenderer.circle(x - size * 0.3, y - size * 0.2, size * 0.15, 1, 1, 1, 0.9);
-      this.shapeRenderer.circle(x + size * 0.3, y - size * 0.2, size * 0.15, 1, 1, 1, 0.9);
-      this.shapeRenderer.circle(x - size * 0.3, y - size * 0.2, size * 0.08, 0, 0, 0, 1);
-      this.shapeRenderer.circle(x + size * 0.3, y - size * 0.2, size * 0.08, 0, 0, 0, 1);
+      this.shapeRenderer.circle(x - size * 0.3, y - size * 0.2, size * 0.15, 1, 1, 1, 0.9 * alpha);
+      this.shapeRenderer.circle(x + size * 0.3, y - size * 0.2, size * 0.15, 1, 1, 1, 0.9 * alpha);
+      this.shapeRenderer.circle(x - size * 0.3, y - size * 0.2, size * 0.08, 0, 0, 0, alpha);
+      this.shapeRenderer.circle(x + size * 0.3, y - size * 0.2, size * 0.08, 0, 0, 0, alpha);
     }
     
-    _renderScoutBody(enemy, x, y, size, r, g, b, time, camera) {
+    _renderScoutBody(enemy, x, y, size, r, g, b, time, camera, alpha = 1) {
       // Body (elongated ellipse approximation)
-      this.shapeRenderer.circle(x, y, size * 0.8, r, g, b, 1);
-      this.shapeRenderer.circle(x - size * 0.3, y, size * 0.5, r * 0.9, g * 0.9, b * 0.9, 1);
-      this.shapeRenderer.circle(x + size * 0.4, y, size * 0.4, r * 1.1, g * 1.1, b * 1.1, 1);
+      this.shapeRenderer.circle(x, y, size * 0.8, r, g, b, alpha);
+      this.shapeRenderer.circle(x - size * 0.3, y, size * 0.5, r * 0.9, g * 0.9, b * 0.9, alpha);
+      this.shapeRenderer.circle(x + size * 0.4, y, size * 0.4, r * 1.1, g * 1.1, b * 1.1, alpha);
       // Tail
-      this.shapeRenderer.circle(x - size * 0.7, y, size * 0.25, r * 0.8, g * 0.8, b * 0.8, 1);
+      this.shapeRenderer.circle(x - size * 0.7, y, size * 0.25, r * 0.8, g * 0.8, b * 0.8, alpha);
       // Speed lines (motion blur effect)
-      const speedAlpha = 0.3 + Math.sin(time * 8) * 0.1;
+      const speedAlpha = (0.3 + Math.sin(time * 8) * 0.1) * alpha;
       this.shapeRenderer.circle(x - size * 1.2, y, size * 0.15, r, g, b, speedAlpha);
       this.shapeRenderer.circle(x - size * 1.5, y, size * 0.1, r, g, b, speedAlpha * 0.5);
       // Eye
-      this.shapeRenderer.circle(x + size * 0.5, y - size * 0.1, size * 0.12, 1, 0.8, 0, 1);
+      this.shapeRenderer.circle(x + size * 0.5, y - size * 0.1, size * 0.12, 1, 0.8, 0, alpha);
     }
     
-    _renderBruteBody(x, y, size, r, g, b, camera) {
+    _renderBruteBody(x, y, size, r, g, b, camera, alpha = 1) {
       const bruteSize = size * 1.2;
       // Main body (square-ish via multiple circles)
-      this.shapeRenderer.circle(x, y, bruteSize, r * 0.8, g * 0.8, b * 0.8, 1);
-      this.shapeRenderer.circle(x - bruteSize * 0.3, y - bruteSize * 0.3, bruteSize * 0.5, r, g, b, 1);
-      this.shapeRenderer.circle(x + bruteSize * 0.3, y - bruteSize * 0.3, bruteSize * 0.5, r, g, b, 1);
-      this.shapeRenderer.circle(x - bruteSize * 0.3, y + bruteSize * 0.3, bruteSize * 0.5, r, g, b, 1);
-      this.shapeRenderer.circle(x + bruteSize * 0.3, y + bruteSize * 0.3, bruteSize * 0.5, r, g, b, 1);
+      this.shapeRenderer.circle(x, y, bruteSize, r * 0.8, g * 0.8, b * 0.8, alpha);
+      this.shapeRenderer.circle(x - bruteSize * 0.3, y - bruteSize * 0.3, bruteSize * 0.5, r, g, b, alpha);
+      this.shapeRenderer.circle(x + bruteSize * 0.3, y - bruteSize * 0.3, bruteSize * 0.5, r, g, b, alpha);
+      this.shapeRenderer.circle(x - bruteSize * 0.3, y + bruteSize * 0.3, bruteSize * 0.5, r, g, b, alpha);
+      this.shapeRenderer.circle(x + bruteSize * 0.3, y + bruteSize * 0.3, bruteSize * 0.5, r, g, b, alpha);
       // Tusks
-      this.shapeRenderer.circle(x - bruteSize * 0.6, y + bruteSize * 0.2, bruteSize * 0.15, 1, 1, 0.9, 1);
-      this.shapeRenderer.circle(x + bruteSize * 0.6, y + bruteSize * 0.2, bruteSize * 0.15, 1, 1, 0.9, 1);
+      this.shapeRenderer.circle(x - bruteSize * 0.6, y + bruteSize * 0.2, bruteSize * 0.15, 1, 1, 0.9, alpha);
+      this.shapeRenderer.circle(x + bruteSize * 0.6, y + bruteSize * 0.2, bruteSize * 0.15, 1, 1, 0.9, alpha);
       // Angry eyes
-      this.shapeRenderer.circle(x - bruteSize * 0.25, y - bruteSize * 0.2, bruteSize * 0.12, 1, 0.2, 0.2, 1);
-      this.shapeRenderer.circle(x + bruteSize * 0.25, y - bruteSize * 0.2, bruteSize * 0.12, 1, 0.2, 0.2, 1);
+      this.shapeRenderer.circle(x - bruteSize * 0.25, y - bruteSize * 0.2, bruteSize * 0.12, 1, 0.2, 0.2, alpha);
+      this.shapeRenderer.circle(x + bruteSize * 0.25, y - bruteSize * 0.2, bruteSize * 0.12, 1, 0.2, 0.2, alpha);
       // Outline
-      this.shapeRenderer.circleOutline(x, y, bruteSize, 2 / camera.zoom, 0, 0, 0, 0.6);
+      this.shapeRenderer.circleOutline(x, y, bruteSize, 2 / camera.zoom, 0, 0, 0, 0.6 * alpha);
     }
     
-    _renderSwarmlingBody(x, y, size, r, g, b, camera) {
+    _renderSwarmlingBody(x, y, size, r, g, b, camera, alpha = 1) {
       const swarmSize = size * 0.8;
       // Body segments
-      this.shapeRenderer.circle(x + swarmSize * 0.3, y, swarmSize * 0.6, r, g, b, 1);
-      this.shapeRenderer.circle(x, y, swarmSize * 0.5, r * 0.9, g * 0.9, b * 0.9, 1);
-      this.shapeRenderer.circle(x - swarmSize * 0.4, y, swarmSize * 0.7, r * 0.85, g * 0.85, b * 0.85, 1);
+      this.shapeRenderer.circle(x + swarmSize * 0.3, y, swarmSize * 0.6, r, g, b, alpha);
+      this.shapeRenderer.circle(x, y, swarmSize * 0.5, r * 0.9, g * 0.9, b * 0.9, alpha);
+      this.shapeRenderer.circle(x - swarmSize * 0.4, y, swarmSize * 0.7, r * 0.85, g * 0.85, b * 0.85, alpha);
       // Legs (simple dots)
       for (let i = 0; i < 3; i++) {
         const legX = x - swarmSize * 0.2 + i * swarmSize * 0.2;
-        this.shapeRenderer.circle(legX, y + swarmSize * 0.5, swarmSize * 0.1, 0.2, 0.2, 0.2, 0.8);
-        this.shapeRenderer.circle(legX, y - swarmSize * 0.5, swarmSize * 0.1, 0.2, 0.2, 0.2, 0.8);
+        this.shapeRenderer.circle(legX, y + swarmSize * 0.5, swarmSize * 0.1, 0.2, 0.2, 0.2, 0.8 * alpha);
+        this.shapeRenderer.circle(legX, y - swarmSize * 0.5, swarmSize * 0.1, 0.2, 0.2, 0.2, 0.8 * alpha);
       }
       // Antenna
-      this.shapeRenderer.circle(x + swarmSize * 0.5, y - swarmSize * 0.3, swarmSize * 0.08, 0.3, 0.3, 0.3, 1);
-      this.shapeRenderer.circle(x + swarmSize * 0.5, y + swarmSize * 0.3, swarmSize * 0.08, 0.3, 0.3, 0.3, 1);
+      this.shapeRenderer.circle(x + swarmSize * 0.5, y - swarmSize * 0.3, swarmSize * 0.08, 0.3, 0.3, 0.3, alpha);
+      this.shapeRenderer.circle(x + swarmSize * 0.5, y + swarmSize * 0.3, swarmSize * 0.08, 0.3, 0.3, 0.3, alpha);
     }
     
-    _renderBossBody(x, y, size, r, g, b, time, camera) {
+    _renderBossBody(x, y, size, r, g, b, time, camera, alpha = 1) {
       const bossSize = size * 1.5;
       // Main body
-      this.shapeRenderer.circle(x, y, bossSize, r * 0.7, g * 0.7, b * 0.7, 1);
-      this.shapeRenderer.circle(x, y, bossSize * 0.85, r, g, b, 1);
-      this.shapeRenderer.circle(x, y, bossSize * 0.6, r * 1.2, g * 1.2, b * 1.2, 1);
+      this.shapeRenderer.circle(x, y, bossSize, r * 0.7, g * 0.7, b * 0.7, alpha);
+      this.shapeRenderer.circle(x, y, bossSize * 0.85, r, g, b, alpha);
+      this.shapeRenderer.circle(x, y, bossSize * 0.6, r * 1.2, g * 1.2, b * 1.2, alpha);
       // Spikes
       for (let i = 0; i < 8; i++) {
         const spikeAngle = (i / 8) * Math.PI * 2;
         const spikeX = x + Math.cos(spikeAngle) * bossSize * 0.9;
         const spikeY = y + Math.sin(spikeAngle) * bossSize * 0.9;
-        this.shapeRenderer.circle(spikeX, spikeY, bossSize * 0.2, r * 0.6, g * 0.6, b * 0.6, 1);
+        this.shapeRenderer.circle(spikeX, spikeY, bossSize * 0.2, r * 0.6, g * 0.6, b * 0.6, alpha);
       }
       // Glowing eyes
       const eyeGlow = Math.sin(time * 5) * 0.3 + 0.7;
-      this.shapeRenderer.circle(x - bossSize * 0.3, y - bossSize * 0.2, bossSize * 0.2, 1, eyeGlow * 0.3, 0, 1);
-      this.shapeRenderer.circle(x + bossSize * 0.3, y - bossSize * 0.2, bossSize * 0.2, 1, eyeGlow * 0.3, 0, 1);
+      this.shapeRenderer.circle(x - bossSize * 0.3, y - bossSize * 0.2, bossSize * 0.2, 1, eyeGlow * 0.3, 0, alpha);
+      this.shapeRenderer.circle(x + bossSize * 0.3, y - bossSize * 0.2, bossSize * 0.2, 1, eyeGlow * 0.3, 0, alpha);
       // Outline
-      this.shapeRenderer.circleOutline(x, y, bossSize, 3 / camera.zoom, 0, 0, 0, 0.7);
+      this.shapeRenderer.circleOutline(x, y, bossSize, 3 / camera.zoom, 0, 0, 0, 0.7 * alpha);
     }
     
     /**
@@ -602,6 +614,280 @@ function EnemyRendererMixin(Base) {
       const barY = y - size - 13;
       this.shapeRenderer.rect(x - barWidth/2, barY, barWidth, 3, 0.2, 0.3, 0.5, 0.8);
       this.shapeRenderer.rect(x - barWidth/2, barY, barWidth * shieldRatio, 3, 0.3, 0.5, 1, 1);
+    }
+    
+    // ===============================
+    // WAVE AURA VISUAL EFFECTS
+    // ===============================
+    
+    /**
+     * Render all aura effects for an enemy
+     * @param {Object} enemy - Enemy with auras array
+     * @param {number} x - Enemy X position
+     * @param {number} y - Enemy Y position (render position with hover offset)
+     * @param {number} size - Enemy size
+     * @param {number} time - Animation time
+     */
+    _renderAuraEffects(enemy, x, y, size, time) {
+      if (!enemy.auras || enemy.auras.length === 0) return;
+      
+      for (const auraId of enemy.auras) {
+        switch (auraId) {
+          case 'haste':
+            this._renderHasteAura(enemy, x, y, size, time);
+            break;
+          case 'fortified':
+            this._renderFortifiedAura(enemy, x, y, size, time);
+            break;
+          case 'regeneration':
+            this._renderRegenerationAura(enemy, x, y, size, time);
+            break;
+          case 'energized':
+            this._renderEnergizedAura(enemy, x, y, size, time);
+            break;
+          case 'ethereal':
+            // Ethereal is handled via transparency modifier in body rendering
+            break;
+          case 'berserker':
+            this._renderBerserkerAura(enemy, x, y, size, time);
+            break;
+          case 'swarm_mind':
+            // Swarm mind rendered separately with connections
+            break;
+        }
+      }
+    }
+    
+    /**
+     * Render Haste aura - blue speed lines trailing behind
+     */
+    _renderHasteAura(enemy, x, y, size, time) {
+      const camera = this.camera;
+      
+      // Speed lines behind the enemy
+      const lineCount = 3;
+      for (let i = 0; i < lineCount; i++) {
+        const offset = (time * 4 + i * 0.5) % 1;
+        const lineX = x - (1 - offset) * size * 2.5;
+        const lineY = y + (i - 1) * size * 0.5;
+        const lineAlpha = offset * 0.5;
+        const lineWidth = size * 1.5 * (1 - offset * 0.5);
+        
+        this.shapeRenderer.rect(
+          lineX, lineY - 1,
+          lineWidth, 2,
+          0.2, 0.6, 0.9, lineAlpha
+        );
+      }
+      
+      // Blue glow outline
+      const glowPulse = Math.sin(time * 6) * 0.1 + 0.3;
+      this.shapeRenderer.circleOutline(x, y, size * 1.15, 1.5 / camera.zoom, 0.3, 0.6, 0.9, glowPulse);
+    }
+    
+    /**
+     * Render Fortified aura - golden shield icon above enemy
+     */
+    _renderFortifiedAura(enemy, x, y, size, time) {
+      const camera = this.camera;
+      
+      // Golden shimmer outline
+      const shimmerPhase = Math.sin(time * 3) * 0.15 + 0.5;
+      this.shapeRenderer.circleOutline(x, y, size * 1.2, 2 / camera.zoom, 0.9, 0.7, 0.2, shimmerPhase);
+      
+      // Shield icon above enemy (simplified triangle)
+      const shieldY = y - size - 6;
+      const shieldSize = 5;
+      const shieldPulse = Math.sin(time * 2) * 0.1 + 0.9;
+      
+      // Shield shape (triangle pointing down)
+      this.shapeRenderer.triangle(
+        x, shieldY + shieldSize,      // Bottom point
+        x - shieldSize, shieldY - shieldSize * 0.3,  // Top left
+        x + shieldSize, shieldY - shieldSize * 0.3,  // Top right
+        0.9, 0.75, 0.2, shieldPulse * 0.8
+      );
+      
+      // Golden particles
+      for (let i = 0; i < 2; i++) {
+        const angle = time * 2 + i * Math.PI;
+        const dist = size + 3;
+        const pX = x + Math.cos(angle) * dist;
+        const pY = y + Math.sin(angle) * dist;
+        const pAlpha = Math.sin(time * 4 + i) * 0.3 + 0.4;
+        this.shapeRenderer.circle(pX, pY, 2, 1, 0.85, 0.3, pAlpha);
+      }
+    }
+    
+    /**
+     * Render Regeneration aura - green healing glow with + symbols
+     */
+    _renderRegenerationAura(enemy, x, y, size, time) {
+      const camera = this.camera;
+      
+      // Green healing glow
+      const glowPulse = Math.sin(time * 3) * 0.1 + 0.25;
+      this.shapeRenderer.circle(x, y, size * 1.3, 0.2, 0.8, 0.3, glowPulse);
+      
+      // Rising heal particles
+      const particleCount = 3;
+      for (let i = 0; i < particleCount; i++) {
+        const phase = (time * 1.5 + i * 0.8) % 2;
+        if (phase > 1) continue; // Only show while rising
+        
+        const pX = x + Math.sin(i * 2.1) * size * 0.6;
+        const pY = y + size * 0.5 - phase * size * 2;
+        const pAlpha = (1 - phase) * 0.7;
+        
+        // Plus sign (two rectangles)
+        this.shapeRenderer.rect(pX - 2, pY - 0.5, 4, 1, 0.3, 0.9, 0.3, pAlpha);
+        this.shapeRenderer.rect(pX - 0.5, pY - 2, 1, 4, 0.3, 0.9, 0.3, pAlpha);
+      }
+    }
+    
+    /**
+     * Render Energized aura - electric sparks around enemy (immune to slow)
+     */
+    _renderEnergizedAura(enemy, x, y, size, time) {
+      const camera = this.camera;
+      
+      // Electric outline
+      const sparkIntensity = Math.abs(Math.sin(time * 10)) * 0.3 + 0.4;
+      this.shapeRenderer.circleOutline(x, y, size * 1.1, 1.5 / camera.zoom, 1, 0.95, 0.3, sparkIntensity);
+      
+      // Random sparks
+      const sparkCount = 4;
+      for (let i = 0; i < sparkCount; i++) {
+        const sparkPhase = (time * 8 + i * 1.5) % 1;
+        if (sparkPhase > 0.3) continue; // Quick flash
+        
+        const angle = (i / sparkCount) * Math.PI * 2 + time * 5;
+        const dist = size * (1.0 + sparkPhase * 0.5);
+        const sparkX = x + Math.cos(angle) * dist;
+        const sparkY = y + Math.sin(angle) * dist;
+        
+        // Spark line
+        const endX = sparkX + Math.cos(angle + 0.3) * 5;
+        const endY = sparkY + Math.sin(angle + 0.3) * 5;
+        
+        this.shapeRenderer.rect(
+          Math.min(sparkX, endX), Math.min(sparkY, endY),
+          Math.abs(endX - sparkX) + 1, Math.abs(endY - sparkY) + 1,
+          1, 1, 0.4, 0.8
+        );
+      }
+    }
+    
+    /**
+     * Render Berserker aura - red flames when below HP threshold
+     */
+    _renderBerserkerAura(enemy, x, y, size, time) {
+      const camera = this.camera;
+      
+      // Check if berserking (below threshold)
+      const hpRatio = enemy.maxHealth > 0 ? enemy.health / enemy.maxHealth : 
+                      (enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1);
+      const threshold = enemy.berserkThreshold || 0.3;
+      const isBerserking = hpRatio <= threshold;
+      
+      if (!isBerserking) {
+        // Subtle red outline when not active
+        this.shapeRenderer.circleOutline(x, y, size * 1.1, 1 / camera.zoom, 0.9, 0.3, 0.2, 0.2);
+        return;
+      }
+      
+      // Active berserker flames!
+      const flameCount = 5;
+      for (let i = 0; i < flameCount; i++) {
+        const angle = (i / flameCount) * Math.PI * 2;
+        const flamePhase = (time * 6 + i * 0.7) % 1;
+        const flameHeight = flamePhase * size * 1.5;
+        const flameX = x + Math.cos(angle) * size * 0.8;
+        const flameY = y - flameHeight;
+        const flameSize = (1 - flamePhase) * 4 + 2;
+        
+        // Orange-red gradient
+        const r = 1;
+        const g = 0.3 + (1 - flamePhase) * 0.4;
+        const b = 0.1;
+        const a = (1 - flamePhase) * 0.7;
+        
+        this.shapeRenderer.circle(flameX, flameY, flameSize, r, g, b, a);
+      }
+      
+      // Intense red glow
+      const glowPulse = Math.sin(time * 8) * 0.15 + 0.5;
+      this.shapeRenderer.circleOutline(x, y, size * 1.2, 2.5 / camera.zoom, 1, 0.2, 0.1, glowPulse);
+    }
+    
+    /**
+     * Render Swarm Mind connections between enemies
+     * This should be called after all enemies are rendered
+     * @param {Object[]} enemies - All enemies with swarm_mind aura
+     * @param {number} time - Animation time
+     */
+    _renderSwarmMindConnections(enemies, time) {
+      if (!enemies || enemies.length < 2) return;
+      
+      const swarmEnemies = enemies.filter(e => e.auras?.includes('swarm_mind'));
+      if (swarmEnemies.length < 2) return;
+      
+      const camera = this.camera;
+      const connectionRange = 150; // Max distance for visual connection
+      
+      // Draw connections between nearby swarm enemies
+      for (let i = 0; i < swarmEnemies.length; i++) {
+        for (let j = i + 1; j < swarmEnemies.length; j++) {
+          const e1 = swarmEnemies[i];
+          const e2 = swarmEnemies[j];
+          
+          const dx = e2.x - e1.x;
+          const dy = e2.y - e1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < connectionRange) {
+            const alpha = (1 - dist / connectionRange) * 0.3;
+            const pulse = Math.sin(time * 4 + i + j) * 0.1 + 0.5;
+            
+            // Draw pulsing line (using rect as line approximation)
+            const angle = Math.atan2(dy, dx);
+            const midX = (e1.x + e2.x) / 2;
+            const midY = (e1.y + e2.y) / 2;
+            
+            // Connection points (energy flowing)
+            const nodeCount = Math.floor(dist / 30);
+            for (let n = 0; n <= nodeCount; n++) {
+              const t = n / (nodeCount || 1);
+              const nodeX = e1.x + dx * t;
+              const nodeY = e1.y + dy * t;
+              const nodePhase = (time * 3 + t * 5) % 1;
+              const nodeAlpha = alpha * pulse * (0.5 + nodePhase * 0.5);
+              
+              this.shapeRenderer.circle(nodeX, nodeY, 2 / camera.zoom, 0.6, 0.3, 0.9, nodeAlpha);
+            }
+          }
+        }
+      }
+      
+      // Purple glow around swarm enemies
+      for (const enemy of swarmEnemies) {
+        const glowPulse = Math.sin(time * 3 + enemy.x * 0.01) * 0.1 + 0.3;
+        const renderY = enemy.isFlying ? enemy.y - (enemy.hoverHeight || 15) : enemy.y;
+        const size = enemy.size || 10;
+        this.shapeRenderer.circleOutline(enemy.x, renderY, size * 1.15, 1.5 / camera.zoom, 0.5, 0.2, 0.8, glowPulse);
+      }
+    }
+    
+    /**
+     * Get ethereal transparency modifier for enemy body
+     * @param {Object} enemy - Enemy to check
+     * @returns {number} Alpha multiplier (0.5 for ethereal, 1 for normal)
+     */
+    _getEtherealAlpha(enemy) {
+      if (enemy.auras?.includes('ethereal')) {
+        return 0.5; // 50% transparency
+      }
+      return 1.0;
     }
     
     /**

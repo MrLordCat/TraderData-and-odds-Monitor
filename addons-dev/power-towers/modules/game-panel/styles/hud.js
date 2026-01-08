@@ -116,6 +116,80 @@ function getHudStyles() {
       font-weight: 400;
     }
     
+    /* Wave Auras Display */
+    .wave-auras-container {
+      position: absolute;
+      top: 55px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 49;
+      pointer-events: auto;
+    }
+    .wave-auras {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(30, 20, 40, 0.85);
+      border: 1px solid rgba(138, 100, 180, 0.3);
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 2px 12px rgba(100, 60, 150, 0.3);
+    }
+    .wave-aura-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      cursor: help;
+      transition: all 0.2s ease;
+    }
+    .wave-aura-item:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: translateY(-1px);
+    }
+    .wave-aura-icon {
+      font-size: 14px;
+    }
+    .wave-aura-name {
+      font-size: 11px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+    /* Aura color coding */
+    .wave-aura-item[data-aura="haste"] { border-left: 2px solid #3498db; }
+    .wave-aura-item[data-aura="fortified"] { border-left: 2px solid #f1c40f; }
+    .wave-aura-item[data-aura="regeneration"] { border-left: 2px solid #2ecc71; }
+    .wave-aura-item[data-aura="energized"] { border-left: 2px solid #f39c12; }
+    .wave-aura-item[data-aura="ethereal"] { border-left: 2px solid #9b59b6; }
+    .wave-aura-item[data-aura="berserker"] { border-left: 2px solid #e74c3c; }
+    .wave-aura-item[data-aura="swarm_mind"] { border-left: 2px solid #8e44ad; }
+    
+    /* Aura tooltip */
+    .wave-aura-item .aura-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 10px;
+      background: rgba(15, 15, 25, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      font-size: 11px;
+      color: #cbd5e0;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+      z-index: 100;
+    }
+    .wave-aura-item:hover .aura-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+    
     /* Legacy stats bar - hidden */
     .game-stats-bar {
       display: none;

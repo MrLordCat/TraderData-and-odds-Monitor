@@ -334,12 +334,19 @@ wave15 = {
 - `core/config/waves/generation.js` - applySpecialModifier
 - `core/config/waves/compositions.js` - волны 8, 12, 14, 17, 18 с Flying/Armored
 
-### Фаза 3: Система аур
+### Фаза 3: Система аур ✅ ЗАВЕРШЕНА
 - [x] Конфиг аур
 - [x] Генерация аур для волны
 - [x] Применение аур к врагам
-- [ ] Визуальные эффекты аур
-- [ ] UI отображение активных аур
+- [x] Визуальные эффекты аур (enemy-renderer.js)
+  - Haste: синие линии скорости
+  - Fortified: золотой щит и частицы
+  - Regeneration: зелёное свечение и + символы
+  - Energized: электрические искры
+  - Ethereal: 50% прозрачность
+  - Berserker: красное пламя при низком HP
+  - Swarm Mind: фиолетовые связи между врагами
+- [x] UI отображение активных аур (game-controller.js, hud.js)
 
 ### Фаза 4: Elite система
 - [x] Конфиг Elite

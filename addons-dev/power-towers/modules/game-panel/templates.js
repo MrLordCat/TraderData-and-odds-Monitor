@@ -142,6 +142,13 @@ function getGameTemplate() {
             </div>
           </div>
           
+          <!-- Wave Auras Display -->
+          <div class="wave-auras-container" id="wave-auras-container" style="display: none;">
+            <div class="wave-auras" id="wave-auras">
+              <!-- Dynamically populated with aura icons -->
+            </div>
+          </div>
+          
           <div class="game-overlay" id="game-overlay" style="display: none;">
             <div class="overlay-content">
               <h3 id="overlay-title">Game Over</h3>
