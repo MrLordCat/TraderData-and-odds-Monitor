@@ -472,11 +472,13 @@ function TowerStatsMixin(Base) {
       // GROUND ZONE / CRATER (Siege)
       const detailCrater = document.getElementById('panel-detail-crater');
       if (detailCrater && attackTypeName === 'siege') {
+        // Ground Zone upgrades are ATTACK TYPE upgrades, not stat upgrades!
+        const attackUpgrades = tower.attackTypeUpgrades || {};
         const craterUnlocked = tower.groundZoneEnabled;
-        const craterUnlockUpg = upgrades.groundZoneUnlock || 0;
-        const slowUpg = upgrades.groundZoneSlow || 0;
-        const durUpg = upgrades.groundZoneDuration || 0;
-        const radiusUpg = upgrades.groundZoneRadius || 0;
+        const craterUnlockUpg = attackUpgrades.groundZoneUnlock || 0;
+        const slowUpg = attackUpgrades.groundZoneSlow || 0;
+        const durUpg = attackUpgrades.groundZoneDuration || 0;
+        const radiusUpg = attackUpgrades.groundZoneRadius || 0;
         
         const builder = createDetailBuilder();
         
