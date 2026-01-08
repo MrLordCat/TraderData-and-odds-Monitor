@@ -7,11 +7,11 @@
 
 const CRYSTAL_WYRM = {
   id: 'crystal_wyrm',
-  name: 'Кристальный Змей',
+  name: 'Crystal Wyrm',
   emoji: '🐉',
   
   // Base stats
-  baseHealth: 1200,
+  baseHealth: 120,
   baseSpeed: 40,
   reward: 200,
   xp: 25,
@@ -28,8 +28,8 @@ const CRYSTAL_WYRM = {
   abilities: [
     {
       id: 'crystal_scales',
-      name: 'Кристальная Чешуя',
-      description: 'Отражает 20% магического урона обратно в башню',
+      name: 'Crystal Scales',
+      description: 'Reflects 20% of magic damage back to tower',
       type: 'passive',
       effect: {
         reflectPercent: 0.2,
@@ -38,8 +38,8 @@ const CRYSTAL_WYRM = {
     },
     {
       id: 'prismatic_shield',
-      name: 'Призматический Щит',
-      description: 'Иммунитет к магии на 2 сек каждые 10 сек',
+      name: 'Prismatic Shield',
+      description: 'Immune to magic for 2 sec every 10 sec',
       type: 'active',
       cooldown: 10000,
       effect: {
@@ -49,8 +49,8 @@ const CRYSTAL_WYRM = {
     },
     {
       id: 'crystal_trail',
-      name: 'Кристальный След',
-      description: 'Оставляет замедляющие кристаллы на пути',
+      name: 'Crystal Trail',
+      description: 'Leaves slowing crystals along the path',
       type: 'passive',
       effect: {
         trailInterval: 3000,  // Every 3 seconds
@@ -80,7 +80,7 @@ const CRYSTAL_WYRM = {
     sound: 'crystal_break',
   },
   
-  description: 'Мини-босс с магической защитой и отражением урона.',
+  description: 'Mini-boss with magic protection and damage reflection.',
 };
 
 /**

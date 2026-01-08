@@ -94,8 +94,8 @@ const FLYING = {
   },
   
   // Description for UI
-  description: 'Летающий враг. Только Magic и Lightning башни могут атаковать.',
-  shortDescription: 'Иммунитет к наземным атакам',
+  description: 'Flying enemy. Only Magic and Lightning towers can attack.',
+  shortDescription: 'Immune to ground attacks',
 };
 
 /**

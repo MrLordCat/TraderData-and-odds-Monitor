@@ -7,11 +7,11 @@
 
 const SHADOW_LORD = {
   id: 'shadow_lord',
-  name: 'Повелитель Теней',
+  name: 'Shadow Lord',
   emoji: '👤',
   
   // Base stats
-  baseHealth: 3500,
+  baseHealth: 350,
   baseSpeed: 35,
   reward: 500,
   xp: 45,
@@ -29,8 +29,8 @@ const SHADOW_LORD = {
   abilities: [
     {
       id: 'shadow_cloak',
-      name: 'Теневая Маскировка',
-      description: 'Невидимость на 3 сек каждые 12 сек (башни не атакуют)',
+      name: 'Shadow Cloak',
+      description: 'Invisibility for 3 sec every 12 sec (towers cannot attack)',
       type: 'active',
       cooldown: 12000,
       effect: {
@@ -40,8 +40,8 @@ const SHADOW_LORD = {
     },
     {
       id: 'shadow_clones',
-      name: 'Теневые Клоны',
-      description: 'Создаёт 2 клона с 30% HP при получении урона (кд 15 сек)',
+      name: 'Shadow Clones',
+      description: 'Creates 2 clones with 30% HP when damaged (15 sec cooldown)',
       type: 'triggered',
       cooldown: 15000,
       effect: {
@@ -52,8 +52,8 @@ const SHADOW_LORD = {
     },
     {
       id: 'life_drain',
-      name: 'Похищение Жизни',
-      description: 'При убийстве клона восстанавливает 10% HP',
+      name: 'Life Drain',
+      description: 'When clone is killed, restores 10% HP',
       type: 'passive',
       effect: {
         healPercent: 0.1,
@@ -66,18 +66,18 @@ const SHADOW_LORD = {
     {
       healthThreshold: 1.0,
       cloakCooldownMod: 1.0,
-      description: 'Начальная фаза',
+      description: 'Initial phase',
     },
     {
       healthThreshold: 0.6,
       cloakCooldownMod: 0.8,  // 20% faster cloak
-      description: 'Тени сгущаются',
+      description: 'Shadows gather',
     },
     {
       healthThreshold: 0.3,
       cloakCooldownMod: 0.5,  // 50% faster cloak
       permanentClones: true,   // Always has clones
-      description: 'Повелитель Тьмы',
+      description: 'Master of Darkness',
     },
   ],
   
@@ -101,7 +101,7 @@ const SHADOW_LORD = {
     sound: 'boss_death_shadow',
   },
   
-  description: 'Tier 2 Final Boss. Мастер теней, способный становиться невидимым и создавать клонов.',
+  description: 'Tier 2 Final Boss. Shadow master able to become invisible and create clones.',
 };
 
 /**

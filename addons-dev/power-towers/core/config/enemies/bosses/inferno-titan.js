@@ -7,11 +7,11 @@
 
 const INFERNO_TITAN = {
   id: 'inferno_titan',
-  name: 'Инферно Титан',
+  name: 'Inferno Titan',
   emoji: '🔥',
   
   // Base stats
-  baseHealth: 6000,
+  baseHealth: 600,
   baseSpeed: 22,
   reward: 800,
   xp: 60,
@@ -29,8 +29,8 @@ const INFERNO_TITAN = {
   abilities: [
     {
       id: 'burning_aura',
-      name: 'Пылающая Аура',
-      description: 'Постоянно наносит 5 урона/сек башням в радиусе 100px',
+      name: 'Burning Aura',
+      description: 'Constantly deals 5 damage/sec to towers within 100px radius',
       type: 'passive',
       effect: {
         radius: 100,
@@ -40,8 +40,8 @@ const INFERNO_TITAN = {
     },
     {
       id: 'meteor_strike',
-      name: 'Удар Метеора',
-      description: 'Каждые 15 сек призывает метеор на случайную башню',
+      name: 'Meteor Strike',
+      description: 'Every 15 sec summons meteor on random tower',
       type: 'active',
       cooldown: 15000,
       effect: {
@@ -54,8 +54,8 @@ const INFERNO_TITAN = {
     },
     {
       id: 'molten_armor',
-      name: 'Расплавленная Броня',
-      description: 'При получении физ. урона наносит 10% урона атакующему',
+      name: 'Molten Armor',
+      description: 'When taking physical damage, reflects 10% damage to attacker',
       type: 'passive',
       effect: {
         reflectPercent: 0.1,
@@ -64,8 +64,8 @@ const INFERNO_TITAN = {
     },
     {
       id: 'inferno_rage',
-      name: 'Инферно Ярость',
-      description: 'При 30% HP - взрывная волна и +50% скорость',
+      name: 'Inferno Rage',
+      description: 'At 30% HP - explosive wave and +50% speed',
       type: 'threshold',
       trigger: { healthPercent: 0.3 },
       effect: {
@@ -82,26 +82,26 @@ const INFERNO_TITAN = {
     {
       healthThreshold: 1.0,
       auraDamage: 5,
-      description: 'Пробуждение',
+      description: 'Awakening',
     },
     {
       healthThreshold: 0.7,
       auraDamage: 8,
       meteorCooldownMod: 0.8,
-      description: 'Разогрев',
+      description: 'Warming up',
     },
     {
       healthThreshold: 0.4,
       auraDamage: 12,
       meteorCooldownMod: 0.6,
-      description: 'Пик жара',
+      description: 'Peak heat',
     },
     {
       healthThreshold: 0.3,
       auraDamage: 15,
       speedMod: 1.5,
       enraged: true,
-      description: 'ИНФЕРНО!',
+      description: 'INFERNO!',
     },
   ],
   
@@ -126,7 +126,7 @@ const INFERNO_TITAN = {
     sound: 'boss_death_inferno',
   },
   
-  description: 'Tier 3 Final Boss. Огненный гигант, оставляющий пепел на своём пути.',
+  description: 'Tier 3 Final Boss. Fire giant leaving ashes in its wake.',
 };
 
 /**

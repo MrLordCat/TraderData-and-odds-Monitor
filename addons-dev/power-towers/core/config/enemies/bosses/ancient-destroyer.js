@@ -7,11 +7,11 @@
 
 const ANCIENT_DESTROYER = {
   id: 'ancient_destroyer',
-  name: 'Древний Разрушитель',
+  name: 'Ancient Destroyer',
   emoji: '💀',
   
   // Base stats (massive)
-  baseHealth: 15000,
+  baseHealth: 150,
   baseSpeed: 15,
   reward: 2000,
   xp: 100,
@@ -30,8 +30,8 @@ const ANCIENT_DESTROYER = {
   abilities: [
     {
       id: 'annihilation_beam',
-      name: 'Луч Аннигиляции',
-      description: 'Каждые 20 сек - луч, уничтожающий снаряды и наносящий 100 урона башням на линии',
+      name: 'Annihilation Beam',
+      description: 'Every 20 sec - beam that destroys projectiles and deals 100 damage to towers in line',
       type: 'active',
       cooldown: 20000,
       effect: {
@@ -43,8 +43,8 @@ const ANCIENT_DESTROYER = {
     },
     {
       id: 'dark_resurrection',
-      name: 'Тёмное Воскрешение',
-      description: 'При падении до 0 HP - восстанавливает 30% и становится неуязвимым на 3 сек (один раз)',
+      name: 'Dark Resurrection',
+      description: 'Upon reaching 0 HP - restores 30% and becomes invulnerable for 3 sec (once)',
       type: 'threshold',
       trigger: { healthPercent: 0 },
       effect: {
@@ -55,8 +55,8 @@ const ANCIENT_DESTROYER = {
     },
     {
       id: 'void_corruption',
-      name: 'Порча Пустоты',
-      description: 'Каждые 10 сек накладывает дебафф на случайную башню (-50% атаки на 8 сек)',
+      name: 'Void Corruption',
+      description: 'Every 10 sec applies debuff to random tower (-50% attack speed for 8 sec)',
       type: 'active',
       cooldown: 10000,
       effect: {
@@ -66,8 +66,8 @@ const ANCIENT_DESTROYER = {
     },
     {
       id: 'summon_heralds',
-      name: 'Призыв Вестников',
-      description: 'При 75%, 50%, 25% HP призывает волну врагов',
+      name: 'Summon Heralds',
+      description: 'At 75%, 50%, 25% HP summons wave of enemies',
       type: 'threshold',
       triggers: [0.75, 0.5, 0.25],
       effect: {
@@ -77,8 +77,8 @@ const ANCIENT_DESTROYER = {
     },
     {
       id: 'despair_aura',
-      name: 'Аура Отчаяния',
-      description: 'Все башни в радиусе 200px наносят на 20% меньше урона',
+      name: 'Despair Aura',
+      description: 'All towers within 200px radius deal 20% less damage',
       type: 'passive',
       effect: {
         radius: 200,
@@ -91,29 +91,29 @@ const ANCIENT_DESTROYER = {
   phases: [
     {
       healthThreshold: 1.0,
-      name: 'Пробуждение',
-      description: 'Древний открывает глаза',
+      name: 'Awakening',
+      description: 'The Ancient opens its eyes',
       auraMod: 1.0,
     },
     {
       healthThreshold: 0.75,
-      name: 'Призыв I',
-      description: 'Призывает первую волну слуг',
+      name: 'Summon I',
+      description: 'Summons first wave of servants',
       summonWave: 1,
       auraMod: 1.0,
     },
     {
       healthThreshold: 0.5,
-      name: 'Призыв II',
-      description: 'Мощь возрастает',
+      name: 'Summon II',
+      description: 'Power increases',
       summonWave: 2,
       speedMod: 1.2,
       auraMod: 1.3,
     },
     {
       healthThreshold: 0.25,
-      name: 'Призыв III',
-      description: 'Последняя волна защитников',
+      name: 'Summon III',
+      description: 'Final wave of defenders',
       summonWave: 3,
       speedMod: 1.5,
       auraMod: 1.5,
@@ -121,8 +121,8 @@ const ANCIENT_DESTROYER = {
     },
     {
       healthThreshold: 0,
-      name: 'Воскрешение',
-      description: 'Смерть - лишь начало',
+      name: 'Resurrection',
+      description: 'Death is only the beginning',
       resurrection: true,
     },
   ],
@@ -151,7 +151,7 @@ const ANCIENT_DESTROYER = {
     sound: 'final_boss_death',
   },
   
-  description: 'ФИНАЛЬНЫЙ БОСС. Древнее зло, пробудившееся после тысячелетий сна. Победа над ним завершает кампанию.',
+  description: 'FINAL BOSS. Ancient evil awakened after millennia of slumber. Victory over it completes the campaign.',
 };
 
 /**

@@ -7,11 +7,11 @@
 
 const STORM_HERALD = {
   id: 'storm_herald',
-  name: 'Вестник Бури',
+  name: 'Storm Herald',
   emoji: '⛈️',
   
   // Base stats
-  baseHealth: 600,
+  baseHealth: 60,
   baseSpeed: 45,
   reward: 150,
   xp: 20,
@@ -28,8 +28,8 @@ const STORM_HERALD = {
   abilities: [
     {
       id: 'lightning_shield',
-      name: 'Грозовой Щит',
-      description: 'Блокирует первые 3 попадания каждые 8 сек',
+      name: 'Lightning Shield',
+      description: 'Blocks first 3 hits every 8 sec',
       type: 'passive',
       effect: {
         chargesMax: 3,
@@ -38,8 +38,8 @@ const STORM_HERALD = {
     },
     {
       id: 'storm_dash',
-      name: 'Рывок Бури',
-      description: 'Телепортируется вперёд на 150px каждые 6 сек',
+      name: 'Storm Dash',
+      description: 'Teleports forward 150px every 6 sec',
       type: 'active',
       cooldown: 6000,
       effect: {
@@ -66,7 +66,7 @@ const STORM_HERALD = {
     sound: 'thunder_crack',
   },
   
-  description: 'Быстрый мини-босс с защитным щитом и телепортацией.',
+  description: 'Fast mini-boss with protective shield and teleportation.',
 };
 
 /**

@@ -7,11 +7,11 @@
 
 const VOID_SENTINEL = {
   id: 'void_sentinel',
-  name: 'Страж Пустоты',
+  name: 'Void Sentinel',
   emoji: '🌀',
   
   // Base stats
-  baseHealth: 2000,
+  baseHealth: 200,
   baseSpeed: 30,
   reward: 300,
   xp: 35,
@@ -28,8 +28,8 @@ const VOID_SENTINEL = {
   abilities: [
     {
       id: 'void_rift',
-      name: 'Разлом Пустоты',
-      description: 'Создаёт зону, блокирующую снаряды на 4 сек',
+      name: 'Void Rift',
+      description: 'Creates zone that blocks projectiles for 4 sec',
       type: 'active',
       cooldown: 12000,
       effect: {
@@ -40,8 +40,8 @@ const VOID_SENTINEL = {
     },
     {
       id: 'reality_anchor',
-      name: 'Якорь Реальности',
-      description: 'Иммунитет к контролю (замедление, стан)',
+      name: 'Reality Anchor',
+      description: 'Immune to crowd control (slow, stun)',
       type: 'passive',
       effect: {
         immuneToSlow: true,
@@ -51,8 +51,8 @@ const VOID_SENTINEL = {
     },
     {
       id: 'entropy',
-      name: 'Энтропия',
-      description: 'Каждые 8 сек снижает урон ближайшей башни на 30% на 5 сек',
+      name: 'Entropy',
+      description: 'Every 8 sec reduces nearest tower damage by 30% for 5 sec',
       type: 'active',
       cooldown: 8000,
       effect: {
@@ -84,7 +84,7 @@ const VOID_SENTINEL = {
     sound: 'void_implosion',
   },
   
-  description: 'Мини-босс, манипулирующий пространством. Иммунен к контролю.',
+  description: 'Mini-boss manipulating space. Immune to crowd control.',
 };
 
 /**

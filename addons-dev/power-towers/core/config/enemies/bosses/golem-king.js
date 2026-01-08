@@ -7,11 +7,11 @@
 
 const GOLEM_KING = {
   id: 'golem_king',
-  name: 'Король Големов',
+  name: 'Golem King',
   emoji: '👑',
   
   // Base stats (before wave scaling)
-  baseHealth: 2000,
+  baseHealth: 200,
   baseSpeed: 18,
   reward: 300,
   xp: 30,
@@ -29,8 +29,8 @@ const GOLEM_KING = {
   abilities: [
     {
       id: 'stone_armor',
-      name: 'Каменная Броня',
-      description: 'Снижает урон на 25%, но уязвим к магии (+15%)',
+      name: 'Stone Armor',
+      description: 'Reduces damage by 25%, but vulnerable to magic (+15%)',
       type: 'passive',
       effect: {
         damageReduction: 0.25,
@@ -39,8 +39,8 @@ const GOLEM_KING = {
     },
     {
       id: 'ground_slam',
-      name: 'Удар о Землю',
-      description: 'Каждые 10 секунд оглушает ближайшие башни на 2 сек',
+      name: 'Ground Slam',
+      description: 'Every 10 seconds stuns nearby towers for 2 sec',
       type: 'active',
       cooldown: 10000,
       effect: {
@@ -51,8 +51,8 @@ const GOLEM_KING = {
     },
     {
       id: 'summon_shards',
-      name: 'Призыв Осколков',
-      description: 'При 50% HP призывает 3 каменных миньона',
+      name: 'Summon Shards',
+      description: 'At 50% HP summons 3 stone minions',
       type: 'threshold',
       trigger: { healthPercent: 0.5 },
       effect: {
@@ -67,19 +67,19 @@ const GOLEM_KING = {
     {
       healthThreshold: 1.0,
       speedMod: 1.0,
-      description: 'Полная сила',
+      description: 'Full power',
     },
     {
       healthThreshold: 0.5,
       speedMod: 0.8,
       triggerAbility: 'summon_shards',
-      description: 'Призыв осколков',
+      description: 'Summon shards',
     },
     {
       healthThreshold: 0.25,
       speedMod: 1.3,
       enraged: true,
-      description: 'Ярость - ускорение!',
+      description: 'Rage - speed boost!',
     },
   ],
   
@@ -102,7 +102,7 @@ const GOLEM_KING = {
     sound: 'boss_death_epic',
   },
   
-  description: 'Tier 1 Final Boss. Древний голем, пробудившийся от вековечного сна.',
+  description: 'Tier 1 Final Boss. Ancient golem awakened from eternal slumber.',
 };
 
 /**

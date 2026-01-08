@@ -96,8 +96,8 @@ const ARMORED = {
   },
   
   // Description for UI
-  description: 'Бронированный враг. 50% сопротивление физ. урону. Magic и Siege эффективны.',
-  shortDescription: 'Высокая защита от физ. урона',
+  description: 'Armored enemy. 50% physical damage resistance. Magic and Siege effective.',
+  shortDescription: 'High physical damage resistance',
 };
 
 /**

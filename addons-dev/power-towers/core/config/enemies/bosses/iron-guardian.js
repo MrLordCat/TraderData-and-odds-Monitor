@@ -7,11 +7,11 @@
 
 const IRON_GUARDIAN = {
   id: 'iron_guardian',
-  name: 'Железный Страж',
+  name: 'Iron Guardian',
   emoji: '🛡️',
   
   // Base stats (before wave scaling)
-  baseHealth: 500,
+  baseHealth: 50,
   baseSpeed: 25,
   reward: 100,
   xp: 15,
@@ -28,8 +28,8 @@ const IRON_GUARDIAN = {
   abilities: [
     {
       id: 'iron_skin',
-      name: 'Железная Кожа',
-      description: 'Снижает весь входящий урон на 15%',
+      name: 'Iron Skin',
+      description: 'Reduces all incoming damage by 15%',
       type: 'passive',
       effect: {
         damageReduction: 0.15,
@@ -37,8 +37,8 @@ const IRON_GUARDIAN = {
     },
     {
       id: 'fortify_aura',
-      name: 'Аура Стойкости',
-      description: 'Союзники в радиусе 100px получают +20% HP',
+      name: 'Fortify Aura',
+      description: 'Allies within 100px radius gain +20% HP',
       type: 'aura',
       effect: {
         radius: 100,
@@ -65,7 +65,7 @@ const IRON_GUARDIAN = {
     sound: 'boss_death_1',
   },
   
-  description: 'Первый мини-босс. Медленный но очень прочный.',
+  description: 'First mini-boss. Slow but very durable.',
 };
 
 /**
