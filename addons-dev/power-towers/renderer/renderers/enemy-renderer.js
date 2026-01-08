@@ -102,6 +102,21 @@ function EnemyRendererMixin(Base) {
           this._renderArmorPlates(enemy, enemy.x, renderY, size, time);
         }
         
+        // Magic-Immune aura
+        if (enemy.isMagicImmune) {
+          this._renderMagicImmuneAura(enemy, enemy.x, renderY, size, time);
+        }
+        
+        // Regenerating glow
+        if (enemy.isRegenerating) {
+          this._renderRegeneratingEffect(enemy, enemy.x, renderY, size, time);
+        }
+        
+        // Shield bubble
+        if (enemy.isShielded) {
+          this._renderShieldBubble(enemy, enemy.x, renderY, size, time);
+        }
+        
         // Boss crown/indicator
         if (enemy.isBoss) {
           this._renderBossIndicator(enemy, enemy.x, renderY, size, time);
@@ -466,6 +481,127 @@ function EnemyRendererMixin(Base) {
       const curseAlpha = 0.3 + Math.sin(time * 2) * 0.1;
       this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 4, 3 / camera.zoom, 0.4, 0.1, 0.5, curseAlpha);
       this.shapeRenderer.circleOutline(enemy.x, enemy.y, size + 6, 2 / camera.zoom, 0.3, 0, 0.4, curseAlpha * 0.5);
+    }
+    
+    /**
+     * Render magic-immune aura (purple anti-magic glow)
+     */
+    _renderMagicImmuneAura(enemy, x, y, size, time) {
+      const camera = this.camera;
+      const pulsePhase = Math.sin(time * 2) * 0.15 + 0.85;
+      const auraRadius = size * 1.4 * pulsePhase;
+      
+      // Outer purple glow
+      this.shapeRenderer.circleOutline(x, y, auraRadius, 3 / camera.zoom, 0.6, 0.4, 1, 0.4);
+      
+      // Inner lighter glow
+      this.shapeRenderer.circleOutline(x, y, size + 2, 2 / camera.zoom, 0.8, 0.6, 1, 0.6);
+      
+      // Rotating runes
+      const runeCount = 4;
+      for (let i = 0; i < runeCount; i++) {
+        const angle = time * 1 + (i / runeCount) * Math.PI * 2;
+        const runeX = x + Math.cos(angle) * (size + 6);
+        const runeY = y + Math.sin(angle) * (size + 6);
+        const runeAlpha = 0.6 + Math.sin(time * 3 + i) * 0.2;
+        this.shapeRenderer.circle(runeX, runeY, 2.5, 0.5, 0.2, 0.8, runeAlpha);
+      }
+      
+      // Anti-magic particles (floating upward)
+      for (let i = 0; i < 2; i++) {
+        const particleTime = (time * 0.5 + i * 0.5) % 1;
+        const particleY = y + size - particleTime * 15;
+        const particleX = x + Math.sin(time * 2 + i * 2) * size * 0.4;
+        const particleAlpha = (1 - particleTime) * 0.6;
+        this.shapeRenderer.circle(particleX, particleY, 2, 0.7, 0.5, 1, particleAlpha);
+      }
+    }
+    
+    /**
+     * Render regenerating enemy effect (green healing glow)
+     */
+    _renderRegeneratingEffect(enemy, x, y, size, time) {
+      const camera = this.camera;
+      
+      // Pulsing green glow
+      const glowPulse = Math.sin(time * 3) * 0.2 + 0.8;
+      this.shapeRenderer.circleOutline(x, y, size + 3, 2 / camera.zoom, 0.3, 0.9, 0.3, 0.4 * glowPulse);
+      
+      // Extra pulse when recently healed
+      if (enemy.lastRegenTime && Date.now() - enemy.lastRegenTime < 500) {
+        const healPulse = 1 - (Date.now() - enemy.lastRegenTime) / 500;
+        this.shapeRenderer.circleOutline(x, y, size + 5 + healPulse * 5, 2 / camera.zoom, 0.4, 1, 0.4, healPulse * 0.5);
+      }
+      
+      // Rising healing particles
+      for (let i = 0; i < 3; i++) {
+        const particleTime = (time * 0.8 + i * 0.33) % 1;
+        const particleY = y + size * 0.5 - particleTime * 20;
+        const particleX = x + Math.sin(time * 1.5 + i * 2.1) * size * 0.5;
+        const particleAlpha = (1 - particleTime) * 0.7;
+        const particleSize = 2 + (1 - particleTime) * 1.5;
+        this.shapeRenderer.circle(particleX, particleY, particleSize, 0.4, 1, 0.4, particleAlpha);
+      }
+      
+      // + symbol indicator
+      const plusAlpha = 0.5 + Math.sin(time * 4) * 0.2;
+      const plusSize = size * 0.3;
+      // Vertical bar
+      this.shapeRenderer.rect(x - 1, y - size - 10 - plusSize/2, 2, plusSize, 0.3, 0.9, 0.3, plusAlpha);
+      // Horizontal bar
+      this.shapeRenderer.rect(x - plusSize/2, y - size - 10 - 1, plusSize, 2, 0.3, 0.9, 0.3, plusAlpha);
+    }
+    
+    /**
+     * Render shield bubble for shielded enemies
+     */
+    _renderShieldBubble(enemy, x, y, size, time) {
+      const camera = this.camera;
+      const shieldHealth = enemy.shieldHealth || 0;
+      const maxShield = enemy.maxShieldHealth || 50;
+      
+      if (shieldHealth <= 0) {
+        // Shield broken - show cracked effect briefly
+        if (enemy.shieldBrokenTime && Date.now() - enemy.shieldBrokenTime < 500) {
+          const breakProgress = (Date.now() - enemy.shieldBrokenTime) / 500;
+          const breakAlpha = (1 - breakProgress) * 0.6;
+          // Scattered fragments
+          for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2 + breakProgress * 2;
+            const dist = size * (1.3 + breakProgress * 0.5);
+            const fragX = x + Math.cos(angle) * dist;
+            const fragY = y + Math.sin(angle) * dist;
+            this.shapeRenderer.circle(fragX, fragY, 3 * (1 - breakProgress), 0.3, 0.5, 1, breakAlpha);
+          }
+        }
+        return;
+      }
+      
+      const shieldRatio = shieldHealth / maxShield;
+      const bubbleRadius = size * 1.3;
+      
+      // Outer bubble
+      const bubbleAlpha = 0.3 + shieldRatio * 0.2 + Math.sin(time * 2) * 0.05;
+      this.shapeRenderer.circleOutline(x, y, bubbleRadius, 2 / camera.zoom, 0.3, 0.5, 1, bubbleAlpha);
+      
+      // Inner glow based on shield health
+      this.shapeRenderer.circle(x, y, bubbleRadius * 0.95, 0.3, 0.5, 0.9, 0.1 * shieldRatio);
+      
+      // Hexagon pattern effect
+      const hexCount = 6;
+      for (let i = 0; i < hexCount; i++) {
+        const angle = (i / hexCount) * Math.PI * 2 + time * 0.5;
+        const hexX = x + Math.cos(angle) * bubbleRadius * 0.7;
+        const hexY = y + Math.sin(angle) * bubbleRadius * 0.7;
+        const hexAlpha = 0.15 + Math.sin(time * 3 + i) * 0.05;
+        this.shapeRenderer.circle(hexX, hexY, 3, 0.4, 0.6, 1, hexAlpha * shieldRatio);
+      }
+      
+      // Shield bar above health bar
+      const barWidth = size * 2;
+      const barY = y - size - 13;
+      this.shapeRenderer.rect(x - barWidth/2, barY, barWidth, 3, 0.2, 0.3, 0.5, 0.8);
+      this.shapeRenderer.rect(x - barWidth/2, barY, barWidth * shieldRatio, 3, 0.3, 0.5, 1, 1);
     }
     
     /**

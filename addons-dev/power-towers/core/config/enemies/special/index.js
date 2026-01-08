@@ -8,13 +8,13 @@
 // Implemented special types
 const { FLYING, applyFlyingModifier, canTargetFlying, getFlyingDamageModifier } = require('./flying');
 const { ARMORED, applyArmoredModifier, calculateArmoredDamage, applyArmorShred, getArmorDisplayInfo } = require('./armored');
+const { MAGIC_IMMUNE, applyMagicImmuneModifier, isMagicImmune, calculateMagicImmuneDamage } = require('./magic-immune');
+const { REGENERATING, applyRegeneratingModifier, isRegenerating, applyRegeneration, calculateRegenAmount } = require('./regenerating');
+const { SHIELDED, applyShieldedModifier, isShielded, hasActiveShield, applyShieldedDamage, calculateShieldedDamage } = require('./shielded');
 
 // Future special types (will be added later)
-// const MAGIC_IMMUNE = require('./magic-immune');
 // const PHASING = require('./phasing');
-// const REGENERATING = require('./regenerating');
 // const UNDEAD = require('./undead');
-// const SHIELDED = require('./shielded');
 // const SPLITTER = require('./splitter');
 
 /**
@@ -24,6 +24,9 @@ const { ARMORED, applyArmoredModifier, calculateArmoredDamage, applyArmorShred, 
 const SPECIAL_ENEMY_TYPES = {
   flying: FLYING,
   armored: ARMORED,
+  magic_immune: MAGIC_IMMUNE,
+  regenerating: REGENERATING,
+  shielded: SHIELDED,
 };
 
 /**
@@ -51,15 +54,37 @@ const SPECIAL_MODIFIERS = {
     config: ARMORED,
     applyModifier: applyArmoredModifier,
   },
-  // Placeholder entries for future types
   magic_immune: {
     id: 'magic_immune',
     name: 'Magic-Immune',
     prefix: '✨',
-    availableFromWave: 15,
-    baseSpawnChance: 0.1,
-    applicableTo: ['minion', 'brute'],
+    availableFromWave: MAGIC_IMMUNE.availableFromWave,
+    baseSpawnChance: MAGIC_IMMUNE.baseSpawnChance,
+    applicableTo: MAGIC_IMMUNE.applicableTo,
+    config: MAGIC_IMMUNE,
+    applyModifier: applyMagicImmuneModifier,
   },
+  regenerating: {
+    id: 'regenerating',
+    name: 'Regenerating',
+    prefix: '🩹',
+    availableFromWave: REGENERATING.availableFromWave,
+    baseSpawnChance: REGENERATING.baseSpawnChance,
+    applicableTo: REGENERATING.applicableTo,
+    config: REGENERATING,
+    applyModifier: applyRegeneratingModifier,
+  },
+  shielded: {
+    id: 'shielded',
+    name: 'Shielded',
+    prefix: '🔮',
+    availableFromWave: SHIELDED.availableFromWave,
+    baseSpawnChance: SHIELDED.baseSpawnChance,
+    applicableTo: SHIELDED.applicableTo,
+    config: SHIELDED,
+    applyModifier: applyShieldedModifier,
+  },
+  // Placeholder entries for future types
   phasing: {
     id: 'phasing',
     name: 'Phasing',
@@ -68,14 +93,6 @@ const SPECIAL_MODIFIERS = {
     baseSpawnChance: 0.08,
     applicableTo: ['scout', 'minion'],
   },
-  regenerating: {
-    id: 'regenerating',
-    name: 'Regenerating',
-    prefix: '🩹',
-    availableFromWave: 20,
-    baseSpawnChance: 0.1,
-    applicableTo: ['brute', 'minion'],
-  },
   undead: {
     id: 'undead',
     name: 'Undead',
@@ -83,14 +100,6 @@ const SPECIAL_MODIFIERS = {
     availableFromWave: 22,
     baseSpawnChance: 0.08,
     applicableTo: ['minion', 'swarmling'],
-  },
-  shielded: {
-    id: 'shielded',
-    name: 'Shielded',
-    prefix: '🔮',
-    availableFromWave: 25,
-    baseSpawnChance: 0.1,
-    applicableTo: ['minion', 'brute'],
   },
   splitter: {
     id: 'splitter',
@@ -222,6 +231,9 @@ module.exports = {
   SPECIAL_ENEMY_TYPES,
   FLYING,
   ARMORED,
+  MAGIC_IMMUNE,
+  REGENERATING,
+  SHIELDED,
   
   // Quick reference
   SPECIAL_MODIFIERS,
@@ -248,4 +260,22 @@ module.exports = {
   calculateArmoredDamage,
   applyArmorShred,
   getArmorDisplayInfo,
+  
+  // Magic-Immune helpers
+  applyMagicImmuneModifier,
+  isMagicImmune,
+  calculateMagicImmuneDamage,
+  
+  // Regenerating helpers
+  applyRegeneratingModifier,
+  isRegenerating,
+  applyRegeneration,
+  calculateRegenAmount,
+  
+  // Shielded helpers
+  applyShieldedModifier,
+  isShielded,
+  hasActiveShield,
+  applyShieldedDamage,
+  calculateShieldedDamage,
 };
