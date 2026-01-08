@@ -121,7 +121,10 @@ function createEnemyInstance(baseEnemy, wave, auras = []) {
   // Add instance-specific data
   enemy = {
     ...enemy,
-    id: `${baseEnemy.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    // Preserve type for renderer (minion, scout, brute, swarmling, boss)
+    type: baseEnemy.id,
+    // Unique instance id
+    instanceId: `${baseEnemy.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     wave,
     isElite: false,
     auras: [],
@@ -149,7 +152,9 @@ function createEnemyInstance(baseEnemy, wave, auras = []) {
 function createBossInstance(bossConfig, wave) {
   const boss = {
     ...bossConfig,
-    id: `boss_${bossConfig.id}_${Date.now()}`,
+    // Preserve type for renderer
+    type: 'boss',
+    instanceId: `boss_${bossConfig.id}_${Date.now()}`,
     wave,
     isBoss: true,
     isElite: false,
