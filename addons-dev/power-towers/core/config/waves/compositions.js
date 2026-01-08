@@ -231,10 +231,11 @@ const WAVE_COMPOSITIONS = {
       { type: 'scout', count: 6 },
       { type: 'brute', count: 3 },
       { type: 'minion', count: 2, special: 'shielded' },
+      { type: 'scout', count: 2, special: 'phasing' },  // First phasing enemies
     ],
     pattern: 'standard',
     auraChance: 0.6,
-    description: 'Enhanced start + first Shielded',
+    description: 'Enhanced start + first Shielded + first Phasing',
   },
   
   22: {
@@ -252,10 +253,11 @@ const WAVE_COMPOSITIONS = {
       { type: 'brute', count: 4, special: 'armored' },
       { type: 'brute', count: 2, special: 'magic_immune' },
       { type: 'minion', count: 8 },
+      { type: 'brute', count: 1, special: 'undead' },  // First undead enemy
     ],
     pattern: 'siege',
     auraChance: 0.7,
-    description: 'Armored wave + Magic-Immune',
+    description: 'Armored wave + Magic-Immune + first Undead',
   },
   
   24: {
@@ -272,10 +274,11 @@ const WAVE_COMPOSITIONS = {
     enemies: [
       { type: 'brute', count: 3, special: 'shielded' },
       { type: 'scout', count: 4 },
+      { type: 'minion', count: 2, special: 'splitter' },  // First splitter enemies
     ],
     pattern: 'boss',
     boss: { type: 'mini', id: 'crystal_wyrm' },
-    description: 'Mini-boss: Crystal Wyrm + Shielded brutes',
+    description: 'Mini-boss: Crystal Wyrm + Shielded brutes + first Splitters',
   },
   
   26: {
@@ -285,10 +288,12 @@ const WAVE_COMPOSITIONS = {
       { type: 'swarmling', count: 12 },
       { type: 'minion', count: 3, special: 'regenerating' },
       { type: 'brute', count: 2, special: 'magic_immune' },
+      { type: 'scout', count: 2, special: 'phasing' },
+      { type: 'minion', count: 1, special: 'undead' },
     ],
     pattern: 'mixed',
     auraChance: 0.8,
-    description: 'Chaotic wave with all specials',
+    description: 'Chaotic wave with all specials including Phasing/Undead',
   },
   
   27: {
@@ -308,9 +313,10 @@ const WAVE_COMPOSITIONS = {
       { type: 'brute', count: 2, special: 'regenerating' },
       { type: 'brute', count: 2, special: 'shielded' },
       { type: 'minion', count: 6 },
+      { type: 'brute', count: 2, special: 'undead' },  // Undead brutes
     ],
     pattern: 'siege',
-    description: 'Heavy siege - armored, regenerating, shielded',
+    description: 'Heavy siege - armored, regenerating, shielded, undead',
   },
   
   29: {
@@ -355,10 +361,11 @@ const WAVE_COMPOSITIONS = {
       { type: 'swarmling', count: 25 },
       { type: 'scout', count: 8, special: 'flying' },
       { type: 'scout', count: 4, special: 'shielded' },
+      { type: 'minion', count: 3, special: 'splitter' },  // Splitters add to swarm
     ],
     pattern: 'swarm',
     auraChance: 0.9,
-    description: 'Mega-swarm with flying and shielded',
+    description: 'Mega-swarm with flying, shielded, and splitters',
   },
   
   33: {
@@ -377,10 +384,11 @@ const WAVE_COMPOSITIONS = {
       { type: 'scout', count: 6, special: 'flying' },
       { type: 'swarmling', count: 15 },
       { type: 'scout', count: 3, special: 'regenerating' },
+      { type: 'scout', count: 4, special: 'phasing' },  // Phasing scouts
     ],
     pattern: 'rush',
     auraChance: 1.0,
-    description: 'Speed storm with specials',
+    description: 'Speed storm with specials + phasing scouts',
   },
   
   35: {
@@ -402,10 +410,13 @@ const WAVE_COMPOSITIONS = {
       { type: 'brute', count: 3, special: 'regenerating' },
       { type: 'swarmling', count: 18 },
       { type: 'minion', count: 4, special: 'shielded' },
+      { type: 'brute', count: 2, special: 'undead' },
+      { type: 'minion', count: 2, special: 'splitter' },
+      { type: 'scout', count: 3, special: 'phasing' },
     ],
     pattern: 'mixed',
     auraChance: 1.0,
-    description: 'Wave of chaos - all special types',
+    description: 'Wave of chaos - ALL 8 special types!',
   },
   
   37: {
@@ -440,10 +451,13 @@ const WAVE_COMPOSITIONS = {
       { type: 'swarmling', count: 20 },
       { type: 'brute', count: 4, special: 'regenerating' },
       { type: 'scout', count: 4, special: 'shielded' },
+      { type: 'brute', count: 3, special: 'undead' },
+      { type: 'minion', count: 3, special: 'splitter' },
+      { type: 'scout', count: 4, special: 'phasing' },
     ],
     pattern: 'mixed',
     auraChance: 1.0,
-    description: 'The final wave - everything at once',
+    description: 'The final wave - ALL enemies with ALL specials!',
   },
   
   40: {

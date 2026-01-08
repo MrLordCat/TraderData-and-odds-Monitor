@@ -120,6 +120,21 @@ function EnemyRendererMixin(Base) {
           this._renderShieldBubble(enemy, enemy.x, renderY, size, time);
         }
         
+        // Phasing ghost effect
+        if (enemy.isPhasing) {
+          this._renderPhasingEffect(enemy, enemy.x, renderY, size, time);
+        }
+        
+        // Undead decay effect
+        if (enemy.isUndead) {
+          this._renderUndeadEffect(enemy, enemy.x, renderY, size, time);
+        }
+        
+        // Splitter split indicator
+        if (enemy.isSplitter && !enemy.isSplitChild) {
+          this._renderSplitterIndicator(enemy, enemy.x, renderY, size, time);
+        }
+        
         // Boss crown/indicator
         if (enemy.isBoss) {
           this._renderBossIndicator(enemy, enemy.x, renderY, size, time);
@@ -884,9 +899,21 @@ function EnemyRendererMixin(Base) {
      * @returns {number} Alpha multiplier (0.5 for ethereal, 1 for normal)
      */
     _getEtherealAlpha(enemy) {
-      if (enemy.auras?.includes('ethereal')) {
-        return 0.5; // 50% transparency
+      // Phasing enemies use their phasingAlpha
+      if (enemy.isPhasing && enemy.phasingAlpha !== undefined) {
+        return enemy.phasingAlpha;
       }
+      
+      // Corpse (Undead waiting to resurrect)
+      if (enemy.isCorpse) {
+        return 0.3;
+      }
+      
+      // Ethereal aura
+      if (enemy.auras?.includes('ethereal')) {
+        return 0.5;
+      }
+      
       return 1.0;
     }
     
@@ -905,6 +932,208 @@ function EnemyRendererMixin(Base) {
         return enemy.statusEffects.find(e => e.type === type);
       }
       return null;
+    }
+    
+    // ===============================
+    // PHASING, UNDEAD, SPLITTER EFFECTS
+    // ===============================
+    
+    /**
+     * Render phasing ghost effect
+     * Shows enemy becoming translucent/intangible
+     */
+    _renderPhasingEffect(enemy, x, y, size, time) {
+      const camera = this.camera;
+      const phasingState = enemy.phasingState || 'solid';
+      const phasingAlpha = enemy.phasingAlpha !== undefined ? enemy.phasingAlpha : 1;
+      
+      // Ghost trail when phasing
+      if (phasingState === 'phased' || phasingState === 'phasing_out') {
+        // Ghostly afterimages
+        for (let i = 1; i <= 3; i++) {
+          const trailOffset = i * 8;
+          const trailAlpha = (0.3 / i) * (1 - phasingAlpha);
+          this.shapeRenderer.circle(
+            x - Math.cos(enemy.angle || 0) * trailOffset,
+            y - Math.sin(enemy.angle || 0) * trailOffset,
+            size * (1 - i * 0.1),
+            0.5, 0.8, 1, trailAlpha
+          );
+        }
+      }
+      
+      // Phase aura - cyan/purple glow
+      if (phasingState !== 'solid') {
+        const pulsePhase = Math.sin(time * 6) * 0.2;
+        const auraRadius = size * (1.2 + pulsePhase);
+        const auraAlpha = 0.4 * (1 - phasingAlpha) + 0.1;
+        
+        // Inner glow
+        this.shapeRenderer.circle(x, y, auraRadius, 0.4, 0.7, 1, auraAlpha * 0.3);
+        
+        // Outline
+        this.shapeRenderer.circleOutline(x, y, auraRadius, 2 / camera.zoom, 0.5, 0.8, 1, auraAlpha);
+        
+        // Phase particles
+        const particleCount = 4;
+        for (let i = 0; i < particleCount; i++) {
+          const angle = time * 2 + (i / particleCount) * Math.PI * 2;
+          const dist = size * 1.3;
+          const px = x + Math.cos(angle) * dist;
+          const py = y + Math.sin(angle) * dist * 0.6;
+          const pSize = 2 + Math.sin(time * 4 + i) * 1;
+          this.shapeRenderer.circle(px, py, pSize, 0.6, 0.9, 1, auraAlpha * 0.8);
+        }
+      }
+      
+      // Phase transition effect
+      if (phasingState === 'phasing_in' || phasingState === 'phasing_out') {
+        const transitionPulse = Math.abs(Math.sin(time * 8));
+        this.shapeRenderer.circleOutline(x, y, size * 1.4, 3 / camera.zoom, 0.6, 0.8, 1, transitionPulse * 0.5);
+      }
+      
+      // Invulnerability indicator when fully phased
+      if (phasingState === 'phased') {
+        const shimmer = Math.sin(time * 10) * 0.3 + 0.7;
+        // "Ghost" text indicator
+        this.shapeRenderer.circleOutline(x, y - size - 12, 5, 1.5 / camera.zoom, 0.5, 0.8, 1, shimmer * 0.6);
+      }
+    }
+    
+    /**
+     * Render undead decay effect
+     * Shows necrotic energy and resurrection potential
+     */
+    _renderUndeadEffect(enemy, x, y, size, time) {
+      const camera = this.camera;
+      const hasResurrected = enemy.hasResurrected || false;
+      const isCorpse = enemy.isCorpse || false;
+      
+      // Corpse state - waiting to resurrect
+      if (isCorpse) {
+        const corpseTimer = enemy.corpseTimer || 0;
+        const pulseIntensity = Math.sin(time * 4) * 0.3 + 0.7;
+        
+        // Dark necrotic glow
+        this.shapeRenderer.circle(x, y, size * 1.2, 0.2, 0.4, 0.2, 0.4 * pulseIntensity);
+        
+        // Soul rising effect
+        const riseOffset = Math.sin(time * 2) * 3;
+        for (let i = 0; i < 3; i++) {
+          const soulY = y - size - 5 - i * 4 + riseOffset;
+          const soulAlpha = 0.5 - i * 0.15;
+          this.shapeRenderer.circle(x, soulY, 3 - i * 0.5, 0.3, 0.8, 0.3, soulAlpha);
+        }
+        
+        // Resurrection progress ring
+        if (enemy.corpseTimer !== undefined && enemy.resurrectDelay !== undefined) {
+          const progress = 1 - (corpseTimer / enemy.resurrectDelay);
+          this.shapeRenderer.circleOutline(x, y, size * 1.4, 3 / camera.zoom, 0.2, 0.9, 0.3, 0.6);
+          // Progress arc (simplified as dots)
+          const dotCount = Math.floor(progress * 8);
+          for (let i = 0; i < dotCount; i++) {
+            const angle = -Math.PI/2 + (i / 8) * Math.PI * 2;
+            const dx = x + Math.cos(angle) * size * 1.4;
+            const dy = y + Math.sin(angle) * size * 1.4;
+            this.shapeRenderer.circle(dx, dy, 3, 0.3, 1, 0.4, 0.9);
+          }
+        }
+        
+        return; // Don't render normal effects for corpse
+      }
+      
+      // Normal undead appearance
+      // Green necrotic aura
+      const necroticPulse = Math.sin(time * 3) * 0.1 + 0.2;
+      this.shapeRenderer.circle(x, y, size * 1.15, 0.2, 0.5, 0.2, necroticPulse);
+      
+      // Decay particles
+      const particleCount = 3;
+      for (let i = 0; i < particleCount; i++) {
+        const pTime = time + i * 1.5;
+        const pY = y + (pTime % 2) * 10 - 10;
+        const pX = x + Math.sin(pTime * 2 + i) * 5;
+        const pAlpha = 0.4 * (1 - (pTime % 2) / 2);
+        this.shapeRenderer.circle(pX, pY, 2, 0.3, 0.6, 0.2, pAlpha);
+      }
+      
+      // Soul indicator (if can still resurrect)
+      if (!hasResurrected) {
+        const soulPulse = Math.sin(time * 2) * 0.2 + 0.8;
+        const indicatorY = y - size - 10;
+        
+        // Soul orb
+        this.shapeRenderer.circle(x, indicatorY, 4, 0.3, 0.9, 0.4, soulPulse * 0.7);
+        this.shapeRenderer.circleOutline(x, indicatorY, 5, 1 / camera.zoom, 0.2, 0.7, 0.3, soulPulse * 0.5);
+      } else {
+        // Already resurrected - show "final death" marker
+        const warnPulse = Math.sin(time * 4) * 0.3 + 0.5;
+        this.shapeRenderer.circle(x, y - size - 10, 3, 0.8, 0.3, 0.3, warnPulse);
+      }
+    }
+    
+    /**
+     * Render splitter division indicator
+     * Shows enemy will split on death
+     */
+    _renderSplitterIndicator(enemy, x, y, size, time) {
+      const camera = this.camera;
+      
+      // Pulsing split warning
+      const splitPulse = Math.sin(time * 3) * 0.2 + 0.8;
+      
+      // Inner division lines
+      const divisionAlpha = 0.3 * splitPulse;
+      // Vertical line
+      this.shapeRenderer.rect(x - 1, y - size * 0.6, 2, size * 1.2, 0.9, 0.6, 0.2, divisionAlpha);
+      // Horizontal line
+      this.shapeRenderer.rect(x - size * 0.6, y - 1, size * 1.2, 2, 0.9, 0.6, 0.2, divisionAlpha);
+      
+      // Split ready indicator (orbiting dots that will become children)
+      const childCount = enemy.splitChildCount || 2;
+      const orbitRadius = size * 1.3;
+      for (let i = 0; i < childCount; i++) {
+        const angle = time * 1.5 + (i / childCount) * Math.PI * 2;
+        const orbX = x + Math.cos(angle) * orbitRadius;
+        const orbY = y + Math.sin(angle) * orbitRadius;
+        const orbPulse = Math.sin(time * 4 + i * 2) * 0.2 + 0.8;
+        
+        // Mini version indicator
+        this.shapeRenderer.circle(orbX, orbY, 4, 0.9, 0.7, 0.3, orbPulse * 0.6);
+        this.shapeRenderer.circleOutline(orbX, orbY, 5, 1 / camera.zoom, 1, 0.8, 0.4, orbPulse * 0.4);
+      }
+      
+      // Outer containment ring
+      this.shapeRenderer.circleOutline(x, y, orbitRadius + 3, 1.5 / camera.zoom, 0.9, 0.6, 0.2, 0.3 * splitPulse);
+      
+      // Warning glow when low HP
+      const hpRatio = enemy.maxHealth > 0 ? enemy.health / enemy.maxHealth : 1;
+      if (hpRatio < 0.3) {
+        const urgentPulse = Math.sin(time * 8) * 0.3 + 0.7;
+        this.shapeRenderer.circle(x, y, size * 1.5, 0.9, 0.5, 0.2, urgentPulse * 0.2);
+        
+        // Cracks appearing
+        for (let i = 0; i < 4; i++) {
+          const crackAngle = (i / 4) * Math.PI * 2;
+          const crackLen = size * 0.8 * (1 - hpRatio * 2);
+          const cx1 = x;
+          const cy1 = y;
+          const cx2 = x + Math.cos(crackAngle) * crackLen;
+          const cy2 = y + Math.sin(crackAngle) * crackLen;
+          // Draw crack as thin rect
+          const dx = cx2 - cx1;
+          const dy = cy2 - cy1;
+          const len = Math.sqrt(dx*dx + dy*dy);
+          if (len > 0) {
+            this.shapeRenderer.rect(
+              (cx1 + cx2) / 2 - 1, 
+              (cy1 + cy2) / 2 - len/2, 
+              2, len, 
+              0.3, 0.2, 0.1, urgentPulse * 0.5
+            );
+          }
+        }
+      }
     }
   };
 }

@@ -15,6 +15,9 @@ const { calculateArmoredDamage, applyArmorShred } = require('../../core/config/e
 const { isMagicImmune, calculateMagicImmuneDamage } = require('../../core/config/enemies/special/magic-immune');
 const { isRegenerating, applyRegeneration } = require('../../core/config/enemies/special/regenerating');
 const { isShielded, hasActiveShield, applyShieldedDamage } = require('../../core/config/enemies/special/shielded');
+const { isPhasing, isCurrentlyPhased, updatePhasingState, calculatePhasingDamage } = require('../../core/config/enemies/special/phasing');
+const { isUndead, canResurrect, processUndeadDeath, resurrectEnemy } = require('../../core/config/enemies/special/undead');
+const { isSplitter, isSplitChild, processSplitterDeath } = require('../../core/config/enemies/special/splitter');
 
 // Get enemy types from config (single source of truth)
 const ENEMY_TYPES = CONFIG.ENEMY_TYPES;
@@ -339,6 +342,10 @@ class EnemiesModule {
       isMagicImmune: enemyData.isMagicImmune || false,
       isRegenerating: enemyData.isRegenerating || false,
       isShielded: enemyData.isShielded || false,
+      isPhasing: enemyData.isPhasing || false,
+      isUndead: enemyData.isUndead || false,
+      isSplitter: enemyData.isSplitter || false,
+      isSplitChild: enemyData.isSplitChild || false,
       specialType: enemyData.specialType || null,
       auras: enemyData.auras || this.activeAuras || [],
       wave: enemyData.wave || this.currentWave,
@@ -354,6 +361,20 @@ class EnemiesModule {
       // Regenerating-specific
       lastDamageTime: enemyData.lastDamageTime || null,
       lastRegenTime: enemyData.lastRegenTime || null,
+      
+      // Phasing-specific
+      phasingState: enemyData.phasingState || 'solid',
+      phasingTimer: enemyData.phasingTimer || 0,
+      phasingAlpha: enemyData.phasingAlpha || 1.0,
+      
+      // Undead-specific
+      hasResurrected: enemyData.hasResurrected || false,
+      resurrectPrevented: enemyData.resurrectPrevented || false,
+      isCorpse: enemyData.isCorpse || false,
+      corpseTimer: enemyData.corpseTimer || 0,
+      
+      // Splitter-specific  
+      pulseEffect: enemyData.pulseEffect || null,
       
       // Elite visual properties
       eliteGlow: enemyData.eliteGlow || null,
@@ -438,6 +459,12 @@ class EnemiesModule {
    * Update single enemy
    */
   updateEnemy(enemy, deltaTime) {
+    // Skip if enemy is a corpse waiting to resurrect
+    if (enemy.isCorpse) {
+      this.updateCorpse(enemy, deltaTime);
+      return;
+    }
+    
     // Update status effects
     this.updateEffects(enemy, deltaTime);
     
@@ -451,6 +478,23 @@ class EnemiesModule {
         this.eventBus.emit('enemy:regenerated', {
           enemyId: enemy.id,
           amount: enemy.health - healthBefore,
+          x: enemy.x,
+          y: enemy.y,
+        });
+      }
+    }
+    
+    // Update phasing state for phasing enemies
+    if (isPhasing(enemy)) {
+      const wasPhased = isCurrentlyPhased(enemy);
+      updatePhasingState(enemy, deltaTime);
+      const nowPhased = isCurrentlyPhased(enemy);
+      
+      // Emit phase change event
+      if (wasPhased !== nowPhased) {
+        this.eventBus.emit('enemy:phase-change', {
+          enemyId: enemy.id,
+          isPhased: nowPhased,
           x: enemy.x,
           y: enemy.y,
         });
@@ -475,6 +519,26 @@ class EnemiesModule {
     
     // Move along path
     this.moveAlongPath(enemy, effectiveSpeed * deltaTime);
+  }
+  
+  /**
+   * Update corpse (undead waiting to resurrect)
+   */
+  updateCorpse(enemy, deltaTime) {
+    enemy.corpseTimer -= deltaTime;
+    
+    if (enemy.corpseTimer <= 0) {
+      // Time to resurrect!
+      const resurrectHP = enemy.pendingResurrectHP || Math.round(enemy.maxHealth * 0.5);
+      resurrectEnemy(enemy, resurrectHP);
+      
+      this.eventBus.emit('enemy:resurrect', {
+        enemy,
+        newHealth: resurrectHP,
+        x: enemy.x,
+        y: enemy.y,
+      });
+    }
   }
 
   /**
@@ -617,6 +681,29 @@ class EnemiesModule {
     
     // Track last damage time (for regeneration pause)
     enemy.lastDamageTime = Date.now();
+    
+    // Store element for undead fire check
+    enemy.lastDamageElement = element || null;
+    
+    // === PHASING CHECK ===
+    // Phasing enemies are immune to direct damage while phased
+    if (isPhasing(enemy)) {
+      const phasingResult = calculatePhasingDamage(damage, enemy, false);
+      
+      if (phasingResult.blocked) {
+        this.eventBus.emit('enemy:phased-miss', {
+          enemy,
+          x: enemy.x,
+          y: enemy.y,
+        });
+        return;
+      }
+      
+      // Apply reduced damage during transition
+      if (phasingResult.reason === 'transitioning') {
+        damage = phasingResult.damage;
+      }
+    }
     
     // === MAGIC-IMMUNE CHECK ===
     // Magic-immune enemies are completely immune to Magic attack type
@@ -914,6 +1001,78 @@ class EnemiesModule {
    * Kill enemy
    */
   killEnemy(enemy, index) {
+    const overkillDamage = enemy.overkillDamage || 0;
+    
+    // === UNDEAD CHECK - Can enemy resurrect? ===
+    if (isUndead(enemy) && canResurrect(enemy)) {
+      const undeadResult = processUndeadDeath(enemy, overkillDamage);
+      
+      if (undeadResult.shouldResurrect) {
+        // Don't remove from array - convert to corpse
+        enemy.isCorpse = true;
+        enemy.corpseTimer = undeadResult.delay;
+        enemy.pendingResurrectHP = undeadResult.resurrectHP;
+        enemy.health = 0;
+        
+        this.eventBus.emit('enemy:dying', {
+          enemy,
+          willResurrect: true,
+          resurrectDelay: undeadResult.delay,
+          x: enemy.x,
+          y: enemy.y,
+        });
+        
+        return; // Don't process as normal kill
+      }
+      
+      // Fire prevented resurrection
+      if (undeadResult.preventedByFire) {
+        this.eventBus.emit('enemy:resurrect-prevented', {
+          enemy,
+          reason: 'fire',
+          x: enemy.x,
+          y: enemy.y,
+        });
+      }
+    }
+    
+    // === SPLITTER CHECK - Does enemy split? ===
+    if (isSplitter(enemy) && !isSplitChild(enemy)) {
+      const splitResult = processSplitterDeath(enemy, overkillDamage, this.currentWave);
+      
+      if (splitResult.shouldSplit) {
+        // Spawn children
+        for (const childData of splitResult.children) {
+          // Stagger spawns
+          setTimeout(() => {
+            const child = this.spawnEnemyFromData(childData, false);
+            
+            this.eventBus.emit('enemy:split-spawn', {
+              parent: enemy,
+              child,
+              x: childData.x,
+              y: childData.y,
+            });
+          }, childData.spawnDelay || 0);
+        }
+        
+        this.eventBus.emit('enemy:split', {
+          enemy,
+          childCount: splitResult.childCount,
+          x: enemy.x,
+          y: enemy.y,
+        });
+      } else if (splitResult.prevented) {
+        this.eventBus.emit('enemy:split-prevented', {
+          enemy,
+          reason: splitResult.reason,
+          x: enemy.x,
+          y: enemy.y,
+        });
+      }
+    }
+    
+    // Normal kill processing
     this.enemies.splice(index, 1);
     this.totalKills++;
     

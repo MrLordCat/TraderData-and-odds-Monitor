@@ -11,11 +11,9 @@ const { ARMORED, applyArmoredModifier, calculateArmoredDamage, applyArmorShred, 
 const { MAGIC_IMMUNE, applyMagicImmuneModifier, isMagicImmune, calculateMagicImmuneDamage } = require('./magic-immune');
 const { REGENERATING, applyRegeneratingModifier, isRegenerating, applyRegeneration, calculateRegenAmount } = require('./regenerating');
 const { SHIELDED, applyShieldedModifier, isShielded, hasActiveShield, applyShieldedDamage, calculateShieldedDamage } = require('./shielded');
-
-// Future special types (will be added later)
-// const PHASING = require('./phasing');
-// const UNDEAD = require('./undead');
-// const SPLITTER = require('./splitter');
+const { PHASING, applyPhasingModifier, isPhasing, isCurrentlyPhased, updatePhasingState, calculatePhasingDamage } = require('./phasing');
+const { UNDEAD, applyUndeadModifier, isUndead, canResurrect, processUndeadDeath, resurrectEnemy } = require('./undead');
+const { SPLITTER, applySplitterModifier, isSplitter, isSplitChild, processSplitterDeath } = require('./splitter');
 
 /**
  * Special enemy types - enemies with unique mechanics
@@ -27,6 +25,9 @@ const SPECIAL_ENEMY_TYPES = {
   magic_immune: MAGIC_IMMUNE,
   regenerating: REGENERATING,
   shielded: SHIELDED,
+  phasing: PHASING,
+  undead: UNDEAD,
+  splitter: SPLITTER,
 };
 
 /**
@@ -39,6 +40,9 @@ const specialTypeAppearanceState = {
   magic_immune: { hasAppeared: false, firstAppearanceWave: null },
   regenerating: { hasAppeared: false, firstAppearanceWave: null },
   shielded: { hasAppeared: false, firstAppearanceWave: null },
+  phasing: { hasAppeared: false, firstAppearanceWave: null },
+  undead: { hasAppeared: false, firstAppearanceWave: null },
+  splitter: { hasAppeared: false, firstAppearanceWave: null },
 };
 
 /**
@@ -136,36 +140,41 @@ const SPECIAL_MODIFIERS = {
     config: SHIELDED,
     applyModifier: applyShieldedModifier,
   },
-  // Placeholder entries for future types
   phasing: {
     id: 'phasing',
     name: 'Phasing',
-    prefix: '⚡',
-    availability: { firstAppearanceRange: [14, 20], guaranteedBy: 22 },
-    availableFromWave: 14,
-    baseSpawnChance: 0.08,
-    spawnChanceScaling: { perWaveAfterFirst: 0.01, maxChance: 0.18 },
-    applicableTo: ['scout', 'minion'],
+    prefix: '👻',
+    availableFromWave: PHASING.availableFromWave,
+    availability: PHASING.availability,
+    baseSpawnChance: PHASING.baseSpawnChance,
+    spawnChanceScaling: PHASING.spawnChanceScaling,
+    applicableTo: PHASING.applicableTo,
+    config: PHASING,
+    applyModifier: applyPhasingModifier,
   },
   undead: {
     id: 'undead',
     name: 'Undead',
     prefix: '💀',
-    availability: { firstAppearanceRange: [18, 26], guaranteedBy: 28 },
-    availableFromWave: 18,
-    baseSpawnChance: 0.08,
-    spawnChanceScaling: { perWaveAfterFirst: 0.01, maxChance: 0.18 },
-    applicableTo: ['minion', 'swarmling'],
+    availableFromWave: UNDEAD.availableFromWave,
+    availability: UNDEAD.availability,
+    baseSpawnChance: UNDEAD.baseSpawnChance,
+    spawnChanceScaling: UNDEAD.spawnChanceScaling,
+    applicableTo: UNDEAD.applicableTo,
+    config: UNDEAD,
+    applyModifier: applyUndeadModifier,
   },
   splitter: {
     id: 'splitter',
     name: 'Splitter',
     prefix: '👥',
-    availability: { firstAppearanceRange: [24, 32], guaranteedBy: 34 },
-    availableFromWave: 24,
-    baseSpawnChance: 0.08,
-    spawnChanceScaling: { perWaveAfterFirst: 0.01, maxChance: 0.18 },
-    applicableTo: ['minion', 'swarmling'],
+    availableFromWave: SPLITTER.availableFromWave,
+    availability: SPLITTER.availability,
+    baseSpawnChance: SPLITTER.baseSpawnChance,
+    spawnChanceScaling: SPLITTER.spawnChanceScaling,
+    applicableTo: SPLITTER.applicableTo,
+    config: SPLITTER,
+    applyModifier: applySplitterModifier,
   },
 };
 
@@ -410,4 +419,24 @@ module.exports = {
   hasActiveShield,
   applyShieldedDamage,
   calculateShieldedDamage,
+  
+  // Phasing helpers
+  applyPhasingModifier,
+  isPhasing,
+  isCurrentlyPhased,
+  updatePhasingState,
+  calculatePhasingDamage,
+  
+  // Undead helpers
+  applyUndeadModifier,
+  isUndead,
+  canResurrect,
+  processUndeadDeath,
+  resurrectEnemy,
+  
+  // Splitter helpers
+  applySplitterModifier,
+  isSplitter,
+  isSplitChild,
+  processSplitterDeath,
 };

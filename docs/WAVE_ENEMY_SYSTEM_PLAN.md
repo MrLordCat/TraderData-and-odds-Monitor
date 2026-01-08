@@ -353,23 +353,47 @@ wave15 = {
 - [x] Логика rollElites
 - [x] Визуал Elite врагов (золотая обводка, звёзды)
 
-### Фаза 5: Остальные спец. враги ✅ ЧАСТИЧНО (ключевые типы готовы)
+### Фаза 5: Остальные спец. враги ✅ ЗАВЕРШЕНА
 - [x] Magic-Immune (конфиг, иммунитет к Magic атакам, сопротивление элементам)
-- [ ] Phasing (конфиг есть как placeholder)
+- [x] Phasing (конфиг, периодическая неуязвимость, DoT работает через phase)
 - [x] Regenerating (конфиг, регенерация HP, пауза при получении урона)
-- [ ] Undead (конфиг есть как placeholder)
+- [x] Undead (конфиг, воскрешение после смерти, огонь предотвращает)
 - [x] Shielded (конфиг, поглощение урона щитом, стан при разрушении)
-- [ ] Splitter (конфиг есть как placeholder)
+- [x] Splitter (конфиг, деление на детей при смерти, overkill предотвращает)
 
 #### Реализованные файлы (Фаза 5):
 - `core/config/enemies/special/magic-immune.js` - Magic-Immune полная реализация
 - `core/config/enemies/special/regenerating.js` - Regenerating полная реализация
 - `core/config/enemies/special/shielded.js` - Shielded полная реализация
+- `core/config/enemies/special/phasing.js` - **NEW** Phasing полная реализация:
+  - Периодическая неуязвимость (1.5s phased, 3s solid)
+  - DoT эффекты работают через phase
+  - 50% урона во время transition
+  - Состояния: solid → phasing_out → phased → phasing_in → solid
+- `core/config/enemies/special/undead.js` - **NEW** Undead полная реализация:
+  - Воскрешение 1 раз с 50% HP
+  - Fire эффект предотвращает воскрешение
+  - Overkill снижает HP воскрешения
+  - Визуал: неактивный труп → воскрешение
+- `core/config/enemies/special/splitter.js` - **NEW** Splitter полная реализация:
+  - Деление на 2-4 детей при смерти
+  - Дети имеют 30% HP родителя
+  - Massive overkill предотвращает деление
+  - Дети не делятся повторно
 - `modules/enemies/index.js` - Интеграция в combat:
-  - `damageEnemy()`: Magic-Immune иммунитет, Shielded поглощение
-  - `updateEnemy()`: Regenerating heal tick
-- `core/config/waves/compositions.js` - Волны 15-40 с Magic-Immune, Regenerating, Shielded
-- `renderer/renderers/enemy-renderer.js` - Визуал для всех 5 special типов
+  - `damageEnemy()`: Magic-Immune иммунитет, Shielded поглощение, Phasing неуязвимость
+  - `updateEnemy()`: Regenerating heal tick, Phasing state update, Corpse update
+  - `killEnemy()`: Undead resurrection check, Splitter child spawn
+- `core/config/waves/compositions.js` - Волны 15-40 с ALL 8 special типов:
+  - Wave 21: первые Phasing
+  - Wave 23: первые Undead
+  - Wave 25: первые Splitter
+  - Wave 36: все 8 special типов!
+  - Wave 39: финальная волна со всеми типами
+- `renderer/renderers/enemy-renderer.js` - Визуал для всех 8 special типов:
+  - Phasing: ghost trail, cyan aura, transition pulse
+  - Undead: green necrotic glow, soul indicator, corpse state
+  - Splitter: division lines, orbiting dots, crack effect at low HP
 
 ### Фаза 6: Мини-боссы
 - [ ] Brood Mother (волна 5)
