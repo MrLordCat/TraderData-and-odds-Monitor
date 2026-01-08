@@ -436,6 +436,11 @@ function UpgradesMixin(Base) {
       // Apply upgrade effect
       applyAttackTypeUpgradeEffect(tower, upgradeId, tower.attackTypeUpgrades[upgradeId]);
       
+      // Recalculate tower stats to apply the upgrade
+      if (tower.recalculateStats) {
+        tower.recalculateStats();
+      }
+      
       // Emit event for UI update
       this.game?.eventBus?.emit('tower:upgraded', { tower, upgradeId, attackTypeUpgrade: true });
     }
