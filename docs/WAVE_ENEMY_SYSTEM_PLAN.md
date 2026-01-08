@@ -353,13 +353,23 @@ wave15 = {
 - [x] Логика rollElites
 - [x] Визуал Elite врагов (золотая обводка, звёзды)
 
-### Фаза 5: Остальные спец. враги
-- [ ] Magic-Immune
-- [ ] Phasing
-- [ ] Regenerating
-- [ ] Undead
-- [ ] Shielded
-- [ ] Splitter
+### Фаза 5: Остальные спец. враги ✅ ЧАСТИЧНО (ключевые типы готовы)
+- [x] Magic-Immune (конфиг, иммунитет к Magic атакам, сопротивление элементам)
+- [ ] Phasing (конфиг есть как placeholder)
+- [x] Regenerating (конфиг, регенерация HP, пауза при получении урона)
+- [ ] Undead (конфиг есть как placeholder)
+- [x] Shielded (конфиг, поглощение урона щитом, стан при разрушении)
+- [ ] Splitter (конфиг есть как placeholder)
+
+#### Реализованные файлы (Фаза 5):
+- `core/config/enemies/special/magic-immune.js` - Magic-Immune полная реализация
+- `core/config/enemies/special/regenerating.js` - Regenerating полная реализация
+- `core/config/enemies/special/shielded.js` - Shielded полная реализация
+- `modules/enemies/index.js` - Интеграция в combat:
+  - `damageEnemy()`: Magic-Immune иммунитет, Shielded поглощение
+  - `updateEnemy()`: Regenerating heal tick
+- `core/config/waves/compositions.js` - Волны 15-40 с Magic-Immune, Regenerating, Shielded
+- `renderer/renderers/enemy-renderer.js` - Визуал для всех 5 special типов
 
 ### Фаза 6: Мини-боссы
 - [ ] Brood Mother (волна 5)
