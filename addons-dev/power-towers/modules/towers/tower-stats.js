@@ -210,23 +210,24 @@ function recalculateTowerStats(tower) {
   
   // === GROUND ZONE (Siege unique) ===
   // Leaves slowing crater after splash explosion
-  // Only available for Siege attack type, unlocked via groundZoneUnlock upgrade
+  // Only available for Siege attack type, unlocked via groundZoneUnlock attack type upgrade
   const isSiegeType = tower.attackTypeId === 'siege';
-  const groundZoneUnlocked = isSiegeType && upgradeLevels.groundZoneUnlock > 0;
+  const attackTypeUpgrades = tower.attackTypeUpgrades || {};
+  const groundZoneUnlocked = isSiegeType && (attackTypeUpgrades.groundZoneUnlock || 0) > 0;
   if (groundZoneUnlocked) {
     let zoneRadius = attackType.groundZoneRadius || 40;
     let zoneDuration = attackType.groundZoneDuration || 2000;
     let zoneSlow = attackType.groundZoneSlow || 0.25;
     
-    // Apply upgrades
-    if (upgradeLevels.groundZoneRadius) {
-      zoneRadius += upgradeLevels.groundZoneRadius * (bonuses.groundZoneRadius || 5);
+    // Apply attack type upgrades for ground zone
+    if (attackTypeUpgrades.groundZoneRadius) {
+      zoneRadius += attackTypeUpgrades.groundZoneRadius * (bonuses.groundZoneRadius || 5);
     }
-    if (upgradeLevels.groundZoneDuration) {
-      zoneDuration += upgradeLevels.groundZoneDuration * (bonuses.groundZoneDuration || 500);
+    if (attackTypeUpgrades.groundZoneDuration) {
+      zoneDuration += attackTypeUpgrades.groundZoneDuration * (bonuses.groundZoneDuration || 500);
     }
-    if (upgradeLevels.groundZoneSlow) {
-      zoneSlow += upgradeLevels.groundZoneSlow * (bonuses.groundZoneSlow || 0.05);
+    if (attackTypeUpgrades.groundZoneSlow) {
+      zoneSlow += attackTypeUpgrades.groundZoneSlow * (bonuses.groundZoneSlow || 0.05);
       zoneSlow = Math.min(0.8, zoneSlow); // Cap at 80% slow
     }
     

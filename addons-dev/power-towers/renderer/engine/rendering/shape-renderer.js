@@ -251,6 +251,15 @@ class ShapeRenderer {
   }
   
   /**
+   * Draw triangle
+   */
+  triangle(x1, y1, x2, y2, x3, y3, r, g, b, a = 1) {
+    this.vertex(x1, y1, r, g, b, a);
+    this.vertex(x2, y2, r, g, b, a);
+    this.vertex(x3, y3, r, g, b, a);
+  }
+  
+  /**
    * Flush to GPU
    */
   flush() {
