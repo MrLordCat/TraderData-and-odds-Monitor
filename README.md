@@ -18,6 +18,9 @@ Connects to your working Excel file for odds adjustments. Python-based watcher r
 **🤖 Auto Mode**  
 Assistant tool that tracks mid/average odds across bookmakers and helps you stay aligned with market movements. Configurable burst levels and adaptive behavior.
 
+**🔌 Browser Extension Support**  
+Chrome/Edge extension for real-time odds extraction. Extract odds directly from your browser and send them to the desktop app via WebSocket. Perfect for bookmakers not natively supported in embedded views.
+
 **🎮 LoL Live Stats**  
 Collects key game data from portal.grid.gg (gold diff, kills, towers, dragons, barons) for faster game state assessment without switching windows.
 
@@ -25,6 +28,7 @@ Collects key game data from portal.grid.gg (gold diff, kills, towers, dragons, b
 
 - **Broker Views**: Persistent sessions per bookmaker with independent zoom and map sync
 - **Odds Board**: Docked panel showing best/mid odds, arbitrage calculations, swap per broker
+- **Browser Extension**: Optional Chrome/Edge extension for external odds extraction (see [Extension Guide](docs/EXTENSION_INTEGRATION.md))
 - **Layout Presets**: Quick arrangements (2x2, 2x3, 1x2x2) for different screen setups
 - **Map Selection**: Synced across all brokers (Map 1, 2, 3, or Match)
 - **Stats Panel**: Dual-slot layout (split/vertical/focus modes) with hide/show control
