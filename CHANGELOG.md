@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### ✨ New Features
+- **Chrome/Edge Extension Support**: Real-time odds extraction from browser
+  - upTime extension for Chrome/Edge with WebSocket integration
+  - Extracts odds from supported bookmaker sites in your browser
+  - Automatic connection to desktop app (port 9988)
+  - Auto-reconnection every 15 seconds
+  - Supports: Rivalry, GG.bet, Thunderpick, BetBoom, Pari, Marathon, Bet365
+  - Extension management UI in Settings with status monitoring
+  - Developer mode installation (load unpacked)
+  - See `docs/EXTENSION_INTEGRATION.md` for full guide
+
+### 📚 Documentation
+- Added comprehensive extension integration guide
+- Created quick start installation guide (EXTENSION_QUICK_START.md)
+- Added architecture diagrams and data flow documentation
+- Updated README with extension feature overview
+
+### 🔧 Technical
+- Added WebSocket server module (`src/main/modules/wsServer/`)
+- Added extension IPC handlers for status and management
+- Added `ws@^8.18.0` dependency for WebSocket support
+- Extension odds integrated into existing odds pipeline
+- Real-time status monitoring with 5-second polling
+
+---
+
 ## [0.2.1]
 
 ### 🐛 Bug Fixes
