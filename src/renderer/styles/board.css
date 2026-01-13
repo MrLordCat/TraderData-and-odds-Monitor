@@ -243,6 +243,18 @@ select {
 .arb-positive { color: var(--good); }
 .arb-negative { color: var(--danger); }
 
+/* Excel(BG) odds comparison coloring */
+.odds-match { color: var(--good); font-weight: 600; }
+.odds-mismatch { color: var(--danger); font-weight: 600; }
+.bg-only { color: var(--accent); font-weight: 500; opacity: 0.9; }
+
+/* DS row styling */
+#dsRow { opacity: 0.85; }
+#dsRow th { font-size: 11px; }
+.bgControls { display: flex; align-items: center; gap: 6px; }
+.bgLabel { font-weight: 500; }
+.bgBadge { font-size: 10px; cursor: help; }
+
 /* Tag badge */
 .tag {
   font-size: 10px;

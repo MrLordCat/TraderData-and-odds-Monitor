@@ -252,7 +252,8 @@ function renderBoard(){
   if(!tb) return;
   const excelRow = document.getElementById('excelRow');
   const excelRecord = boardData['excel'];
-  const vals=Object.values(boardData).filter(r=>r.broker!=='excel').sort((a,b)=> a.broker.localeCompare(b.broker));
+  // Filter out excel and ds from broker list (ds shows in Excel row brackets)
+  const vals=Object.values(boardData).filter(r=>r.broker!=='excel' && r.broker!=='ds').sort((a,b)=> a.broker.localeCompare(b.broker));
   if(OddsBoardShared && OddsBoardShared.buildRowsHtml){
     const out = OddsBoardShared.buildRowsHtml(vals, { variant:'board', isSwapped: (b)=> swapped.has(b) });
     tb.innerHTML = out.html;
@@ -277,26 +278,63 @@ function renderBoard(){
             `<td class="${bestCls2} ${frozenCls}">${d2}</td></tr>`;
     }).join('');
   }
-  // Update Excel row
+  // Update Excel row with format: Excel(DS) if ds connected
   if(excelRow){
     const valSpan = document.getElementById('excelOddsVal');
     const statusSpan = document.getElementById('excelStatusCell');
-    if(excelRecord && Array.isArray(excelRecord.odds)){
-      const o1=excelRecord.odds[0];
-      const o2=excelRecord.odds[1];
-      if(valSpan) valSpan.textContent = `${o1} / ${o2}`; else excelRow.children[1].textContent = `${o1} / ${o2}`;
-      // Show suspension only on odds cell, not the whole Excel row
-      try {
-        const oddsCell = excelRow.querySelector('td');
-        if(oddsCell){ oddsCell.classList.toggle('frozen', !!excelRecord.frozen); }
-      } catch(_){ }
+    const bgRecord = boardData['ds'];
+    const hasBgOdds = bgRecord && Array.isArray(bgRecord.odds) && bgRecord.odds[0] !== '-';
+    const hasExcelOdds = excelRecord && Array.isArray(excelRecord.odds) && excelRecord.odds[0] !== '-';
+    
+    let displayHtml = '';
+    
+    if(hasExcelOdds && hasBgOdds){
+      // Both Excel and DS have odds - show with comparison
+      const excelO1 = excelRecord.odds[0];
+      const excelO2 = excelRecord.odds[1];
+      const bgO1 = bgRecord.odds[0];
+      const bgO2 = bgRecord.odds[1];
+      
+      // Compare for color coding (green = match, red = mismatch)
+      const match1 = compareOdds(excelO1, bgO1);
+      const match2 = compareOdds(excelO2, bgO2);
+      const cls1 = match1 ? 'odds-match' : 'odds-mismatch';
+      const cls2 = match2 ? 'odds-match' : 'odds-mismatch';
+      
+      displayHtml = `<span class="${cls1}">${excelO1}</span>(<span class="${cls1}">${bgO1}</span>) / (<span class="${cls2}">${bgO2}</span>)<span class="${cls2}">${excelO2}</span>`;
+    } else if(hasExcelOdds && !hasBgOdds){
+      // Only Excel odds
+      displayHtml = `${excelRecord.odds[0]} / ${excelRecord.odds[1]}`;
+    } else if(!hasExcelOdds && hasBgOdds){
+      // Only DS odds - show as "- (dsOdds)"
+      const bgO1 = bgRecord.odds[0];
+      const bgO2 = bgRecord.odds[1];
+      displayHtml = `- <span class="bg-only">(${bgO1})</span> / - <span class="bg-only">(${bgO2})</span>`;
     } else {
-      if(valSpan) valSpan.textContent='-'; else excelRow.children[1].textContent='-';
-      try { const oddsCell = excelRow.querySelector('td'); if(oddsCell){ oddsCell.classList.remove('frozen'); } } catch(_){ }
+      // Neither has odds
+      displayHtml = '- / -';
     }
+    
+    if(valSpan) valSpan.innerHTML = displayHtml; else excelRow.children[1].innerHTML = displayHtml;
+    
+    // Show suspension only on odds cell, not the whole Excel row
+    try {
+      const oddsCell = excelRow.querySelector('td');
+      if(oddsCell){ oddsCell.classList.toggle('frozen', !!(excelRecord && excelRecord.frozen)); }
+    } catch(_){ }
+    
     if(statusSpan && statusSpan.dataset.last==='idle'){ statusSpan.style.display='none'; }
   }
+  
   computeDerived();
+}
+
+// Compare odds with tolerance (match if within 0.02)
+function compareOdds(o1, o2){
+  const n1 = parseFloat(o1);
+  const n2 = parseFloat(o2);
+  if(isNaN(n1) || isNaN(n2)) return false;
+  return Math.abs(n1 - n2) < 0.02;
 }
 
 // Attach to shared OddsCore if available to avoid duplicating collection
@@ -327,7 +365,8 @@ if(window.desktopAPI){
   window.desktopAPI.onBrokerClosed && window.desktopAPI.onBrokerClosed((id)=>{ if (boardData[id]) { delete boardData[id]; renderBoard(); }});
   window.desktopAPI.onBrokersSync && window.desktopAPI.onBrokersSync((ids)=>{
     const set = new Set(ids);
-    Object.keys(boardData).forEach(k=>{ if(!set.has(k)) delete boardData[k]; });
+    // Don't remove excel or ds - they come from different sources
+    Object.keys(boardData).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)) delete boardData[k]; });
     renderBoard();
   });
   // Fallback to raw IPC if desktopAPI does not provide broker events
@@ -338,7 +377,7 @@ if(window.desktopAPI){
         ipcRenderer.on('broker-closed', (_e,p)=>{ try { const id=p&&p.id; if(id && boardData[id]){ delete boardData[id]; renderBoard(); } } catch(_){ } });
       }
       if(!window.desktopAPI.onBrokersSync){
-        ipcRenderer.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); Object.keys(boardData).forEach(k=>{ if(!set.has(k)) delete boardData[k]; }); renderBoard(); } catch(_){ } });
+        ipcRenderer.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); Object.keys(boardData).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)) delete boardData[k]; }); renderBoard(); } catch(_){ } });
       }
     }
   } catch(_){ }

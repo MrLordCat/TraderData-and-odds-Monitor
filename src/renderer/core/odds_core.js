@@ -8,7 +8,7 @@
   function computeDerivedFrom(records){
   const swapSet = global.__swappedBrokers;
   const isSwapped = (broker)=>{ try { return !!(swapSet && swapSet.has && swapSet.has(broker)); } catch(_){ return false; } };
-  const vals = Object.values(records||{}).filter(r=> r && r.broker!=='excel' && !r.frozen && Array.isArray(r.odds) && r.odds.length===2 && r.odds.every(o=>!isNaN(parseFloat(o))));
+  const vals = Object.values(records||{}).filter(r=> r && r.broker!=='excel' && r.broker!=='ds' && !r.frozen && Array.isArray(r.odds) && r.odds.length===2 && r.odds.every(o=>!isNaN(parseFloat(o))));
     if(!vals.length){ return { hasMid:false, arbProfitPct:null, mid:null }; }
     const s1=vals.map(r=>{ const sw=isSwapped(r.broker); return parseFloat(sw ? r.odds[1] : r.odds[0]); });
     const s2=vals.map(r=>{ const sw=isSwapped(r.broker); return parseFloat(sw ? r.odds[0] : r.odds[1]); });
@@ -47,14 +47,14 @@
           window.desktopAPI.onBrokerClosed((id)=>{ try { if(id){ remove(id); } } catch(_){ } });
         }
         if(window.desktopAPI.onBrokersSync){
-          window.desktopAPI.onBrokersSync((ids)=>{ try { const set=new Set(ids||[]); Object.keys(state.records).forEach(k=>{ if(!set.has(k)) delete state.records[k]; }); notify(); } catch(_){ } });
+          window.desktopAPI.onBrokersSync((ids)=>{ try { const set=new Set(ids||[]); Object.keys(state.records).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)) delete state.records[k]; }); notify(); } catch(_){ } });
         }
       } else {
         const { ipcRenderer } = window.require? window.require('electron') : {};
         if(ipcRenderer && ipcRenderer.on){
           ipcRenderer.on('odds-update', (_e,p)=> handler(p));
           ipcRenderer.on('broker-closed', (_e,p)=>{ try { const id=p&&p.id; if(id){ remove(id); } } catch(_){ } });
-          ipcRenderer.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); Object.keys(state.records).forEach(k=>{ if(!set.has(k)) delete state.records[k]; }); notify(); } catch(_){ } });
+          ipcRenderer.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); Object.keys(state.records).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)) delete state.records[k]; }); notify(); } catch(_){ } });
         }
       }
     } catch(_){ }

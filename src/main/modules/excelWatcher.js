@@ -7,7 +7,7 @@ const path = require('path');
 let electronApp = null;
 try { ({ app: electronApp } = require('electron')); } catch(_){ }
 
-function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, verbose=false }) {
+function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, extensionBridgeRef, verbose=false }) {
   if(!win || win.isDestroyed()) return { dispose(){} };
 
   let lastSig = '';
@@ -99,6 +99,7 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
   lastData = { odds1, odds2, frozen, rawTs, map: desiredMap };
     try { win.webContents.send('odds-update', payload); } catch(e){ log('emit failed main win', e.message); }
     try { if(typeof sendOdds === 'function') sendOdds(payload); } catch(e){ log('emit forward failed', e.message); }
+    // Note: Excel odds are no longer sent to extension - extension doesn't need them
     log('emit', payload);
     // Also broadcast latest template+map for AHK sync consumers
     broadcastTemplateSync();

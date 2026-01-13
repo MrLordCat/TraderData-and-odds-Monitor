@@ -155,7 +155,8 @@ try { initEmbeddedSwapSync(); } catch(_){ }
 function renderEmbeddedOdds(){
   const rowsEl=document.getElementById('embeddedOddsRows'); if(!rowsEl) return;
   const excelRec = embeddedOddsData['excel'];
-  const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel');
+  // Filter out excel and ds from broker list (ds shows in Excel row brackets)
+  const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel' && r.broker!=='ds');
   let liveNums1 = [];
   let liveNums2 = [];
   if(OddsBoardShared && OddsBoardShared.buildRowsHtml){
@@ -187,18 +188,30 @@ function renderEmbeddedOdds(){
         `</tr>`;
     }).join('');
   }
-  // Excel row update
+  // Excel row update - show DS odds in brackets
   try {
     const excelCell=document.getElementById('embeddedExcelCell');
     const excelRow=document.getElementById('embeddedExcelRow');
+    const bgRec = embeddedOddsData['ds'];
+    const hasBgOdds = bgRec && Array.isArray(bgRec.odds) && bgRec.odds[0] !== '-';
+    const hasExcelOdds = excelRec && Array.isArray(excelRec.odds) && excelRec.odds[0] !== '-';
+    
     if(excelCell && excelRow){
-      if(excelRec && Array.isArray(excelRec.odds)){
-        excelCell.textContent = `${excelRec.odds[0]} / ${excelRec.odds[1]}`;
-        excelRow.classList.toggle('frozen', !!excelRec.frozen);
-      } else {
-        excelCell.textContent='-';
-        excelRow.classList.remove('frozen');
+      let displayText = '- / -';
+      
+      if(hasExcelOdds && hasBgOdds){
+        // Both Excel and DS - show with comparison
+        displayText = `${excelRec.odds[0]}(${bgRec.odds[0]}) / (${bgRec.odds[1]})${excelRec.odds[1]}`;
+      } else if(hasExcelOdds){
+        // Only Excel
+        displayText = `${excelRec.odds[0]} / ${excelRec.odds[1]}`;
+      } else if(hasBgOdds){
+        // Only DS - show in brackets
+        displayText = `- (${bgRec.odds[0]}) / - (${bgRec.odds[1]})`;
       }
+      
+      excelCell.textContent = displayText;
+      excelRow.classList.toggle('frozen', !!(excelRec && excelRec.frozen));
     }
   } catch(_){ }
   const midCell=document.getElementById('embeddedMidCell');
@@ -301,7 +314,8 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   // Sync with full active brokers list (drop any stale entries not present anymore)
   try {
     if(window.desktopAPI?.onBrokersSync){
-      window.desktopAPI.onBrokersSync(ids=>{ try { const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
+      // Don't remove 'excel' or 'ds' - they come from different sources
+      window.desktopAPI.onBrokersSync(ids=>{ try { const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
     }
   } catch(_){ }
   // One-time attempt to fetch last Excel odds (if loaded after they were emitted) so user doesn't need to re-select map

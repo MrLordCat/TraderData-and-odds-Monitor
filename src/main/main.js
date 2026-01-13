@@ -268,6 +268,13 @@ const { createAddonManager } = require('./modules/addonManager');
 const { registerAddonIpc } = require('./modules/ipc/addons');
 // Module detach for sidebar modules
 const { registerModuleDetachIpc, closeAllDetachedWindows } = require('./modules/ipc/moduleDetach');
+// Extension Bridge for Edge upTime extension
+const { createExtensionBridge } = require('./modules/extensionBridge');
+const { createExtensionInstaller } = require('./modules/extensionBridge/installer');
+const { initExtensionBridgeIpc } = require('./modules/ipc/extensionBridge');
+let extensionBridge = null; // initialized in bootstrap()
+let extensionInstaller = null; // initialized in bootstrap()
+const extensionBridgeRef = { value: null }; // ref for IPC modules
 let addonManager = null; // initialized in bootstrap()
 let updateManager = null; // initialized in bootstrap()
 // External Excel odds JSON watcher (pseudo broker 'excel')
@@ -496,11 +503,11 @@ function bootstrap() {
       };
       // Annotate forward with a hint for template sync side-channel
       try { Object.defineProperty(forward, '__acceptsTemplateSync', { value: false, enumerable:false }); } catch(_){ }
-      global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward, statsManager, boardManager, verbose: false });
+      global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward, statsManager, boardManager, extensionBridgeRef, verbose: false });
     }
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
   // Initialize map selection IPC (needs boardManager, statsManager, mainWindow references)
-  initMapIpc({ ipcMain, store, views, mainWindow, boardWindowRef:{ value: null }, boardManager, statsManager });
+  initMapIpc({ ipcMain, store, views, mainWindow, boardWindowRef:{ value: null }, boardManager, statsManager, extensionBridgeRef });
   // Initialize periodic map re-broadcast (odds refresh auto loop)
   try {
     const { initMapAutoRefreshIpc } = require('./modules/ipc/mapAutoRefresh');
@@ -558,6 +565,57 @@ function bootstrap() {
       if(bwc && !bwc.isDestroyed()){ bwc.focus(); console.log('[startup] auto-focused board webContents'); }
     } catch(_){ }
   }, 800);
+  // --- Extension Bridge (upTime Edge extension) ---
+  try {
+    extensionInstaller = createExtensionInstaller({ store, app });
+    extensionBridge = createExtensionBridge({
+      store,
+      port: 9876,
+      onOddsUpdate: (payload) => {
+        // Forward DS odds like any other broker
+        try { if(boardManager && boardManager.sendOdds) boardManager.sendOdds(payload); } catch(_){ }
+        try {
+          if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
+            statsManager.views.panel.webContents.send('odds-update', payload);
+          }
+        } catch(_){ }
+        try { if(latestOddsRef && latestOddsRef.value) latestOddsRef.value[payload.broker] = payload; } catch(_){ }
+        // Broadcast to main window as well
+        try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', payload); } catch(_){ }
+      },
+      onConnect: ({ version, updateAvailable }) => {
+        console.log('[extensionBridge] Extension connected, version:', version, 'updateAvailable:', updateAvailable);
+        extensionInstaller.markExtensionConnected();
+        // Send current map and Excel odds to extension
+        const currentMap = store.get('lastMap') || 1;
+        extensionBridge.sendCurrentMap(currentMap);
+        // Send last Excel odds if available
+        if(global.__lastExcelOdds){
+          extensionBridge.sendExcelOdds(global.__lastExcelOdds.odds, global.__lastExcelOdds.map);
+        }
+        // Show update dialog if needed
+        if(updateAvailable){
+          setTimeout(() => {
+            extensionInstaller.showUpdateDialog(mainWindow, version, extensionBridge.BUNDLED_EXTENSION_VERSION);
+          }, 2000);
+        }
+      },
+      onDisconnect: () => {
+        console.log('[extensionBridge] Extension disconnected');
+      }
+    });
+    extensionBridge.start();
+    extensionBridgeRef.value = extensionBridge; // expose via ref for IPC modules
+    initExtensionBridgeIpc({ extensionBridge, extensionInstaller, mainWindow, store });
+    console.log('[extensionBridge] WebSocket server started on port 9876');
+    
+    // Check if should show install prompt (first launch, extension not connected)
+    setTimeout(() => {
+      if(extensionInstaller.shouldShowInstallPrompt() && !extensionBridge.isConnected()){
+        extensionInstaller.showInstallDialog(mainWindow);
+      }
+    }, 5000);
+  } catch(e){ console.warn('[extensionBridge] init failed', e.message); }
   // --- Auto-Update Manager ---
   try {
     updateManager = createUpdateManager({ app, store, dialog, mainWindow });

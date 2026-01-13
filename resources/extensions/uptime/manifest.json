@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Uptime Tracker",
+  "version": "1.1.0",
+  "description": "Tracks uptime based on trading state changes and sends odds to OddsMoni",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://dataservices.betgenius.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://dataservices.betgenius.com/*"],
+      "js": ["uptimeEngine.js", "displayManager.js", "content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ]
+}

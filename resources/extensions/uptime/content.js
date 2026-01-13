@@ -1,0 +1,280 @@
+// Main content script - coordinates uptime engine and display manager
+let uptimeEngine = null;
+let displayManager = null;
+let tracker = null; // Legacy compatibility
+let oddsBridge = null; // WebSocket bridge to OddsMoni
+
+// ============================================
+// OddsBridge - WebSocket client for OddsMoni
+// ============================================
+class OddsBridge {
+  constructor() {
+    this.ws = null;
+    this.reconnectInterval = 15000; // 15 seconds fixed
+    this.oddsInterval = null;
+    this.currentMap = 1;
+    this.isLast = false;  // Bo1 mode: use Match Up Winner for map 1
+    this.connected = false;
+    this.version = '1.1.0'; // Extension version
+    this.connect();
+  }
+
+  connect() {
+    try {
+      this.ws = new WebSocket('ws://localhost:9876');
+
+      this.ws.onopen = () => {
+        console.log('[upTime] Connected to OddsMoni');
+        this.connected = true;
+        this.sendHandshake();
+        this.startOddsPolling();
+        this.updateConnectionStatus(true);
+      };
+
+      this.ws.onclose = () => {
+        console.log('[upTime] Disconnected from OddsMoni, retry in 15s');
+        this.connected = false;
+        this.stopOddsPolling();
+        this.updateConnectionStatus(false);
+        setTimeout(() => this.connect(), this.reconnectInterval);
+      };
+
+      this.ws.onerror = (err) => {
+        // onerror is always followed by onclose
+        console.log('[upTime] WebSocket error');
+      };
+
+      this.ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          this.handleMessage(msg);
+        } catch (err) {
+          console.warn('[upTime] Message parse error:', err);
+        }
+      };
+
+    } catch (err) {
+      console.log('[upTime] WebSocket connection failed, retry in 15s');
+      setTimeout(() => this.connect(), this.reconnectInterval);
+    }
+  }
+
+  sendHandshake() {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'handshake',
+        version: this.version
+      }));
+    }
+  }
+
+  handleMessage(msg) {
+    switch (msg.type) {
+      case 'init':
+        // Initial state from OddsMoni
+        this.currentMap = msg.currentMap || 1;
+        this.isLast = !!msg.isLast;
+        console.log('[upTime] Init received, map:', this.currentMap, 'isLast:', this.isLast);
+        if (msg.updateAvailable) {
+          console.log('[upTime] Update available:', msg.latestVersion);
+          this.showUpdateNotification(msg.latestVersion);
+        }
+        break;
+
+      case 'current-map':
+        this.currentMap = msg.map || 1;
+        this.isLast = !!msg.isLast;
+        console.log('[upTime] Map changed to:', this.currentMap, 'isLast:', this.isLast);
+        // Immediately send odds for new map
+        this.sendOddsNow();
+        break;
+
+      case 'update-available':
+        this.showUpdateNotification(msg.latestVersion);
+        break;
+
+      case 'pong':
+        // Heartbeat response
+        break;
+    }
+  }
+
+  startOddsPolling() {
+    // Clear any existing interval
+    this.stopOddsPolling();
+    
+    // Poll every 500ms
+    this.oddsInterval = setInterval(() => {
+      this.sendOddsNow();
+    }, 500);
+  }
+
+  stopOddsPolling() {
+    if (this.oddsInterval) {
+      clearInterval(this.oddsInterval);
+      this.oddsInterval = null;
+    }
+  }
+
+  sendOddsNow() {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    
+    const data = window.extractMapOdds?.(this.currentMap, this.isLast);
+    if (data) {
+      this.ws.send(JSON.stringify({
+        type: 'odds-update',
+        map: data.map,
+        odds: data.odds,
+        frozen: data.frozen,
+        teams: data.teams
+      }));
+    }
+  }
+
+  updateConnectionStatus(connected) {
+    // Update visual indicator
+    let badge = document.getElementById('oddsmoni-connection-badge');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'oddsmoni-connection-badge';
+      badge.style.cssText = `
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-family: Arial, sans-serif;
+        z-index: 99999;
+        pointer-events: none;
+        transition: all 0.3s ease;
+      `;
+      document.body.appendChild(badge);
+    }
+    
+    if (connected) {
+      badge.textContent = '🟢 OddsMoni';
+      badge.style.background = 'rgba(0, 128, 0, 0.8)';
+      badge.style.color = '#fff';
+    } else {
+      badge.textContent = '🔴 OddsMoni (reconnect 15s)';
+      badge.style.background = 'rgba(128, 0, 0, 0.8)';
+      badge.style.color = '#fff';
+    }
+  }
+
+  showUpdateNotification(latestVersion) {
+    // Simple notification
+    let notif = document.getElementById('uptime-update-notif');
+    if (!notif) {
+      notif = document.createElement('div');
+      notif.id = 'uptime-update-notif';
+      notif.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        padding: 10px 15px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: Arial, sans-serif;
+        z-index: 99999;
+        background: rgba(255, 165, 0, 0.95);
+        color: #000;
+        cursor: pointer;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      `;
+      notif.innerHTML = `⚠️ Доступно обновление upTime v${latestVersion}<br><small>Нажмите для закрытия</small>`;
+      notif.onclick = () => notif.remove();
+      document.body.appendChild(notif);
+      
+      // Auto-hide after 30 seconds
+      setTimeout(() => notif.remove(), 30000);
+    }
+  }
+}
+
+function initTracker() {
+    if (uptimeEngine && displayManager) {
+        return;
+    }
+    
+    // Initialize uptime tracking engine
+    uptimeEngine = new UptimeEngine();
+    uptimeEngine.init();
+    
+    // Initialize display manager
+    displayManager = new UptimeDisplayManager(uptimeEngine);
+    displayManager.init();
+    
+    // Legacy compatibility
+    tracker = {
+        createUptimeDisplay: () => displayManager.createUptimeDisplay(),
+        reset: () => displayManager.reset()
+    };
+    
+    // Initialize OddsBridge for OddsMoni integration
+    if (!oddsBridge) {
+        oddsBridge = new OddsBridge();
+    }
+}
+
+// Initialize when page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTracker);
+} else {
+    initTracker();
+}
+
+// Re-create display if trading-state container changes
+const pageObserver = new MutationObserver((mutations) => {
+    const hasSignificantChange = mutations.some(mutation => 
+        mutation.type === 'childList' && 
+        Array.from(mutation.addedNodes).some(node => 
+            node.nodeType === Node.ELEMENT_NODE && 
+            node.classList?.contains('trading-state-container')
+        )
+    );
+    
+    if (hasSignificantChange && !document.querySelector('.uptime-tracker-container')) {
+        setTimeout(() => displayManager?.createUptimeDisplay(), 1000);
+    }
+});
+
+pageObserver.observe(document.body, { childList: true, subtree: true });
+
+// Hotkeys for spinner buttons (Numpad +/-) and Commit (Enter)
+// Numpad - : Decrease odd team 1
+// Numpad + : Decrease odd team 2
+// Enter   : Commit prices
+document.addEventListener('keydown', (e) => {
+    // Numpad Subtract (-) -> Decrease odd team 1
+    if (e.code === 'NumpadSubtract') {
+        const downBtn = document.querySelector('button.spinner-down');
+        if (downBtn) {
+            downBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            downBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+            downBtn.click();
+            e.preventDefault();
+        }
+    }
+    
+    // Numpad Add (+) -> Decrease odd team 2
+    if (e.code === 'NumpadAdd') {
+        const upBtn = document.querySelector('button.spinner-up');
+        if (upBtn) {
+            upBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            upBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+            upBtn.click();
+            e.preventDefault();
+        }
+    }
+    
+    // Enter -> Commit prices
+    if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+        const commitBtn = document.querySelector('button#commit-prices');
+        if (commitBtn && !commitBtn.disabled) {
+            commitBtn.click();
+            e.preventDefault();
+        }
+    }
+}, true);
