@@ -48,7 +48,8 @@
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "electron": "^38.0.0",

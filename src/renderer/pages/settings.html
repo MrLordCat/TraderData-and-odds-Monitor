@@ -208,6 +208,36 @@
 					</section>
 
 					<section class="seg">
+					<h2 class="sectionTitle">Extension (Chrome/Edge)</h2>
+					<div class="extension-container">
+						<div class="extension-status">
+							<label>WebSocket Server:</label>
+							<span id="ext-server-status" class="staticVal">—</span>
+							<label>Connected Clients:</label>
+							<span id="ext-clients-count" class="staticVal">0</span>
+							<label>Port:</label>
+							<span class="staticVal">9988</span>
+						</div>
+						<div class="extension-actions" style="margin-top: 12px;">
+							<button id="ext-restart" type="button">Restart Server</button>
+							<button id="ext-open-folder" type="button">Open Extension Folder</button>
+						</div>
+					</div>
+					<div class="hint" style="margin-top: 12px;">
+						<strong>Installation Instructions:</strong><br>
+						1. Open Edge: <code>edge://extensions/</code><br>
+						2. Enable "Developer mode"<br>
+						3. Click "Load unpacked"<br>
+						4. Navigate to: <code>[App Directory]/src/extensions/upTime</code><br>
+						5. Extension will connect automatically to port 9988
+					</div>
+					<div class="hint" style="margin-top: 8px;">
+						The extension extracts real-time odds from bookmaker sites and sends them to the app via WebSocket.
+						Ensure the app is running before opening bookmaker sites in the browser.
+					</div>
+					</section>
+
+					<section class="seg">
 					<h2 class="sectionTitle">Dev</h2>
 					<div class="grid formGrid">
 						<label>DevTools</label>

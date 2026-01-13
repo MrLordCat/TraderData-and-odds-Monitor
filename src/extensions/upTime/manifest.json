@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "upTime - Odds Extractor",
+  "version": "1.0.0",
+  "description": "Real-time odds extraction for bookmaker sites",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.rivalry.com/*",
+    "https://gg.bet/*",
+    "https://thunderpick.io/*",
+    "https://betboom.ru/*",
+    "https://pari.ru/*",
+    "https://www.marathonbet.dk/*",
+    "https://www.bet365.ee/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.rivalry.com/*",
+        "https://gg.bet/*",
+        "https://thunderpick.io/*",
+        "https://betboom.ru/*",
+        "https://pari.ru/*",
+        "https://www.marathonbet.dk/*",
+        "https://www.bet365.ee/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

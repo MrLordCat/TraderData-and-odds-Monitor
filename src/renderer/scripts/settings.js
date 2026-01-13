@@ -1108,3 +1108,62 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	loadAddons();
 })();
 
+// ===== Extension Management =====
+(async function initExtension(){
+	const statusEl = document.getElementById('ext-server-status');
+	const clientsEl = document.getElementById('ext-clients-count');
+	const restartBtn = document.getElementById('ext-restart');
+	const openFolderBtn = document.getElementById('ext-open-folder');
+	
+	async function updateStatus(){
+		try {
+			const status = await ipcRenderer.invoke('extension-get-status');
+			if(status){
+				if(statusEl) statusEl.textContent = status.running ? '✓ Running' : '✗ Stopped';
+				if(statusEl) statusEl.style.color = status.running ? '#4caf50' : '#f44336';
+				if(clientsEl) clientsEl.textContent = String(status.clients || 0);
+			}
+		} catch(e){
+			console.error('[settings][extension] status update failed:', e);
+			if(statusEl) statusEl.textContent = 'Error';
+		}
+	}
+	
+	// Restart server button
+	if(restartBtn){
+		restartBtn.addEventListener('click', async () => {
+			restartBtn.disabled = true;
+			restartBtn.textContent = 'Restarting...';
+			try {
+				await ipcRenderer.invoke('extension-restart-server');
+				setTimeout(updateStatus, 1000);
+			} catch(e){
+				console.error('[settings][extension] restart failed:', e);
+			} finally {
+				restartBtn.disabled = false;
+				restartBtn.textContent = 'Restart Server';
+			}
+		});
+	}
+	
+	// Open extension folder
+	if(openFolderBtn){
+		openFolderBtn.addEventListener('click', () => {
+			try {
+				const path = require('path');
+				// Get app path and construct extension path
+				const extPath = path.join(__dirname, '..', '..', '..', 'src', 'extensions', 'upTime');
+				ipcRenderer.send('shell-open-path', extPath);
+			} catch(e){
+				console.error('[settings][extension] openFolder failed:', e);
+			}
+		});
+	}
+	
+	// Initial status update
+	updateStatus();
+	
+	// Poll status every 5 seconds
+	setInterval(updateStatus, 5000);
+})();
+

@@ -252,6 +252,8 @@ initEarlyIpc({ ipcMain, store, boardManagerRef });
 
 // Stats debug & raw mirroring moved to modules/ipc/statsDebug.js (initialized after stats log window helper is defined)
 
+// Extension IPC for WebSocket server management
+const { initExtensionIpc } = require('./modules/ipc/extension');
 
 const { ensureVisibleBounds } = require('./modules/utils/display');
 // Deferred IPC module requires (kept top-level so bundle analyzers see them)
@@ -274,6 +276,9 @@ let updateManager = null; // initialized in bootstrap()
 const { createExcelWatcher } = require('./modules/excelWatcher');
 const { createExcelExtractorController } = require('./modules/excelExtractorController');
 let excelExtractorController = null; // initialized in bootstrap()
+// WebSocket server for Chrome/Edge extension communication
+const { createWsServer } = require('./modules/wsServer');
+let wsServer = null; // initialized in bootstrap()
 const lolTeamNamesRef = { value: lolTeamNames };
 const autoRefreshEnabledRef = { value: autoRefreshEnabled };
 function createMainWindow() {
@@ -578,6 +583,43 @@ function bootstrap() {
     });
     console.log('[addons] AddonManager initialized');
   } catch(e){ console.warn('[addons] createAddonManager failed', e.message); }
+  // --- WebSocket Server for Extension ---
+  try {
+    wsServer = createWsServer({
+      port: 9988,
+      onOddsUpdate: (data) => {
+        try {
+          console.log('[wsServer] Odds update from extension:', data.brokerId);
+          // Create odds payload in same format as broker extractors
+          const payload = {
+            broker: data.brokerId,
+            odds: data.odds,
+            frozen: data.frozen,
+            source: 'extension',
+            timestamp: data.timestamp
+          };
+          // Forward to board manager
+          if (boardManager && boardManager.sendOdds) {
+            boardManager.sendOdds(payload);
+          }
+          // Forward to stats panel
+          if (statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()) {
+            statsManager.views.panel.webContents.send('odds-update', payload);
+          }
+          // Store in latestOdds cache
+          if (latestOddsRef && latestOddsRef.value) {
+            latestOddsRef.value[data.brokerId] = payload;
+          }
+        } catch (err) {
+          console.error('[wsServer] onOddsUpdate error:', err);
+        }
+      }
+    });
+    wsServer.start();
+    console.log('[wsServer] WebSocket server initialized on port 9988');
+    // Initialize extension IPC
+    initExtensionIpc({ ipcMain, wsServer });
+  } catch(e){ console.warn('[wsServer] createWsServer failed', e.message); }
   // Menu intentionally suppressed (user prefers F12 only)
   // Removed broker-id partition probing to avoid creating unused persistent profiles
 }
@@ -893,5 +935,7 @@ app.on('before-quit', ()=>{
   quittingRef.value=true; 
   // Close all detached module windows to prevent zombie processes
   try { closeAllDetachedWindows(); } catch(e){ console.warn('[before-quit] closeAllDetachedWindows error:', e.message); }
+  // Stop WebSocket server
+  try { if (wsServer) wsServer.stop(); } catch(e){ console.warn('[before-quit] wsServer.stop error:', e.message); }
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
