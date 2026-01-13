@@ -104,6 +104,8 @@ const firstEventFlags = {}; // legacy safety (used for initial value flags)
 const animTimers = { delete: ()=>{}, get: ()=>null, set: ()=>{} }; // inert placeholder
 let liveDataset = null, cachedLive = null, currentLiveGame = null, currentGame = null; // game selection
 let swapTeams = false; // manual mode swap
+// Excel team names (priority over grid)
+let excelTeamNames = { team1: null, team2: null };
 // Manual mode data
 let manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats: { '1': makeEmptyGame() } };
 
@@ -385,21 +387,23 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
  } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
 
-// Team names from Excel K4/N4 (read-only, updates headers)
+// Team names from Excel K4/N4 (read-only, updates headers) - PRIORITY over grid
 ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
   try {
     console.log('[stats_panel] Received excel-team-names IPC:', { team1, team2 });
-    const t1 = (team1 || '').trim() || 'Team 1';
-    const t2 = (team2 || '').trim() || 'Team 2';
-    console.log('[stats_panel] Parsed team names:', t1, '/', t2);
-    setTeamHeader(1, t1);
-    setTeamHeader(2, t2);
+    const t1 = (team1 || '').trim();
+    const t2 = (team2 || '').trim();
+    // Store Excel team names (even if empty to clear priority)
+    excelTeamNames.team1 = t1 || null;
+    excelTeamNames.team2 = t2 || null;
+    console.log('[stats_panel] Stored Excel team names:', excelTeamNames);
+    // Apply if non-empty
+    if(t1) setTeamHeader(1, t1);
+    if(t2) setTeamHeader(2, t2);
     // Also update manual mode data for consistency
-    if(manualData.team1Name !== t1 || manualData.team2Name !== t2){
-      renameTeamInternal(1, t1);
-      renameTeamInternal(2, t2);
-    }
-    console.log('[stats_panel] Excel team names applied:', t1, '/', t2);
+    if(t1 && manualData.team1Name !== t1) renameTeamInternal(1, t1);
+    if(t2 && manualData.team2Name !== t2) renameTeamInternal(2, t2);
+    console.log('[stats_panel] Excel team names applied:', t1 || '(empty)', '/', t2 || '(empty)');
   } catch(e){ console.error('[stats_panel] excel-team-names error:', e); }
 });
 
@@ -660,8 +664,9 @@ function renderLol(payload, manual=false){
     const t1Key = dispTeam1;
     const t2Key = dispTeam2;
     const th1=document.getElementById('lt-team1'); const th2=document.getElementById('lt-team2');
-    const headerDisp1 = (customTeamNames[1] && !manual) ? customTeamNames[1] : (dispTeam1||'Team 1');
-    const headerDisp2 = (customTeamNames[2] && !manual) ? customTeamNames[2] : (dispTeam2||'Team 2');
+    // Priority: Excel team names > grid team names > custom > default
+    const headerDisp1 = excelTeamNames.team1 || ((customTeamNames[1] && !manual) ? customTeamNames[1] : (dispTeam1||'Team 1'));
+    const headerDisp2 = excelTeamNames.team2 || ((customTeamNames[2] && !manual) ? customTeamNames[2] : (dispTeam2||'Team 2'));
   setTeamHeader(1, headerDisp1, true);
   setTeamHeader(2, headerDisp2, true);
     scheduleAdjustCols();
