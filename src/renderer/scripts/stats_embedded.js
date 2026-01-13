@@ -188,30 +188,37 @@ function renderEmbeddedOdds(){
         `</tr>`;
     }).join('');
   }
-  // Excel row update - show DS odds in brackets
+  // Excel row update - simple display
   try {
     const excelCell=document.getElementById('embeddedExcelCell');
     const excelRow=document.getElementById('embeddedExcelRow');
-    const bgRec = embeddedOddsData['ds'];
-    const hasBgOdds = bgRec && Array.isArray(bgRec.odds) && bgRec.odds[0] !== '-';
     const hasExcelOdds = excelRec && Array.isArray(excelRec.odds) && excelRec.odds[0] !== '-';
     
     if(excelCell && excelRow){
       let displayText = '- / -';
-      
-      if(hasExcelOdds && hasBgOdds){
-        // Both Excel and DS - show with comparison
-        displayText = `${excelRec.odds[0]}(${bgRec.odds[0]}) / (${bgRec.odds[1]})${excelRec.odds[1]}`;
-      } else if(hasExcelOdds){
-        // Only Excel
+      if(hasExcelOdds){
         displayText = `${excelRec.odds[0]} / ${excelRec.odds[1]}`;
-      } else if(hasBgOdds){
-        // Only DS - show in brackets
-        displayText = `- (${bgRec.odds[0]}) / - (${bgRec.odds[1]})`;
       }
-      
       excelCell.textContent = displayText;
       excelRow.classList.toggle('frozen', !!(excelRec && excelRec.frozen));
+    }
+  } catch(_){ }
+  
+  // DS row update - separate row for DS odds
+  try {
+    const dsCell=document.getElementById('embeddedDsCell');
+    const dsRow=document.getElementById('embeddedDsRow');
+    const dsRec = embeddedOddsData['ds'];
+    const hasDsOdds = dsRec && Array.isArray(dsRec.odds) && dsRec.odds[0] !== '-';
+    
+    if(dsCell && dsRow){
+      if(hasDsOdds){
+        dsCell.textContent = `${dsRec.odds[0]} / ${dsRec.odds[1]}`;
+        dsRow.style.display = '';
+        dsRow.classList.toggle('frozen', !!dsRec.frozen);
+      } else {
+        dsRow.style.display = 'none';
+      }
     }
   } catch(_){ }
   const midCell=document.getElementById('embeddedMidCell');

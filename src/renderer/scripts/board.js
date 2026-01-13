@@ -278,41 +278,15 @@ function renderBoard(){
             `<td class="${bestCls2} ${frozenCls}">${d2}</td></tr>`;
     }).join('');
   }
-  // Update Excel row with format: Excel(DS) if ds connected
+  // Update Excel row - simple display
   if(excelRow){
     const valSpan = document.getElementById('excelOddsVal');
     const statusSpan = document.getElementById('excelStatusCell');
-    const bgRecord = boardData['ds'];
-    const hasBgOdds = bgRecord && Array.isArray(bgRecord.odds) && bgRecord.odds[0] !== '-';
     const hasExcelOdds = excelRecord && Array.isArray(excelRecord.odds) && excelRecord.odds[0] !== '-';
     
-    let displayHtml = '';
-    
-    if(hasExcelOdds && hasBgOdds){
-      // Both Excel and DS have odds - show with comparison
-      const excelO1 = excelRecord.odds[0];
-      const excelO2 = excelRecord.odds[1];
-      const bgO1 = bgRecord.odds[0];
-      const bgO2 = bgRecord.odds[1];
-      
-      // Compare for color coding (green = match, red = mismatch)
-      const match1 = compareOdds(excelO1, bgO1);
-      const match2 = compareOdds(excelO2, bgO2);
-      const cls1 = match1 ? 'odds-match' : 'odds-mismatch';
-      const cls2 = match2 ? 'odds-match' : 'odds-mismatch';
-      
-      displayHtml = `<span class="${cls1}">${excelO1}</span>(<span class="${cls1}">${bgO1}</span>) / (<span class="${cls2}">${bgO2}</span>)<span class="${cls2}">${excelO2}</span>`;
-    } else if(hasExcelOdds && !hasBgOdds){
-      // Only Excel odds
+    let displayHtml = '- / -';
+    if(hasExcelOdds){
       displayHtml = `${excelRecord.odds[0]} / ${excelRecord.odds[1]}`;
-    } else if(!hasExcelOdds && hasBgOdds){
-      // Only DS odds - show as "- (dsOdds)"
-      const bgO1 = bgRecord.odds[0];
-      const bgO2 = bgRecord.odds[1];
-      displayHtml = `- <span class="bg-only">(${bgO1})</span> / - <span class="bg-only">(${bgO2})</span>`;
-    } else {
-      // Neither has odds
-      displayHtml = '- / -';
     }
     
     if(valSpan) valSpan.innerHTML = displayHtml; else excelRow.children[1].innerHTML = displayHtml;
@@ -326,15 +300,25 @@ function renderBoard(){
     if(statusSpan && statusSpan.dataset.last==='idle'){ statusSpan.style.display='none'; }
   }
   
+  // Update DS row - separate row for DS odds
+  try {
+    const dsRow = document.getElementById('dsRow');
+    const dsCell = document.getElementById('dsOddsVal');
+    const dsRecord = boardData['ds'];
+    const hasDsOdds = dsRecord && Array.isArray(dsRecord.odds) && dsRecord.odds[0] !== '-';
+    
+    if(dsRow && dsCell){
+      if(hasDsOdds){
+        dsCell.textContent = `${dsRecord.odds[0]} / ${dsRecord.odds[1]}`;
+        dsRow.style.display = '';
+        dsRow.classList.toggle('frozen', !!dsRecord.frozen);
+      } else {
+        dsRow.style.display = 'none';
+      }
+    }
+  } catch(_){ }
+  
   computeDerived();
-}
-
-// Compare odds with tolerance (match if within 0.02)
-function compareOdds(o1, o2){
-  const n1 = parseFloat(o1);
-  const n2 = parseFloat(o2);
-  if(isNaN(n1) || isNaN(n2)) return false;
-  return Math.abs(n1 - n2) < 0.02;
 }
 
 // Attach to shared OddsCore if available to avoid duplicating collection
