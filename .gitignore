@@ -73,13 +73,12 @@ renderer/fonts/
 auto_press_confirm_debug.json
 
 # Runtime-generated state (app / Excel Extractor)
-auto_press_signal.json
+**/auto_press_signal.json
+**/auto_press_debug.json
+**/sendKeyInject.ps1
 Excel Extractor/template_sync.json
 Excel Extractor/current_state.json
 Excel Extractor/hotkey_status.json
-
-# Runtime-generated (do not commit)
-auto_press_debug.json
 
 # Python virtual environments (Excel Extractor)
 .venv/
