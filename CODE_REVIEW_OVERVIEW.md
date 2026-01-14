@@ -26,9 +26,8 @@ Responsibilities:
 - Odds cache `latestOddsRef` for re-renders after reconnect/reattach.
 - Freshness & auto-reload: `brokerHealth`, `STALE_MS`, `HEALTH_CHECK_INTERVAL`; `staleMonitor` auto-reloads stuck brokers.
 - Map/team reapply after navigations: `scheduleMapReapply(view)` with multiple delays (400/1400/3000/5000ms) to survive SPA/transitions.
-- (Removed) DataServices URL prompt.
-- Hotkeys: window-level `before-input-event` (Space toggles stats; F12/Ctrl+F12 DevTools; Alt+C disables auto). Global shortcuts: `Control+Alt+L` (stats log) and `Num5` (auto toggle) with in-window fallback.
-- Auto press injection (`send-auto-press`) using PowerShell helper (`sendKeyInject.ps1`): schedules F22 confirm for F23/F24.
+- Hotkeys: window-level `before-input-event` (Space toggles stats; F12/Ctrl+F12 DevTools; Alt+C disables auto). Global shortcut: `Num5` (auto toggle).
+- Auto press injection (`send-auto-press`) using PowerShell helper (generated at runtime): schedules F22 confirm for F23/F24.
 - Central de-dup for F21 (suspend) requests: main collapses near-simultaneous initial and retry F21s coming from multiple windows.
 - Managers init order: `layoutManager`, `brokerManager`, `boardManager`, `statsManager`, `excelWatcher`.
 - Modular IPC: `early`, `brokers`, `layout`, `settings`, `map`, `board`, `teamNames`, `autoRefresh`, `stats`.
