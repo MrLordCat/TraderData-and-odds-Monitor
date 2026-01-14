@@ -226,8 +226,6 @@ const { createStatsManager } = require('./modules/stats/');
 let statsManager; // temporary undefined until after stageBoundsRef creation
 let statsState = { mode: 'hidden', panelHidden: !!store.get('statsPanelHidden', false) }; // 'hidden' | 'embedded', plus panelHidden
 let lastStatsToggleTs = 0; // throttle for space hotkey
-// Stub for stats log window (feature deprecated but references remain)
-function openStatsLogWindow(){ try { console.log('[stats-log] feature deprecated'); } catch(_){} }
 // Dev helper moved to dev/devCssWatcher.js
 const { initDevCssWatcher } = require('./modules/dev/devCssWatcher');
 // Early refs required by statsManager; define before first createStatsManager call
@@ -807,18 +805,10 @@ app.whenReady().then(()=>{
       });
     }
   } catch(e){ console.warn('[ipc][send-auto-press] register failed', e); }
-  // Register global shortcut for opening Stats Log window
+  // Global Numpad5 toggle for auto modes (board + embedded stats) even when app not focused
   try {
-    if(globalShortcut.isRegistered('Control+Alt+L')) globalShortcut.unregister('Control+Alt+L');
-    const ok = globalShortcut.register('Control+Alt+L', () => {
-      try { openStatsLogWindow(); } catch(e){ console.warn('[shortcut][stats-log] open failed', e); }
-    });
-    if(!ok) console.warn('[shortcut][stats-log] registration returned false');
-    else console.log('[shortcut][stats-log] registered Ctrl+Alt+L');
-    // Global Numpad5 toggle for auto modes (board + embedded stats) even when app not focused
-    try {
-      // Try several accelerator variants to improve cross-OS/keyboard reliability
-      const candidates = ['Num5','Numpad5','num5'];
+    // Try several accelerator variants to improve cross-OS/keyboard reliability
+    const candidates = ['Num5','Numpad5','num5'];
       const handler = () => {
         try {
           broadcastAutoToggleAll();
@@ -899,11 +889,6 @@ app.on('browser-window-created', (_e, win)=>{
             broadcastToAll(getBroadcastCtx(), 'auto-disable-all');
             console.log('[hotkey][Alt+C] broadcast auto-disable-all');
           } catch(e){ console.warn('[hotkey][Alt+C] failed', e); }
-          return;
-        }
-        // Ctrl+Alt+L opens (or focuses) the Stats Log window (fallback if global shortcut unavailable)
-        if((input.control || input.meta) && input.alt && (input.key==='L' || input.key==='l')){
-          try { openStatsLogWindow(); } catch(e){ console.warn('[shortcut][stats-log][fallback] open failed', e); }
           return;
         }
         // Manual auto odds press mapping remains for brackets BUT internal automation now emits only F23/F24.

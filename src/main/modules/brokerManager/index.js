@@ -271,12 +271,9 @@ function createBrokerManager(ctx){
   // Запускаем loop сразу при создании manager
   startWakeUpLoop();
 
-  // Deprecated: inline picker now used instead of popup dialog.
-  function openAddBrokerDialog(){ /* no-op retained for backward IPC compatibility */ }
-
   function getAllBrokers(){ return BROKERS.slice(); }
 
-  return { createAll, addBroker, closeBroker, openAddBrokerDialog, getAllBrokers };
+  return { createAll, addBroker, closeBroker, getAllBrokers };
 }
 
 module.exports = { createBrokerManager };

@@ -42,15 +42,10 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,openSettings: () => ipcRenderer.send('open-settings')
   ,getSetting: (key) => ipcRenderer.invoke('get-setting', key)
   ,setSetting: (k,v) => ipcRenderer.send('set-setting', { key:k, value:v })
-  // contrast events removed (stubs kept for backward compatibility)
-  ,onContrastPreview: () => ()=>{}
-  ,onContrastSaved: () => ()=>{}
   ,onUIBlurOn: (cb) => withUnsub('ui-blur-on', cb)
   ,onUIBlurOff: (cb) => withUnsub('ui-blur-off', cb)
   ,onOpenSettings: (cb) => withUnsub('ui-open-settings', cb)
   ,onCloseSettings: (cb) => withUnsub('ui-close-settings', cb)
-  ,previewContrast: (_v) => {}
-  ,saveContrast: (_v) => {}
   ,closeSettings: () => ipcRenderer.send('close-settings')
   // Board docking API
   ,getBoardState: () => ipcRenderer.invoke('get-board-state')

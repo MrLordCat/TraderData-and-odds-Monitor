@@ -43,8 +43,6 @@ try {
 // Now using pure CSS column-count - segments stay in DOM order.
 
 
-// (Removed) Game Stats table theme controls (deprecated)
-const fields = {}; // retain empty object to avoid ref errors if any leftover code executes
 // Heat bar fields (with opacity integrated)
 const hb = {
 	enabled: document.getElementById('hb-enabled'),
@@ -54,9 +52,6 @@ const hb = {
 	color2: document.getElementById('hb-color2'),
 	opacity: document.getElementById('hb-opacity')
 };
-// Deprecated theme removed – keep minimal stub for IPC compatibility (no-op values)
-const defaultTheme = {};
-let currentTheme = {};
 let currentHeatBar = { enabled:true, decayPerSec:0.18, bumpAmount:0.22, color1:'#3c78ff', color2:'#ff4646' };
 // Stats table config (subset we manage here)
 let currentStatsConfig = { winLoseEnabled:true, heatBarOpacity:0.55 };
@@ -416,11 +411,9 @@ if(st.winlose){ st.winlose.addEventListener('input', ()=> updateStatsConfigFromI
 if(hb.opacity){ hb.opacity.addEventListener('input', ()=> updateStatsConfigFromInputs(true)); hb.opacity.addEventListener('change', ()=> updateStatsConfigFromInputs(true)); }
 Object.values(anim).forEach(el=>{ if(el){ el.addEventListener('input', ()=> queueStatsConfigSend()); el.addEventListener('change', ()=> queueStatsConfigSend()); } });
 
-function emitTheme(){ /* no-op: theme system deprecated */ }
 function emitHeatBar(){
 	ipcRenderer.send('gs-heatbar-preview', currentHeatBar);
 }
-function applyInputsToTheme(){ /* deprecated */ }
 
 function applyHeatBarInputs(){
 	const decayRaw = hb.decay.value.trim();
