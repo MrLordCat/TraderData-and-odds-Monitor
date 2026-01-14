@@ -825,7 +825,6 @@ app.whenReady().then(()=>{
       if(!registeredWith) console.warn('[shortcut][Num5] registration returned false (tried: '+candidates.join(', ')+')');
       else console.log('[shortcut][Num5] registered global as', registeredWith);
     } catch(e){ console.warn('[shortcut][Num5] registration error', e); }
-  } catch(e){ console.warn('[shortcut][stats-log] registration error', e); }
 });
 // Hotkey strategy:
 //  - Global 'Space' accelerator was REMOVED to prevent capturing space keystrokes when user focus is outside the app.

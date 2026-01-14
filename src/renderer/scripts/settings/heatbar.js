@@ -66,16 +66,16 @@ function updateStatsConfigFromInputs(immediate) {
 }
 
 function applyHeatBarInputs() {
-	const decayRaw = hb.decay.value.trim();
-	const bumpRaw = hb.bump.value.trim();
+	const decayRaw = hb.decay ? hb.decay.value.trim() : '';
+	const bumpRaw = hb.bump ? hb.bump.value.trim() : '';
 	const decayNum = Number(decayRaw);
 	const bumpNum = Number(bumpRaw);
 	currentHeatBar = {
-		enabled: !!hb.enabled.checked,
+		enabled: hb.enabled ? !!hb.enabled.checked : currentHeatBar.enabled,
 		decayPerSec: Math.max(0.01, Math.min(2, !isNaN(decayNum) ? decayNum : currentHeatBar.decayPerSec)),
 		bumpAmount: Math.max(0.01, Math.min(1, !isNaN(bumpNum) ? bumpNum : currentHeatBar.bumpAmount)),
-		color1: hb.color1.value || currentHeatBar.color1,
-		color2: hb.color2.value || currentHeatBar.color2
+		color1: (hb.color1 && hb.color1.value) || currentHeatBar.color1,
+		color2: (hb.color2 && hb.color2.value) || currentHeatBar.color2
 	};
 	emitHeatBar();
 	updateStatsConfigFromInputs(true);
@@ -114,11 +114,11 @@ function bindEvents() {
 
 // ===== Actions =====
 function reset() {
-	hb.enabled.checked = true;
-	hb.decay.value = '0.18';
-	hb.bump.value = '0.22';
-	hb.color1.value = '#3c78ff';
-	hb.color2.value = '#ff4646';
+	if (hb.enabled) hb.enabled.checked = true;
+	if (hb.decay) hb.decay.value = '0.18';
+	if (hb.bump) hb.bump.value = '0.22';
+	if (hb.color1) hb.color1.value = '#3c78ff';
+	if (hb.color2) hb.color2.value = '#ff4646';
 	if (hb.opacity) hb.opacity.value = '0.55';
 	if (st.winlose) st.winlose.checked = true;
 	applyHeatBarInputs();
@@ -128,8 +128,8 @@ function save() {
 	applyHeatBarInputs();
 	currentHeatBar.decayPerSec = +Number(currentHeatBar.decayPerSec).toFixed(3);
 	currentHeatBar.bumpAmount = +Number(currentHeatBar.bumpAmount).toFixed(3);
-	hb.decay.value = String(currentHeatBar.decayPerSec);
-	hb.bump.value = String(currentHeatBar.bumpAmount);
+	if (hb.decay) hb.decay.value = String(currentHeatBar.decayPerSec);
+	if (hb.bump) hb.bump.value = String(currentHeatBar.bumpAmount);
 	ipcRenderer.send('gs-heatbar-save', currentHeatBar);
 	updateStatsConfigFromInputs(false);
 	queueStatsConfigSend();
@@ -140,11 +140,11 @@ function applyConfig(cfg) {
 	if (cfg && cfg.gsHeatBar) {
 		currentHeatBar = { ...currentHeatBar, ...cfg.gsHeatBar };
 	}
-	hb.enabled.checked = !!currentHeatBar.enabled;
-	hb.decay.value = String(currentHeatBar.decayPerSec);
-	hb.bump.value = String(currentHeatBar.bumpAmount);
-	hb.color1.value = currentHeatBar.color1;
-	hb.color2.value = currentHeatBar.color2;
+	if (hb.enabled) hb.enabled.checked = !!currentHeatBar.enabled;
+	if (hb.decay) hb.decay.value = String(currentHeatBar.decayPerSec);
+	if (hb.bump) hb.bump.value = String(currentHeatBar.bumpAmount);
+	if (hb.color1) hb.color1.value = currentHeatBar.color1;
+	if (hb.color2) hb.color2.value = currentHeatBar.color2;
 
 	if (cfg && cfg.statsConfig) {
 		currentStatsConfig = { ...currentStatsConfig, ...cfg.statsConfig };

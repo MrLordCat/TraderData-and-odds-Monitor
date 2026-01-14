@@ -34,6 +34,7 @@ function hideProgress() {
 }
 
 function updateButtonState() {
+	if (!downloadBtn) return;
 	if (updateReady) {
 		downloadBtn.textContent = 'Restart';
 		downloadBtn.disabled = false;
@@ -50,8 +51,8 @@ async function loadUpdaterState() {
 	try {
 		const status = await ipcRenderer.invoke('updater-get-status');
 		if (status) {
-			channelSel.value = status.channel || 'stable';
-			autoChk.checked = status.autoCheck !== false;
+			if (channelSel) channelSel.value = status.channel || 'stable';
+			if (autoChk) autoChk.checked = status.autoCheck !== false;
 			if (versionSpan) versionSpan.textContent = status.currentVersion || '—';
 
 			if (status.availableUpdate) {
@@ -200,13 +201,13 @@ function bindIpcEvents() {
 		setStatus('Update ready - click Restart to apply');
 		showProgress(100);
 		updateButtonState();
-		checkBtn.disabled = false;
+		if (checkBtn) checkBtn.disabled = false;
 	});
 
 	ipcRenderer.on('updater-update-error', (_e, err) => {
 		setStatus('Error: ' + (err.message || err));
 		hideProgress();
-		checkBtn.disabled = false;
+		if (checkBtn) checkBtn.disabled = false;
 		updateButtonState();
 	});
 }

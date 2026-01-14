@@ -48,6 +48,15 @@ src/
 │   │   ├── settings.html      # Settings overlay (incl. Addons section)
 │   │   └── stats_panel.html   # Stats panel (Odds Board + Game Stats embedded)
 │   ├── scripts/               # Page-specific JS
+│   │   └── settings/          # Settings modules (modular structure)
+│   │       ├── index.js       # Main entry, orchestrates all modules
+│   │       ├── init.js        # Version display, DevTools buttons
+│   │       ├── auto-settings.js # Auto trading settings
+│   │       ├── heatbar.js     # Heat bar & animations config
+│   │       ├── updater.js     # Updates section
+│   │       ├── extension.js   # Edge Extension section
+│   │       ├── game-selector.js # Game selector
+│   │       └── addons.js      # Addons management
 │   ├── styles/                # CSS files
 │   ├── core/                  # Shared logic (auto_core, auto_hub, odds_core)
 │   ├── ui/                    # UI components (toast, excel_status, api_helpers)
