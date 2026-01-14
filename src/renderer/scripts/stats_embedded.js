@@ -1,3 +1,9 @@
+// Load shared DOM helper
+let byId = null;
+try { const DomHelpers = require('../ui/dom_helpers'); byId = DomHelpers.byId; } catch(_){ }
+if(!byId && window.DomHelpers) byId = window.DomHelpers.byId;
+if(!byId) byId = (id) => { try { return byId(id); } catch(_){ return null; } };
+
 // Embedded odds board + section reorder extracted
 // Polyfill: stats panel BrowserView does NOT use the main preload (no window.desktopAPI)
 // so we use the shared shim to create a minimal bridge.
@@ -6,7 +12,7 @@ try { require('../ui/desktop_api_shim'); } catch(_){ }
 let currentMap = undefined; // shared map number propagated from main / board
 function updateEmbeddedMapTag(){
   try {
-    const el=document.getElementById('embeddedMapTag');
+    const el=byId('embeddedMapTag');
     if(!el) return;
     if(currentMap==null || currentMap===0 || currentMap==='') el.textContent='Map -';
     else el.textContent='Map '+currentMap;
@@ -27,7 +33,7 @@ function initEmbeddedMapSync(){
     bindEmbeddedMapSelect();
     // Bind 'Last' toggle button in Odds Board header
     try {
-      const lastBtn = document.getElementById('embeddedIsLast');
+      const lastBtn = byId('embeddedIsLast');
       if(lastBtn && !lastBtn.dataset.bound){
         lastBtn.dataset.bound='1';
         let isLast = false;
@@ -50,7 +56,7 @@ function initEmbeddedMapSync(){
 }
 function syncEmbeddedMapSelect(){
   try {
-    const sel=document.getElementById('embeddedMapSelect');
+    const sel=byId('embeddedMapSelect');
     if(!sel) return; const v = (currentMap==null?'' : String(currentMap));
     if(v !== '' && sel.value!==v){ sel.value=v; }
   } catch(_){ }
@@ -62,14 +68,14 @@ function forceMapSelectValue(){
   if(desired==='') return; // nothing to force
   attempts.forEach(ms=> setTimeout(()=>{
     try {
-      const sel=document.getElementById('embeddedMapSelect');
+      const sel=byId('embeddedMapSelect');
       if(!sel) return; if(sel.value!==desired){ sel.value=desired; /* console.debug('[embeddedOdds] force map select', desired, 'at', ms);*/ }
     } catch(_){ }
   }, ms));
 }
 function bindEmbeddedMapSelect(){
   try {
-    const sel=document.getElementById('embeddedMapSelect');
+    const sel=byId('embeddedMapSelect');
     if(!sel || sel.dataset.bound) return; sel.dataset.bound='1';
     sel.addEventListener('change', e=>{
       try {
@@ -85,7 +91,7 @@ function bindEmbeddedMapSelect(){
     });
     // Refresh button handler (rebroadcast current map without changing selection)
     try {
-      const btn=document.getElementById('embeddedMapRefreshBtn');
+      const btn=byId('embeddedMapRefreshBtn');
       if(btn && !btn.dataset.bound){
         btn.dataset.bound='1';
         btn.addEventListener('click', ()=>{
@@ -114,7 +120,7 @@ try { OddsBoardShared = require('../ui/odds_board_shared'); } catch(_){ }
 try {
   function applyEmbeddedMapAutoRefreshVisual(p){
     try {
-      const btn=document.getElementById('embeddedMapRefreshBtn'); if(!btn) return;
+      const btn=byId('embeddedMapRefreshBtn'); if(!btn) return;
       const enabled = !!(p && p.enabled);
       btn.style.opacity = enabled ? '1' : '';
       btn.style.background = enabled ? '#2f4b6a' : '';
@@ -156,7 +162,7 @@ async function initEmbeddedSwapSync(){
 }
 try { initEmbeddedSwapSync(); } catch(_){ }
 function renderEmbeddedOdds(){
-  const rowsEl=document.getElementById('embeddedOddsRows'); if(!rowsEl) return;
+  const rowsEl=byId('embeddedOddsRows'); if(!rowsEl) return;
   const excelRec = embeddedOddsData['excel'];
   // Filter out excel and ds from broker list (ds shows in Excel row brackets)
   const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel' && r.broker!=='ds');
@@ -193,8 +199,8 @@ function renderEmbeddedOdds(){
   }
   // Excel row update - simple display
   try {
-    const excelCell=document.getElementById('embeddedExcelCell');
-    const excelRow=document.getElementById('embeddedExcelRow');
+    const excelCell=byId('embeddedExcelCell');
+    const excelRow=byId('embeddedExcelRow');
     const hasExcelOdds = excelRec && Array.isArray(excelRec.odds) && excelRec.odds[0] !== '-';
     
     if(excelCell && excelRow){
@@ -215,12 +221,12 @@ function renderEmbeddedOdds(){
       lastEmbeddedExcelOdds = excelOddsKey;
       // Clear previous timer and remove mismatch highlight
       if(embeddedDsMismatchTimer){ clearTimeout(embeddedDsMismatchTimer); embeddedDsMismatchTimer = null; }
-      const dsRow = document.getElementById('embeddedDsRow');
+      const dsRow = byId('embeddedDsRow');
       if(dsRow) dsRow.classList.remove('ds-mismatch');
       // Start 5s timer to check for mismatch
       embeddedDsMismatchTimer = setTimeout(()=>{
         try {
-          const dsRow = document.getElementById('embeddedDsRow');
+          const dsRow = byId('embeddedDsRow');
           const dsRec = embeddedOddsData['ds'];
           const excelRec = embeddedOddsData['excel'];
           if(!dsRow || !dsRec || !excelRec) return;
@@ -239,8 +245,8 @@ function renderEmbeddedOdds(){
   
   // DS row update - separate row for DS odds
   try {
-    const dsCell=document.getElementById('embeddedDsCell');
-    const dsRow=document.getElementById('embeddedDsRow');
+    const dsCell=byId('embeddedDsCell');
+    const dsRow=byId('embeddedDsRow');
     const dsRec = embeddedOddsData['ds'];
     const hasDsOdds = dsRec && Array.isArray(dsRec.odds) && dsRec.odds[0] !== '-';
     
@@ -266,7 +272,7 @@ function renderEmbeddedOdds(){
       }
     }
   } catch(_){ }
-  const midCell=document.getElementById('embeddedMidCell');
+  const midCell=byId('embeddedMidCell');
   if(midCell){
     const mid = (OddsBoardShared && OddsBoardShared.calcMidFromLiveNums)
       ? OddsBoardShared.calcMidFromLiveNums(liveNums1, liveNums2)
@@ -278,8 +284,8 @@ function renderEmbeddedOdds(){
   // Arb calculation: margin = (1/best1 + 1/best2) * 100
   // Only show if margin < 100% (real arbitrage opportunity)
   try {
-    const arbCell = document.getElementById('embeddedArbCell');
-    const arbRow = document.getElementById('embeddedArbRow');
+    const arbCell = byId('embeddedArbCell');
+    const arbRow = byId('embeddedArbRow');
     if(arbCell && arbRow){
       if(!isNaN(embeddedBest1) && !isNaN(embeddedBest2) && embeddedBest1 > 0 && embeddedBest2 > 0){
         const margin = (1/embeddedBest1 + 1/embeddedBest2) * 100;
@@ -301,13 +307,13 @@ function renderEmbeddedOdds(){
   try {
     const h1=document.querySelector('#lt-team1 .teamNameWrap')?.textContent || 'Side 1';
     const h2=document.querySelector('#lt-team2 .teamNameWrap')?.textContent || 'Side 2';
-    const eo1=document.getElementById('eo-side1'); const eo2=document.getElementById('eo-side2');
+    const eo1=byId('eo-side1'); const eo2=byId('eo-side2');
     if(eo1) eo1.textContent=h1; if(eo2) eo2.textContent=h2;
   } catch(_){ }
 
   // Embedded auto rows (only indicators now) visibility update
   try {
-    const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow');
+    const indRow=byId('embeddedExcelAutoIndicatorsRow');
     const sim = window.__embeddedAutoSim;
     const vis = (sim && sim.active) ? '' : 'none';
     if(indRow) indRow.style.display = vis;
@@ -332,7 +338,7 @@ function handleEmbeddedOdds(p){ try {
 
 // ======= Embedded derived + auto guard =======
 // Derived + market guards handled by AutoHub now
-function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSection'); if(!root) return; // collapse handled globally
+function initEmbeddedOdds(){ const root=byId('embeddedOddsSection'); if(!root) return; // collapse handled globally
   // Prefer shared OddsCore hub if available; fallback to direct onOdds (legacy)
   try {
     if(window.OddsCore && !window.__embeddedOddsHub){
@@ -378,9 +384,9 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   // Excel extractor toggle + status (embedded panel)
   try {
     const { ipcRenderer } = require('electron');
-    const btn = document.getElementById('embeddedExcelScriptBtn');
-    const statusCell = document.getElementById('embeddedExcelStatusCell');
-    const scriptMapBadge = document.getElementById('embeddedScriptMapBadge');
+    const btn = byId('embeddedExcelScriptBtn');
+    const statusCell = byId('embeddedExcelStatusCell');
+    const scriptMapBadge = byId('embeddedScriptMapBadge');
 
     // Use shared Excel status module
     let ExcelStatusUI = null;
@@ -390,7 +396,7 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
     // Get board map from embedded map selector
     function getEmbeddedBoardMap(){
       try {
-        const sel = document.getElementById('embeddedMapSelect');
+        const sel = byId('embeddedMapSelect');
         if(sel) return parseInt(sel.value, 10);
       } catch(_){ }
       return null;
@@ -409,7 +415,7 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
       try { ipcRenderer.invoke('excel-extractor-status-get').then(applyStatus).catch(()=>{}); } catch(_){ }
       
       // Refresh badge when map changes
-      const mapSel = document.getElementById('embeddedMapSelect');
+      const mapSel = byId('embeddedMapSelect');
       if(mapSel && refreshBadgeMatch){
         mapSel.addEventListener('change', ()=> refreshBadgeMatch());
       }
@@ -479,7 +485,7 @@ try {
   function getEngTol(){ try { const st = window.__embeddedAutoSim; if(st && typeof st.tolerancePct==='number' && !isNaN(st.tolerancePct)) return st.tolerancePct; } catch(_){ } return null; }
   function setEmbTolBadge(v){
     try {
-      const el=document.getElementById('embeddedTolBadge'); if(!el) return;
+      const el=byId('embeddedTolBadge'); if(!el) return;
       const eff = getEngTol(); const val = (typeof eff==='number' && !isNaN(eff)) ? eff : ((typeof v==='number' && !isNaN(v)) ? v : null);
       el.textContent = (val!=null) ? `Tol: ${val.toFixed(2)}%` : 'Tol: —';
     } catch(_){ }
@@ -513,9 +519,9 @@ document.addEventListener('click', e=>{
 // ======= Unified panel toolbar bindings =======
 function initEmbeddedToolbar(){
   try {
-    const addBtn = document.getElementById('embeddedAddBroker');
-    const layoutSel = document.getElementById('embeddedLayoutPreset');
-    const refreshBtn = document.getElementById('embeddedRefreshAll');
+    const addBtn = byId('embeddedAddBroker');
+    const layoutSel = byId('embeddedLayoutPreset');
+    const refreshBtn = byId('embeddedRefreshAll');
     
     // Add broker
     if(addBtn){

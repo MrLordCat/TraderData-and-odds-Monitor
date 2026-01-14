@@ -1,9 +1,15 @@
+// Load shared DOM helper
+let byId = null;
+try { const DomHelpers = require('../ui/dom_helpers'); byId = DomHelpers.byId; } catch(_){ }
+if(!byId && window.DomHelpers) byId = window.DomHelpers.byId;
+if(!byId) byId = (id) => { try { return byId(id); } catch(_){ return null; } };
+
 const { ipcRenderer } = require('electron');
 
 // Load and display current version dynamically
 (function loadVersion(){
 	try {
-		const label = document.getElementById('version-label');
+		const label = byId('version-label');
 		if(!label) return;
 		ipcRenderer.invoke('updater-get-version').then(info => {
 			if(info && info.version){
@@ -22,19 +28,19 @@ const { ipcRenderer } = require('electron');
 
 // DevTools button (moved from main toolbar)
 try {
-	const devBtn = document.getElementById('open-devtools');
+	const devBtn = byId('open-devtools');
 	if(devBtn){ devBtn.addEventListener('click', ()=>{ try { ipcRenderer.send('open-devtools'); } catch(_){ } }); }
 } catch(_){ }
 
 // Main Window DevTools button
 try {
-	const mainDevBtn = document.getElementById('open-main-devtools');
+	const mainDevBtn = byId('open-main-devtools');
 	if(mainDevBtn){ mainDevBtn.addEventListener('click', ()=>{ try { ipcRenderer.send('open-main-devtools'); } catch(_){ } }); }
 } catch(_){ }
 
 // Open User Data folder button
 try {
-	const userDataBtn = document.getElementById('open-userdata');
+	const userDataBtn = byId('open-userdata');
 	if(userDataBtn){ userDataBtn.addEventListener('click', ()=>{ try { ipcRenderer.send('open-userdata-folder'); } catch(_){ } }); }
 } catch(_){ }
 
@@ -47,12 +53,12 @@ try {
 const fields = {}; // retain empty object to avoid ref errors if any leftover code executes
 // Heat bar fields (with opacity integrated)
 const hb = {
-	enabled: document.getElementById('hb-enabled'),
-	decay: document.getElementById('hb-decay'),
-	bump: document.getElementById('hb-bump'),
-	color1: document.getElementById('hb-color1'),
-	color2: document.getElementById('hb-color2'),
-	opacity: document.getElementById('hb-opacity')
+	enabled: byId('hb-enabled'),
+	decay: byId('hb-decay'),
+	bump: byId('hb-bump'),
+	color1: byId('hb-color1'),
+	color2: byId('hb-color2'),
+	opacity: byId('hb-opacity')
 };
 // Deprecated theme removed – keep minimal stub for IPC compatibility (no-op values)
 const defaultTheme = {};
@@ -60,20 +66,20 @@ let currentTheme = {};
 let currentHeatBar = { enabled:true, decayPerSec:0.18, bumpAmount:0.22, color1:'#3c78ff', color2:'#ff4646' };
 // Stats table config (subset we manage here)
 let currentStatsConfig = { winLoseEnabled:true, heatBarOpacity:0.55 };
-const st = { winlose: document.getElementById('st-winlose') };
+const st = { winlose: byId('st-winlose') };
 // Animation controls
 const anim = {
-	enabled: document.getElementById('anim-enabled'),
-	duration: document.getElementById('anim-duration'),
-	scale: document.getElementById('anim-scale'),
-	color1: document.getElementById('anim-color1'),
-	color2: document.getElementById('anim-color2')
+	enabled: byId('anim-enabled'),
+	duration: byId('anim-duration'),
+	scale: byId('anim-scale'),
+	color1: byId('anim-color1'),
+	color2: byId('anim-color2')
 };
 
 // Optional future inputs for auto interval/adaptive (not present in current UI but support live apply if added)
-const autoIntervalInput = document.getElementById('auto-interval');
-const autoIntervalVal = document.getElementById('auto-interval-val');
-const autoAdaptiveInput = document.getElementById('auto-adaptive');
+const autoIntervalInput = byId('auto-interval');
+const autoIntervalVal = byId('auto-interval-val');
+const autoAdaptiveInput = byId('auto-adaptive');
 let autoIntervalMs = 500;
 let autoAdaptiveEnabled = true;
 
@@ -105,8 +111,8 @@ if(autoAdaptiveInput){
 }
 
 // Shock threshold (%)
-const autoShockInput = document.getElementById('auto-shock-threshold');
-const autoShockVal = document.getElementById('auto-shock-threshold-val');
+const autoShockInput = byId('auto-shock-threshold');
+const autoShockVal = byId('auto-shock-threshold-val');
 let shockThresholdPct = 80;
 function clampShock(v){ return Math.max(40, Math.min(120, Math.round(v))); }
 function renderShock(){
@@ -130,7 +136,7 @@ if(autoShockInput){
 }
 
 // Stop on no MID
-const autoStopNoMidInput = document.getElementById('auto-stop-no-mid');
+const autoStopNoMidInput = byId('auto-stop-no-mid');
 let stopOnNoMidEnabled = true;
 if(autoStopNoMidInput){
 	autoStopNoMidInput.addEventListener('change', ()=>{
@@ -140,8 +146,8 @@ if(autoStopNoMidInput){
 }
 
 // Fire cooldown (ms)
-const autoFireCooldownInput = document.getElementById('auto-fire-cooldown');
-const autoFireCooldownVal = document.getElementById('auto-fire-cooldown-val');
+const autoFireCooldownInput = byId('auto-fire-cooldown');
+const autoFireCooldownVal = byId('auto-fire-cooldown-val');
 let fireCooldownMs = 900;
 function clampCooldown(v){ return Math.max(100, Math.min(3000, Math.floor(v))); }
 function renderFireCooldown(){
@@ -165,8 +171,8 @@ if(autoFireCooldownInput){
 }
 
 // Max Excel wait (ms)
-const autoMaxExcelWaitInput = document.getElementById('auto-max-excel-wait');
-const autoMaxExcelWaitVal = document.getElementById('auto-max-excel-wait-val');
+const autoMaxExcelWaitInput = byId('auto-max-excel-wait');
+const autoMaxExcelWaitVal = byId('auto-max-excel-wait-val');
 let maxExcelWaitMs = 1600;
 function clampMaxWait(v){ return Math.max(500, Math.min(5000, Math.floor(v))); }
 function renderMaxExcelWait(){
@@ -190,8 +196,8 @@ if(autoMaxExcelWaitInput){
 }
 
 // Pulse gap (ms)
-const autoPulseGapInput = document.getElementById('auto-pulse-gap');
-const autoPulseGapVal = document.getElementById('auto-pulse-gap-val');
+const autoPulseGapInput = byId('auto-pulse-gap');
+const autoPulseGapVal = byId('auto-pulse-gap-val');
 let pulseGapMs = 55;
 function clampPulseGap(v){ return Math.max(20, Math.min(200, Math.floor(v))); }
 function renderPulseGap(){
@@ -215,7 +221,7 @@ if(autoPulseGapInput){
 }
 
 // Burst L3 enabled
-const burst3EnabledInput = document.getElementById('burst3-enabled');
+const burst3EnabledInput = byId('burst3-enabled');
 let burst3Enabled = true;
 if(burst3EnabledInput){
 	burst3EnabledInput.addEventListener('change', ()=>{
@@ -225,8 +231,8 @@ if(burst3EnabledInput){
 }
 
 // Auto odds tolerance (percent difference threshold)
-const autoTolInput = document.getElementById('auto-tolerance');
-const autoTolVal = document.getElementById('auto-tolerance-val');
+const autoTolInput = byId('auto-tolerance');
+const autoTolVal = byId('auto-tolerance-val');
 let autoTolerancePct = 0.5; // percent
 function clampTol(v){ return Math.max(0.5, Math.min(10, Math.round(v*10)/10)); }
 function renderTol(){
@@ -251,8 +257,8 @@ if(autoTolInput){
 }
 
 // Auto Suspend threshold (%) – auto suspends when diff% >= this; resumes when diff < threshold/2
-const autoSuspendInput = document.getElementById('auto-suspend-threshold');
-const autoSuspendVal = document.getElementById('auto-suspend-threshold-val');
+const autoSuspendInput = byId('auto-suspend-threshold');
+const autoSuspendVal = byId('auto-suspend-threshold-val');
 let autoSuspendThresholdPct = 40.0; // default UI suggestion
 function clampAutoSuspend(v){ return Math.max(15, Math.min(80, Math.round(v))); }
 function renderAutoSuspend(){
@@ -277,14 +283,14 @@ if(autoSuspendInput){
 
 // Burst levels (3 tiers configurable)
 const burstInputs = {
-	th1: document.getElementById('burst1-th'), pulses1: document.getElementById('burst1-pulses'),
-	th2: document.getElementById('burst2-th'), pulses2: document.getElementById('burst2-pulses'),
-	th3: document.getElementById('burst3-th'), pulses3: document.getElementById('burst3-pulses'),
+	th1: byId('burst1-th'), pulses1: byId('burst1-pulses'),
+	th2: byId('burst2-th'), pulses2: byId('burst2-pulses'),
+	th3: byId('burst3-th'), pulses3: byId('burst3-pulses'),
 };
 const burstVals = {
-	th1: document.getElementById('burst1-th-val'), pulses1: document.getElementById('burst1-pulses-val'),
-	th2: document.getElementById('burst2-th-val'), pulses2: document.getElementById('burst2-pulses-val'),
-	th3: document.getElementById('burst3-th-val'), pulses3: document.getElementById('burst3-pulses-val'),
+	th1: byId('burst1-th-val'), pulses1: byId('burst1-pulses-val'),
+	th2: byId('burst2-th-val'), pulses2: byId('burst2-pulses-val'),
+	th3: byId('burst3-th-val'), pulses3: byId('burst3-pulses-val'),
 };
 
 // NOTE: Burst levels are applied by threshold descending internally.
@@ -439,13 +445,13 @@ function applyHeatBarInputs(){
 }
 Object.values(hb).forEach(el=>{ if(el){ el.addEventListener('input', applyHeatBarInputs); el.addEventListener('change', applyHeatBarInputs); } });
 
-document.getElementById('reset').onclick = ()=>{
+byId('reset').onclick = ()=>{
 	// Reset heat bar + opacity + win/lose
 	hb.enabled.checked = true; hb.decay.value='0.18'; hb.bump.value='0.22'; hb.color1.value='#3c78ff'; hb.color2.value='#ff4646'; if(hb.opacity) hb.opacity.value='0.55';
 	if(st.winlose) st.winlose.checked = true;
 	applyHeatBarInputs();
 };
-document.getElementById('save').onclick = ()=>{
+byId('save').onclick = ()=>{
 	applyHeatBarInputs();
 	currentHeatBar.decayPerSec = +Number(currentHeatBar.decayPerSec).toFixed(3);
 	currentHeatBar.bumpAmount = +Number(currentHeatBar.bumpAmount).toFixed(3);
@@ -469,9 +475,9 @@ document.getElementById('save').onclick = ()=>{
 	try { readBurstInputs(); ipcRenderer.send('auto-burst-levels-set', { levels: burstLevels }); } catch(_){ }
 	ipcRenderer.send('close-settings');
 };
-document.getElementById('close').onclick = ()=> ipcRenderer.send('close-settings');
+byId('close').onclick = ()=> ipcRenderer.send('close-settings');
 window.addEventListener('keydown', e=>{ if(e.key==='Escape') ipcRenderer.send('close-settings'); });
-document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-settings');
+byId('backdrop').onclick = ()=> ipcRenderer.send('close-settings');
 
 	ipcRenderer.on('settings-init', (_e,cfg)=>{
 	if(cfg && cfg.gsHeatBar){ currentHeatBar = { ...currentHeatBar, ...cfg.gsHeatBar }; }
@@ -542,14 +548,14 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 	try { ipcRenderer.invoke('auto-burst-levels-get').then(v=>{ if(Array.isArray(v)) { burstLevels = v; } applyBurstInputsFromModel(); }).catch(()=> applyBurstInputsFromModel()); } catch(_){ applyBurstInputsFromModel(); }
 	// Pre-apply game selector from payload if present
 	try {
-		const sel = document.getElementById('game-select');
+		const sel = byId('game-select');
 		if(sel && cfg && cfg.selectedGame){ sel.value = cfg.selectedGame; }
 	} catch(_){ }
 });
 
 // ===== Game selector (global) =====
 (function(){
-	const sel = document.getElementById('game-select');
+	const sel = byId('game-select');
 	if(!sel) return;
 	const VALID = new Set(['lol','cs2','dota2']);
 	function applyInitial(v){
@@ -569,13 +575,13 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 
 // ===== Updates section =====
 (function(){
-	const channelSel = document.getElementById('upd-channel');
-	const autoChk = document.getElementById('upd-auto');
-	const versionSpan = document.getElementById('upd-version');
-	const statusSpan = document.getElementById('upd-status');
-	const checkBtn = document.getElementById('upd-check');
-	const downloadBtn = document.getElementById('upd-download');
-	const progressDiv = document.getElementById('upd-progress');
+	const channelSel = byId('upd-channel');
+	const autoChk = byId('upd-auto');
+	const versionSpan = byId('upd-version');
+	const statusSpan = byId('upd-status');
+	const checkBtn = byId('upd-check');
+	const downloadBtn = byId('upd-download');
+	const progressDiv = byId('upd-progress');
 	const progressBar = progressDiv ? progressDiv.querySelector('.bar') : null;
 
 	if(!channelSel || !autoChk || !checkBtn || !downloadBtn) return;
@@ -771,9 +777,9 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 
 // ===== Edge Extension section =====
 (function(){
-	const statusSpan = document.getElementById('ext-status');
-	const versionSpan = document.getElementById('ext-version');
-	const openFolderBtn = document.getElementById('ext-open-folder');
+	const statusSpan = byId('ext-status');
+	const versionSpan = byId('ext-version');
+	const openFolderBtn = byId('ext-open-folder');
 	
 	if(!openFolderBtn) return;
 	
@@ -821,11 +827,11 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 
 // ===== Addons section =====
 (function(){
-	const listEl = document.getElementById('addons-list');
-	const availableEl = document.getElementById('addons-available-list');
-	const refreshBtn = document.getElementById('addons-refresh');
-	const openFolderBtn = document.getElementById('addons-open-folder');
-	const channelSelect = document.getElementById('addon-channel');
+	const listEl = byId('addons-list');
+	const availableEl = byId('addons-available-list');
+	const refreshBtn = byId('addons-refresh');
+	const openFolderBtn = byId('addons-open-folder');
+	const channelSelect = byId('addon-channel');
 	
 	if(!listEl) return;
 	
@@ -915,7 +921,7 @@ document.getElementById('backdrop').onclick = ()=> ipcRenderer.send('close-setti
 			`;
 			listEl.appendChild(notice);
 			
-			const restartBtn = document.getElementById('addon-restart-btn');
+			const restartBtn = byId('addon-restart-btn');
 			if(restartBtn){
 				restartBtn.addEventListener('click', () => {
 					try { ipcRenderer.invoke('updater-restart'); } catch(_){}

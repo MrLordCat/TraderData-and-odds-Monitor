@@ -1,3 +1,9 @@
+// Load shared DOM helper
+let byId = null;
+try { const DomHelpers = require('../ui/dom_helpers'); byId = DomHelpers.byId; } catch(_){ }
+if(!byId && window.DomHelpers) byId = window.DomHelpers.byId;
+if(!byId) byId = (id) => { try { return byId(id); } catch(_){ return null; } };
+
 // ================= Side-panel toolbar wiring (icons) =================
 // Load shared UI helpers
 let MiniToast = null;
@@ -8,7 +14,7 @@ try { ApiHelpers = require('../ui/api_helpers'); } catch(_){ }
 let __boardDockState = null;
 function updateBoardSideIcon(state){
   try {
-    const btn = document.getElementById('tbBoardSide');
+    const btn = byId('tbBoardSide');
     if(!btn || !state) return;
     btn.dataset.side = state.side === 'left' ? 'left' : 'right';
   } catch(_){ }
@@ -83,7 +89,7 @@ function bindTopbar(){
 
   // + Add broker (opens slot picker)
   try {
-    const addBtn = document.getElementById('tbAddBroker');
+    const addBtn = byId('tbAddBroker');
     if(addBtn){
       addBtn.addEventListener('click', (e)=>{ try { e && e.stopPropagation && e.stopPropagation(); } catch(_){ } togglePicker(addBtn); });
     }
@@ -97,7 +103,7 @@ function bindTopbar(){
       if(__pickerEl && (t===__pickerEl || (__pickerEl.contains && __pickerEl.contains(t)))) return;
       closePicker();
     });
-    window.addEventListener('resize', ()=>{ try { if(__pickerOpen){ const a=document.getElementById('tbAddBroker'); positionPicker(a); } } catch(_){ } });
+    window.addEventListener('resize', ()=>{ try { if(__pickerOpen){ const a=byId('tbAddBroker'); positionPicker(a); } } catch(_){ } });
     window.addEventListener('keydown', (e)=>{ try { if(__pickerOpen && e && e.key==='Escape'){ closePicker(); } } catch(_){ } });
   } catch(_){ }
 
@@ -105,7 +111,7 @@ function bindTopbar(){
   try {
     if(ApiHelpers){ ApiHelpers.bindSelectToApi('tbLayoutPreset', 'getLayoutPreset', 'applyLayoutPreset'); }
     else {
-      const sel = document.getElementById('tbLayoutPreset');
+      const sel = byId('tbLayoutPreset');
       if(sel){
         window.desktopAPI.getLayoutPreset?.().then(p=>{ try { if(p) sel.value = p; } catch(_){ } }).catch(()=>{});
         sel.addEventListener('change', ()=>{ try { if(sel.value) window.desktopAPI.applyLayoutPreset(sel.value); } catch(_){ } });
@@ -115,13 +121,13 @@ function bindTopbar(){
 
   // Refresh all
   if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbRefreshAll', 'refreshAll'); }
-  else { try { document.getElementById('tbRefreshAll')?.addEventListener('click', ()=>{ window.desktopAPI.refreshAll?.(); }); } catch(_){ } }
+  else { try { byId('tbRefreshAll')?.addEventListener('click', ()=>{ window.desktopAPI.refreshAll?.(); }); } catch(_){ } }
 
   // Auto refresh checkbox
   if(ApiHelpers){ ApiHelpers.bindCheckboxToApi('tbAutoReload', 'getAutoRefreshEnabled', 'setAutoRefreshEnabled', 'onAutoRefreshUpdated'); }
   else {
     try {
-      const cb = document.getElementById('tbAutoReload');
+      const cb = byId('tbAutoReload');
       if(cb){
         window.desktopAPI.getAutoRefreshEnabled?.().then(v=>{ try { cb.checked = !!v; } catch(_){ } }).catch(()=>{});
         cb.addEventListener('change', ()=>{ try { window.desktopAPI.setAutoRefreshEnabled && window.desktopAPI.setAutoRefreshEnabled(!!cb.checked); } catch(_){ } });
@@ -132,7 +138,7 @@ function bindTopbar(){
 
   // Board side arrow
   try {
-    const sideBtn = document.getElementById('tbBoardSide');
+    const sideBtn = byId('tbBoardSide');
     if(sideBtn){
       sideBtn.addEventListener('click', ()=>{
         try {
@@ -148,11 +154,11 @@ function bindTopbar(){
 
   // Stats
   if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbStats', 'statsToggle'); }
-  else { try { document.getElementById('tbStats')?.addEventListener('click', ()=>{ window.desktopAPI.statsToggle?.(); }); } catch(_){ } }
+  else { try { byId('tbStats')?.addEventListener('click', ()=>{ window.desktopAPI.statsToggle?.(); }); } catch(_){ } }
 
   // Settings
   if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbSettings', 'openSettings'); }
-  else { try { document.getElementById('tbSettings')?.addEventListener('click', ()=>{ window.desktopAPI.openSettings?.(); }); } catch(_){ } }
+  else { try { byId('tbSettings')?.addEventListener('click', ()=>{ window.desktopAPI.openSettings?.(); }); } catch(_){ } }
 }
 
 // ===== Board collapse (title click) =====
@@ -212,8 +218,8 @@ try { OddsBoardShared = require('../ui/odds_board_shared'); } catch(_){ }
 
 
 function computeDerived(){
-  const midRow = document.getElementById('midRow');
-  const arbRow = document.getElementById('arbRow');
+  const midRow = byId('midRow');
+  const arbRow = byId('arbRow');
   if(!midRow || !arbRow) return;
   const midCell=midRow.children[1];
   const arbCell=arbRow.children[1];
@@ -251,9 +257,9 @@ function computeDerived(){
 
 
 function renderBoard(){
-  const tb = document.getElementById('rows');
+  const tb = byId('rows');
   if(!tb) return;
-  const excelRow = document.getElementById('excelRow');
+  const excelRow = byId('excelRow');
   const excelRecord = boardData['excel'];
   // Filter out excel and ds from broker list (ds shows in Excel row brackets)
   const vals=Object.values(boardData).filter(r=>r.broker!=='excel' && r.broker!=='ds').sort((a,b)=> a.broker.localeCompare(b.broker));
@@ -283,8 +289,8 @@ function renderBoard(){
   }
   // Update Excel row - simple display
   if(excelRow){
-    const valSpan = document.getElementById('excelOddsVal');
-    const statusSpan = document.getElementById('excelStatusCell');
+    const valSpan = byId('excelOddsVal');
+    const statusSpan = byId('excelStatusCell');
     const hasExcelOdds = excelRecord && Array.isArray(excelRecord.odds) && excelRecord.odds[0] !== '-';
     
     let displayHtml = '- / -';
@@ -311,11 +317,11 @@ function renderBoard(){
       lastExcelOdds = excelOddsKey;
       // Clear previous timer and start new 5s countdown
       if(dsMismatchTimer) clearTimeout(dsMismatchTimer);
-      const dsRow = document.getElementById('dsRow');
+      const dsRow = byId('dsRow');
       if(dsRow) dsRow.classList.remove('ds-mismatch');
       dsMismatchTimer = setTimeout(()=>{
         try {
-          const dsRow = document.getElementById('dsRow');
+          const dsRow = byId('dsRow');
           const dsRecord = boardData['ds'];
           const excelRecord = boardData['excel'];
           if(!dsRow || !dsRecord || !excelRecord) return;
@@ -332,8 +338,8 @@ function renderBoard(){
   
   // Update DS row - separate row for DS odds
   try {
-    const dsRow = document.getElementById('dsRow');
-    const dsCell = document.getElementById('dsOddsVal');
+    const dsRow = byId('dsRow');
+    const dsCell = byId('dsOddsVal');
     const dsRecord = boardData['ds'];
     const hasDsOdds = dsRecord && Array.isArray(dsRecord.odds) && dsRecord.odds[0] !== '-';
     
@@ -414,14 +420,14 @@ if(window.desktopAPI){
     try { ExcelStatusUI = require('../ui/excel_status'); } catch(_){ }
     if(!ExcelStatusUI && window.ExcelStatusUI) ExcelStatusUI = window.ExcelStatusUI;
     
-    const sBtn = document.getElementById('excelScriptBtn');
-    const statusEl = document.getElementById('excelStatusCell');
-    const scriptMapBadge = document.getElementById('scriptMapBadge');
+    const sBtn = byId('excelScriptBtn');
+    const statusEl = byId('excelStatusCell');
+    const scriptMapBadge = byId('scriptMapBadge');
     
     // Get board map from selector
     function getBoardMap(){
       try {
-        const sel = document.getElementById('mapSelect');
+        const sel = byId('mapSelect');
         if(sel) return parseInt(sel.value, 10);
       } catch(_){ }
       return null;
@@ -477,7 +483,7 @@ function forceBoardMapSelect(value){
   attempts.forEach(ms=> setTimeout(()=>{
     try {
       if(myToken !== mapForceToken) return; // a newer map arrived; discard this attempt
-      const sel=document.getElementById('mapSelect'); if(!sel) return;
+      const sel=byId('mapSelect'); if(!sel) return;
       if(sel.value!==value){ sel.value=value; /* console.debug('[board] force map select', value, ms);*/ }
     } catch(_){ }
   }, ms));
@@ -487,7 +493,7 @@ async function restoreMapAndBroadcast(){
     if(!window.desktopAPI) return;
     const last = await window.desktopAPI.getLastMap();
     if (typeof last !== 'undefined' && last !== null) {
-      const sel = document.getElementById('mapSelect');
+      const sel = byId('mapSelect');
       if(sel){
         const val = String(last);
         currentMapBoard = val;
@@ -511,21 +517,21 @@ async function restoreIsLast(){
     if(!window.desktopAPI || !window.desktopAPI.getIsLast) return;
     const val = await window.desktopAPI.getIsLast();
     isLastFlag = !!val;
-    const chk=document.getElementById('isLastChk');
+    const chk=byId('isLastChk');
     if(chk) chk.checked = isLastFlag;
   } catch(_){}
 }
-document.getElementById('isLastChk')?.addEventListener('change', e=>{
+byId('isLastChk')?.addEventListener('change', e=>{
   try {
     const v=!!e.target.checked; isLastFlag=v;
     if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(v); }
   } catch(_){ }
 });
 if(window.desktopAPI && window.desktopAPI.onIsLast){
-  window.desktopAPI.onIsLast(v=>{ try { isLastFlag=!!v; const chk=document.getElementById('isLastChk'); if(chk) chk.checked=isLastFlag; } catch(_){ } });
+  window.desktopAPI.onIsLast(v=>{ try { isLastFlag=!!v; const chk=byId('isLastChk'); if(chk) chk.checked=isLastFlag; } catch(_){ } });
 }
 
-document.getElementById('mapSelect')?.addEventListener('change', e=>{
+byId('mapSelect')?.addEventListener('change', e=>{
   if(!window.desktopAPI) return;
   const map=e.target.value;
   window.desktopAPI.setMap('*', map);
@@ -536,10 +542,10 @@ document.getElementById('mapSelect')?.addEventListener('change', e=>{
 });
 
 // Map refresh button: re-broadcast current selection (forces odds collectors to re-run with the same map)
-document.getElementById('mapRefreshBtn')?.addEventListener('click', ()=>{
+byId('mapRefreshBtn')?.addEventListener('click', ()=>{
   try {
     if(!window.desktopAPI) return;
-    const sel=document.getElementById('mapSelect'); if(!sel) return;
+    const sel=byId('mapSelect'); if(!sel) return;
     const val=sel.value;
     // Emit again; main process will persist and broadcast identically
     window.desktopAPI.setMap('*', val);
@@ -547,14 +553,14 @@ document.getElementById('mapRefreshBtn')?.addEventListener('click', ()=>{
   } catch(_){ }
 });
 // Right click toggles 30s auto-rebroadcast mode (shared between board & embedded stats)
-document.getElementById('mapRefreshBtn')?.addEventListener('contextmenu', (e)=>{
+byId('mapRefreshBtn')?.addEventListener('contextmenu', (e)=>{
   try { e.preventDefault(); if(window.desktopAPI && window.desktopAPI.toggleMapAutoRefresh){ window.desktopAPI.toggleMapAutoRefresh(); } else { const { ipcRenderer } = require('electron'); ipcRenderer.send('toggle-map-auto-refresh'); } } catch(_){ }
 });
 
 // Status listener to style button when auto enabled
 function bindMapAutoRefreshStatus(){
   try {
-    const btn=document.getElementById('mapRefreshBtn'); if(!btn) return;
+    const btn=byId('mapRefreshBtn'); if(!btn) return;
     if(window.desktopAPI && window.desktopAPI.getMapAutoRefreshStatus){
       window.desktopAPI.getMapAutoRefreshStatus().then(p=>applyMapAutoRefreshVisual(p)).catch(()=>{});
     }
@@ -562,7 +568,7 @@ function bindMapAutoRefreshStatus(){
 }
 function applyMapAutoRefreshVisual(p){
   try {
-    const btn=document.getElementById('mapRefreshBtn'); if(!btn) return;
+    const btn=byId('mapRefreshBtn'); if(!btn) return;
     const enabled = !!(p && p.enabled);
     btn.style.opacity = enabled ? '1' : '';
     btn.style.background = enabled ? '#2f4b6a' : '';
@@ -584,7 +590,7 @@ if(window.desktopAPI && window.desktopAPI.onMap){
       const v=String(mapVal);
       if(currentMapBoard === v) return; // no change
       currentMapBoard = v;
-      const sel=document.getElementById('mapSelect');
+      const sel=byId('mapSelect');
       if(sel && sel.value!==v){ sel.value=v; }
       forceBoardMapSelect(v);
     } catch(_){ }
@@ -595,8 +601,8 @@ if(window.desktopAPI && window.desktopAPI.onMap){
 function updateTeamHeaders(names){
   try {
     if(!names) return;
-    const s1=document.getElementById('side1Header');
-    const s2=document.getElementById('side2Header');
+    const s1=byId('side1Header');
+    const s2=byId('side2Header');
     if(s1 && names.team1) s1.textContent = names.team1;
     if(s2 && names.team2) s2.textContent = names.team2;
   } catch(_){ }
@@ -626,7 +632,7 @@ if(window.desktopAPI && window.desktopAPI.onTeamNames){
 // Visual state helpers for Auto buttons (kept for board UI)
 function refreshAutoButtonsVisual(){
   try {
-    const autoBtn = document.getElementById('autoBtn');
+    const autoBtn = byId('autoBtn');
     const sim = window.__autoSim;
     if(autoBtn && sim){
       autoBtn.classList.toggle('on', !!sim.active);
@@ -651,7 +657,7 @@ function flashDot(idx){
     const eff = currentEngTol();
     lastTol = (typeof eff==='number' && !isNaN(eff)) ? eff : ((typeof v==='number' && !isNaN(v)) ? v : null);
     try {
-      const el = document.getElementById('tolBadge'); if(!el) return;
+      const el = byId('tolBadge'); if(!el) return;
       if(lastTol!=null) el.textContent = `Tol: ${lastTol.toFixed(2)}%`;
       else el.textContent = 'Tol: —';
     } catch(_){ }
