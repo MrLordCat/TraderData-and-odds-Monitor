@@ -178,6 +178,9 @@ try { window.addEventListener('DOMContentLoaded', bindTopbar); } catch(_){ }
 
 const boardData = {};
 const swapped = new Set();
+// Track Excel odds changes for DS mismatch highlight
+let lastExcelOdds = null;
+let dsMismatchTimer = null;
 // Centralized swap (team orientation) is synced via IPC; fallback to localStorage only if IPC unavailable.
 try { window.__swappedBrokers = swapped; } catch(_){ }
 
@@ -300,6 +303,33 @@ function renderBoard(){
     if(statusSpan && statusSpan.dataset.last==='idle'){ statusSpan.style.display='none'; }
   }
   
+  // Track Excel odds changes for DS mismatch detection
+  try {
+    const excelOddsKey = excelRecord && Array.isArray(excelRecord.odds) 
+      ? excelRecord.odds.join('|') : null;
+    if(excelOddsKey && excelOddsKey !== lastExcelOdds){
+      lastExcelOdds = excelOddsKey;
+      // Clear previous timer and start new 5s countdown
+      if(dsMismatchTimer) clearTimeout(dsMismatchTimer);
+      const dsRow = document.getElementById('dsRow');
+      if(dsRow) dsRow.classList.remove('ds-mismatch');
+      dsMismatchTimer = setTimeout(()=>{
+        try {
+          const dsRow = document.getElementById('dsRow');
+          const dsRecord = boardData['ds'];
+          const excelRecord = boardData['excel'];
+          if(!dsRow || !dsRecord || !excelRecord) return;
+          if(!Array.isArray(dsRecord.odds) || !Array.isArray(excelRecord.odds)) return;
+          const dsKey = dsRecord.odds.join('|');
+          const exKey = excelRecord.odds.join('|');
+          if(dsKey !== exKey && dsRecord.odds[0] !== '-' && excelRecord.odds[0] !== '-'){
+            dsRow.classList.add('ds-mismatch');
+          }
+        } catch(_){ }
+      }, 5000);
+    }
+  } catch(_){ }
+  
   // Update DS row - separate row for DS odds
   try {
     const dsRow = document.getElementById('dsRow');
@@ -312,8 +342,21 @@ function renderBoard(){
         dsCell.textContent = `${dsRecord.odds[0]} / ${dsRecord.odds[1]}`;
         dsRow.style.display = '';
         dsRow.classList.toggle('frozen', !!dsRecord.frozen);
+        
+        // If DS odds now match Excel, clear mismatch highlight and cancel timer
+        try {
+          if(excelRecord && Array.isArray(excelRecord.odds) && excelRecord.odds[0] !== '-'){
+            const dsOddsKey = dsRecord.odds.join('|');
+            const excelOddsKey = excelRecord.odds.join('|');
+            if(dsOddsKey === excelOddsKey){
+              dsRow.classList.remove('ds-mismatch');
+              if(dsMismatchTimer){ clearTimeout(dsMismatchTimer); dsMismatchTimer = null; }
+            }
+          }
+        } catch(_){ }
       } else {
         dsRow.style.display = 'none';
+        dsRow.classList.remove('ds-mismatch');
       }
     }
   } catch(_){ }

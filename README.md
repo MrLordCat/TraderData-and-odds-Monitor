@@ -79,6 +79,20 @@ Later I built another extension to scrape odds from multiple bookmakers and disp
 **Board (odds):**
 - Docked to the side of the stage; move between left/right; resize with splitter
 - Receives odds from brokers and from the optional Excel watcher
+- DS odds highlight: pulses red when different from Excel for >5 seconds
+
+## Edge Extension (DS Uptime Tracker)
+
+Optional browser extension for DS page integration:
+- **Uptime tracking**: Monitors Active/Suspended states, calculates uptime percentage
+- **Odds sync**: Sends DS odds to OddsMoni via WebSocket
+- **Auto-update**: Check for updates directly from GitHub
+
+Installation:
+1. Open Edge → Extensions → Manage Extensions
+2. Enable "Developer mode"
+3. Click "Load unpacked" → select `resources/extensions/uptime/`
+4. Or use Settings → Updates → Edge Extension → Open Extension Folder
 
 ## Hotkeys
 

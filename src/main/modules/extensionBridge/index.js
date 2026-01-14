@@ -5,9 +5,17 @@
 
 const WebSocket = require('ws');
 const path = require('path');
+const https = require('https');
+const fs = require('fs');
+const { app } = require('electron');
 
 // Version of bundled extension (update when shipping new version)
-const BUNDLED_EXTENSION_VERSION = '1.1.0';
+const BUNDLED_EXTENSION_VERSION = '1.2.0';
+
+// GitHub repo info for auto-update
+const GITHUB_OWNER = 'MrLordCat';
+const GITHUB_REPO = 'TraderData-and-odds-Monitor';
+const EXTENSION_PATH = 'resources/extensions/uptime';
 
 /**
  * Create extension bridge WebSocket server
@@ -118,9 +126,137 @@ function createExtensionBridge(opts = {}) {
         ws.send(JSON.stringify({ type: 'pong' }));
         break;
 
+      case 'check-update':
+        // Check GitHub for latest extension version and update if needed
+        console.log('[extensionBridge] Update check requested, current:', msg.currentVersion);
+        checkAndUpdateExtension(ws, msg.currentVersion);
+        break;
+
       default:
         console.log('[extensionBridge] Unknown message type:', msg.type);
     }
+  }
+
+  // Check GitHub for updates and download if available
+  async function checkAndUpdateExtension(ws, currentVersion) {
+    try {
+      // Fetch manifest.json from GitHub main branch
+      const manifestUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${EXTENSION_PATH}/manifest.json`;
+      
+      const manifest = await fetchJson(manifestUrl);
+      const latestVersion = manifest.version;
+      
+      console.log(`[extensionBridge] GitHub version: ${latestVersion}, current: ${currentVersion}`);
+      
+      if (!isVersionNewer(latestVersion, currentVersion)) {
+        ws.send(JSON.stringify({ 
+          type: 'update-result', 
+          upToDate: true, 
+          version: currentVersion 
+        }));
+        return;
+      }
+      
+      // Download and update extension files
+      console.log('[extensionBridge] Downloading extension update...');
+      
+      // Get list of extension files to update
+      const filesToUpdate = [
+        'manifest.json',
+        'content.js',
+        'uptimeEngine.js',
+        'displayManager.js',
+        'popup.html',
+        'popup.js',
+        'styles.css'
+      ];
+      
+      // Determine extension directory (in app resources for packaged, or source for dev)
+      const isDev = !app.isPackaged;
+      const extDir = isDev 
+        ? path.join(__dirname, '..', '..', '..', '..', EXTENSION_PATH)
+        : path.join(process.resourcesPath, 'extensions', 'uptime');
+      
+      // Download each file
+      let updatedCount = 0;
+      for (const file of filesToUpdate) {
+        try {
+          const fileUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${EXTENSION_PATH}/${file}`;
+          const content = await fetchText(fileUrl);
+          const filePath = path.join(extDir, file);
+          
+          // Ensure directory exists
+          fs.mkdirSync(path.dirname(filePath), { recursive: true });
+          fs.writeFileSync(filePath, content, 'utf8');
+          updatedCount++;
+          console.log(`[extensionBridge] Updated: ${file}`);
+        } catch (err) {
+          console.warn(`[extensionBridge] Failed to update ${file}:`, err.message);
+        }
+      }
+      
+      if (updatedCount > 0) {
+        ws.send(JSON.stringify({ 
+          type: 'update-result', 
+          updated: true, 
+          version: latestVersion,
+          filesUpdated: updatedCount
+        }));
+        console.log(`[extensionBridge] Extension updated to v${latestVersion}`);
+      } else {
+        ws.send(JSON.stringify({ 
+          type: 'update-result', 
+          error: 'Failed to download files' 
+        }));
+      }
+      
+    } catch (err) {
+      console.error('[extensionBridge] Update check failed:', err.message);
+      ws.send(JSON.stringify({ 
+        type: 'update-result', 
+        error: err.message 
+      }));
+    }
+  }
+
+  // Fetch JSON from URL
+  function fetchJson(url) {
+    return new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'User-Agent': 'OddsMoni' } }, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          return fetchJson(res.headers.location).then(resolve).catch(reject);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }).on('error', reject);
+    });
+  }
+
+  // Fetch text from URL
+  function fetchText(url) {
+    return new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'User-Agent': 'OddsMoni' } }, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          return fetchText(res.headers.location).then(resolve).catch(reject);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve(data));
+      }).on('error', reject);
+    });
   }
 
   // Send current map to extension

@@ -721,3 +721,14 @@ small {
 	font-size: var(--md-sys-typescale-body-medium-size);
 	color: var(--md-sys-color-on-surface-variant);
 }
+
+/* DS row mismatch highlight (when DS odds differ from Excel >5s) */
+#embeddedDsRow.ds-mismatch #embeddedDsCell,
+#dsRow.ds-mismatch #dsOddsVal {
+	color: var(--md-sys-color-error, #ff3d5e);
+	animation: ds-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ds-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.5; }
+}

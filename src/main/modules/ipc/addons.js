@@ -75,6 +75,17 @@ function registerAddonIpc({ addonManager }) {
       console.error('[addons] shell.openPath failed:', e);
     }
   });
+  
+  // Open path in file explorer (handle version for invoke)
+  ipcMain.handle('shell-open-path', async (event, dirPath) => {
+    try {
+      await shell.openPath(dirPath);
+      return { success: true };
+    } catch (e) {
+      console.error('[addons] shell.openPath failed:', e);
+      return { success: false, error: e.message };
+    }
+  });
 }
 
 module.exports = { registerAddonIpc };

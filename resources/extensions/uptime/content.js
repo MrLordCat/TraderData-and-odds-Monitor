@@ -4,6 +4,17 @@ let displayManager = null;
 let tracker = null; // Legacy compatibility
 let oddsBridge = null; // WebSocket bridge to OddsMoni
 
+// Helper to safely call Chrome APIs (handles extension context invalidation)
+function safeStorageSet(data) {
+  try {
+    if (chrome?.runtime?.id) {
+      chrome.storage.local.set(data);
+    }
+  } catch (e) {
+    // Extension context invalidated - ignore
+  }
+}
+
 // ============================================
 // OddsBridge - WebSocket client for OddsMoni
 // ============================================
@@ -15,7 +26,7 @@ class OddsBridge {
     this.currentMap = 1;
     this.isLast = false;  // Bo1 mode: use Match Up Winner for map 1
     this.connected = false;
-    this.version = '1.1.0'; // Extension version
+    this.version = '1.3.0'; // Extension version
     this.connect();
   }
 
@@ -93,6 +104,18 @@ class OddsBridge {
         this.showUpdateNotification(msg.latestVersion);
         break;
 
+      case 'update-result':
+        // Response from OddsMoni after check-update request
+        console.log('[upTime] Update result:', msg);
+        if (msg.error) {
+          safeStorageSet({ extensionUpdateStatus: { error: msg.error } });
+        } else if (msg.updated) {
+          safeStorageSet({ extensionUpdateStatus: { updated: true, version: msg.version } });
+        } else if (msg.upToDate) {
+          safeStorageSet({ extensionUpdateStatus: { upToDate: true, version: msg.version } });
+        }
+        break;
+
       case 'pong':
         // Heartbeat response
         break;
@@ -132,6 +155,9 @@ class OddsBridge {
   }
 
   updateConnectionStatus(connected) {
+    // Save to storage for popup
+    safeStorageSet({ oddsMoniConnected: connected });
+    
     // Update visual indicator
     let badge = document.getElementById('oddsmoni-connection-badge');
     if (!badge) {
@@ -241,6 +267,47 @@ const pageObserver = new MutationObserver((mutations) => {
 });
 
 pageObserver.observe(document.body, { childList: true, subtree: true });
+
+// Message handler for popup commands
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'reconnect') {
+        console.log('[upTime] Reconnect requested from popup');
+        if (oddsBridge) {
+            oddsBridge.connect();
+        }
+        sendResponse({ success: true });
+    } else if (message.action === 'resetUptime') {
+        console.log('[upTime] Reset uptime requested from popup');
+        if (uptimeEngine) {
+            uptimeEngine.reset();
+        }
+        if (displayManager) {
+            displayManager.reset();
+        }
+        sendResponse({ success: true });
+    } else if (message.action === 'getStatus') {
+        sendResponse({ 
+            connected: oddsBridge?.ws?.readyState === WebSocket.OPEN,
+            uptime: uptimeEngine?.uptime || 0,
+            tracking: uptimeEngine?.isTracking || false
+        });
+    } else if (message.action === 'checkUpdate') {
+        console.log('[upTime] Check update requested from popup');
+        // Send update request to OddsMoni via WebSocket
+        if (oddsBridge?.ws?.readyState === WebSocket.OPEN) {
+            safeStorageSet({ extensionUpdateStatus: { checking: true, message: 'Checking GitHub...' } });
+            oddsBridge.ws.send(JSON.stringify({ 
+                type: 'check-update',
+                currentVersion: chrome.runtime.getManifest().version
+            }));
+            sendResponse({ success: true });
+        } else {
+            safeStorageSet({ extensionUpdateStatus: { error: 'Not connected to OddsMoni' } });
+            sendResponse({ success: false, error: 'Not connected' });
+        }
+    }
+    return true; // Keep channel open for async response
+});
 
 // Hotkeys for spinner buttons (Numpad +/-) and Commit (Enter)
 // Numpad - : Decrease odd team 1

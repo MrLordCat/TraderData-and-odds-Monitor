@@ -105,6 +105,9 @@ function bindEmbeddedMapSelect(){
   } catch(_){ }
 }
 const embeddedOddsData = {}; let embeddedBest1=NaN, embeddedBest2=NaN;
+// DS mismatch tracking
+let lastEmbeddedExcelOdds = null;
+let embeddedDsMismatchTimer = null;
 let OddsBoardShared = null;
 try { OddsBoardShared = require('../ui/odds_board_shared'); } catch(_){ }
 // Auto map rebroadcast status visual sync (shim guarantees desktopAPI)
@@ -202,6 +205,36 @@ function renderEmbeddedOdds(){
       excelCell.textContent = displayText;
       excelRow.classList.toggle('frozen', !!(excelRec && excelRec.frozen));
     }
+    
+    // Track Excel odds changes for DS mismatch detection
+    // Compare as numbers to avoid 1.4 vs 1.40 mismatch
+    const excelNum1 = hasExcelOdds ? parseFloat(excelRec.odds[0]) : NaN;
+    const excelNum2 = hasExcelOdds ? parseFloat(excelRec.odds[1]) : NaN;
+    const excelOddsKey = hasExcelOdds ? `${excelNum1}|${excelNum2}` : null;
+    if(excelOddsKey && excelOddsKey !== lastEmbeddedExcelOdds){
+      lastEmbeddedExcelOdds = excelOddsKey;
+      // Clear previous timer and remove mismatch highlight
+      if(embeddedDsMismatchTimer){ clearTimeout(embeddedDsMismatchTimer); embeddedDsMismatchTimer = null; }
+      const dsRow = document.getElementById('embeddedDsRow');
+      if(dsRow) dsRow.classList.remove('ds-mismatch');
+      // Start 5s timer to check for mismatch
+      embeddedDsMismatchTimer = setTimeout(()=>{
+        try {
+          const dsRow = document.getElementById('embeddedDsRow');
+          const dsRec = embeddedOddsData['ds'];
+          const excelRec = embeddedOddsData['excel'];
+          if(!dsRow || !dsRec || !excelRec) return;
+          if(!Array.isArray(dsRec.odds) || !Array.isArray(excelRec.odds)) return;
+          if(dsRec.odds[0] === '-' || excelRec.odds[0] === '-') return;
+          // Compare as numbers
+          const dsN1 = parseFloat(dsRec.odds[0]), dsN2 = parseFloat(dsRec.odds[1]);
+          const exN1 = parseFloat(excelRec.odds[0]), exN2 = parseFloat(excelRec.odds[1]);
+          if(dsN1 !== exN1 || dsN2 !== exN2){
+            dsRow.classList.add('ds-mismatch');
+          }
+        } catch(_){ }
+      }, 5000);
+    }
   } catch(_){ }
   
   // DS row update - separate row for DS odds
@@ -216,8 +249,20 @@ function renderEmbeddedOdds(){
         dsCell.textContent = `${dsRec.odds[0]} / ${dsRec.odds[1]}`;
         dsRow.style.display = '';
         dsRow.classList.toggle('frozen', !!dsRec.frozen);
+        
+        // If DS odds now match Excel, clear mismatch highlight and cancel timer
+        if(excelRec && Array.isArray(excelRec.odds) && excelRec.odds[0] !== '-'){
+          // Compare as numbers
+          const dsN1 = parseFloat(dsRec.odds[0]), dsN2 = parseFloat(dsRec.odds[1]);
+          const exN1 = parseFloat(excelRec.odds[0]), exN2 = parseFloat(excelRec.odds[1]);
+          if(dsN1 === exN1 && dsN2 === exN2){
+            dsRow.classList.remove('ds-mismatch');
+            if(embeddedDsMismatchTimer){ clearTimeout(embeddedDsMismatchTimer); embeddedDsMismatchTimer = null; }
+          }
+        }
       } else {
         dsRow.style.display = 'none';
+        dsRow.classList.remove('ds-mismatch');
       }
     }
   } catch(_){ }

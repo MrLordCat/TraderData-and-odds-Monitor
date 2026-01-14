@@ -608,13 +608,6 @@ function bootstrap() {
     extensionBridgeRef.value = extensionBridge; // expose via ref for IPC modules
     initExtensionBridgeIpc({ extensionBridge, extensionInstaller, mainWindow, store });
     console.log('[extensionBridge] WebSocket server started on port 9876');
-    
-    // Check if should show install prompt (first launch, extension not connected)
-    setTimeout(() => {
-      if(extensionInstaller.shouldShowInstallPrompt() && !extensionBridge.isConnected()){
-        extensionInstaller.showInstallDialog(mainWindow);
-      }
-    }, 5000);
   } catch(e){ console.warn('[extensionBridge] init failed', e.message); }
   // --- Auto-Update Manager ---
   try {

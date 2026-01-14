@@ -249,6 +249,14 @@ select {
 #dsRow { opacity: 0.85; }
 #dsRow th { font-size: 11px; color: var(--accent); }
 #dsRow.frozen { opacity: 0.5; }
+#dsRow.ds-mismatch #dsOddsVal {
+  color: var(--danger);
+  animation: ds-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ds-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 
 /* Tag badge */
 .tag {

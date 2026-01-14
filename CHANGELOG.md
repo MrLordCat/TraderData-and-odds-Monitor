@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-01-14
+
+### ✨ New Features
+- **DS/Excel Odds Mismatch Alert**: DS odds row pulses red when different from Excel for >5 seconds
+  - Numeric comparison (1.4 == 1.40) to avoid false positives
+  - Auto-clears when odds match again
+- **Edge Extension v1.3.0**: Complete upTime tracking extension for DS page
+  - Popup menu with Connect, Check Updates, Reload, Reset buttons
+  - Modern soft UI design with gradients
+  - Auto-update via GitHub (direct fetch, no OddsMoni dependency)
+  - Improved uptime algorithm: deducts suspend time when game ends in Suspended state
+- **Extension Settings Section**: New "Edge Extension" card in Settings → Updates
+  - Shows extension status and version
+  - "Open Extension Folder" button for easy installation
+
+### 🐛 Bug Fixes
+- **Extension context invalidated**: Wrapped chrome.storage calls in try-catch with `safeStorageSet()` helper
+- **Popup duplicate variable**: Fixed `updateStatus` element vs function naming conflict
+- **Connection errors**: Better error handling showing "Refresh DS page" message
+
+### 🧹 Cleanup
+- **Removed legacy files**: Deleted unused `renderer/board.js` and `renderer/stats_embedded.js`
+- **Removed empty folder**: Deleted legacy `renderer/` directory
+
+### 🔧 Technical
+- **WebSocket bridge**: Extension connects to OddsMoni on port 9876
+- **Uptime calculation**: Tracks Active/Suspended states, calculates percentage excluding last suspend
+- **stats_embedded.js**: DS mismatch logic with setTimeout-based detection
+
+---
+
+## [0.2.2]
+
+### 🐛 Bug Fixes
+- Minor stability improvements
+
+---
+
 ## [0.2.1]
 
 ### 🐛 Bug Fixes

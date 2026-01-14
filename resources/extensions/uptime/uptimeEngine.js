@@ -221,7 +221,13 @@ class UptimeEngine {
     // Unified state setter + persistence
     setState(next) {
         this.state = { ...this.state, ...next };
-        chrome.storage.local.set({ uptimeData: this.state });
+        try {
+            if (chrome?.runtime?.id) {
+                chrome.storage.local.set({ uptimeData: this.state });
+            }
+        } catch (e) {
+            // Extension context invalidated - ignore
+        }
     }
 
     // One scan to detect phase + trading status, then apply changes
@@ -369,11 +375,54 @@ class UptimeEngine {
     stopTracking() {
         if (!this.state.isTracking) return;
         const now = Date.now();
-        let { totalUptime, lastTradingStartTime, gameStartTime } = this.state;
-        if (this.state.currentTradingStatus === 'Trading' && lastTradingStartTime) totalUptime += now - lastTradingStartTime;
-        const final = { isTracking: false, gameEndTime: now, finalUptime: totalUptime, finalGameTime: now - gameStartTime, currentSuspensionStart: null };
-        final.finalSuspendedTime = this.getTotalSuspendedTime({ ...this.state, ...final });
+        let { totalUptime, lastTradingStartTime, gameStartTime, suspensionPeriods, currentSuspensionStart } = this.state;
+        
+        // If currently Trading, add time since last trading start
+        if (this.state.currentTradingStatus === 'Trading' && lastTradingStartTime) {
+            totalUptime += now - lastTradingStartTime;
+        }
+        
+        let adjustedGameTime = now - gameStartTime;
+        let lastSuspendDeducted = 0;
+        
+        // If game ended while Suspended (didn't return to Trading before end)
+        // Deduct the final suspension period from total game time
+        // This increases uptime% because we consider the game "effectively ended" at suspend start
+        if (this.state.currentTradingStatus === 'Suspended' && currentSuspensionStart) {
+            lastSuspendDeducted = now - currentSuspensionStart;
+            adjustedGameTime = currentSuspensionStart - gameStartTime; // Game time = start to last suspend
+            
+            suspensionPeriods = [...suspensionPeriods, { 
+                start: currentSuspensionStart, 
+                end: now, 
+                duration: lastSuspendDeducted,
+                deductedFromTotal: true  // This suspend was deducted from game time
+            }];
+            console.log('[UpTime] Game ended with active Suspend. Deducting', Math.round(lastSuspendDeducted/1000), 'sec from total time');
+        }
+        
+        const final = { 
+            isTracking: false, 
+            gameEndTime: now, 
+            finalUptime: totalUptime, 
+            finalGameTime: adjustedGameTime,  // Adjusted: excludes last suspend if ended in Suspended
+            rawGameTime: now - gameStartTime, // Original total time
+            lastSuspendDeducted,
+            currentSuspensionStart: null,
+            suspensionPeriods 
+        };
+        
+        // Calculate suspended time (excluding the deducted final suspend)
+        final.finalSuspendedTime = suspensionPeriods
+            .filter(p => !p.deductedFromTotal)
+            .reduce((sum, p) => sum + p.duration, 0);
+        
         this.setState(final);
+        
+        const pct = adjustedGameTime > 0 ? ((totalUptime / adjustedGameTime) * 100).toFixed(1) : 0;
+        console.log('[UpTime] Tracking stopped. Uptime:', this.formatTime(totalUptime), 
+                    '/ GameTime:', this.formatTime(adjustedGameTime), 
+                    '=', pct + '%');
     }
 
     // Metrics
@@ -384,16 +433,35 @@ class UptimeEngine {
         return u;
     }
     getTotalGameTime() {
+        // After game ends, use finalGameTime (adjusted if ended in Suspended)
+        if (this.state.finalGameTime !== undefined) return this.state.finalGameTime;
+        if (!this.state.gameStartTime) return 0;
+        // During tracking, calculate live (but subtract current suspend if active)
+        let total = (this.state.gameEndTime || Date.now()) - this.state.gameStartTime;
+        // If currently suspended, subtract this suspend period from display
+        if (this.state.isTracking && this.state.currentSuspensionStart) {
+            total -= (Date.now() - this.state.currentSuspensionStart);
+        }
+        return total;
+    }
+    getRawGameTime() {
+        // Always returns the full game time without adjustments
         if (!this.state.gameStartTime) return 0;
         return (this.state.gameEndTime || Date.now()) - this.state.gameStartTime;
     }
     getTotalSuspendedTime(st = this.state) {
-        let t = st.suspensionPeriods.reduce((s, p) => s + p.duration, 0);
+        // Exclude deducted suspends from total
+        let t = st.suspensionPeriods
+            .filter(p => !p.deductedFromTotal)
+            .reduce((s, p) => s + p.duration, 0);
         if (st.isTracking && st.currentSuspensionStart) t += Date.now() - st.currentSuspensionStart;
         return t;
     }
     getCurrentSuspendedTime() { return this.state.finalSuspendedTime ?? this.getTotalSuspendedTime(); }
-    getUptimePercentage() { const tt = this.getTotalGameTime(); return tt > 0 ? (this.getCurrentUptime() / tt) * 100 : 0; }
+    getUptimePercentage() { 
+        const tt = this.getTotalGameTime(); 
+        return tt > 0 ? (this.getCurrentUptime() / tt) * 100 : 0; 
+    }
     formatTime(ms) {
         if (!Number.isFinite(ms) || ms < 0) return '00:00:00';
         const s = Math.floor(ms / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60);
@@ -414,6 +482,8 @@ class UptimeEngine {
             currentSuspensionStart: null,
             finalUptime: undefined,
             finalGameTime: undefined,
+            rawGameTime: undefined,
+            lastSuspendDeducted: 0,
             finalSuspendedTime: undefined
         });
     }

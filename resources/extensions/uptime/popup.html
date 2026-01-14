@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      width: 220px;
+      padding: 16px;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      font-size: 13px;
+      background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+      color: #e8e8f0;
+      margin: 0;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .header-icon {
+      font-size: 18px;
+    }
+    .header-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #a8c8ff;
+      letter-spacing: 0.3px;
+    }
+    .status-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+    }
+    .status-row:not(:last-child) {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+    }
+    .status-label {
+      color: #888;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-value {
+      font-weight: 500;
+      font-size: 12px;
+    }
+    .status-value.connected {
+      color: #6dd68c;
+    }
+    .status-value.disconnected {
+      color: #ff7b7b;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 11px 14px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.2px;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #5b8def 0%, #4a7de0 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(90,140,240,0.25);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #6b9dff 0%, #5a8df0 100%);
+      box-shadow: 0 4px 12px rgba(90,140,240,0.35);
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: #c8c8d8;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    .btn-danger {
+      background: rgba(255,100,100,0.15);
+      color: #ff8888;
+      border: 1px solid rgba(255,100,100,0.2);
+    }
+    .btn-danger:hover {
+      background: rgba(255,100,100,0.25);
+      color: #ffaaaa;
+    }
+    .btn-icon {
+      font-size: 14px;
+    }
+    .update-status {
+      display: none;
+      margin: 10px 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .update-status.success {
+      background: rgba(100,200,120,0.15);
+      border: 1px solid rgba(100,200,120,0.2);
+      color: #8fd8a0;
+    }
+    .update-status.error {
+      background: rgba(255,100,100,0.15);
+      border: 1px solid rgba(255,100,100,0.2);
+      color: #ff9999;
+    }
+    .update-status.info {
+      background: rgba(100,150,255,0.15);
+      border: 1px solid rgba(100,150,255,0.2);
+      color: #a0c0ff;
+    }
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+      margin: 12px 0;
+    }
+    .version {
+      text-align: center;
+      font-size: 10px;
+      color: #555;
+      margin-top: 12px;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="header-icon">⏱️</span>
+    <span class="header-title">Uptime Tracker</span>
+  </div>
+  
+  <div class="status-card">
+    <div class="status-row">
+      <span class="status-label">OddsMoni</span>
+      <span class="status-value" id="connStatus">Checking...</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Page</span>
+      <span class="status-value" id="pageStatus">—</span>
+    </div>
+  </div>
+  
+  <button class="btn btn-primary" id="connectBtn">
+    <span class="btn-icon">🔌</span> Connect
+  </button>
+  
+  <button class="btn btn-secondary" id="updateBtn">
+    <span class="btn-icon">↓</span> Check Updates
+  </button>
+  
+  <div class="update-status" id="updateStatus"></div>
+  
+  <div class="divider"></div>
+  
+  <button class="btn btn-secondary" id="reloadBtn">
+    <span class="btn-icon">↻</span> Reload Extension
+  </button>
+  
+  <button class="btn btn-danger" id="resetBtn">
+    <span class="btn-icon">🗑</span> Reset Uptime
+  </button>
+  
+  <div class="version" id="versionDisplay">v1.3.0</div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

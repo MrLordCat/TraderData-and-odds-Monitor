@@ -45,19 +45,25 @@ src/
 ├── renderer/
 │   ├── pages/                 # HTML pages
 │   │   ├── index.html         # Main window
-│   │   ├── board.html         # Dockable odds board
 │   │   ├── settings.html      # Settings overlay (incl. Addons section)
-│   │   └── stats_panel.html   # Stats panel
+│   │   └── stats_panel.html   # Stats panel (Odds Board + Game Stats embedded)
 │   ├── scripts/               # Page-specific JS
 │   ├── styles/                # CSS files
 │   ├── core/                  # Shared logic (auto_core, auto_hub, odds_core)
 │   ├── ui/                    # UI components (toast, excel_status, api_helpers)
-│   ├── sidebar/               # Modular sidebar system (see section 13)
 │   └── lolstats/              # LoL stats embeds
 ├── brokers/
 │   ├── extractors.js          # DOM parsers per bookmaker
 │   └── mapNav.js              # Map navigation helpers
 └── assets/                    # Fonts, images
+
+resources/extensions/uptime/   # Edge extension for DS uptime tracking
+├── manifest.json              # Extension manifest v3
+├── content.js                 # Content script with OddsBridge WebSocket
+├── uptimeEngine.js            # State machine (Active/Suspended tracking)
+├── displayManager.js          # UI injection on DS page
+├── popup.html/js              # Extension popup menu
+└── background.js              # Service worker
 
 Excel Extractor/               # Python integration (outside src/)
 ├── excel_watcher.py           # Reads Excel cells, writes current_state.json
@@ -161,58 +167,30 @@ electron-store keys:
 
 Always wrap fragile calls in `try/catch`.
 
-## 13. Sidebar Module System
-Modular architecture for sidebar panels in `renderer/sidebar/`:
+## 13. Extension Bridge (DS Uptime)
+WebSocket bridge for Edge extension communication:
 
-```
-sidebar/
-├── core/
-│   ├── sidebar-base.css    # Shared styles
-│   ├── sidebar-base.js     # Base class & registry
-│   └── sidebar-loader.js   # Dynamic loader (incl. external addons)
-├── modules/
-│   ├── toolbar/            # Top toolbar (order: 0)
-│   ├── sources-layout/     # Sources list (order: 5)
-│   └── odds-board/         # Odds table (order: 10)
-├── sidebar.html            # Container
-└── sidebar-init.js         # Initialization (loads addons)
-```
+**Architecture:**
+- `src/main/modules/extensionBridge/index.js` - WebSocket server on port 9876
+- Extension connects, sends odds updates with broker id `'ds'`
+- Odds flow: Extension → WebSocket → `onOddsUpdate` → broadcast to all views
 
-Creating a module:
-```javascript
-const { SidebarModule, registerModule } = require('../../core/sidebar-base');
-class MyModule extends SidebarModule {
-  static id = 'my-module';
-  static title = 'My Module';
-  static order = 50;
-  getTemplate() { return '<div>Content</div>'; }
-  onMount(container) { super.onMount(container); }
-}
-registerModule(MyModule);
-```
+**Extension Files (`resources/extensions/uptime/`):**
+- `content.js` - OddsBridge class, connects to OddsMoni, sends odds
+- `uptimeEngine.js` - Tracks Active/Suspended states, calculates uptime %
+- `displayManager.js` - Injects UI overlay on DS page
+- `popup.js` - Extension popup with Connect, Check Updates, Reload buttons
 
-**Detachable Modules:**
-Sidebar modules can be detached into separate windows:
-```javascript
-class MyModule extends SidebarModule {
-  static detachable = true;   // Enable detach button (default: true)
-  detachWidth = 400;          // Optional window width
-  detachHeight = 500;         // Optional window height
-}
-```
+**DS Mismatch Detection:**
+- `stats_embedded.js` tracks Excel odds changes
+- If DS odds differ from Excel for >5 seconds → red pulse animation
+- Numeric comparison (parseFloat) to avoid 1.4 vs 1.40 false positives
 
-IPC channels for detach:
-- `module-detach` - Open module in separate window
-- `module-attach` - Close detached window, return to sidebar
-- `module-is-detached` - Check if module is detached
-- `module-get-detached` - Get list of detached modules
+**Extension Installation:**
+- Manual: Load unpacked from `resources/extensions/uptime/`
+- Settings → Updates → Edge Extension → Open Extension Folder
 
-Files:
-- `src/main/modules/ipc/moduleDetach.js` - IPC handlers
-- `src/renderer/pages/module_detach.html` - Detached window template
-- `src/renderer/scripts/addon_loader.js` - SidebarModule base with detach support
-
-## 14. Addon System
+## 14. Addon System (for external plugins)
 External modules loaded from `%APPDATA%/oddsmoni/addons/<addon-id>/`.
 
 **Channels:** `dev` (pre-release builds) and `release` (stable tags).
