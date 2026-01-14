@@ -11,6 +11,13 @@ if(!ipcRenderer){
   window.ipcRenderer = ipcRenderer = { send: ()=>{}, on: ()=>{}, invoke: async()=>{} };
 }
 let activityModule = (window.__activityModule)||null; if(!activityModule){ try { activityModule = require('./stats_activity'); } catch(_){ } }
+
+// Load shared DOM helper
+let byId = null;
+try { const DomHelpers = require('../ui/dom_helpers'); byId = DomHelpers.byId; } catch(_){ }
+if(!byId && window.DomHelpers) byId = window.DomHelpers.byId;
+if(!byId) byId = (id) => { try { return byId(id); } catch(_){ return null; } };
+
 function send(ch,p){ ipcRenderer.send(ch,p); }
 
 // ================= Compact Topbar (icons) =================
@@ -18,13 +25,12 @@ let __statsPanelSide = 'right';
 function __setPanelSideUi(side){
   try {
     __statsPanelSide = (side === 'left') ? 'left' : 'right';
-    const btn = document.getElementById('spPanelSide');
+    const btn = byId('spPanelSide');
     if(btn) btn.dataset.side = __statsPanelSide;
   } catch(_){ }
 }
 
 function bindStatsTopbar(){
-  const byId = (id)=> document.getElementById(id);
 
   try {
     const sideBtn = byId('spPanelSide');
@@ -76,7 +82,7 @@ try {
     try {
       const side = p && p.side;
       __setPanelSideUi(side);
-      const dbg = document.getElementById('dbgSide');
+      const dbg = byId('dbgSide');
       if(dbg) dbg.textContent = __statsPanelSide;
     } catch(_){ }
   });
@@ -111,7 +117,7 @@ let manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats: { '1': mak
 
 // ================= Team Header Utilities =================
 function setTeamHeader(idx, rawText){
-  const th = document.getElementById(idx===1? 'lt-team1':'lt-team2');
+  const th = byId(idx===1? 'lt-team1':'lt-team2');
   if(!th) return;
   // Ensure wrapper exists (in case of dynamic rebuild)
   let wrap = th.querySelector('.teamNameWrap');
@@ -222,13 +228,13 @@ function animationsAllowed(){
     return !!(cfg && cfg.animationsEnabled);
   } catch(_){ return false; }
 }
-function cell(id, side){ return document.getElementById(`${id}-${side}`); }
-function sendPersist(){ send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, metricVisibility, metricOrder: metricsOrderMutable }); }
+function cell(id, side){ return byId(`${id}-${side}`); }
+function sendPersist(){ send('lol-stats-settings',{ manualMode: byId('lolManualMode')?.checked, metricVisibility, metricOrder: metricsOrderMutable }); }
 // Persist animation settings (no-op)
 function persistAnim(){}
 
 // ================= Metrics UI =================
-function buildMetricToggles(){ const wrap=document.getElementById('metricToggles'); if(!wrap) return; wrap.innerHTML=''; metricsOrder.forEach(id=>{ const label=document.createElement('label'); label.className='metricToggle'; const cb=document.createElement('input'); cb.type='checkbox'; cb.checked = metricVisibility[id] !== false; cb.onchange=()=>{ metricVisibility[id]=cb.checked; sendPersist(); applyVisibility(); }; label.appendChild(cb); label.appendChild(document.createTextNode(metricLabels[id]||id)); wrap.appendChild(label); }); }
+function buildMetricToggles(){ const wrap=byId('metricToggles'); if(!wrap) return; wrap.innerHTML=''; metricsOrder.forEach(id=>{ const label=document.createElement('label'); label.className='metricToggle'; const cb=document.createElement('input'); cb.type='checkbox'; cb.checked = metricVisibility[id] !== false; cb.onchange=()=>{ metricVisibility[id]=cb.checked; sendPersist(); applyVisibility(); }; label.appendChild(cb); label.appendChild(document.createTextNode(metricLabels[id]||id)); wrap.appendChild(label); }); }
 function applyVisibility(){
   let hidden=0; let total=0;
   metricsOrder.forEach(id=>{
@@ -246,7 +252,7 @@ function applyVisibility(){
   }
 }
 function ensureRows(){
-  const body = document.getElementById('lt-body');
+  const body = byId('lt-body');
   if(!body){ return; }
   const sig = metricsOrderMutable.join('|');
   if(body.children.length && sig === lastOrderSig){ return; }
@@ -336,7 +342,7 @@ function setText(id, side, val){
 }
 
 // ================= LoL Update Handling =================
-ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(document.getElementById('lolManualMode').checked) return; try {
+ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(byId('lolManualMode').checked) return; try {
   const firstRender = (lastGameRendered == null);
   if(firstRender){ try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ } }
   liveDataset = payload; cachedLive = payload; const games=Object.keys(payload.gameStats||{}).map(Number).sort((a,b)=>a-b); const sig = games.join(','); if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; if(sig !== lastLiveGamesSig){ lastLiveGamesSig = sig; if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; }
@@ -348,7 +354,7 @@ function clearLol(){
     const isCount = COUNT_METRICS.includes(id);
     const isBinary = BINARY_METRICS.includes(id) || ['quadra','penta','atakhan','dragonOrders','firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20'].includes(id);
     ['t1','t2'].forEach(side=>{
-      const c=document.getElementById(`${id}-${side}`);
+      const c=byId(`${id}-${side}`);
       if(!c) return;
       let val='';
       if(isCount) val='0';
@@ -366,14 +372,14 @@ function clearLol(){
   });
 }
 
-ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; clearLol(); updateGameSelect(); const st=document.getElementById('lolStatus'); if(st) st.textContent='Waiting...'; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
+ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; clearLol(); updateGameSelect(); const st=byId('lolStatus'); if(st) st.textContent='Waiting...'; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
 
 // ================= Credentials =================
 
 function ensureOption(select, value){ if(![...select.options].some(o=>o.value===value)){ const opt=document.createElement('option'); opt.value=value; opt.textContent=value.replace(/^https?:\/\/(www\.)?/,'').slice(0,40); select.appendChild(opt); } }
 
 // ================= Init From Main (stats-init) =================
-ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; document.getElementById('lolManualMode').checked = !!cfg.lolManualMode; const sw=!!cfg.singleWindow; const swEl=document.getElementById('singleWindowMode'); if(swEl){ swEl.checked=sw; if(typeof window.__applySingleWindowUi==='function') window.__applySingleWindowUi(sw); } metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
+ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=byId('srcA'); const sb=byId('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; byId('dbgLayout').textContent = cfg.mode; byId('dbgSide').textContent = cfg.side; byId('lolManualMode').checked = !!cfg.lolManualMode; const sw=!!cfg.singleWindow; const swEl=byId('singleWindowMode'); if(swEl){ swEl.checked=sw; if(typeof window.__applySingleWindowUi==='function') window.__applySingleWindowUi(sw); } metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
   if(cfg.lolManualData && typeof cfg.lolManualData==='object'){
     try { manualData = JSON.parse(JSON.stringify(cfg.lolManualData)); } catch(_){ }
   }
@@ -381,8 +387,8 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
     window.__LOL_CHECK_STATE = JSON.parse(JSON.stringify(cfg.lolMetricMarks));
   }
   buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); }
-  if(document.getElementById('lolManualMode').checked){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
-  try { ipcRenderer.send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE }); } catch(_){ }
+  if(byId('lolManualMode').checked){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
+  try { ipcRenderer.send('lol-stats-settings',{ manualMode: byId('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE }); } catch(_){ }
   try { __setPanelSideUi(cfg && cfg.side); } catch(_){ }
  } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
@@ -411,8 +417,8 @@ function applyWinLose(){
   try {
     // Reset header classes
     try {
-      const th1 = document.getElementById('lt-team1');
-      const th2 = document.getElementById('lt-team2');
+      const th1 = byId('lt-team1');
+      const th2 = byId('lt-team2');
       if(th1) th1.classList.remove('wl-win','wl-lose');
       if(th2) th2.classList.remove('wl-win','wl-lose');
     } catch(_){ }
@@ -420,8 +426,8 @@ function applyWinLose(){
     metricsOrder.forEach(id=>{
       const row = document.querySelector(`tr[data-metric="${id}"]`);
       if(!row) return;
-      const c1 = document.getElementById(`${id}-t1`);
-      const c2 = document.getElementById(`${id}-t2`);
+      const c1 = byId(`${id}-t1`);
+      const c2 = byId(`${id}-t2`);
       if(!c1 || !c2) return;
       c1.classList.remove('wl-win','wl-lose');
       c2.classList.remove('wl-win','wl-lose');
@@ -449,10 +455,10 @@ function applyWinLose(){
     // Apply header highlight ONLY if an explicit Winner row has ✓; otherwise, don't mark header at all.
     if(!(window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get().winLoseEnabled===false)){
       try {
-        const th1 = document.getElementById('lt-team1');
-        const th2 = document.getElementById('lt-team2');
-        const w1 = document.getElementById('winner-t1');
-        const w2 = document.getElementById('winner-t2');
+        const th1 = byId('lt-team1');
+        const th2 = byId('lt-team2');
+        const w1 = byId('winner-t1');
+        const w2 = byId('winner-t2');
         const hasWinner = !!(w1 && w2 && ((w1.textContent||'').trim()==='✓' || (w2.textContent||'').trim()==='✓'));
         if(th1 && th2 && hasWinner){
           const t1won = (w1.textContent||'').trim()==='✓';
@@ -468,7 +474,7 @@ function applyWinLose(){
 
 // ================= UI Event Bindings =================
 function bindBasic(){
-  const byId = id => document.getElementById(id);
+  const byId = id => byId(id);
   const safe = (id, fn)=>{ const el=byId(id); if(el) fn(el); };
   safe('srcA', el=> el.onchange = e=> send('stats-set-url',{slot:'A',url:e.target.value}));
   safe('srcB', el=> el.onchange = e=> send('stats-set-url',{slot:'B',url:e.target.value}));
@@ -511,7 +517,7 @@ function bindBasic(){
 }
 
 function bindReset(){
-  const btn = document.getElementById('lolReset');
+  const btn = byId('lolReset');
   if(!btn) return;
   btn.onclick = () => {
     try {
@@ -523,7 +529,7 @@ function bindReset(){
       customTeamNames[1]=null; customTeamNames[2]=null;
       setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false);
       // Additional manual dataset reset if in manual mode
-      if(document.getElementById('lolManualMode').checked){
+      if(byId('lolManualMode').checked){
         manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats:{ '1': makeEmptyGame() } };
         currentGame='1';
         updateGameSelect();
@@ -540,14 +546,14 @@ function bindReset(){
       // Re‑signal injected scripts (in case they are already present) after a short delay
       setTimeout(()=>{
         try { window.postMessage({ type:'restart_data_collection', reason:'manual-reset' }, '*'); } catch(_){ }
-        const st=document.getElementById('lolStatus'); if(st) st.textContent='Manual reset...';
+        const st=byId('lolStatus'); if(st) st.textContent='Manual reset...';
       }, 150);
     } catch(e){ console.warn('lolReset failed', e); }
   };
 }
 
 function bindSettings(){
-  const manualCb = document.getElementById('lolManualMode');
+  const manualCb = byId('lolManualMode');
   function applyManualClass(){
     try { document.body.classList.toggle('manual-mode', !!manualCb.checked); } catch(_){ }
   }
@@ -562,15 +568,15 @@ function attachManualHandlers(){
       const el = cell(id, side);
       if(!el || el.dataset.bound) return;
       el.dataset.bound='1';
-      el.addEventListener('click', ()=>{ if(!document.getElementById('lolManualMode').checked) return; handleManualClick(id, side); });
-      el.addEventListener('contextmenu', e=>{ if(!document.getElementById('lolManualMode').checked) return; e.preventDefault(); handleManualRightClick(id, side); return false; });
+      el.addEventListener('click', ()=>{ if(!byId('lolManualMode').checked) return; handleManualClick(id, side); });
+      el.addEventListener('contextmenu', e=>{ if(!byId('lolManualMode').checked) return; e.preventDefault(); handleManualRightClick(id, side); return false; });
       el.title='LMB: + / set, RMB: - / clear';
     });
   });
 }
-function initDragAndDrop(){ const body=document.getElementById('lt-body'); if(!body) return; body.querySelectorAll('tr').forEach(tr=>{ tr.addEventListener('dragstart', ev=>{ tr.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; }); tr.addEventListener('dragend', ()=>{ tr.classList.remove('dragging'); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); }); }); body.addEventListener('dragover', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); if(after) after.classList.add('drop-target'); }); body.addEventListener('drop', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); const dragging=body.querySelector('tr.dragging'); if(!dragging) return; if(after) body.insertBefore(dragging, after); else body.appendChild(dragging); metricsOrderMutable=[...body.querySelectorAll('tr')].map(r=>r.dataset.metric); metricsOrder=[...metricsOrderMutable]; lastOrderSig = null; // Suppress animations briefly while DOM reshuffles
+function initDragAndDrop(){ const body=byId('lt-body'); if(!body) return; body.querySelectorAll('tr').forEach(tr=>{ tr.addEventListener('dragstart', ev=>{ tr.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; }); tr.addEventListener('dragend', ()=>{ tr.classList.remove('dragging'); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); }); }); body.addEventListener('dragover', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); if(after) after.classList.add('drop-target'); }); body.addEventListener('drop', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); const dragging=body.querySelector('tr.dragging'); if(!dragging) return; if(after) body.insertBefore(dragging, after); else body.appendChild(dragging); metricsOrderMutable=[...body.querySelectorAll('tr')].map(r=>r.dataset.metric); metricsOrder=[...metricsOrderMutable]; lastOrderSig = null; // Suppress animations briefly while DOM reshuffles
   try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
-  ensureRows(); if(document.getElementById('lolManualMode').checked) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
+  ensureRows(); if(byId('lolManualMode').checked) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
 function getAfterRow(body,y){ const rows=[...body.querySelectorAll('tr:not(.dragging)')]; return rows.find(r=> y <= r.getBoundingClientRect().top + r.getBoundingClientRect().height/2); }
 let addBtn; let gameSelect; let headerH1;
 // Compute a simple winner for a given game's stats snapshot, mirroring applyWinLose comparisons
@@ -601,7 +607,7 @@ function computeGameWinnerSimple(snapshot, team1Name, team2Name){
 }
 function updateGameSelect(){
   if(!gameSelect) return;
-  const manualOn=document.getElementById('lolManualMode').checked;
+  const manualOn=byId('lolManualMode').checked;
   gameSelect.innerHTML='';
   const placeholder=document.createElement('option');
   placeholder.value=''; placeholder.disabled=true; placeholder.textContent='Game -';
@@ -663,7 +669,7 @@ function renderLol(payload, manual=false){
     const dispTeam2 = swapTeams ? team1Name : team2Name;
     const t1Key = dispTeam1;
     const t2Key = dispTeam2;
-    const th1=document.getElementById('lt-team1'); const th2=document.getElementById('lt-team2');
+    const th1=byId('lt-team1'); const th2=byId('lt-team2');
     // Priority: Excel team names > grid team names > custom > default
     const headerDisp1 = excelTeamNames.team1 || ((customTeamNames[1] && !manual) ? customTeamNames[1] : (dispTeam1||'Team 1'));
     const headerDisp2 = excelTeamNames.team2 || ((customTeamNames[2] && !manual) ? customTeamNames[2] : (dispTeam2||'Team 2'));
@@ -693,7 +699,7 @@ function renderLol(payload, manual=false){
   const nw = s.netWorth || {}; const hasNw1 = Object.prototype.hasOwnProperty.call(nw, t1Key); const hasNw2 = Object.prototype.hasOwnProperty.call(nw, t2Key); const nw1 = hasNw1 ? nw[t1Key] : ''; const nw2 = hasNw2 ? nw[t2Key] : ''; setText('netWorth','t1', nw1); setText('netWorth','t2', nw2);
     if(s.quadra) setBinary('quadra', filledBinary); if(s.penta) setBinary('penta', filledBinary); if(s.atakhan) setBinary('atakhan', filledBinary);
   ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'].forEach(m=>{ if(!filledBinary.has(m)){ setText(m,'t1','✗'); setText(m,'t2','✗'); } });
-    const statusEl=document.getElementById('lolStatus'); if(statusEl) statusEl.textContent = `Games: ${games.join(', ')}`;
+    const statusEl=byId('lolStatus'); if(statusEl) statusEl.textContent = `Games: ${games.join(', ')}`;
     // After all cell values are updated compute win/lose highlighting
     applyWinLose();
   } catch(e) { /* swallow */ }
@@ -714,8 +720,8 @@ function renderLol(payload, manual=false){
   // Setup game controls
   headerH1 = document.querySelector('#stats h1');
   // Prefer static elements if present (added to HTML for stability)
-  gameSelect = document.getElementById('lolGameSelect') || gameSelect;
-  addBtn = document.getElementById('lolAddGameBtn') || addBtn;
+  gameSelect = byId('lolGameSelect') || gameSelect;
+  addBtn = byId('lolAddGameBtn') || addBtn;
   // Fallback (older HTML) dynamic creation
   if(!gameSelect){ gameSelect=document.createElement('select'); gameSelect.style='padding:4px;font-size:11px;min-width:70px;'; headerH1 && headerH1.appendChild(gameSelect); }
   if(!addBtn){ addBtn=document.createElement('button'); addBtn.textContent='Add Game'; addBtn.style='padding:4px 10px;font-size:11px;'; headerH1 && headerH1.appendChild(addBtn); }
@@ -737,7 +743,7 @@ function renderLol(payload, manual=false){
   } catch(err){ }
   };
   if(gameSelect){
-    gameSelect.onchange=()=>{ const manualOn=document.getElementById('lolManualMode').checked; const val=gameSelect.value; if(!val) return; try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+    gameSelect.onchange=()=>{ const manualOn=byId('lolManualMode').checked; const val=gameSelect.value; if(!val) return; try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
       if(manualOn){ currentGame=val; renderManual(); } else { currentLiveGame=Number(val); const games=Object.keys(liveDataset?.gameStats||{}).map(Number).sort((a,b)=>a-b); const last=games[games.length-1]; followLatestLiveGame = (currentLiveGame===last); if(liveDataset) renderLol(liveDataset); }
       try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ } };
   }
@@ -745,12 +751,12 @@ function renderLol(payload, manual=false){
   document.addEventListener('mouseup', ()=>{ document.querySelectorAll('td.pressing').forEach(td=> td.classList.remove('pressing')); });
   // (per-section collapse handlers consolidated in stats_collapse.js)
   // Swap teams
-  document.getElementById('swapTeamsBtn').onclick=()=>{ 
+  byId('swapTeamsBtn').onclick=()=>{ 
     swapTeams=!swapTeams; 
-    document.getElementById('swapTeamsBtn').classList.toggle('active', swapTeams); 
+    byId('swapTeamsBtn').classList.toggle('active', swapTeams); 
     // Suppress heatbar/cell bump animations briefly while values visually reshuffle
     try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
-    if(document.getElementById('lolManualMode').checked) { 
+    if(byId('lolManualMode').checked) { 
       renderManual(); 
     } else { 
       const snap = liveDataset || cachedLive; 
@@ -765,14 +771,14 @@ function renderLol(payload, manual=false){
     applyWinLose();
   };
   window.addEventListener('resize', ()=> scheduleAdjustCols());
-  document.getElementById('swapTeamsBtn').title='Swap display order of teams';
+  byId('swapTeamsBtn').title='Swap display order of teams';
   // Local Detach button (stats window separation)
   // detach button not present
   // Team names are read-only (from Excel K4/N4) - no dblclick editing
   // Manual toggle logic extension
-  document.getElementById('lolManualMode').addEventListener('change', ()=>{ const on=document.getElementById('lolManualMode').checked; if(on){ if(cachedLive){ manualData.team1Name=cachedLive.team1Name||manualData.team1Name; manualData.team2Name=cachedLive.team2Name||manualData.team2Name; manualData.gameStats = JSON.parse(JSON.stringify(cachedLive.gameStats||manualData.gameStats)); } ensureRows(); attachManualHandlers(); updateGameSelect(); renderManual(); } else { updateGameSelect(); if(liveDataset) renderLol(liveDataset); } try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ } });
-  document.getElementById('lolManualMode').addEventListener('change', ()=>{
-    const on = document.getElementById('lolManualMode').checked;
+  byId('lolManualMode').addEventListener('change', ()=>{ const on=byId('lolManualMode').checked; if(on){ if(cachedLive){ manualData.team1Name=cachedLive.team1Name||manualData.team1Name; manualData.team2Name=cachedLive.team2Name||manualData.team2Name; manualData.gameStats = JSON.parse(JSON.stringify(cachedLive.gameStats||manualData.gameStats)); } ensureRows(); attachManualHandlers(); updateGameSelect(); renderManual(); } else { updateGameSelect(); if(liveDataset) renderLol(liveDataset); } try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ } });
+  byId('lolManualMode').addEventListener('change', ()=>{
+    const on = byId('lolManualMode').checked;
     if(on){
       if(cachedLive){
         manualData.team1Name = cachedLive.team1Name || manualData.team1Name;
@@ -805,7 +811,7 @@ function renderLol(payload, manual=false){
   window.__LOL_CHECK_STATE = window.__LOL_CHECK_STATE || {}; // { gameId: { metricId: true } }
   function currentGameId(){
     try {
-      if(document.getElementById('lolManualMode').checked){
+      if(byId('lolManualMode').checked){
         return String(currentGame||'1');
       }
       // live mode: use lastGameRendered or detected live game
@@ -836,12 +842,12 @@ function renderLol(payload, manual=false){
   });
   // Hook into game select changes & manual/live toggle to refresh checkbox states
   const obs = new MutationObserver(()=> syncFromState());
-  const body = document.getElementById('lt-body'); if(body) obs.observe(body, { childList:true, subtree:true });
+  const body = byId('lt-body'); if(body) obs.observe(body, { childList:true, subtree:true });
   // Refresh when game changes (override existing handler by wrapping)
   const origUpdateGameSelect = updateGameSelect;
   updateGameSelect = function(){ origUpdateGameSelect.apply(this, arguments); setTimeout(syncFromState, 0); };
   // Integrate with reset button: clear all states when reset fires
-  const resetBtn = document.getElementById('lolReset');
+  const resetBtn = byId('lolReset');
   if(resetBtn){
     const prev = resetBtn.onclick;
     resetBtn.onclick = function(ev){

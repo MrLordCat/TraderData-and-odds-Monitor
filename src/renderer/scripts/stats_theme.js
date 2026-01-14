@@ -3,8 +3,15 @@
   let ipcRenderer = (window && window.ipcRenderer) || null;
   if(!ipcRenderer){ try { ipcRenderer = require('electron').ipcRenderer; window.ipcRenderer = ipcRenderer; } catch(_){ /* no ipc */ } }
   let activityModule = null; try { activityModule = require('./stats_activity'); } catch(_){ }
+  
+  // Use shared DOM helper
+  let byId = null;
+  try { const DomHelpers = require('../ui/dom_helpers'); byId = DomHelpers.byId; } catch(_){ }
+  if(!byId && window.DomHelpers) byId = window.DomHelpers.byId;
+  if(!byId) byId = (id) => { try { return document.getElementById(id); } catch(_){ return null; } };
+
   const styleId='gs-theme-style';
-  function ensureStyle(){ let el=document.getElementById(styleId); if(!el){ el=document.createElement('style'); el.id=styleId; document.head.appendChild(el);} return el; }
+  function ensureStyle(){ let el=byId(styleId); if(!el){ el=document.createElement('style'); el.id=styleId; document.head.appendChild(el);} return el; }
   function applyTheme(t){
     // Ultra-minimal theme: only base structural colors
     if(!t) return;

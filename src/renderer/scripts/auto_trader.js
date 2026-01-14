@@ -5,13 +5,17 @@
   if(window.__autoTraderUnifiedLoaded) return;
   window.__autoTraderUnifiedLoaded = true;
 
-  // Load shared toast utility
+  // Load shared utilities
   let MiniToast = null;
   try { MiniToast = require('../ui/toast'); } catch(_){ }
   // Also try window.MiniToast if loaded via script tag
   if(!MiniToast && window.MiniToast) MiniToast = window.MiniToast;
 
-  function byId(id){ try { return document.getElementById(id); } catch(_){ return null; } }
+  // Use shared DOM helper
+  let byId = null;
+  try { const DomHelpers = require('../ui/dom_helpers'); byId = DomHelpers.byId; } catch(_){ }
+  if(!byId && window.DomHelpers) byId = window.DomHelpers.byId;
+  if(!byId) byId = (id) => { try { return document.getElementById(id); } catch(_){ return null; } };
 
   const isBoard = !!byId('autoBtn');
   const isEmbedded = !isBoard && !!byId('embeddedAutoBtn');
