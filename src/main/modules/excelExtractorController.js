@@ -62,18 +62,18 @@ function createExcelExtractorController({
   }
 
   function excelLog() {
-    const msg = Array.from(arguments)
-      .map(a => {
-        if (a instanceof Error) return a.stack || a.message;
-        if (typeof a === 'object') {
-          try { return JSON.stringify(a); } catch (_) { return String(a); }
-        }
-        return String(a);
-      })
-      .join(' ');
-
-    try { console.log('[excel-extractor][log]', msg); } catch (_) { }
-    broadcast('excel-extractor-log', { ts: Date.now(), msg });
+    // Debug logging disabled
+    // const msg = Array.from(arguments)
+    //   .map(a => {
+    //     if (a instanceof Error) return a.stack || a.message;
+    //     if (typeof a === 'object') {
+    //       try { return JSON.stringify(a); } catch (_) { return String(a); }
+    //     }
+    //     return String(a);
+    //   })
+    //   .join(' ');
+    // try { console.log('[excel-extractor][log]', msg); } catch (_) { }
+    // broadcast('excel-extractor-log', { ts: Date.now(), msg });
   }
 
   function getAppRoot() {

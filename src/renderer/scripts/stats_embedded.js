@@ -13,30 +13,56 @@ function updateEmbeddedMapTag(){
 }
 function initEmbeddedMapSync(){
   try {
-    if(window.desktopAPI && window.desktopAPI.onMap){
-  window.desktopAPI.onMap(mapVal=>{ try { currentMap = mapVal; window.__embeddedCurrentMap = currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } catch(_){} });
-    } else {
-      const { ipcRenderer } = require('electron');
-  // Listen for atomic map config (preferred)
-  try {
-    const { ipcRenderer } = require('electron');
-    ipcRenderer.on('set-map-config', (_e, cfg)=>{ 
-      try { 
-        if(cfg && typeof cfg.map !== 'undefined'){
-          currentMap = cfg.map; 
+    // Listen for atomic map config (preferred)
+    if(window.desktopAPI && window.desktopAPI.onMapConfig){
+      window.desktopAPI.onMapConfig(cfg=>{ 
+        try { 
+          if(cfg && typeof cfg.map !== 'undefined'){
+            currentMap = cfg.map; 
+            window.__embeddedCurrentMap = currentMap; 
+            updateEmbeddedMapTag(); 
+            syncEmbeddedMapSelect(); 
+            forceMapSelectValue();
+          }
+          // Update isLast button state
+          const lastBtn = document.getElementById('embeddedIsLast');
+          if(lastBtn && typeof cfg?.isLast !== 'undefined'){
+            lastBtn.classList.toggle('active', !!cfg.isLast);
+          }
+        } catch(_){} 
+      });
+    } else if(window.desktopAPI && window.desktopAPI.onMap){
+      window.desktopAPI.onMap(mapVal=>{ 
+        try { 
+          currentMap = mapVal; 
           window.__embeddedCurrentMap = currentMap; 
           updateEmbeddedMapTag(); 
           syncEmbeddedMapSelect(); 
-          forceMapSelectValue();
-        }
-        // Update isLast button state
-        const lastBtn = document.getElementById('embeddedIsLast');
-        if(lastBtn && typeof cfg?.isLast !== 'undefined'){
-          lastBtn.classList.toggle('active', !!cfg.isLast);
-        }
-      } catch(_){} 
-    });
+          forceMapSelectValue(); 
+        } catch(_){} 
+      });
+    } else {
+      // Fallback: direct IPC listener
+      try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.on('set-map-config', (_e, cfg)=>{ 
+          try { 
+            if(cfg && typeof cfg.map !== 'undefined'){
+              currentMap = cfg.map; 
+              window.__embeddedCurrentMap = currentMap; 
+              updateEmbeddedMapTag(); 
+              syncEmbeddedMapSelect(); 
+              forceMapSelectValue();
+            }
+            const lastBtn = document.getElementById('embeddedIsLast');
+            if(lastBtn && typeof cfg?.isLast !== 'undefined'){
+              lastBtn.classList.toggle('active', !!cfg.isLast);
+            }
+          } catch(_){} 
+        });
+      } catch(_){}
     }
+    
     // Initial fetch
     if(window.desktopAPI && window.desktopAPI.getMapConfig){
       window.desktopAPI.getMapConfig().then(cfg=>{ 
@@ -53,9 +79,19 @@ function initEmbeddedMapSync(){
         }
       }).catch(()=>{});
     } else if(window.desktopAPI && window.desktopAPI.getLastMap){
-  window.desktopAPI.getLastMap().then(v=>{ if(typeof v!=='undefined'){ currentMap=v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } }).catch(()=>{});
+      window.desktopAPI.getLastMap().then(v=>{ 
+        if(typeof v!=='undefined'){ 
+          currentMap=v; 
+          window.__embeddedCurrentMap=currentMap; 
+          updateEmbeddedMapTag(); 
+          syncEmbeddedMapSelect(); 
+          forceMapSelectValue(); 
+        } 
+      }).catch(()=>{});
     }
+    
     bindEmbeddedMapSelect();
+    
     // Bind 'Last' toggle button in Odds Board header
     try {
       const lastBtn = document.getElementById('embeddedIsLast');
@@ -71,9 +107,10 @@ function initEmbeddedMapSync(){
         });
         // Initial state already set from getMapConfig above, but keep legacy fallback
         if(window.desktopAPI && window.desktopAPI.getIsLast && !lastBtn.classList.contains('active')){
-          window.desktopAPI.getIsLast().then(v=>{ try { isLast = !!v; lastBtn.classList.toggle('active', isLast); } catch(_){ } }).catch(()=>{});
+          window.desktopAPI.getIsLast().then(v=>{ 
+            try { isLast = !!v; lastBtn.classList.toggle('active', isLast); } catch(_){ } 
+          }).catch(()=>{});
         }
-        // onIsLast now listens via set-map-config above
       }
     } catch(_){ }
   } catch(_){ }

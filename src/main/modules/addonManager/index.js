@@ -37,18 +37,9 @@ function syncDevAddons(addonsDir) {
     const appRoot = path.join(__dirname, '..', '..', '..', '..');
     const devAddonsDir = path.join(appRoot, 'addons-dev');
     
-    console.log('[AddonManager] syncDevAddons called');
-    console.log('[AddonManager] __dirname:', __dirname);
-    console.log('[AddonManager] appRoot:', appRoot);
-    console.log('[AddonManager] devAddonsDir:', devAddonsDir);
-    console.log('[AddonManager] devAddonsDir exists:', fs.existsSync(devAddonsDir));
-    
     if (!fs.existsSync(devAddonsDir)) {
-      console.log('[AddonManager] No addons-dev folder found, skipping dev sync');
       return;
     }
-    
-    console.log(`[AddonManager] Dev mode: syncing addons from ${devAddonsDir}`);
     
     // Get list of addon folders (exclude README and other files)
     const entries = fs.readdirSync(devAddonsDir, { withFileTypes: true });
@@ -60,7 +51,6 @@ function syncDevAddons(addonsDir) {
       
       // Skip if no manifest
       if (!fs.existsSync(manifestPath)) {
-        console.log(`[AddonManager] Skipping ${folder.name} - no manifest.json`);
         continue;
       }
       
@@ -80,7 +70,6 @@ function syncDevAddons(addonsDir) {
       copyDirRecursive(srcDir, destDir);
     }
     
-    console.log('[AddonManager] Dev addon sync complete');
   } catch (e) {
     console.warn('[AddonManager] Dev addon sync failed:', e.message);
   }
@@ -124,8 +113,6 @@ function createAddonManager({ store, mainWindow }) {
   const isDevMode = !app.isPackaged;
   if (isDevMode) {
     syncDevAddons(addonsDir);
-  } else {
-    console.log('[AddonManager] Not in dev mode, skipping addons-dev sync');
   }
   
   // State
@@ -253,13 +240,11 @@ function createAddonManager({ store, mainWindow }) {
   async function fetchAvailableAddons(forceRefresh = false) {
     // Return cached if fresh
     if (!forceRefresh && availableAddons.length > 0 && Date.now() - lastFetchTime < CACHE_TTL) {
-      console.log('[AddonManager] Returning cached addons');
       return availableAddons;
     }
     
     try {
       const channel = addonChannel;
-      console.log(`[AddonManager] Fetching addons for channel: ${channel}`);
       
       // Fetch releases from GitHub API
       const releases = await fetchJSON(`${GITHUB_API_BASE}/releases`);
@@ -336,7 +321,6 @@ function createAddonManager({ store, mainWindow }) {
       
       // Fallback to registry for release channel
       if (addonChannel === 'release') {
-        console.log('[AddonManager] Falling back to registry...');
         return fetchFromRegistry();
       }
       
@@ -619,7 +603,6 @@ function createAddonManager({ store, mainWindow }) {
       }
     }
     
-    console.log('[AddonManager] Updates available:', updates);
     return updates;
   }
   
@@ -683,7 +666,6 @@ function createAddonManager({ store, mainWindow }) {
       }
     }
     
-    console.log('[AddonManager] getEnabledAddonPaths:', result);
     return result;
   }
   

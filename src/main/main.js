@@ -540,13 +540,11 @@ function bootstrap() {
   setTimeout(()=>{ layoutManager.applyLayoutPreset('2x2'); }, 200);
     }
   } catch(e) {}
-  // After a short delay (views loading), broadcast persisted map config
-  // (scheduleMapReapply handles this atomically, so this is just a safety fallback)
   // Auto-focus board webContents after initial load so hotkeys work immediately
-  setTimeout(()=>{{
+  setTimeout(()=>{
     try {
       const bwc = boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null;
-      if(bwc && !bwc.isDestroyed()){ bwc.focus(); console.log('[startup] auto-focused board webContents'); }
+      if(bwc && !bwc.isDestroyed()){ bwc.focus(); }
     } catch(_){ }
   }, 800);
   // --- Extension Bridge (upTime Edge extension) ---
@@ -775,7 +773,7 @@ app.whenReady().then(()=>{
         try { __autoLast.active = !!(p&&p.on); } catch(_){ }
         try { broadcastToAll(getBroadcastCtx(), 'auto-active-set', p); } catch(_){ }
       });
-      ipcMain.handle('auto-state-get', ()=> { try { console.log('[auto][state-get] return', { active: __autoLast.active }); } catch(_){ } return ({ active: __autoLast.active }); });
+      ipcMain.handle('auto-state-get', ()=> { return ({ active: __autoLast.active }); });
       // Forwarded renderer console lines (selective)
       ipcMain.on('renderer-log-forward', (_e, payload)=>{
         try {
@@ -804,7 +802,6 @@ app.whenReady().then(()=>{
         } catch(_){ /* try next */ }
       }
       if(!registeredWith) console.warn('[shortcut][Num5] registration returned false (tried: '+candidates.join(', ')+')');
-      else console.log('[shortcut][Num5] registered global as', registeredWith);
     } catch(e){ console.warn('[shortcut][Num5] registration error', e); }
 });
 // Hotkey strategy:

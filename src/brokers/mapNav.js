@@ -14,14 +14,20 @@ function triggerMapChange(host, map, opts={}){
       // Bo1 special case: if map 1 + isLast, click "Main" tab to show Match Winner
       if(map === 1 && isLast){
         const mainTab = document.querySelector('[data-testid="MainTab"]');
-        if(mainTab && mainTab.getAttribute('aria-selected') !== 'true') mainTab.click();
+        if(mainTab && mainTab.getAttribute('aria-selected') !== 'true'){
+          mainTab.click();
+        }
       } else {
         const targetTestId=`Map ${map}Tab`;
         const tab=document.querySelector(`[data-testid="${targetTestId}"]`);
-        if(tab) tab.click();
+        if(tab){
+          tab.click();
+        }
         else {
           const fallback=[...document.querySelectorAll('[role="tab"]')].find(t=>t.textContent.trim()==='Map '+map);
-          if(fallback) fallback.click();
+          if(fallback){
+            fallback.click();
+          }
         }
       }
     } else if(/betboom\.ru$/.test(host)) {

@@ -49,7 +49,6 @@ function createExtensionBridge(opts = {}) {
 
     try {
       wss = new WebSocket.Server({ port });
-      console.log(`[extensionBridge] WebSocket server started on port ${port}`);
 
       wss.on('connection', handleConnection);
       wss.on('error', (err) => {
@@ -62,7 +61,6 @@ function createExtensionBridge(opts = {}) {
 
   // Handle new client connection
   function handleConnection(ws) {
-    console.log('[extensionBridge] Extension connected');
     connectedClient = ws;
 
     ws.on('message', (raw) => {
@@ -75,7 +73,6 @@ function createExtensionBridge(opts = {}) {
     });
 
     ws.on('close', () => {
-      console.log('[extensionBridge] Extension disconnected');
       if (connectedClient === ws) {
         connectedClient = null;
         extensionVersion = null;
@@ -93,7 +90,6 @@ function createExtensionBridge(opts = {}) {
     switch (msg.type) {
       case 'handshake':
         extensionVersion = msg.version || '1.0.0';
-        console.log(`[extensionBridge] Extension version: ${extensionVersion}`);
         
         // Check if update available
         const updateAvailable = isVersionNewer(BUNDLED_EXTENSION_VERSION, extensionVersion);
@@ -127,7 +123,6 @@ function createExtensionBridge(opts = {}) {
 
       case 'auto-command-ack':
         // Extension acknowledges auto command execution
-        console.log('[extensionBridge] Auto command ack:', msg.command, msg.success ? 'OK' : 'FAIL');
         break;
 
       case 'ping':
@@ -136,12 +131,11 @@ function createExtensionBridge(opts = {}) {
 
       case 'check-update':
         // Check GitHub for latest extension version and update if needed
-        console.log('[extensionBridge] Update check requested, current:', msg.currentVersion);
         checkAndUpdateExtension(ws, msg.currentVersion);
         break;
 
       default:
-        console.log('[extensionBridge] Unknown message type:', msg.type);
+        break;
     }
   }
 
@@ -319,7 +313,6 @@ function createExtensionBridge(opts = {}) {
       wss = null;
       connectedClient = null;
       extensionVersion = null;
-      console.log('[extensionBridge] Server stopped');
     }
   }
 
@@ -349,7 +342,6 @@ function createExtensionBridge(opts = {}) {
         ts: Date.now()
       };
       connectedClient.send(JSON.stringify(msg));
-      console.log('[extensionBridge] Auto command sent:', command, opts);
       return true;
     }
     console.warn('[extensionBridge] Cannot send auto command - not connected');

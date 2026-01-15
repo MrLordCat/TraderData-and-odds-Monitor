@@ -83,7 +83,7 @@ ipcRenderer.on('set-map-config', (_e, config)=>{
       __lastOddsSig = ''; // Reset to ensure new odds are sent
       triggerMapChange(HOST, desiredMap, { isLast });
     }
-  } catch(_){ }
+  } catch(e){ /* silent */ }
 });
 
 // Periodic odds loop with deduplication (only send if changed)
@@ -104,7 +104,7 @@ setInterval(sendOddsIfChanged, 1500);
 let lastHref=location.href;
 try {
   new MutationObserver(()=>{
-    const href=location.href; if(href!==lastHref){ lastHref=href; [400,1200].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap)), d)); }
+    const href=location.href; if(href!==lastHref){ lastHref=href; [400,1200].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap, { isLast })), d)); }
   }).observe(document, { subtree:true, childList:true });
 } catch(_){ }
 

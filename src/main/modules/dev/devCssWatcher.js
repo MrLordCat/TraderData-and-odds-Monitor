@@ -36,7 +36,6 @@ function initDevCssWatcher(ctx){
       } catch(_){ }
     }
     watchDir(watchRoot);
-    try { console.log('[dev] CSS watcher active'); } catch(_){ }
   } catch(e){ try { console.warn('initDevCssWatcher failed', e); } catch(_){ } }
 }
 
