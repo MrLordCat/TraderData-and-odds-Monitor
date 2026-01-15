@@ -72,9 +72,13 @@ function buildRowsHtml(records, opts){
   return { html, best1, best2, liveNums1, liveNums2 };
 }
 
-module.exports = {
+const OddsBoardShared = {
   toNum,
   calcBestNonFrozen,
   calcMidFromLiveNums,
   buildRowsHtml,
 };
+
+// Export for both CommonJS (require) and browser (script tag)
+if(typeof module !== 'undefined' && module.exports) module.exports = OddsBoardShared;
+if(typeof window !== 'undefined') window.OddsBoardShared = OddsBoardShared;

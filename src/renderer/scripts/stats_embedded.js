@@ -1,7 +1,6 @@
 // Embedded odds board + section reorder extracted
-// Polyfill: stats panel BrowserView does NOT use the main preload (no window.desktopAPI)
-// so we use the shared shim to create a minimal bridge.
-try { require('../ui/desktop_api_shim'); } catch(_){ }
+// Note: stats panel BrowserView does NOT use the main preload (no window.desktopAPI)
+// desktop_api_shim.js is loaded via script tag in stats_panel.html before this file
 
 let currentMap = undefined; // shared map number propagated from main / board
 function updateEmbeddedMapTag(){
@@ -108,8 +107,7 @@ const embeddedOddsData = {}; let embeddedBest1=NaN, embeddedBest2=NaN;
 // DS mismatch tracking
 let lastEmbeddedExcelOdds = null;
 let embeddedDsMismatchTimer = null;
-let OddsBoardShared = null;
-try { OddsBoardShared = require('../ui/odds_board_shared'); } catch(_){ }
+// OddsBoardShared loaded via script tag in stats_panel.html (use window.OddsBoardShared)
 // Auto map rebroadcast status visual sync (shim guarantees desktopAPI)
 try {
   function applyEmbeddedMapAutoRefreshVisual(p){
@@ -162,8 +160,8 @@ function renderEmbeddedOdds(){
   const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel' && r.broker!=='ds');
   let liveNums1 = [];
   let liveNums2 = [];
-  if(OddsBoardShared && OddsBoardShared.buildRowsHtml){
-    const out = OddsBoardShared.buildRowsHtml(vals, { variant:'embedded', isSwapped: (b)=> !!(window.__swappedBrokers && window.__swappedBrokers.has(b)) });
+  if(window.OddsBoardShared && window.OddsBoardShared.buildRowsHtml){
+    const out = window.OddsBoardShared.buildRowsHtml(vals, { variant:'embedded', isSwapped: (b)=> !!(window.__swappedBrokers && window.__swappedBrokers.has(b)) });
     rowsEl.innerHTML = out.html;
     embeddedBest1 = out.best1;
     embeddedBest2 = out.best2;
@@ -247,8 +245,8 @@ function renderEmbeddedOdds(){
   } catch(_){ }
   const midCell=document.getElementById('embeddedMidCell');
   if(midCell){
-    const mid = (OddsBoardShared && OddsBoardShared.calcMidFromLiveNums)
-      ? OddsBoardShared.calcMidFromLiveNums(liveNums1, liveNums2)
+    const mid = (window.OddsBoardShared && window.OddsBoardShared.calcMidFromLiveNums)
+      ? window.OddsBoardShared.calcMidFromLiveNums(liveNums1, liveNums2)
       : (liveNums1.length && liveNums2.length ? { mid1:(Math.min(...liveNums1)+Math.max(...liveNums1))/2, mid2:(Math.min(...liveNums2)+Math.max(...liveNums2))/2 } : null);
     if(!mid){ midCell.textContent='-'; }
     else { midCell.textContent=`${mid.mid1.toFixed(2)} / ${mid.mid2.toFixed(2)}`; }
@@ -361,10 +359,8 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
     const statusCell = document.getElementById('embeddedExcelStatusCell');
     const scriptMapBadge = document.getElementById('embeddedScriptMapBadge');
 
-    // Use shared Excel status module
-    let ExcelStatusUI = null;
-    try { ExcelStatusUI = require('../ui/excel_status'); } catch(_){ }
-    if(!ExcelStatusUI && window.ExcelStatusUI) ExcelStatusUI = window.ExcelStatusUI;
+    // Excel status module loaded via script tag
+    const ExcelStatusUI = window.ExcelStatusUI;
     
     // Get board map from embedded map selector
     function getEmbeddedBoardMap(){

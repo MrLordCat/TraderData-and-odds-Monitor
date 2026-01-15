@@ -5,11 +5,8 @@
   if(window.__autoTraderUnifiedLoaded) return;
   window.__autoTraderUnifiedLoaded = true;
 
-  // Load shared toast utility
-  let MiniToast = null;
-  try { MiniToast = require('../ui/toast'); } catch(_){ }
-  // Also try window.MiniToast if loaded via script tag
-  if(!MiniToast && window.MiniToast) MiniToast = window.MiniToast;
+  // Toast utility loaded via script tag before this file
+  const MiniToast = window.MiniToast;
 
   function byId(id){ try { return document.getElementById(id); } catch(_){ return null; } }
 

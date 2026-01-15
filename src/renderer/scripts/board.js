@@ -1,9 +1,5 @@
 // ================= Side-panel toolbar wiring (icons) =================
-// Load shared UI helpers
-let MiniToast = null;
-let ApiHelpers = null;
-try { MiniToast = require('../ui/toast'); } catch(_){ }
-try { ApiHelpers = require('../ui/api_helpers'); } catch(_){ }
+// UI helpers (MiniToast, ApiHelpers) loaded via script tags in board.html - use window.* directly
 
 let __boardDockState = null;
 function updateBoardSideIcon(state){
@@ -103,7 +99,7 @@ function bindTopbar(){
 
   // Layout preset
   try {
-    if(ApiHelpers){ ApiHelpers.bindSelectToApi('tbLayoutPreset', 'getLayoutPreset', 'applyLayoutPreset'); }
+    if(window.ApiHelpers){ window.ApiHelpers.bindSelectToApi('tbLayoutPreset', 'getLayoutPreset', 'applyLayoutPreset'); }
     else {
       const sel = document.getElementById('tbLayoutPreset');
       if(sel){
@@ -114,11 +110,11 @@ function bindTopbar(){
   } catch(_){ }
 
   // Refresh all
-  if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbRefreshAll', 'refreshAll'); }
+  if(window.ApiHelpers){ window.ApiHelpers.bindBtnToApi('tbRefreshAll', 'refreshAll'); }
   else { try { document.getElementById('tbRefreshAll')?.addEventListener('click', ()=>{ window.desktopAPI.refreshAll?.(); }); } catch(_){ } }
 
   // Auto refresh checkbox
-  if(ApiHelpers){ ApiHelpers.bindCheckboxToApi('tbAutoReload', 'getAutoRefreshEnabled', 'setAutoRefreshEnabled', 'onAutoRefreshUpdated'); }
+  if(window.ApiHelpers){ window.ApiHelpers.bindCheckboxToApi('tbAutoReload', 'getAutoRefreshEnabled', 'setAutoRefreshEnabled', 'onAutoRefreshUpdated'); }
   else {
     try {
       const cb = document.getElementById('tbAutoReload');
@@ -147,11 +143,11 @@ function bindTopbar(){
   } catch(_){ }
 
   // Stats
-  if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbStats', 'statsToggle'); }
+  if(window.ApiHelpers){ window.ApiHelpers.bindBtnToApi('tbStats', 'statsToggle'); }
   else { try { document.getElementById('tbStats')?.addEventListener('click', ()=>{ window.desktopAPI.statsToggle?.(); }); } catch(_){ } }
 
   // Settings
-  if(ApiHelpers){ ApiHelpers.bindBtnToApi('tbSettings', 'openSettings'); }
+  if(window.ApiHelpers){ window.ApiHelpers.bindBtnToApi('tbSettings', 'openSettings'); }
   else { try { document.getElementById('tbSettings')?.addEventListener('click', ()=>{ window.desktopAPI.openSettings?.(); }); } catch(_){ } }
 }
 
@@ -207,13 +203,7 @@ async function initSwapSync(){
 }
 try { initSwapSync(); } catch(_){ }
 
-let OddsBoardShared = null;
-try { OddsBoardShared = require('../ui/odds_board_shared'); } catch(_){ }
-
-// Load OddsCore for derived calculations (avoid duplication)
-let OddsCore = null;
-try { OddsCore = require('../core/odds_core'); } catch(_){ }
-try { if(!OddsCore && window.OddsCore) OddsCore = window.OddsCore; } catch(_){ }
+// OddsBoardShared and OddsCore loaded via script tags in board.html (use window.* directly)
 
 function computeDerived(){
   const midRow = document.getElementById('midRow');
@@ -223,8 +213,8 @@ function computeDerived(){
   const arbCell = arbRow.children[1];
   
   // Use shared OddsCore.computeDerivedFrom if available
-  const derived = (OddsCore && OddsCore.computeDerivedFrom) 
-    ? OddsCore.computeDerivedFrom(boardData) 
+  const derived = (window.OddsCore && window.OddsCore.computeDerivedFrom) 
+    ? window.OddsCore.computeDerivedFrom(boardData) 
     : null;
   
   if(!derived || !derived.hasMid){
@@ -255,8 +245,8 @@ function renderBoard(){
   const excelRecord = boardData['excel'];
   // Filter out excel and ds from broker list (ds shows in Excel row brackets)
   const vals=Object.values(boardData).filter(r=>r.broker!=='excel' && r.broker!=='ds').sort((a,b)=> a.broker.localeCompare(b.broker));
-  if(OddsBoardShared && OddsBoardShared.buildRowsHtml){
-    const out = OddsBoardShared.buildRowsHtml(vals, { variant:'board', isSwapped: (b)=> swapped.has(b) });
+  if(window.OddsBoardShared && window.OddsBoardShared.buildRowsHtml){
+    const out = window.OddsBoardShared.buildRowsHtml(vals, { variant:'board', isSwapped: (b)=> swapped.has(b) });
     tb.innerHTML = out.html;
   }
   // Update Excel row - simple display
@@ -388,10 +378,7 @@ if(window.desktopAPI){
   } catch(_){ }
   // Excel extractor status updates - using shared module
   try {
-    let ExcelStatusUI = null;
-    try { ExcelStatusUI = require('../ui/excel_status'); } catch(_){ }
-    if(!ExcelStatusUI && window.ExcelStatusUI) ExcelStatusUI = window.ExcelStatusUI;
-    
+    const ExcelStatusUI = window.ExcelStatusUI;
     const sBtn = document.getElementById('excelScriptBtn');
     const statusEl = document.getElementById('excelStatusCell');
     const scriptMapBadge = document.getElementById('scriptMapBadge');
