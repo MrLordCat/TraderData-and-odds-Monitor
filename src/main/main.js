@@ -584,12 +584,7 @@ function bootstrap() {
         if(global.__lastExcelOdds){
           extensionBridge.sendExcelOdds(global.__lastExcelOdds.odds, global.__lastExcelOdds.map);
         }
-        // Show update dialog if needed
-        if(updateAvailable){
-          setTimeout(() => {
-            extensionInstaller.showUpdateDialog(mainWindow, version, extensionBridge.BUNDLED_EXTENSION_VERSION);
-          }, 2000);
-        }
+        // Update dialog removed - user can manually update extension from Settings
       },
       onDisconnect: () => {
         console.log('[extensionBridge] Extension disconnected');
