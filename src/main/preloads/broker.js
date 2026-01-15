@@ -3,6 +3,7 @@ const { ipcRenderer } = require('electron');
 // Initial desired map (generic)
 let desiredMap = 1;
 let isLast = false; // global flag from main indicating final map should use match market for certain brokers
+let isLastInitialized = false; // tracks if we've received the first set-is-last from main
 const HOST = location.host;
 const { collectOdds: collectOddsExt, getBrokerId } = require('../../brokers/extractors');
 const { triggerMapChange } = require('../../brokers/mapNav');
@@ -73,9 +74,11 @@ ipcRenderer.on('set-is-last', (_e, flag)=>{
   try {
     const wasLast = isLast;
     isLast = !!flag;
-    // Always re-trigger map navigation when isLast is set (including on initial load)
-    // This ensures Bo1 handling works on startup when isLast was persisted as true
-    if(desiredMap === 1){
+    // Trigger map navigation only on first init (startup) or when value actually changes
+    // This prevents repeated triggers from scheduleMapReapply's multiple delayed sends
+    const shouldTrigger = !isLastInitialized || (wasLast !== isLast);
+    isLastInitialized = true;
+    if(shouldTrigger && desiredMap === 1){
       triggerMapChange(HOST, desiredMap, { isLast });
     }
   } catch(_){ }
