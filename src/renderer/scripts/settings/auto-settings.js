@@ -13,6 +13,11 @@ let burst3Enabled = true;
 let autoTolerancePct = 0.5;
 let autoSuspendThresholdPct = 40.0;
 
+// DS Auto Mode state
+let dsAutoModeEnabled = false;
+let dsConnectionStatus = false;
+let dsStatusPollInterval = null;
+
 // Burst levels (3 tiers)
 let burstLevels = [
 	{ thresholdPct: 25, pulses: 4 },
@@ -114,7 +119,10 @@ function cacheElements() {
 			th1: document.getElementById('burst1-th-val'), pulses1: document.getElementById('burst1-pulses-val'),
 			th2: document.getElementById('burst2-th-val'), pulses2: document.getElementById('burst2-pulses-val'),
 			th3: document.getElementById('burst3-th-val'), pulses3: document.getElementById('burst3-pulses-val'),
-		}
+		},
+		// DS Auto Mode
+		dsAutoModeInput: document.getElementById('ds-auto-mode'),
+		dsConnectionStatusEl: document.getElementById('ds-connection-status'),
 	};
 }
 
@@ -446,6 +454,69 @@ async function loadFromStore() {
 		if (Array.isArray(v)) burstLevels = v;
 		applyBurstInputsFromModel();
 	} catch (_) { applyBurstInputsFromModel(); }
+
+	// DS Auto Mode
+	try {
+		const v = await ipcRenderer.invoke('ds-auto-mode-get');
+		if (typeof v === 'boolean') dsAutoModeEnabled = v;
+		renderDsAutoMode();
+	} catch (_) { renderDsAutoMode(); }
+
+	// Start DS connection status polling
+	startDsStatusPolling();
+}
+
+// ===== DS Auto Mode =====
+function renderDsAutoMode() {
+	try {
+		if (elements.dsAutoModeInput) elements.dsAutoModeInput.checked = dsAutoModeEnabled;
+		renderDsConnectionStatus();
+	} catch (_) { }
+}
+
+function renderDsConnectionStatus() {
+	try {
+		const el = elements.dsConnectionStatusEl;
+		if (!el) return;
+		if (dsConnectionStatus) {
+			el.textContent = '🟢 DS Connected';
+			el.classList.remove('disconnected');
+			el.classList.add('connected');
+		} else {
+			el.textContent = '⚫ DS Disconnected';
+			el.classList.remove('connected');
+			el.classList.add('disconnected');
+		}
+	} catch (_) { }
+}
+
+async function updateDsConnectionStatus() {
+	try {
+		const status = await ipcRenderer.invoke('ds-connection-status');
+		dsConnectionStatus = !!(status && status.connected);
+		renderDsConnectionStatus();
+	} catch (_) {
+		dsConnectionStatus = false;
+		renderDsConnectionStatus();
+	}
+}
+
+function startDsStatusPolling() {
+	// Poll DS connection status every 2 seconds
+	if (dsStatusPollInterval) clearInterval(dsStatusPollInterval);
+	updateDsConnectionStatus();
+	dsStatusPollInterval = setInterval(updateDsConnectionStatus, 2000);
+}
+
+function bindDsAutoModeEvents() {
+	const el = elements.dsAutoModeInput;
+	if (!el) return;
+	el.addEventListener('change', async () => {
+		dsAutoModeEnabled = el.checked;
+		try {
+			await ipcRenderer.invoke('ds-auto-mode-set', dsAutoModeEnabled);
+		} catch (_) { }
+	});
 }
 
 // ===== Save all =====
@@ -467,6 +538,7 @@ function saveAll() {
 function init() {
 	cacheElements();
 	bindEvents();
+	bindDsAutoModeEvents();
 }
 
 module.exports = { init, loadFromStore, saveAll };

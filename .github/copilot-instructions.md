@@ -139,6 +139,23 @@ Key settings (stored in electron-store):
 - `autoTolerancePct` - Tolerance threshold (%)
 - `autoSuspendThresholdPct` - Auto-suspend on large diff
 - `autoBurstLevels` - Burst pulse configuration
+- `dsAutoModeEnabled` - DS Auto Mode (work without Excel)
+
+### DS Auto Mode (without Excel)
+When Excel is not available, Auto can work directly with DS extension:
+- Enable via Settings → Auto Odds → "DS Auto Mode" checkbox
+- Requires DS extension connected (green status indicator)
+- Compares MID (from brokers) with DS odds
+- Sends `adjust-up`/`adjust-down` + `commit` commands to extension
+- Extension simulates DS page hotkeys (spinner buttons + commit)
+- DS page native hotkeys: `ESC` = suspend, `Shift+ESC` = trade
+
+**Commands sent to extension:**
+- `adjust-up` - Click spinner up button
+- `adjust-down` - Click spinner down button
+- `commit` - Click commit prices button
+- `suspend` - Simulate ESC key
+- `trade` - Simulate Shift+ESC
 
 ## 9. Excel / Python Integration
 - **excel_watcher.py**: Reads Excel cells (including K4/N4 for team names), writes `current_state.json`.
@@ -183,12 +200,18 @@ WebSocket bridge for Edge extension communication:
 - `src/main/modules/extensionBridge/index.js` - WebSocket server on port 9876
 - Extension connects, sends odds updates with broker id `'ds'`
 - Odds flow: Extension → WebSocket → `onOddsUpdate` → broadcast to all views
+- DS Auto Mode: OddsMoni → `sendAutoCommand()` → WebSocket → Extension → simulate clicks
 
 **Extension Files (`resources/extensions/uptime/`):**
-- `content.js` - OddsBridge class, connects to OddsMoni, sends odds
+- `content.js` - OddsBridge class, connects to OddsMoni, sends odds, handles auto commands
 - `uptimeEngine.js` - Tracks Active/Suspended states, calculates uptime %
 - `displayManager.js` - Injects UI overlay on DS page
 - `popup.js` - Extension popup with Connect, Check Updates, Reload buttons
+
+**DS Auto Mode Commands:**
+- `auto-command` message from OddsMoni triggers `executeAutoCommand()` in extension
+- Supported commands: `adjust-up`, `adjust-down`, `commit`, `suspend`, `trade`
+- Extension simulates mouse clicks on DS page buttons or keyboard events
 
 **DS Mismatch Detection:**
 - `stats_embedded.js` tracks Excel odds changes

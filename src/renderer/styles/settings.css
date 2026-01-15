@@ -268,3 +268,25 @@ h1 {
 .restart-notice { display: flex; align-items: center; gap: var(--md-sys-spacing-sm); padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-md); background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); border-radius: var(--md-sys-shape-corner-small); font-size: var(--md-sys-typescale-label-medium-size); margin-top: var(--md-sys-spacing-md); }
 .restart-notice button { padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-sm); }
 
+/* DS Auto Mode */
+.dsAutoWrap {
+	display: flex;
+	align-items: center;
+	gap: var(--md-sys-spacing-sm);
+}
+.ds-status {
+	font-size: var(--md-sys-typescale-label-small-size);
+	padding: 2px 8px;
+	border-radius: var(--md-sys-shape-corner-small);
+	font-weight: 500;
+	transition: all var(--md-sys-motion-duration-short2);
+}
+.ds-status.disconnected {
+	background: var(--md-sys-color-error-container);
+	color: var(--md-sys-color-on-error-container);
+}
+.ds-status.connected {
+	background: var(--md-sys-color-primary-container);
+	color: var(--md-sys-color-on-primary-container);
+}
+

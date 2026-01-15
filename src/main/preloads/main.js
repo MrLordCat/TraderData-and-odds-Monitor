@@ -134,6 +134,14 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,onAddonUninstalled: (cb) => withUnsub('addon-uninstalled', cb)
   ,onAddonEnabledChanged: (cb) => withUnsub('addon-enabled-changed', cb)
   ,onAddonUpdated: (cb) => withUnsub('addon-updated', cb)
+
+  // --- DS Auto Mode API (Auto without Excel) ---
+  ,dsAutoModeGet: () => ipcRenderer.invoke('ds-auto-mode-get')
+  ,dsAutoModeSet: (enabled) => ipcRenderer.invoke('ds-auto-mode-set', enabled)
+  ,onDsAutoModeUpdated: (cb) => withUnsub('ds-auto-mode-updated', cb)
+  ,dsAutoCommand: (command, opts) => ipcRenderer.invoke('ds-auto-command', command, opts)
+  ,dsConnectionStatus: () => ipcRenderer.invoke('ds-connection-status')
+  ,dsGetLastOdds: () => ipcRenderer.invoke('ds-get-last-odds')
 });
 
 // ---------- Console forwarding (selective) ----------

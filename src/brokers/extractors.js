@@ -278,13 +278,18 @@ function extractThunder(mapNum=1, game='lol'){
   return {odds:odds.length===2?odds:['-','-'],frozen:false};
 }
 
-function extractBetboom(mapNum=1, game='lol'){
+function extractBetboom(mapNum=1, game='lol', opts={}){
   // NOTE: Russian words ("Карта", "Исход", "Исход матча", "П") intentionally retained.
   // They match the bookmaker's live DOM and must NOT be translated.
   const sections=[...document.querySelectorAll('section')];
   let target=null;
-  if(mapNum<=0){
-    // Explicit match-level (do NOT coerce to map1)
+  
+  // Bo1 special case: if map 1 selected AND isLast flag is set, use match-level odds ("Исход матча")
+  // This handles Bo1 matches where "Карта 1" tab doesn't exist but "Матч" tab shows match winner odds
+  const useBo1MatchLevel = (mapNum === 1 && opts.isLast === true);
+  
+  if(mapNum<=0 || useBo1MatchLevel){
+    // Explicit match-level (do NOT coerce to map1) OR Bo1 mode
     target=sections.find(s=>/Исход\s+матча/i.test(s.textContent));
   } else {
     const num=parseInt(mapNum,10)||1; const mapRe=new RegExp(`Карта\\s*${num}`,'i');
@@ -457,16 +462,22 @@ const EXTRACTOR_TABLE = [
   { test: /gg199\.bet$/i, fn: extractGg },
   { test: /gg\.bet$/i, fn: extractGg },
   { test: /thunderpick\.io$/i, fn: extractThunder },
-  { test: /betboom\.ru$/i, fn: extractBetboom },
+  { test: /betboom\.ru$/i, fn: extractBetboom, passOpts: true },
   { test: /pari\.ru$/i, fn: extractPari },
   { test: /marathonbet\./i, fn: extractMarathon }
   ,{ test: /bet365\./i, fn: extractBet365 }
 ];
 
-function collectOdds(host, desiredMap, game){
+function collectOdds(host, desiredMap, game, opts={}){
   const g = normalizeGame(game);
   let meta={odds:['-','-'],frozen:false};
-  for(const row of EXTRACTOR_TABLE){ if(row.test.test(host)){ meta=row.fn(desiredMap, g)||meta; break; } }
+  for(const row of EXTRACTOR_TABLE){
+    if(row.test.test(host)){
+      // Pass opts to extractors that need it (e.g. betboom for isLast/Bo1 handling)
+      meta = row.passOpts ? (row.fn(desiredMap, g, opts)||meta) : (row.fn(desiredMap, g)||meta);
+      break;
+    }
+  }
   // Post-process: if one side is '-' but the other has valid odds, replace '-' with '1'
   // This handles cases where bookmakers show e.g. 14.5 on one side but lock/hide the opposing 1.0 odds
   let odds = meta.odds;

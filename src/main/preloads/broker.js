@@ -51,7 +51,7 @@ ipcRenderer.on('game-changed', (_e, game)=>{ try { if(typeof game==='string') __
 let __lastOddsSig = '';
 
 function getCurrentOdds(){
-  const data = collectOddsExt(HOST, effectiveMap(), __selectedGame);
+  const data = collectOddsExt(HOST, effectiveMap(), __selectedGame, { isLast });
   try { if(BROKER_ID && data && typeof data==='object') data.broker = BROKER_ID; } catch(_){ }
   return data;
 }

@@ -23,6 +23,145 @@
     let excelProcInstalling = false;
     let excelProcError = null;
 
+    // DS Auto Mode: работает без Excel, использует DS как reference и отправляет команды расширению
+    let dsAutoModeEnabled = false;
+    let dsConnected = false;
+    let lastDsOdds = null;
+
+    function updateDsStatus(){
+      try {
+        if(global.desktopAPI && global.desktopAPI.dsConnectionStatus){
+          global.desktopAPI.dsConnectionStatus().then(s=>{
+            dsConnected = !!(s && s.connected);
+            if(s && s.lastOdds) lastDsOdds = s.lastOdds;
+          }).catch(()=>{ dsConnected = false; });
+        }
+      } catch(_){ dsConnected = false; }
+    }
+
+    function setDsAutoMode(enabled){
+      dsAutoModeEnabled = !!enabled;
+      console.log('[autoHub] DS Auto mode set to:', dsAutoModeEnabled);
+      // When DS Auto mode enabled, update DS status
+      if(dsAutoModeEnabled) updateDsStatus();
+    }
+
+    function getDsRecord(){
+      // Get DS odds from OddsHub state (broker='ds')
+      return state.records['ds'] || null;
+    }
+
+    /**
+     * Send DS Auto command to extension via desktopAPI
+     * @param {string} command - 'adjust-up', 'adjust-down', 'commit', 'suspend', 'trade'
+     * @param {Object} opts - Optional parameters
+     */
+    function sendDsAutoCommand(command, opts = {}){
+      try {
+        if(global.desktopAPI && global.desktopAPI.dsAutoCommand){
+          return global.desktopAPI.dsAutoCommand(command, opts);
+        }
+        if(global.require){
+          const { ipcRenderer } = global.require('electron');
+          if(ipcRenderer && ipcRenderer.invoke){
+            return ipcRenderer.invoke('ds-auto-command', command, opts);
+          }
+        }
+      } catch(_){ }
+      return Promise.resolve({ success: false, error: 'unavailable' });
+    }
+
+    // DS Auto Mode step: compare MID with DS odds, send adjust commands if needed
+    let dsAutoTimer = null;
+    let dsAutoLastFireTs = 0;
+    const dsAutoFireCooldownMs = 1200; // Longer cooldown for DS (manual spinner clicks)
+    const dsAutoStepMs = 800;
+    
+    function dsAutoStep(){
+      if(!dsAutoModeEnabled || !dsConnected) return;
+      if(!sharedEngine || !sharedEngine.state.active) return;
+      
+      const mid = getMid();
+      const ds = getDsRecord();
+      
+      if(!mid || !ds || !Array.isArray(ds.odds) || ds.odds.length !== 2){
+        statusAll('DS Auto: нет данных');
+        dsAutoSchedule();
+        return;
+      }
+      
+      const dsOdds = [parseFloat(ds.odds[0]), parseFloat(ds.odds[1])];
+      if(isNaN(dsOdds[0]) || isNaN(dsOdds[1])){
+        statusAll('DS Auto: invalid DS odds');
+        dsAutoSchedule();
+        return;
+      }
+      
+      // Check if DS is frozen/suspended
+      if(ds.frozen){
+        statusAll('DS Auto: suspended');
+        dsAutoSchedule();
+        return;
+      }
+      
+      const tolerancePct = sharedEngine.state.tolerancePct || 1;
+      
+      // Min-side alignment (same logic as Excel mode)
+      const sideToAdjust = (mid[0] <= mid[1]) ? 0 : 1;
+      const diffPct = Math.abs(dsOdds[sideToAdjust] - mid[sideToAdjust]) / mid[sideToAdjust] * 100;
+      
+      if(diffPct <= tolerancePct){
+        statusAll('DS Auto: aligned ✓');
+        dsAutoSchedule();
+        return;
+      }
+      
+      // Check cooldown
+      const now = Date.now();
+      if(now - dsAutoLastFireTs < dsAutoFireCooldownMs){
+        statusAll('DS Auto: cooldown...');
+        dsAutoSchedule();
+        return;
+      }
+      
+      const direction = (dsOdds[sideToAdjust] < mid[sideToAdjust]) ? 'raise' : 'lower';
+      const adjustCommand = direction === 'raise' ? 'adjust-up' : 'adjust-down';
+      
+      statusAll(`DS Auto: ${direction} S${sideToAdjust+1} ${diffPct.toFixed(1)}%`);
+      notifyAllUIs('flash', sideToAdjust);
+      
+      // Send adjust command
+      dsAutoLastFireTs = now;
+      sendDsAutoCommand(adjustCommand, { side: sideToAdjust, direction, diffPct }).then(res=>{
+        if(res && res.success){
+          // After adjustment, send commit
+          setTimeout(()=>{
+            sendDsAutoCommand('commit').catch(()=>{});
+          }, 200);
+        }
+      }).catch(()=>{});
+      
+      dsAutoSchedule();
+    }
+    
+    function dsAutoSchedule(delayMs){
+      if(!dsAutoModeEnabled) return;
+      clearTimeout(dsAutoTimer);
+      dsAutoTimer = setTimeout(dsAutoStep, typeof delayMs === 'number' ? delayMs : dsAutoStepMs);
+    }
+    
+    function dsAutoStart(){
+      if(!dsAutoModeEnabled || !dsConnected) return;
+      console.log('[autoHub] DS Auto started');
+      dsAutoStep();
+    }
+    
+    function dsAutoStop(){
+      clearTimeout(dsAutoTimer);
+      dsAutoTimer = null;
+      console.log('[autoHub] DS Auto stopped');
+    }
+
     function getAutoEnableInfo(){
       const info = {
         canEnable: false,
@@ -33,10 +172,26 @@
           installing: excelProcInstalling,
           error: excelProcError,
         },
+        ds: {
+          enabled: dsAutoModeEnabled,
+          connected: dsConnected,
+        },
         scriptMap: scriptMap,
         boardMap: boardMap,
       };
-      // Block when status unknown (startup) OR when not running OR when starting/installing.
+      
+      // DS Auto Mode: allow auto if DS connected, even without Excel
+      if(dsAutoModeEnabled){
+        if(!dsConnected){
+          info.reasonCode = 'ds-not-connected';
+          return info;
+        }
+        // DS mode doesn't require Excel - can enable
+        info.canEnable = true;
+        return info;
+      }
+      
+      // Normal Excel mode: Block when status unknown (startup) OR when not running OR when starting/installing.
       if(excelProcRunning !== true){
         info.reasonCode = (excelProcRunning === null) ? 'excel-unknown' : 'excel-off';
         return info;
@@ -110,7 +265,11 @@
     }
 
     function canEnableAuto(){
-      // Block when status unknown (startup) OR when not running OR when starting/installing.
+      // DS Auto Mode: allow auto if DS connected, even without Excel
+      if(dsAutoModeEnabled){
+        return dsConnected === true;
+      }
+      // Normal Excel mode: Block when status unknown (startup) OR when not running OR when starting/installing.
       if(excelProcRunning !== true) return false;
       if(excelProcStarting) return false;
       if(excelProcInstalling) return false;
@@ -643,6 +802,10 @@
           if(was !== val){ sharedEngine.setActive(val); }
           // Notify all UI views
           notifyAllUIs('onActiveChanged', val, sharedEngine.state);
+          // DS Auto Mode: start/stop DS auto step loop
+          if(dsAutoModeEnabled){
+            if(val){ dsAutoStart(); } else { dsAutoStop(); }
+          }
           // Broadcast across windows to sync late/other views
           try {
             if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on: val }); }
@@ -671,6 +834,20 @@
           if(typeof v === 'number') setShockThreshold(v);
         }).catch(()=>{});
         
+        // DS Auto Mode: load initial state and subscribe to updates
+        ipc.invoke('ds-auto-mode-get').then(v=>{
+          if(typeof v === 'boolean') setDsAutoMode(v);
+        }).catch(()=>{});
+        ipc.on('ds-auto-mode-updated', (_e, v)=>{
+          if(typeof v === 'boolean') setDsAutoMode(v);
+          console.log('[AutoHub] DS Auto mode updated to', v);
+        });
+        
+        // Periodically update DS connection status when DS Auto mode is enabled
+        setInterval(()=>{
+          if(dsAutoModeEnabled) updateDsStatus();
+        }, 2000);
+        
         // Listen for updates
         ipc.on('auto-stop-no-mid-updated', (_e, v)=>{
           if(typeof v === 'boolean') setStopOnNoMid(v);
@@ -681,6 +858,24 @@
         });
       }
     } catch(_){ }
+    
+    // DS Auto Mode: Subscribe via desktopAPI if available
+    try {
+      if(global.desktopAPI){
+        if(global.desktopAPI.dsAutoModeGet){
+          global.desktopAPI.dsAutoModeGet().then(v=>{
+            if(typeof v === 'boolean') setDsAutoMode(v);
+          }).catch(()=>{});
+        }
+        if(global.desktopAPI.onDsAutoModeUpdated){
+          global.desktopAPI.onDsAutoModeUpdated((v)=>{
+            if(typeof v === 'boolean') setDsAutoMode(v);
+          });
+        }
+        // Initial DS status check
+        updateDsStatus();
+      }
+    } catch(_){ }
 
     return {
       attachView,
@@ -689,6 +884,9 @@
       setScriptMap,
       setBoardMap,
       setStopOnNoMid,
+      setDsAutoMode,
+      getDsAutoMode: ()=> dsAutoModeEnabled,
+      isDsConnected: ()=> dsConnected,
     };
   }
 

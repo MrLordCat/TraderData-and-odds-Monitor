@@ -46,6 +46,17 @@
 					<section class="seg">
 					<h2 class="sectionTitle">Auto Odds</h2>
 					<div class="grid formGrid">
+						<!-- DS Auto Mode Section -->
+						<div class="subRule" aria-hidden="true"></div>
+						<label for="ds-auto-mode">DS Auto Mode
+							<small class="labelHint">Use DS extension instead of Excel (no Python needed)</small>
+						</label>
+						<div class="dsAutoWrap">
+							<input id="ds-auto-mode" type="checkbox" />
+							<span id="ds-connection-status" class="ds-status disconnected">⚫ DS</span>
+						</div>
+						<div class="subRule" aria-hidden="true"></div>
+						<!-- End DS Auto Mode -->
 						<label for="auto-tolerance">Tolerance (%)</label>
 						<div class="rangeWrap">
 							<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />

@@ -10,7 +10,7 @@ const fs = require('fs');
 const { app } = require('electron');
 
 // Version of bundled extension (update when shipping new version)
-const BUNDLED_EXTENSION_VERSION = '1.2.0';
+const BUNDLED_EXTENSION_VERSION = '1.4.0';
 
 // GitHub repo info for auto-update
 const GITHUB_OWNER = 'MrLordCat';
@@ -41,6 +41,7 @@ function createExtensionBridge(opts = {}) {
   let currentMap = store?.get('lastMap') || 1;
   let isLast = store?.get('isLast') || false;
   let lastExcelOdds = null;
+  let lastDsOdds = null; // Store latest DS odds for DS Auto mode
 
   // Start WebSocket server
   function start() {
@@ -119,7 +120,14 @@ function createExtensionBridge(opts = {}) {
           ts: Date.now(),
           source: 'extension'
         };
+        // Store latest DS odds for DS Auto mode
+        lastDsOdds = { odds: payload.odds, frozen: payload.frozen, map: payload.map, ts: payload.ts };
         onOddsUpdate?.(payload);
+        break;
+
+      case 'auto-command-ack':
+        // Extension acknowledges auto command execution
+        console.log('[extensionBridge] Auto command ack:', msg.command, msg.success ? 'OK' : 'FAIL');
         break;
 
       case 'ping':
@@ -326,12 +334,43 @@ function createExtensionBridge(opts = {}) {
     return false;
   }
 
+  /**
+   * Send auto command to extension for DS page
+   * Commands: 'suspend' (ESC), 'trade' (Shift+ESC), 'adjust-up', 'adjust-down'
+   * @param {string} command - Command to execute
+   * @param {Object} opts - Optional parameters (side, amount, etc.)
+   */
+  function sendAutoCommand(command, opts = {}) {
+    if (connectedClient?.readyState === WebSocket.OPEN) {
+      const msg = {
+        type: 'auto-command',
+        command,
+        ...opts,
+        ts: Date.now()
+      };
+      connectedClient.send(JSON.stringify(msg));
+      console.log('[extensionBridge] Auto command sent:', command, opts);
+      return true;
+    }
+    console.warn('[extensionBridge] Cannot send auto command - not connected');
+    return false;
+  }
+
+  /**
+   * Get latest DS odds (for DS Auto mode reference)
+   */
+  function getLastDsOdds() {
+    return lastDsOdds;
+  }
+
   return {
     start,
     stop,
     sendCurrentMap,
     sendExcelOdds,
     sendUpdateNotification,
+    sendAutoCommand,
+    getLastDsOdds,
     isConnected,
     getExtensionVersion,
     BUNDLED_EXTENSION_VERSION

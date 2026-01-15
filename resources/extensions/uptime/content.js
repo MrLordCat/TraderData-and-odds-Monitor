@@ -26,7 +26,7 @@ class OddsBridge {
     this.currentMap = 1;
     this.isLast = false;  // Bo1 mode: use Match Up Winner for map 1
     this.connected = false;
-    this.version = '1.3.0'; // Extension version
+    this.version = '1.4.0'; // Extension version (DS Auto Mode support)
     this.connect();
   }
 
@@ -119,6 +119,100 @@ class OddsBridge {
       case 'pong':
         // Heartbeat response
         break;
+
+      case 'auto-command':
+        // Auto trading command from OddsMoni
+        this.executeAutoCommand(msg.command, msg);
+        break;
+    }
+  }
+
+  /**
+   * Execute auto trading command by simulating DS hotkeys
+   * Commands:
+   *   'suspend' - Press ESC to suspend trading
+   *   'trade' - Press Shift+ESC to execute trade
+   *   'adjust-up' - Press spinner up button (Numpad+)
+   *   'adjust-down' - Press spinner down button (Numpad-)
+   *   'commit' - Press commit button (Enter)
+   */
+  executeAutoCommand(command, opts = {}) {
+    console.log('[upTime] Auto command received:', command, opts);
+    let success = false;
+    
+    try {
+      switch (command) {
+        case 'suspend':
+          // ESC key to suspend
+          document.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Escape',
+            code: 'Escape',
+            keyCode: 27,
+            which: 27,
+            bubbles: true
+          }));
+          success = true;
+          break;
+
+        case 'trade':
+          // Shift+ESC to trade
+          document.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Escape',
+            code: 'Escape',
+            keyCode: 27,
+            which: 27,
+            shiftKey: true,
+            bubbles: true
+          }));
+          success = true;
+          break;
+
+        case 'adjust-up':
+          // Click spinner up button (same as Numpad+)
+          const upBtn = document.querySelector('button.spinner-up');
+          if (upBtn) {
+            upBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            upBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+            upBtn.click();
+            success = true;
+          }
+          break;
+
+        case 'adjust-down':
+          // Click spinner down button (same as Numpad-)
+          const downBtn = document.querySelector('button.spinner-down');
+          if (downBtn) {
+            downBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            downBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+            downBtn.click();
+            success = true;
+          }
+          break;
+
+        case 'commit':
+          // Click commit prices button (same as Enter)
+          const commitBtn = document.querySelector('button#commit-prices');
+          if (commitBtn && !commitBtn.disabled) {
+            commitBtn.click();
+            success = true;
+          }
+          break;
+
+        default:
+          console.warn('[upTime] Unknown auto command:', command);
+      }
+    } catch (err) {
+      console.error('[upTime] Auto command error:', err);
+    }
+
+    // Send acknowledgement back to OddsMoni
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'auto-command-ack',
+        command,
+        success,
+        ts: Date.now()
+      }));
     }
   }
 
