@@ -18,16 +18,13 @@ function bindTopbar(){
   let __pickerOpen = false;
   function closePicker(){
     __pickerOpen = false;
-    try { if(__pickerEl) __pickerEl.classList.add('hidden'); } catch(_){ }
+    if(__pickerEl) __pickerEl.classList.add('hidden');
   }
   function positionPicker(anchor){
-    try {
-      if(!__pickerEl || !anchor) return;
-      const r = anchor.getBoundingClientRect();
-      // Use fixed positioning inside the BrowserView
-      __pickerEl.style.left = Math.max(6, Math.min(window.innerWidth - 240, r.left)) + 'px';
-      __pickerEl.style.top = (r.bottom + 6) + 'px';
-    } catch(_){ }
+    if(!__pickerEl || !anchor) return;
+    const r = anchor.getBoundingClientRect();
+    __pickerEl.style.left = Math.max(6, Math.min(window.innerWidth - 240, r.left)) + 'px';
+    __pickerEl.style.top = (r.bottom + 6) + 'px';
   }
   async function openPicker(anchor){
     try {
@@ -65,7 +62,7 @@ function bindTopbar(){
         btn.textContent = b.title || b.name || b.id;
         btn.title = b.id;
         btn.addEventListener('click', ()=>{
-          try { window.desktopAPI.addBroker && window.desktopAPI.addBroker(b.id); } catch(_){ }
+          window.desktopAPI.addBroker?.(b.id);
           closePicker();
         });
         list.appendChild(btn);
@@ -78,77 +75,46 @@ function bindTopbar(){
   }
 
   // + Add broker (opens slot picker)
-  try {
-    const addBtn = document.getElementById('tbAddBroker');
-    if(addBtn){
-      addBtn.addEventListener('click', (e)=>{ try { e && e.stopPropagation && e.stopPropagation(); } catch(_){ } togglePicker(addBtn); });
-    }
-  } catch(_){ }
-
-  // Close picker on outside click / resize / Esc
-  try {
-    document.addEventListener('click', (e)=>{
-      if(!__pickerOpen) return;
-      const t = e && e.target;
-      if(__pickerEl && (t===__pickerEl || (__pickerEl.contains && __pickerEl.contains(t)))) return;
-      closePicker();
-    });
-    window.addEventListener('resize', ()=>{ try { if(__pickerOpen){ const a=document.getElementById('tbAddBroker'); positionPicker(a); } } catch(_){ } });
-    window.addEventListener('keydown', (e)=>{ try { if(__pickerOpen && e && e.key==='Escape'){ closePicker(); } } catch(_){ } });
-  } catch(_){ }
-
-  // Layout preset
-  try {
-    if(window.ApiHelpers){ window.ApiHelpers.bindSelectToApi('tbLayoutPreset', 'getLayoutPreset', 'applyLayoutPreset'); }
-    else {
-      const sel = document.getElementById('tbLayoutPreset');
-      if(sel){
-        window.desktopAPI.getLayoutPreset?.().then(p=>{ try { if(p) sel.value = p; } catch(_){ } }).catch(()=>{});
-        sel.addEventListener('change', ()=>{ try { if(sel.value) window.desktopAPI.applyLayoutPreset(sel.value); } catch(_){ } });
-      }
-    }
-  } catch(_){ }
-
-  // Refresh all
-  if(window.ApiHelpers){ window.ApiHelpers.bindBtnToApi('tbRefreshAll', 'refreshAll'); }
-  else { try { document.getElementById('tbRefreshAll')?.addEventListener('click', ()=>{ window.desktopAPI.refreshAll?.(); }); } catch(_){ } }
-
-  // Auto refresh checkbox
-  if(window.ApiHelpers){ window.ApiHelpers.bindCheckboxToApi('tbAutoReload', 'getAutoRefreshEnabled', 'setAutoRefreshEnabled', 'onAutoRefreshUpdated'); }
-  else {
-    try {
-      const cb = document.getElementById('tbAutoReload');
-      if(cb){
-        window.desktopAPI.getAutoRefreshEnabled?.().then(v=>{ try { cb.checked = !!v; } catch(_){ } }).catch(()=>{});
-        cb.addEventListener('change', ()=>{ try { window.desktopAPI.setAutoRefreshEnabled && window.desktopAPI.setAutoRefreshEnabled(!!cb.checked); } catch(_){ } });
-        window.desktopAPI.onAutoRefreshUpdated?.(p=>{ try { cb.checked = !!(p && p.enabled); } catch(_){ } });
-      }
-    } catch(_){ }
+  const addBtn = document.getElementById('tbAddBroker');
+  if(addBtn){
+    addBtn.addEventListener('click', (e)=>{ e.stopPropagation(); togglePicker(addBtn); });
   }
 
+  // Close picker on outside click / resize / Esc
+  document.addEventListener('click', (e)=>{
+    if(!__pickerOpen) return;
+    if(__pickerEl?.contains(e.target)) return;
+    closePicker();
+  });
+  window.addEventListener('resize', ()=>{ if(__pickerOpen) positionPicker(addBtn); });
+  window.addEventListener('keydown', (e)=>{ if(__pickerOpen && e.key==='Escape') closePicker(); });
+
+  // Layout preset
+  window.ApiHelpers.bindSelectToApi('tbLayoutPreset', 'getLayoutPreset', 'applyLayoutPreset');
+
+  // Refresh all
+  window.ApiHelpers.bindBtnToApi('tbRefreshAll', 'refreshAll');
+
+  // Auto refresh checkbox
+  window.ApiHelpers.bindCheckboxToApi('tbAutoReload', 'getAutoRefreshEnabled', 'setAutoRefreshEnabled', 'onAutoRefreshUpdated');
+
   // Board side arrow
-  try {
-    const sideBtn = document.getElementById('tbBoardSide');
-    if(sideBtn){
-      sideBtn.addEventListener('click', ()=>{
-        try {
-          const cur = (__boardDockState && __boardDockState.side) ? __boardDockState.side : (sideBtn.dataset.side || 'right');
-          const next = (cur === 'left') ? 'right' : 'left';
-          window.desktopAPI.boardSetSide && window.desktopAPI.boardSetSide(next);
-        } catch(_){ }
-      });
-      window.desktopAPI.getBoardState?.().then(st=>{ __boardDockState = st; updateBoardSideIcon(st); }).catch(()=>{});
-      window.desktopAPI.onBoardUpdated?.(st=>{ __boardDockState = st; updateBoardSideIcon(st); });
-    }
-  } catch(_){ }
+  const sideBtn = document.getElementById('tbBoardSide');
+  if(sideBtn){
+    sideBtn.addEventListener('click', ()=>{
+      const cur = __boardDockState?.side || sideBtn.dataset.side || 'right';
+      const next = cur === 'left' ? 'right' : 'left';
+      window.desktopAPI.boardSetSide?.(next);
+    });
+    window.desktopAPI.getBoardState?.().then(st=>{ __boardDockState = st; updateBoardSideIcon(st); }).catch(()=>{});
+    window.desktopAPI.onBoardUpdated?.(st=>{ __boardDockState = st; updateBoardSideIcon(st); });
+  }
 
   // Stats
-  if(window.ApiHelpers){ window.ApiHelpers.bindBtnToApi('tbStats', 'statsToggle'); }
-  else { try { document.getElementById('tbStats')?.addEventListener('click', ()=>{ window.desktopAPI.statsToggle?.(); }); } catch(_){ } }
+  window.ApiHelpers.bindBtnToApi('tbStats', 'statsToggle');
 
   // Settings
-  if(window.ApiHelpers){ window.ApiHelpers.bindBtnToApi('tbSettings', 'openSettings'); }
-  else { try { document.getElementById('tbSettings')?.addEventListener('click', ()=>{ window.desktopAPI.openSettings?.(); }); } catch(_){ } }
+  window.ApiHelpers.bindBtnToApi('tbSettings', 'openSettings');
 }
 
 // ===== Board collapse (title click) =====
@@ -238,96 +204,88 @@ function computeDerived(){
 }
 
 
+// Helper: get odds key for comparison (returns null if invalid)
+function getOddsKey(record){
+  return record && Array.isArray(record.odds) && record.odds[0] !== '-' 
+    ? record.odds.join('|') : null;
+}
+
 function renderBoard(){
   const tb = document.getElementById('rows');
   if(!tb) return;
-  const excelRow = document.getElementById('excelRow');
+  
   const excelRecord = boardData['excel'];
-  // Filter out excel and ds from broker list (ds shows in Excel row brackets)
-  const vals=Object.values(boardData).filter(r=>r.broker!=='excel' && r.broker!=='ds').sort((a,b)=> a.broker.localeCompare(b.broker));
-  if(window.OddsBoardShared && window.OddsBoardShared.buildRowsHtml){
-    const out = window.OddsBoardShared.buildRowsHtml(vals, { variant:'board', isSwapped: (b)=> swapped.has(b) });
-    tb.innerHTML = out.html;
+  const dsRecord = boardData['ds'];
+  const dsRow = document.getElementById('dsRow');
+  
+  // Render broker rows (excluding excel and ds)
+  const vals = Object.values(boardData)
+    .filter(r => r.broker !== 'excel' && r.broker !== 'ds')
+    .sort((a, b) => a.broker.localeCompare(b.broker));
+  
+  if(window.OddsBoardShared?.buildRowsHtml){
+    tb.innerHTML = window.OddsBoardShared.buildRowsHtml(vals, { 
+      variant: 'board', 
+      isSwapped: b => swapped.has(b) 
+    }).html;
   }
-  // Update Excel row - simple display
+  
+  // Update Excel row
+  const excelRow = document.getElementById('excelRow');
   if(excelRow){
     const valSpan = document.getElementById('excelOddsVal');
+    const excelOddsKey = getOddsKey(excelRecord);
+    const displayHtml = excelOddsKey ? `${excelRecord.odds[0]} / ${excelRecord.odds[1]}` : '- / -';
+    
+    if(valSpan) valSpan.innerHTML = displayHtml; 
+    else excelRow.children[1].innerHTML = displayHtml;
+    
+    const oddsCell = excelRow.querySelector('td');
+    if(oddsCell) oddsCell.classList.toggle('frozen', !!excelRecord?.frozen);
+    
     const statusSpan = document.getElementById('excelStatusCell');
-    const hasExcelOdds = excelRecord && Array.isArray(excelRecord.odds) && excelRecord.odds[0] !== '-';
+    if(statusSpan?.dataset.last === 'idle') statusSpan.style.display = 'none';
     
-    let displayHtml = '- / -';
-    if(hasExcelOdds){
-      displayHtml = `${excelRecord.odds[0]} / ${excelRecord.odds[1]}`;
-    }
-    
-    if(valSpan) valSpan.innerHTML = displayHtml; else excelRow.children[1].innerHTML = displayHtml;
-    
-    // Show suspension only on odds cell, not the whole Excel row
-    try {
-      const oddsCell = excelRow.querySelector('td');
-      if(oddsCell){ oddsCell.classList.toggle('frozen', !!(excelRecord && excelRecord.frozen)); }
-    } catch(_){ }
-    
-    if(statusSpan && statusSpan.dataset.last==='idle'){ statusSpan.style.display='none'; }
-  }
-  
-  // Track Excel odds changes for DS mismatch detection
-  try {
-    const excelOddsKey = excelRecord && Array.isArray(excelRecord.odds) 
-      ? excelRecord.odds.join('|') : null;
+    // Track Excel odds changes for DS mismatch detection
     if(excelOddsKey && excelOddsKey !== lastExcelOdds){
       lastExcelOdds = excelOddsKey;
-      // Clear previous timer and start new 5s countdown
       if(dsMismatchTimer) clearTimeout(dsMismatchTimer);
-      const dsRow = document.getElementById('dsRow');
       if(dsRow) dsRow.classList.remove('ds-mismatch');
-      dsMismatchTimer = setTimeout(()=>{
-        try {
-          const dsRow = document.getElementById('dsRow');
-          const dsRecord = boardData['ds'];
-          const excelRecord = boardData['excel'];
-          if(!dsRow || !dsRecord || !excelRecord) return;
-          if(!Array.isArray(dsRecord.odds) || !Array.isArray(excelRecord.odds)) return;
-          const dsKey = dsRecord.odds.join('|');
-          const exKey = excelRecord.odds.join('|');
-          if(dsKey !== exKey && dsRecord.odds[0] !== '-' && excelRecord.odds[0] !== '-'){
-            dsRow.classList.add('ds-mismatch');
-          }
-        } catch(_){ }
+      
+      dsMismatchTimer = setTimeout(() => {
+        const dsRec = boardData['ds'];
+        const exRec = boardData['excel'];
+        const dsKey = getOddsKey(dsRec);
+        const exKey = getOddsKey(exRec);
+        const row = document.getElementById('dsRow');
+        if(row && dsKey && exKey && dsKey !== exKey){
+          row.classList.add('ds-mismatch');
+        }
       }, 5000);
     }
-  } catch(_){ }
+  }
   
-  // Update DS row - separate row for DS odds
-  try {
-    const dsRow = document.getElementById('dsRow');
-    const dsCell = document.getElementById('dsOddsVal');
-    const dsRecord = boardData['ds'];
-    const hasDsOdds = dsRecord && Array.isArray(dsRecord.odds) && dsRecord.odds[0] !== '-';
-    
-    if(dsRow && dsCell){
-      if(hasDsOdds){
-        dsCell.textContent = `${dsRecord.odds[0]} / ${dsRecord.odds[1]}`;
-        dsRow.style.display = '';
-        dsRow.classList.toggle('frozen', !!dsRecord.frozen);
-        
-        // If DS odds now match Excel, clear mismatch highlight and cancel timer
-        try {
-          if(excelRecord && Array.isArray(excelRecord.odds) && excelRecord.odds[0] !== '-'){
-            const dsOddsKey = dsRecord.odds.join('|');
-            const excelOddsKey = excelRecord.odds.join('|');
-            if(dsOddsKey === excelOddsKey){
-              dsRow.classList.remove('ds-mismatch');
-              if(dsMismatchTimer){ clearTimeout(dsMismatchTimer); dsMismatchTimer = null; }
-            }
-          }
-        } catch(_){ }
-      } else {
-        dsRow.style.display = 'none';
+  // Update DS row
+  const dsCell = document.getElementById('dsOddsVal');
+  const dsOddsKey = getOddsKey(dsRecord);
+  
+  if(dsRow && dsCell){
+    if(dsOddsKey){
+      dsCell.textContent = `${dsRecord.odds[0]} / ${dsRecord.odds[1]}`;
+      dsRow.style.display = '';
+      dsRow.classList.toggle('frozen', !!dsRecord.frozen);
+      
+      // If DS odds match Excel, clear mismatch
+      const excelOddsKey = getOddsKey(excelRecord);
+      if(excelOddsKey && dsOddsKey === excelOddsKey){
         dsRow.classList.remove('ds-mismatch');
+        if(dsMismatchTimer){ clearTimeout(dsMismatchTimer); dsMismatchTimer = null; }
       }
+    } else {
+      dsRow.style.display = 'none';
+      dsRow.classList.remove('ds-mismatch');
     }
-  } catch(_){ }
+  }
   
   computeDerived();
 }
@@ -348,70 +306,72 @@ try {
   }
 } catch(_){ }
 
+// Helper: sync boardData with active broker list
+function syncBoardDataWithBrokers(ids){
+  const set = new Set(ids);
+  Object.keys(boardData).forEach(k => {
+    if(k === 'excel' || k === 'ds') return; // keep special sources
+    if(!set.has(k)) delete boardData[k];
+  });
+  renderBoard();
+}
+
 if(window.desktopAPI){
   // Excel extractor log bridging
-  try { window.desktopAPI.onExcelLog && window.desktopAPI.onExcelLog(payload=>{ try { if(payload && payload.msg) console.log('[excel-extractor][bridge]', payload.msg); } catch(_){ } }); } catch(_){ }
-  // Mirror auto ON/OFF from other views to update visuals promptly
-  try {
-    if(window.desktopAPI && window.desktopAPI.onAutoSetAll){ window.desktopAPI.onAutoSetAll(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
-    if(window.desktopAPI && window.desktopAPI.onAutoToggleAll){ window.desktopAPI.onAutoToggleAll(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
-    if(window.desktopAPI && window.desktopAPI.onAutoActiveSet){ window.desktopAPI.onAutoActiveSet(()=>{ try { refreshAutoButtonsVisual && refreshAutoButtonsVisual(); } catch(_){ } }); }
-  } catch(_){ }
-  window.desktopAPI.onBrokerClosed && window.desktopAPI.onBrokerClosed((id)=>{ if (boardData[id]) { delete boardData[id]; renderBoard(); }});
-  window.desktopAPI.onBrokersSync && window.desktopAPI.onBrokersSync((ids)=>{
-    const set = new Set(ids);
-    // Don't remove excel or ds - they come from different sources
-    Object.keys(boardData).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)) delete boardData[k]; });
-    renderBoard();
+  window.desktopAPI.onExcelLog?.(payload => {
+    if(payload?.msg) console.log('[excel-extractor][bridge]', payload.msg);
   });
+  
+  // Mirror auto ON/OFF from other views to update visuals promptly
+  window.desktopAPI.onAutoSetAll?.(() => refreshAutoButtonsVisual?.());
+  window.desktopAPI.onAutoToggleAll?.(() => refreshAutoButtonsVisual?.());
+  window.desktopAPI.onAutoActiveSet?.(() => refreshAutoButtonsVisual?.());
+  
+  // Broker lifecycle events
+  window.desktopAPI.onBrokerClosed?.(id => {
+    if(boardData[id]){ delete boardData[id]; renderBoard(); }
+  });
+  window.desktopAPI.onBrokersSync?.(syncBoardDataWithBrokers);
+  
   // Fallback to raw IPC if desktopAPI does not provide broker events
   try {
     const { ipcRenderer } = require('electron');
     if(ipcRenderer){
       if(!window.desktopAPI.onBrokerClosed){
-        ipcRenderer.on('broker-closed', (_e,p)=>{ try { const id=p&&p.id; if(id && boardData[id]){ delete boardData[id]; renderBoard(); } } catch(_){ } });
+        ipcRenderer.on('broker-closed', (_e, p) => {
+          if(p?.id && boardData[p.id]){ delete boardData[p.id]; renderBoard(); }
+        });
       }
       if(!window.desktopAPI.onBrokersSync){
-        ipcRenderer.on('brokers-sync', (_e,p)=>{ try { const ids=(p&&p.ids)||[]; const set=new Set(ids); Object.keys(boardData).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)) delete boardData[k]; }); renderBoard(); } catch(_){ } });
+        ipcRenderer.on('brokers-sync', (_e, p) => syncBoardDataWithBrokers(p?.ids || []));
       }
     }
   } catch(_){ }
+  
   // Excel extractor status updates - using shared module
-  try {
-    const ExcelStatusUI = window.ExcelStatusUI;
-    const sBtn = document.getElementById('excelScriptBtn');
-    const statusEl = document.getElementById('excelStatusCell');
-    const scriptMapBadge = document.getElementById('scriptMapBadge');
+  const ExcelStatusUI = window.ExcelStatusUI;
+  const sBtn = document.getElementById('excelScriptBtn');
+  
+  if(ExcelStatusUI && sBtn){
+    const getBoardMap = () => {
+      const sel = document.getElementById('mapSelect');
+      return sel ? parseInt(sel.value, 10) : null;
+    };
     
-    // Get board map from selector
-    function getBoardMap(){
-      try {
-        const sel = document.getElementById('mapSelect');
-        if(sel) return parseInt(sel.value, 10);
-      } catch(_){ }
-      return null;
-    }
+    const { applyStatus, refreshBadgeMatch } = ExcelStatusUI.bindExcelStatusButton({
+      btn: sBtn,
+      statusEl: document.getElementById('excelStatusCell'),
+      scriptMapBadge: document.getElementById('scriptMapBadge'),
+      getBoardMap,
+      toggle: () => window.desktopAPI.excelScriptToggle?.()
+    });
     
-    if(ExcelStatusUI && sBtn){
-      const { applyStatus, refreshBadgeMatch } = ExcelStatusUI.bindExcelStatusButton({
-        btn: sBtn,
-        statusEl: statusEl,
-        scriptMapBadge: scriptMapBadge,
-        getBoardMap: getBoardMap,
-        toggle: ()=> window.desktopAPI.excelScriptToggle && window.desktopAPI.excelScriptToggle()
-      });
-      
-      // Store refreshBadgeMatch for use in map change handler
-      window._boardExcelStatusRefresh = refreshBadgeMatch;
-      
-      if(window.desktopAPI.onExcelExtractorStatus){
-        window.desktopAPI.onExcelExtractorStatus(applyStatus);
-      }
-      if(window.desktopAPI.getExcelExtractorStatus){
-        window.desktopAPI.getExcelExtractorStatus().then(applyStatus).catch(()=>{});
-      }
-    }
-  } catch(_){ }
+    // Store refreshBadgeMatch for use in map change handler
+    window._boardExcelStatusRefresh = refreshBadgeMatch;
+    
+    window.desktopAPI.onExcelExtractorStatus?.(applyStatus);
+    window.desktopAPI.getExcelExtractorStatus?.().then(applyStatus).catch(() => {});
+  }
 }
 
 document.addEventListener('click', e=>{
@@ -469,26 +429,14 @@ async function restoreMapAndBroadcast(){
   } catch(e) {}
 }
 
-// --- isLast flag support ---
-let isLastFlag = false;
-async function restoreIsLast(){
-  try {
-    if(!window.desktopAPI || !window.desktopAPI.getIsLast) return;
-    const val = await window.desktopAPI.getIsLast();
-    isLastFlag = !!val;
-    const chk=document.getElementById('isLastChk');
-    if(chk) chk.checked = isLastFlag;
-  } catch(_){}
-}
 document.getElementById('isLastChk')?.addEventListener('change', e=>{
-  try {
-    const v=!!e.target.checked; isLastFlag=v;
-    if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(v); }
-  } catch(_){ }
+  const v = !!e.target.checked;
+  window.desktopAPI?.setIsLast?.(v);
 });
-if(window.desktopAPI && window.desktopAPI.onIsLast){
-  window.desktopAPI.onIsLast(v=>{ try { isLastFlag=!!v; const chk=document.getElementById('isLastChk'); if(chk) chk.checked=isLastFlag; } catch(_){ } });
-}
+window.desktopAPI?.onIsLast?.(v => {
+  const chk = document.getElementById('isLastChk');
+  if(chk) chk.checked = !!v;
+});
 
 document.getElementById('mapSelect')?.addEventListener('change', e=>{
   if(!window.desktopAPI) return;
@@ -590,23 +538,17 @@ if(window.desktopAPI && window.desktopAPI.onTeamNames){
 
 // Visual state helpers for Auto buttons (kept for board UI)
 function refreshAutoButtonsVisual(){
-  try {
-    const autoBtn = document.getElementById('autoBtn');
-    const sim = window.__autoSim;
-    if(autoBtn && sim){
-      autoBtn.classList.toggle('on', !!sim.active);
-      const paused = !sim.active && !!sim.userWanted && (sim.lastDisableReason && !/^manual/.test(sim.lastDisableReason));
-      autoBtn.classList.toggle('paused', paused);
-      autoBtn.classList.toggle('susp', !!sim.lastDisableReason && sim.lastDisableReason==='excel-suspended');
-      // No native title - miniToast handles tooltip on hover
-    }
-  } catch(_){ }
+  const autoBtn = document.getElementById('autoBtn');
+  const sim = window.__autoSim;
+  if(autoBtn && sim){
+    autoBtn.classList.toggle('on', !!sim.active);
+    const paused = !sim.active && !!sim.userWanted && (sim.lastDisableReason && !/^manual/.test(sim.lastDisableReason));
+    autoBtn.classList.toggle('paused', paused);
+    autoBtn.classList.toggle('susp', !!sim.lastDisableReason && sim.lastDisableReason==='excel-suspended');
+  }
 }
-function flashDot(idx){
-  const dot=document.querySelector('.autoDot.'+(idx===0?'side1':'side2'));
-  const stepMs = (window.__autoSim && window.__autoSim.stepMs) ? window.__autoSim.stepMs : 500;
-  if(dot){ dot.classList.add('active'); setTimeout(()=>dot.classList.remove('active'), stepMs-80); }
-}
+// Export for auto_trader.js
+window.refreshAutoButtonsVisual = refreshAutoButtonsVisual;
 
 // Centralized tolerance badge (from core Settings)
 (function bindToleranceBadge(){
