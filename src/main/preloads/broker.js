@@ -66,11 +66,18 @@ ipcRenderer.on('collect-now', ()=> safe(()=>{
 ipcRenderer.on('set-map', (_e, mapVal)=>{
   const n=parseInt(mapVal,10); desiredMap=Number.isNaN(n)?1:n;
   __lastOddsSig = ''; // Reset to ensure new odds are sent
-  triggerMapChange(HOST, desiredMap);
-  [600,1500,3000].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap)), d));
+  triggerMapChange(HOST, desiredMap, { isLast });
+  [600,1500,3000].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap, { isLast })), d));
 });
 ipcRenderer.on('set-is-last', (_e, flag)=>{
-  try { isLast = !!flag; } catch(_){ }
+  try {
+    const wasLast = isLast;
+    isLast = !!flag;
+    // If isLast changed and we're on map 1, re-trigger map navigation (BetBoom Bo1 handling)
+    if(wasLast !== isLast && desiredMap === 1){
+      triggerMapChange(HOST, desiredMap, { isLast });
+    }
+  } catch(_){ }
 });
 
 // Periodic odds loop with deduplication (only send if changed)

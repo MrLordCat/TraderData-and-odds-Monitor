@@ -2,7 +2,8 @@
 // Exports: triggerMapChange(host, map)
 const { deepQuery } = require('./extractors');
 
-function triggerMapChange(host, map){
+function triggerMapChange(host, map, opts={}){
+  const isLast = opts.isLast === true;
   try {
     if(/rivalry\.com$/.test(host)) {
       // Rivalry: авто-клик по карте отключён. Экстрактор сам выбирает нужный рынок по mapNum.
@@ -21,7 +22,8 @@ function triggerMapChange(host, map){
       const buttons=[...document.querySelectorAll('button[role="radio"]')];
       let target;
       // NOTE: Russian textContent comparisons ("Матч", "Карта") intentionally kept for site UI.
-      if(map===0) target=buttons.find(b=>b.textContent.trim()==='Матч');
+      // Bo1 special case: if map 1 + isLast, stay on "Матч" tab (match-level odds)
+      if(map===0 || (map===1 && isLast)) target=buttons.find(b=>b.textContent.trim()==='Матч');
       else target=buttons.find(b=>b.textContent.trim()==='Карта '+map);
       if(target && target.getAttribute('data-state')!=='on') target.click();
     } else if(/pari\.ru$/.test(host)) {
