@@ -32,6 +32,41 @@
 					</section>
 
 					<section class="seg">
+					<h2 class="sectionTitle">Broker Refresh</h2>
+					<div class="grid formGrid">
+						<label for="br-reselect-enabled">Map reselect (periodic)
+							<small class="labelHint">Periodically re-click map tabs to ensure correct odds</small>
+						</label>
+						<input id="br-reselect-enabled" type="checkbox" checked />
+						<label for="br-reselect-interval">Reselect interval</label>
+						<div class="rangeWrap">
+							<input id="br-reselect-interval" type="range" min="5" max="60" step="5" value="10" />
+							<span id="br-reselect-interval-val" class="rangeVal">10s</span>
+						</div>
+						<div class="subRule" aria-hidden="true"></div>
+						<label for="br-reload-enabled">Auto reload stale brokers
+							<small class="labelHint">Reload broker page if odds missing or unchanged</small>
+						</label>
+						<input id="br-reload-enabled" type="checkbox" checked />
+						<label for="br-missing-timeout">Missing odds timeout
+							<small class="labelHint">Reload if odds are '-' for this long</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="br-missing-timeout" type="range" min="1" max="10" step="1" value="1" />
+							<span id="br-missing-timeout-val" class="rangeVal">1 min</span>
+						</div>
+						<label for="br-unchanged-timeout">Unchanged odds timeout
+							<small class="labelHint">Reload if odds haven't changed for this long</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="br-unchanged-timeout" type="range" min="1" max="10" step="1" value="3" />
+							<span id="br-unchanged-timeout-val" class="rangeVal">3 min</span>
+						</div>
+					</div>
+					<div class="hint">Map reselect periodically re-clicks map tabs (useful for SPAs). Auto reload refreshes broker pages when odds go stale or missing. These features work when the ⟳ button is active.</div>
+					</section>
+
+					<section class="seg">
 					<h2 class="sectionTitle">Hotkeys</h2>
 					<ul class="hotkeyList">
 						<li><span class="hk">Tab</span> — switch between Brokers and Stats</li>

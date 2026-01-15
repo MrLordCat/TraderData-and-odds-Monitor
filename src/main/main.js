@@ -499,6 +499,11 @@ function bootstrap() {
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
   // Initialize map selection IPC (needs boardManager, statsManager, mainWindow references)
   initMapIpc({ ipcMain, store, views, mainWindow, boardManager, statsManager, extensionBridgeRef });
+  // Initialize broker refresh settings IPC (must be before mapAutoRefresh so it can listen to settings changes)
+  try {
+    const { initBrokerRefreshIpc } = require('./modules/ipc/brokerRefresh');
+    initBrokerRefreshIpc({ ipcMain, store });
+  } catch(e){ console.warn('initBrokerRefreshIpc failed', e.message); }
   // Initialize periodic map re-broadcast (odds refresh auto loop)
   try {
     const { initMapAutoRefreshIpc } = require('./modules/ipc/mapAutoRefresh');

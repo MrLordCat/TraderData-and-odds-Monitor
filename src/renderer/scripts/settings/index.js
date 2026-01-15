@@ -8,6 +8,7 @@ const baseDir = path.join(__dirname, '..', 'scripts', 'settings');
 
 const initModule = require(path.join(baseDir, 'init'));
 const autoSettings = require(path.join(baseDir, 'auto-settings'));
+const brokerRefresh = require(path.join(baseDir, 'broker-refresh'));
 const heatbar = require(path.join(baseDir, 'heatbar'));
 const updater = require(path.join(baseDir, 'updater'));
 const extension = require(path.join(baseDir, 'extension'));
@@ -41,6 +42,7 @@ function initAll() {
 	// Initialize all modules (wrapped in try-catch to prevent one failure breaking everything)
 	try { initModule.init(); } catch (e) { console.error('[settings] init module failed:', e); }
 	try { autoSettings.init(); } catch (e) { console.error('[settings] autoSettings init failed:', e); }
+	try { brokerRefresh.init(); } catch (e) { console.error('[settings] brokerRefresh init failed:', e); }
 	try { heatbar.init(); } catch (e) { console.error('[settings] heatbar init failed:', e); }
 	try { updater.init(); } catch (e) { console.error('[settings] updater init failed:', e); }
 	try { extension.init(); } catch (e) { console.error('[settings] extension init failed:', e); }
@@ -58,6 +60,7 @@ function initAll() {
 	if (saveBtn) saveBtn.onclick = () => {
 		heatbar.save();
 		autoSettings.saveAll();
+		brokerRefresh.saveAll();
 		ipcRenderer.send('close-settings');
 	};
 
