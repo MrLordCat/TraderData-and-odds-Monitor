@@ -59,7 +59,7 @@ ipcMain.on('open-userdata-folder', () => {
   } catch(e){ console.warn('openUserDataFolder failed', e); }
 });
 
-// Reapply stored map & team names after broker navigation (multi-delay strategy as documented in project instructions)
+// Reapply stored map & team names after broker navigation (atomic config approach)
 function scheduleMapReapply(view){
   try {
     if(!view || view.isDestroyed()) return;
@@ -69,15 +69,15 @@ function scheduleMapReapply(view){
     const defaultMap = 1;
     const mapToApply = (typeof lastMap !== 'undefined') ? lastMap : defaultMap;
     const isLastFlag = !!store.get('isLast');
+    // Send atomic config with both map and isLast to avoid race conditions
+    const config = { map: mapToApply, isLast: isLastFlag };
     const delays = [400, 1400, 3000, 5000];
     delays.forEach(d=> setTimeout(()=>{
       try {
         if(view.isDestroyed()) return;
-        // Always assert a map (use default when no persisted lastMap yet)
-        view.webContents.send('set-map', mapToApply);
+        // Atomic map config - broker receives both values together
+        view.webContents.send('set-map-config', config);
         if(teamNames) view.webContents.send('set-team-names', teamNames);
-        // Re-apply isLast bet365 semantic flag as well
-        view.webContents.send('set-is-last', isLastFlag);
         // Nudge an immediate collection shortly after applying controls
         setTimeout(()=>{ try { if(!view.isDestroyed()) view.webContents.send('collect-now'); } catch(_){ } }, 250);
       } catch(_){ }
@@ -540,17 +540,10 @@ function bootstrap() {
   setTimeout(()=>{ layoutManager.applyLayoutPreset('2x2'); }, 200);
     }
   } catch(e) {}
-  // After a short delay (views loading), broadcast persisted map selection if any
-  const lastMap = store.get('lastMap');
-  if (typeof lastMap !== 'undefined') {
-    setTimeout(() => {
-      for (const id of Object.keys(views)) {
-        try { views[id].webContents.send('set-map', lastMap); } catch(e) {}
-      }
-    }, 1200);
-  }
+  // After a short delay (views loading), broadcast persisted map config
+  // (scheduleMapReapply handles this atomically, so this is just a safety fallback)
   // Auto-focus board webContents after initial load so hotkeys work immediately
-  setTimeout(()=>{
+  setTimeout(()=>{{
     try {
       const bwc = boardManager && boardManager.getWebContents ? boardManager.getWebContents() : null;
       if(bwc && !bwc.isDestroyed()){ bwc.focus(); console.log('[startup] auto-focused board webContents'); }

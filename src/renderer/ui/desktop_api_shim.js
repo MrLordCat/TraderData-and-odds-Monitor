@@ -36,16 +36,20 @@
 
       // Odds
       onOdds: (cb) => withUnsub('odds-update', cb),
-      onMap: (cb) => withUnsub('set-map', cb),
+      onMap: (cb) => withUnsub('set-map-config', (cfg) => cb(cfg?.map)),
       onBrokerClosed: (cb) => withUnsub('broker-closed', (p)=> cb(p?.id)),
       onBrokersSync: (cb) => withUnsub('brokers-sync', (p)=> cb(p?.ids || [])),
       setMap: (id, map) => { try { ipcRenderer.send('set-map', { id, map }); } catch(_){} },
       getLastMap: () => ipcRenderer.invoke('get-last-map'),
 
-      // Last map (bet365)
+      // Last map (bet365, thunderpick, betboom)
       getIsLast: () => ipcRenderer.invoke('get-is-last').catch(()=>false),
       setIsLast: (v) => { try { ipcRenderer.send('set-is-last', !!v); } catch(_){} },
-      onIsLast: (cb) => withUnsub('set-is-last', cb),
+      onIsLast: (cb) => withUnsub('set-map-config', (cfg) => cb(cfg?.isLast)),
+      // Atomic map config API (preferred for reliable isLast handling)
+      getMapConfig: () => ipcRenderer.invoke('get-map-config').catch(()=>({ map: 1, isLast: false })),
+      setMapConfig: (cfg) => { try { ipcRenderer.send('set-map-config', cfg); } catch(_){} },
+      onMapConfig: (cb) => withUnsub('set-map-config', cb),
 
       // Auto trader
       autoSendPress: (side) => { try { return ipcRenderer.invoke('send-auto-press', side); } catch(_){ return Promise.resolve(false); } },

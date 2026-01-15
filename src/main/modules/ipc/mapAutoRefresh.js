@@ -24,9 +24,10 @@ function initMapAutoRefreshIpc({ ipcMain, store, mainWindow, boardManager, stats
 
   function rebroadcastMap(){
     try {
-      const mapVal = parseInt(store.get('lastMap'),10) || 0;
-      // Re-use existing map IPC full broadcast (includes broker views) via original handler
-      ipcMain.emit('set-map', {}, { id:'*', map: mapVal });
+      const mapVal = parseInt(store.get('lastMap'),10) || 1;
+      const isLastVal = !!store.get('isLast');
+      // Re-use existing map IPC full broadcast (includes broker views) via atomic handler
+      ipcMain.emit('set-map-config', {}, { map: mapVal, isLast: isLastVal });
     } catch(_){ }
   }
 

@@ -3,7 +3,7 @@ const { ipcRenderer } = require('electron');
 // Initial desired map (generic)
 let desiredMap = 1;
 let isLast = false; // global flag from main indicating final map should use match market for certain brokers
-let isLastInitialized = false; // tracks if we've received the first set-is-last from main
+let mapConfigInitialized = false; // tracks if we've received the first set-map-config from main
 const HOST = location.host;
 const { collectOdds: collectOddsExt, getBrokerId } = require('../../brokers/extractors');
 const { triggerMapChange } = require('../../brokers/mapNav');
@@ -63,22 +63,24 @@ ipcRenderer.on('collect-now', ()=> safe(()=>{
   safeSend('bv-odds-update', odds);
 }));
 
-// Map change listener (reset signature to force fresh send)
-ipcRenderer.on('set-map', (_e, mapVal)=>{
-  const n=parseInt(mapVal,10); desiredMap=Number.isNaN(n)?1:n;
-  __lastOddsSig = ''; // Reset to ensure new odds are sent
-  triggerMapChange(HOST, desiredMap, { isLast });
-  [600,1500,3000].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap, { isLast })), d));
-});
-ipcRenderer.on('set-is-last', (_e, flag)=>{
+// Atomic map config listener - receives both map and isLast together to avoid race conditions
+ipcRenderer.on('set-map-config', (_e, config)=>{
   try {
-    const wasLast = isLast;
-    isLast = !!flag;
-    // Trigger map navigation only on first init (startup) or when value actually changes
-    // This prevents repeated triggers from scheduleMapReapply's multiple delayed sends
-    const shouldTrigger = !isLastInitialized || (wasLast !== isLast);
-    isLastInitialized = true;
-    if(shouldTrigger && desiredMap === 1){
+    const newMap = parseInt(config?.map, 10);
+    const newIsLast = !!config?.isLast;
+    const mapChanged = !Number.isNaN(newMap) && newMap !== desiredMap;
+    const isLastChanged = newIsLast !== isLast;
+    
+    // Update state
+    if(!Number.isNaN(newMap)) desiredMap = newMap;
+    isLast = newIsLast;
+    
+    // Trigger navigation only on first init or when something actually changed
+    const shouldTrigger = !mapConfigInitialized || mapChanged || isLastChanged;
+    mapConfigInitialized = true;
+    
+    if(shouldTrigger){
+      __lastOddsSig = ''; // Reset to ensure new odds are sent
       triggerMapChange(HOST, desiredMap, { isLast });
     }
   } catch(_){ }

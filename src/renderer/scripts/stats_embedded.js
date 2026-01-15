@@ -17,10 +17,42 @@ function initEmbeddedMapSync(){
   window.desktopAPI.onMap(mapVal=>{ try { currentMap = mapVal; window.__embeddedCurrentMap = currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } catch(_){} });
     } else {
       const { ipcRenderer } = require('electron');
-  ipcRenderer.on('set-map', (_e, mapVal)=>{ try { currentMap = mapVal; window.__embeddedCurrentMap = currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } catch(_){} });
+  // Listen for atomic map config (preferred)
+  try {
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.on('set-map-config', (_e, cfg)=>{ 
+      try { 
+        if(cfg && typeof cfg.map !== 'undefined'){
+          currentMap = cfg.map; 
+          window.__embeddedCurrentMap = currentMap; 
+          updateEmbeddedMapTag(); 
+          syncEmbeddedMapSelect(); 
+          forceMapSelectValue();
+        }
+        // Update isLast button state
+        const lastBtn = document.getElementById('embeddedIsLast');
+        if(lastBtn && typeof cfg?.isLast !== 'undefined'){
+          lastBtn.classList.toggle('active', !!cfg.isLast);
+        }
+      } catch(_){} 
+    });
     }
     // Initial fetch
-    if(window.desktopAPI && window.desktopAPI.getLastMap){
+    if(window.desktopAPI && window.desktopAPI.getMapConfig){
+      window.desktopAPI.getMapConfig().then(cfg=>{ 
+        if(cfg && typeof cfg.map!=='undefined'){ 
+          currentMap=cfg.map; 
+          window.__embeddedCurrentMap=currentMap; 
+          updateEmbeddedMapTag(); 
+          syncEmbeddedMapSelect(); 
+          forceMapSelectValue();
+        }
+        const lastBtn = document.getElementById('embeddedIsLast');
+        if(lastBtn && typeof cfg?.isLast !== 'undefined'){
+          lastBtn.classList.toggle('active', !!cfg.isLast);
+        }
+      }).catch(()=>{});
+    } else if(window.desktopAPI && window.desktopAPI.getLastMap){
   window.desktopAPI.getLastMap().then(v=>{ if(typeof v!=='undefined'){ currentMap=v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); } }).catch(()=>{});
     }
     bindEmbeddedMapSelect();
@@ -29,7 +61,7 @@ function initEmbeddedMapSync(){
       const lastBtn = document.getElementById('embeddedIsLast');
       if(lastBtn && !lastBtn.dataset.bound){
         lastBtn.dataset.bound='1';
-        let isLast = false;
+        let isLast = lastBtn.classList.contains('active');
         lastBtn.addEventListener('click', ()=>{
           try {
             isLast = !isLast;
@@ -37,12 +69,11 @@ function initEmbeddedMapSync(){
             if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(isLast); }
           } catch(_){ }
         });
-        if(window.desktopAPI && window.desktopAPI.getIsLast){
+        // Initial state already set from getMapConfig above, but keep legacy fallback
+        if(window.desktopAPI && window.desktopAPI.getIsLast && !lastBtn.classList.contains('active')){
           window.desktopAPI.getIsLast().then(v=>{ try { isLast = !!v; lastBtn.classList.toggle('active', isLast); } catch(_){ } }).catch(()=>{});
         }
-        if(window.desktopAPI && window.desktopAPI.onIsLast){
-          window.desktopAPI.onIsLast(v=>{ try { isLast = !!v; lastBtn.classList.toggle('active', isLast); } catch(_){ } });
-        }
+        // onIsLast now listens via set-map-config above
       }
     } catch(_){ }
   } catch(_){ }
@@ -75,9 +106,6 @@ function bindEmbeddedMapSelect(){
         const v=e.target.value;
         try { console.debug('[embeddedOdds] map change via stats select ->', v); } catch(_){ }
         if(window.desktopAPI && window.desktopAPI.setMap){ window.desktopAPI.setMap('*', v); }
-        else {
-          try { const { ipcRenderer } = require('electron'); ipcRenderer.send('set-map', { id:'*', map:v }); } catch(_){ }
-        }
   // update locally immediately
         currentMap = v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag();
       } catch(_){ }
@@ -91,7 +119,6 @@ function bindEmbeddedMapSelect(){
           try {
             const v = sel.value;
             if(window.desktopAPI && window.desktopAPI.setMap){ window.desktopAPI.setMap('*', v); }
-            else { try { const { ipcRenderer } = require('electron'); ipcRenderer.send('set-map', { id:'*', map:v }); } catch(_){ } }
             try { console.debug('[embeddedOdds] manual map refresh ->', v); } catch(_){ }
           } catch(_){ }
         });

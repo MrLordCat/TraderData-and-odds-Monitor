@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   listBrokers: () => ipcRenderer.invoke('list-brokers'),
   refresh: (id) => ipcRenderer.send('refresh-broker', id),
   onOdds: (cb) => withUnsub('odds-update', cb),
-  onMap: (cb) => withUnsub('set-map', cb),
+  onMap: (cb) => withUnsub('set-map-config', (cfg) => cb(cfg?.map)),
   onBrokerClosed: (cb) => withUnsub('broker-closed', (p)=> cb(p.id)),
   onBrokersSync: (cb) => withUnsub('brokers-sync', (p)=> cb(p.ids || [])),
   getLayout: () => ipcRenderer.invoke('get-layout'),
@@ -34,7 +34,11 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   getLastMap: () => ipcRenderer.invoke('get-last-map')
   ,getIsLast: () => ipcRenderer.invoke('get-is-last')
   ,setIsLast: (v) => ipcRenderer.send('set-is-last', !!v)
-  ,onIsLast: (cb) => withUnsub('set-is-last', cb)
+  ,onIsLast: (cb) => withUnsub('set-map-config', (cfg) => cb(cfg?.isLast))
+  // Atomic map config API (preferred)
+  ,getMapConfig: () => ipcRenderer.invoke('get-map-config')
+  ,setMapConfig: (cfg) => ipcRenderer.send('set-map-config', cfg)
+  ,onMapConfig: (cb) => withUnsub('set-map-config', cb)
   ,requestAddBroker: () => ipcRenderer.send('global-open-broker-picker')
   ,getAutoRefreshEnabled: () => ipcRenderer.invoke('get-auto-refresh-enabled')
   ,setAutoRefreshEnabled: (v) => ipcRenderer.send('set-auto-refresh-enabled', !!v)
