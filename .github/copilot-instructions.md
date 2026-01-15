@@ -112,6 +112,10 @@ IPC is modular under `src/main/modules/ipc/*.js`:
 - IPC channels: `odds-update`, `excel-team-names`, `auto-toggle-all`, `auto-state-updated`, `ui-blur-on/off`.
 - Avoid global shortcuts; use `before-input-event` handlers.
 
+**Bo1 (isLast) flow:**
+- Флаг `isLast` передаётся из broker.js preload → `triggerMapChange(host, map, { isLast })` и `collectOdds(host, map, game, { isLast })`.
+- При map=1 и isLast=true используются матчевые рынки вместо карты 1.
+
 ## 5. Layout / View Management
 - `layoutManager.applyLayoutPreset(id)` is idempotent; auto-creates slot placeholders.
 - Preset syntax: `'2x3'` = 2 rows of 3, `'1x2x2'` = rows of 1, 2, 2 brokers.
@@ -120,9 +124,15 @@ IPC is modular under `src/main/modules/ipc/*.js`:
 ## 6. Broker Extension Pattern
 To add a bookmaker:
 1. Add to `BROKERS` array in `src/main/main.js` (id + default URL).
-2. In `src/brokers/extractors.js`: implement `extractFoo(mapNum)` returning `{ odds:[s1,s2], frozen }`.
+2. In `src/brokers/extractors.js`: implement `extractFoo(mapNum, game, opts)` returning `{ odds:[s1,s2], frozen }`.
 3. Add `test` regex + `fn` entry in `EXTRACTOR_TABLE`; update `getBrokerId` hostname mapping.
+   - Если экстрактору нужен `opts` (например, `opts.isLast` для Bo1), добавьте `passOpts: true`.
+   - Пример: `{ test: /thunderpick\.io$/i, fn: extractThunder, passOpts: true }`
 4. Prefer stable selectors (data attributes) over brittle class names.
+
+**Bo1 handling (BetBoom, Thunderpick):**
+- При `mapNum === 1 && opts.isLast === true` экстрактор возвращает матчевые коэффициенты ("Исход матча"/"Match Winner").
+- mapNav.js при тех же условиях кликает вкладку "Матч"/"Main" вместо "Карта 1"/"Map 1".
 
 ## 7. Stats / Board
 - Stats modes: `hidden|embedded|window` in `statsState.mode`.

@@ -73,8 +73,9 @@ ipcRenderer.on('set-is-last', (_e, flag)=>{
   try {
     const wasLast = isLast;
     isLast = !!flag;
-    // If isLast changed and we're on map 1, re-trigger map navigation (BetBoom Bo1 handling)
-    if(wasLast !== isLast && desiredMap === 1){
+    // Always re-trigger map navigation when isLast is set (including on initial load)
+    // This ensures Bo1 handling works on startup when isLast was persisted as true
+    if(desiredMap === 1){
       triggerMapChange(HOST, desiredMap, { isLast });
     }
   } catch(_){ }
