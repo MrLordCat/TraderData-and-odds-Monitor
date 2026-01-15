@@ -11,12 +11,18 @@ function triggerMapChange(host, map, opts={}){
     } else if(/gg199\.bet$/.test(host)||/gg\.bet$/.test(host)) {
       // no-op (dynamic markets)
     } else if(/thunderpick\.io$/.test(host)) {
-      const targetTestId=`Map ${map}Tab`;
-      const tab=document.querySelector(`[data-testid="${targetTestId}"]`);
-      if(tab) tab.click();
-      else {
-        const fallback=[...document.querySelectorAll('[role="tab"]')].find(t=>t.textContent.trim()==='Map '+map);
-        if(fallback) fallback.click();
+      // Bo1 special case: if map 1 + isLast, click "Main" tab to show Match Winner
+      if(map === 1 && isLast){
+        const mainTab = document.querySelector('[data-testid="MainTab"]');
+        if(mainTab && mainTab.getAttribute('aria-selected') !== 'true') mainTab.click();
+      } else {
+        const targetTestId=`Map ${map}Tab`;
+        const tab=document.querySelector(`[data-testid="${targetTestId}"]`);
+        if(tab) tab.click();
+        else {
+          const fallback=[...document.querySelectorAll('[role="tab"]')].find(t=>t.textContent.trim()==='Map '+map);
+          if(fallback) fallback.click();
+        }
       }
     } else if(/betboom\.ru$/.test(host)) {
       const buttons=[...document.querySelectorAll('button[role="radio"]')];

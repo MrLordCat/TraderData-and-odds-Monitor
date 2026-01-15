@@ -250,11 +250,15 @@ function extractGg(mapNum=1, game='lol'){
   return {odds:odds.length===2?odds:['-','-'],frozen};
 }
 
-function extractThunder(mapNum=1, game='lol'){
+function extractThunder(mapNum=1, game='lol', opts={}){
   const markets=[...document.querySelectorAll("div[data-testid^='market-']")];
   let t=null;
-  if(mapNum<=0){
-    // Last button: look for Match Winner only
+  
+  // Bo1 special case: if map 1 selected AND isLast flag is set, use Match Winner (same as mapNum=0)
+  const useBo1MatchLevel = (mapNum === 1 && opts.isLast === true);
+  
+  if(mapNum<=0 || useBo1MatchLevel){
+    // Match Winner market
     const matchRe=/Match\s+Winner/i;
     t=markets.find(m=>{
       const header=m.querySelector('.text-gray-light, .mr-auto');
@@ -461,7 +465,7 @@ const EXTRACTOR_TABLE = [
   { test: /rivalry\.com$/i, fn: extractRivalry },
   { test: /gg199\.bet$/i, fn: extractGg },
   { test: /gg\.bet$/i, fn: extractGg },
-  { test: /thunderpick\.io$/i, fn: extractThunder },
+  { test: /thunderpick\.io$/i, fn: extractThunder, passOpts: true },
   { test: /betboom\.ru$/i, fn: extractBetboom, passOpts: true },
   { test: /pari\.ru$/i, fn: extractPari },
   { test: /marathonbet\./i, fn: extractMarathon }
