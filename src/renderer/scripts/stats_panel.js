@@ -82,10 +82,6 @@ try {
   });
 } catch(_){ }
 
-// (Removed) Capture Data prototype wiring – feature deprecated.
-
-// (Theme logic moved to stats_theme.js)
-
 // ================= Runtime State =================
 let metricVisibility = {}; // runtime copy controlling row visibility
 const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'];
@@ -640,7 +636,7 @@ function updateGameSelect(){
   }
   if(!any){ placeholder.selected=true; gameSelect.appendChild(placeholder); }
 }
-// startInlineRename removed - team names are read-only from Excel K4/N4
+
 function renderLol(payload, manual=false){
   try {
     ensureRows();
@@ -790,8 +786,6 @@ function renderLol(payload, manual=false){
     try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ }
   });
   updateGameSelect(); if(addBtn){ addBtn.setAttribute('aria-disabled','true'); addBtn.disabled=true; }
-  // Lightweight self-test sample (only if no data after short delay)
-  // Removed mock Alpha/Beta injection sample.
   // Ensure headers initialized & dblclick bound immediately (before first data payload)
   try { setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false); } catch(_){ }
   // (embedded odds + reordering initialized by stats_boot.js)

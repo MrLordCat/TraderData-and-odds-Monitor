@@ -1,5 +1,5 @@
 // Map selection IPC handlers extracted from main.js
-// Exports initMapIpc({ ipcMain, store, views, mainWindow, boardWindowRef, boardManager, statsManager, extensionBridgeRef })
+// Exports initMapIpc({ ipcMain, store, views, mainWindow, boardManager, statsManager, extensionBridgeRef })
 
 function initMapIpc({ ipcMain, store, views, mainWindow, boardManager, statsManager, extensionBridgeRef }){
   ipcMain.on('set-map', (e, { id, map }) => {
@@ -9,7 +9,6 @@ function initMapIpc({ ipcMain, store, views, mainWindow, boardManager, statsMana
       const sendTo = [];
       Object.values(views).forEach(v=>{ if(v && v.webContents && !v.webContents.isDestroyed()) sendTo.push(v.webContents); });
       if (mainWindow && !mainWindow.isDestroyed()) sendTo.push(mainWindow.webContents);
-  // boardWindow removed
       try { if(boardManager && boardManager.getWebContents){ const bwc = boardManager.getWebContents(); if(bwc && !bwc.isDestroyed()) sendTo.push(bwc); } } catch(_){ }
       try {
         if(statsManager && statsManager.views){
@@ -35,7 +34,6 @@ function initMapIpc({ ipcMain, store, views, mainWindow, boardManager, statsMana
       const sendTo = [];
       Object.values(views).forEach(v=>{ try { if(v && v.webContents && !v.webContents.isDestroyed()) sendTo.push(v.webContents); } catch(_){ } });
       if (mainWindow && !mainWindow.isDestroyed()) sendTo.push(mainWindow.webContents);
-  // boardWindow removed
       try { if(statsManager && statsManager.views){ Object.values(statsManager.views).forEach(v=>{ if(v && v.webContents && !v.webContents.isDestroyed()) sendTo.push(v.webContents); }); } } catch(_){ }
       const seen=new Set();
       sendTo.forEach(wc=>{ if(!wc || seen.has(wc)) return; seen.add(wc); try { wc.send('set-is-last', boolVal); } catch(_){ } });

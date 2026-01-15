@@ -1,5 +1,5 @@
 // Live CSS watcher extracted from main.js
-// initDevCssWatcher({ app, mainWindow, boardWindowRef, statsManager, baseDir })
+// initDevCssWatcher({ app, mainWindow, statsManager, baseDir })
 
 function initDevCssWatcher(ctx){
   const { app, mainWindow, statsManager, baseDir } = ctx;
@@ -15,7 +15,6 @@ function initDevCssWatcher(ctx){
       const list = Array.from(pending);
       pending.clear();
       try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dev-css-changed', list); } catch(_){ }
-  // boardWindow removed
       try {
         if (statsManager && statsManager.views) {
           Object.values(statsManager.views).forEach(v=>{ try { v.webContents && !v.webContents.isDestroyed() && v.webContents.send('dev-css-changed', list); } catch(_){ } });

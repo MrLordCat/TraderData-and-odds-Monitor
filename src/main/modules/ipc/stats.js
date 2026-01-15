@@ -8,7 +8,6 @@ function initStatsIpc(ctx){
   const { statsState, lastStatsToggleTs } = refs;
   ipcMain.handle('get-stats-state', ()=> statsState);
   ipcMain.on('stats-toggle', ()=> toggleStatsEmbedded());
-  // stats-detach / stats-attach removed (window mode deleted)
   // Forward common stats panel control channels + config/persistence updates to statsManager
   ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings','stats-config-set','stats-single-window','stats-panel-set-hidden','stats-panel-toggle','stats-set-side'].forEach(ch=>{
     ipcMain.on(ch, (e,p)=>{

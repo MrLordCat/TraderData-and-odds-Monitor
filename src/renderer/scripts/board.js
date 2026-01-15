@@ -210,43 +210,41 @@ try { initSwapSync(); } catch(_){ }
 let OddsBoardShared = null;
 try { OddsBoardShared = require('../ui/odds_board_shared'); } catch(_){ }
 
+// Load OddsCore for derived calculations (avoid duplication)
+let OddsCore = null;
+try { OddsCore = require('../core/odds_core'); } catch(_){ }
+try { if(!OddsCore && window.OddsCore) OddsCore = window.OddsCore; } catch(_){ }
 
 function computeDerived(){
   const midRow = document.getElementById('midRow');
   const arbRow = document.getElementById('arbRow');
   if(!midRow || !arbRow) return;
-  const midCell=midRow.children[1];
-  const arbCell=arbRow.children[1];
-  // Exclude only excel from aggregated mid/arb calculations
-  const active = Object.values(boardData).filter(r=> r.broker!=='excel' && !r.frozen && Array.isArray(r.odds) && r.odds.length===2 && r.odds.every(o=>!isNaN(parseFloat(o))));
-  if (!active.length){
-    midCell.textContent='-'; arbCell.textContent='-';
-    try { window.__boardDerived = { hasMid:false, arbProfitPct:null }; } catch(_){ }
+  const midCell = midRow.children[1];
+  const arbCell = arbRow.children[1];
+  
+  // Use shared OddsCore.computeDerivedFrom if available
+  const derived = (OddsCore && OddsCore.computeDerivedFrom) 
+    ? OddsCore.computeDerivedFrom(boardData) 
+    : null;
+  
+  if(!derived || !derived.hasMid){
+    midCell.textContent = '-'; 
+    arbCell.textContent = '-';
+    try { window.__boardDerived = { hasMid: false, arbProfitPct: null }; } catch(_){ }
     return;
   }
-  const s1=active.map(r=>{
-    const isS = swapped.has(r.broker);
-    return parseFloat(isS ? r.odds[1] : r.odds[0]);
-  });
-  const s2=active.map(r=>{
-    const isS = swapped.has(r.broker);
-    return parseFloat(isS ? r.odds[0] : r.odds[1]);
-  });
-  // IMPORTANT: Mid is defined as the midpoint between the lowest and highest odds only
-  // (NOT the average of all books). This matches product requirement #1.
-  const mid1=(Math.min(...s1)+Math.max(...s1))/2; const mid2=(Math.min(...s2)+Math.max(...s2))/2;
-  const over=1/Math.max(...s1)+1/Math.max(...s2);
-  midCell.textContent=`${mid1.toFixed(2)} / ${mid2.toFixed(2)}`;
-  arbCell.classList.remove('arb-positive','arb-negative');
-  if (over < 1) {
-    const profitPct = (1 - over) * 100;
-    arbCell.textContent = profitPct.toFixed(2) + '%';
+  
+  const [mid1, mid2] = derived.mid || [0, 0];
+  midCell.textContent = `${mid1.toFixed(2)} / ${mid2.toFixed(2)}`;
+  arbCell.classList.remove('arb-positive', 'arb-negative');
+  
+  if(derived.arbProfitPct > 0){
+    arbCell.textContent = derived.arbProfitPct.toFixed(2) + '%';
     arbCell.classList.add('arb-positive');
-    try { window.__boardDerived = { hasMid:true, arbProfitPct: profitPct }; } catch(_){ }
   } else {
     arbCell.textContent = '—';
-    try { window.__boardDerived = { hasMid:true, arbProfitPct: 0 }; } catch(_){ }
   }
+  try { window.__boardDerived = { hasMid: true, arbProfitPct: derived.arbProfitPct || 0 }; } catch(_){ }
 }
 
 
@@ -260,26 +258,6 @@ function renderBoard(){
   if(OddsBoardShared && OddsBoardShared.buildRowsHtml){
     const out = OddsBoardShared.buildRowsHtml(vals, { variant:'board', isSwapped: (b)=> swapped.has(b) });
     tb.innerHTML = out.html;
-  } else {
-    // Fallback (legacy inline renderer)
-    const liveVals = vals.filter(r=>!r.frozen && Array.isArray(r.odds) && r.odds.length===2);
-    const parsed1=liveVals.map(r=>parseFloat(swapped.has(r.broker) ? r.odds[1] : r.odds[0])).filter(n=>!isNaN(n));
-    const parsed2=liveVals.map(r=>parseFloat(swapped.has(r.broker) ? r.odds[0] : r.odds[1])).filter(n=>!isNaN(n));
-    const best1=parsed1.length?Math.max(...parsed1):NaN;
-    const best2=parsed2.length?Math.max(...parsed2):NaN;
-    tb.innerHTML = vals.map(r=>{
-      const isSwapped = swapped.has(r.broker);
-      const d1 = isSwapped ? r.odds?.[1] : r.odds?.[0];
-      const d2 = isSwapped ? r.odds?.[0] : r.odds?.[1];
-      const o1=parseFloat(d1);
-      const o2=parseFloat(d2);
-      const bestCls1 = (!r.frozen && o1===best1)?'best':'';
-      const bestCls2 = (!r.frozen && o2===best2)?'best':'';
-      const frozenCls = r.frozen ? 'frozen' : '';
-      return `<tr><td><div class="brokerCell"><span class="bName" title="${r.broker}">${r.broker}</span><button class="swapBtn ${isSwapped?'on':''}" data-broker="${r.broker}" title="Swap sides">⇄</button></div></td>`+
-            `<td class="${bestCls1} ${frozenCls}">${d1}</td>`+
-            `<td class="${bestCls2} ${frozenCls}">${d2}</td></tr>`;
-    }).join('');
   }
   // Update Excel row - simple display
   if(excelRow){

@@ -169,27 +169,6 @@ function renderEmbeddedOdds(){
     embeddedBest2 = out.best2;
     liveNums1 = out.liveNums1 || [];
     liveNums2 = out.liveNums2 || [];
-  } else {
-    const liveVals = vals.filter(r=>!r.frozen);
-    const p1=liveVals.map(r=>parseFloat(r.odds[0])).filter(n=>!isNaN(n));
-    const p2=liveVals.map(r=>parseFloat(r.odds[1])).filter(n=>!isNaN(n));
-    liveNums1 = p1; liveNums2 = p2;
-    embeddedBest1=p1.length?Math.max(...p1):NaN; embeddedBest2=p2.length?Math.max(...p2):NaN;
-    rowsEl.innerHTML = vals.map(r=>{
-      const o1=parseFloat(r.odds[0]); const o2=parseFloat(r.odds[1]);
-      const frozenCls = r.frozen ? 'frozen' : '';
-      const suspTag = r.frozen ? ' eo-broker-label' : ' eo-broker-label';
-      const bestCls1 = (!r.frozen && o1===embeddedBest1)?'best':'';
-      const bestCls2 = (!r.frozen && o2===embeddedBest2)?'best':'';
-      const isSwapped = window.__embeddedSwapped && window.__embeddedSwapped.has(r.broker);
-      const swapBtn = `<button class=\"eo-swapBtn ${isSwapped?'on':''}\" data-broker=\"${r.broker}\" title=\"Swap sides\">⇄</button>`;
-      return `<tr class="${frozenCls}">`+
-        `<td class="eo-broker"><span class="${suspTag}" title="${r.frozen?'Suspended / stale':''}">${r.broker}</span></td>`+
-        `<td class="${bestCls1} ${frozenCls}">${r.odds[0]}</td>`+
-        `<td class="eo-swap-cell">${swapBtn}</td>`+
-        `<td class="${bestCls2} ${frozenCls}">${r.odds[1]}</td>`+
-        `</tr>`;
-    }).join('');
   }
   // Excel row update - simple display
   try {

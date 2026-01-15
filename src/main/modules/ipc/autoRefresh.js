@@ -1,5 +1,5 @@
 // Auto-refresh toggle IPC extracted from main.js
-// initAutoRefreshIpc({ ipcMain, store, boardWindowRef, mainWindow, autoRefreshEnabledRef })
+// initAutoRefreshIpc({ ipcMain, store, mainWindow, autoRefreshEnabledRef })
 
 function initAutoRefreshIpc(ctx){
   const { ipcMain, store, mainWindow, autoRefreshEnabledRef } = ctx;
@@ -7,7 +7,6 @@ function initAutoRefreshIpc(ctx){
   ipcMain.on('set-auto-refresh-enabled', (_e, value) => {
     autoRefreshEnabledRef.value = !!value;
     try { store.set('autoRefreshEnabled', autoRefreshEnabledRef.value); } catch(_) {}
-    // boardWindow removed
     if (mainWindow && !mainWindow.isDestroyed()) {
       try { mainWindow.webContents.send('auto-refresh-updated', { enabled: autoRefreshEnabledRef.value }); } catch(_) {}
     }

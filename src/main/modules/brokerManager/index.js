@@ -12,8 +12,6 @@ function createBrokerManager(ctx){
   const brokerHealth = ctx.brokerHealth;
   const loadFailures = ctx.loadFailures;
 
-  function syncBoard(){ /* legacy board window removed; docking manager handles sync separately */ }
-
   function createAll(){
     const disabled = store.get('disabledBrokers', []);
     const layout = store.get('layout', {});
@@ -26,7 +24,6 @@ function createBrokerManager(ctx){
       const vb = views[b.id].getBounds();
       cursorX += vb.width + GAP;
     }
-    syncBoard();
   }
 
   function createSingleInternal(brokerDef, existingBounds, startUrl, cursorX){
@@ -85,7 +82,6 @@ function createBrokerManager(ctx){
             event.preventDefault();
             return;
           }
-          // Space hotkey REMOVED - now handled by addons (e.g. Power Towers game)
         }
       });
     } catch(_) {}
@@ -99,7 +95,6 @@ function createBrokerManager(ctx){
     view.setAutoResize({ width:false, height:false });
     layoutManager.clampViewToStage(brokerDef.id);
     view.webContents.loadURL(startUrl);
-    // (Removed: dataservices-specific injection)
     view.webContents.on('did-finish-load', ()=>{
       try { view.webContents.insertCSS(ctx.BROKER_FRAME_CSS); } catch(_){}
       scheduleMapReapply(view);
@@ -213,7 +208,6 @@ function createBrokerManager(ctx){
       if(vid.startsWith('slot-')){ try { slotBounds = v.getBounds(); } catch(_){} claimedSlotId = vid; break; }
     }
     createSingleInternal(def, slotBounds, startUrlOverride || def.url, stageBoundsRef.value.x);
-    // (Removed: dataservices-specific immediate map/team replay)
     // Remove the claimed slot after adding broker (so layout manager won't think it's still available)
     if(claimedSlotId){
       const sv = views[claimedSlotId];
@@ -230,7 +224,6 @@ function createBrokerManager(ctx){
         [0,80,200].forEach(d=> setTimeout(()=>{ try { ctx.statsManager.ensureTopmost(); } catch(_){ } }, d));
       }
     } catch(_){ }
-    syncBoard();
   }
 
   function closeBroker(id){
@@ -250,7 +243,6 @@ function createBrokerManager(ctx){
         [0,80,200].forEach(d=> setTimeout(()=>{ try { ctx.statsManager.ensureTopmost(); } catch(_){ } }, d));
       }
     } catch(_){ }
-    syncBoard();
   }
 
   // Периодическое "пробуждение" broker views - борьба с Chromium throttling для фоновых вкладок

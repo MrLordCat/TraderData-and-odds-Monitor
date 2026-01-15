@@ -1,5 +1,5 @@
 // Broker-related IPC extracted from main.js
-// initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, boardWindowRef, mainWindow, boardManager, brokerHealth,
+// initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, mainWindow, boardManagerRef, brokerHealth,
 //                 latestOddsRef, zoom, SNAP, stageBoundsRef })
 
 function initBrokerIpc(ctx){
@@ -25,7 +25,6 @@ function initBrokerIpc(ctx){
       }
       latestOdds[brokerId] = payload;
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', payload);
-  // boardWindow removed
       try { if (statsManager && statsManager.views && statsManager.views.panel) { statsManager.views.panel.webContents.send('odds-update', payload); } } catch(_){ }
   try { const bm = boardManagerRef && boardManagerRef.value; bm && bm.sendOdds && bm.sendOdds(payload); } catch(_){ }
     } catch(err) { console.error('bv-odds-update error', err); }
@@ -47,8 +46,6 @@ function initBrokerIpc(ctx){
       });
     } catch(err){ console.error('capture-credentials failed', err); }
   });
-
-  // Drag-related IPC removed.
 
   ipcMain.on('bv-zoom-wheel', (e, { deltaY }) => {
     try {
@@ -100,7 +97,6 @@ function initBrokerIpc(ctx){
       // Emit placeholder removal marker so any listeners (board aggregation, stats panel) can drop it immediately
   const removalPayload = { broker: brokerId, odds:['-','-'], removed:true };
       try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', removalPayload); } catch(_){ }
-  // boardWindow removed
       try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('odds-update', removalPayload); } catch(_){ }
       // Direct broker-closed for stats panel (in case odds removal races with initial render)
       try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('broker-closed', { id: brokerId }); } catch(_){ }
@@ -121,7 +117,6 @@ function initBrokerIpc(ctx){
     } catch(err){ console.error('request-add-broker-data failed', err); }
   });
   ipcMain.on('add-broker-selected', (e,{ id })=> brokerManager.addBroker(id));
-  // (Removed: dataservices pseudo-broker IPC)
 
   // Global toolbar trigger: open first empty slot picker (or force layout to create one if none)
   ipcMain.on('global-open-broker-picker', ()=>{

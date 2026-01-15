@@ -130,7 +130,6 @@ function broadcastPlaceholderOdds(id){
     try { if(boardManager && boardManager.sendOdds) boardManager.sendOdds(payload); } catch(_){ }
   } catch(err){ try { console.warn('broadcastPlaceholderOdds failed', err); } catch(_){} }
 }
-// (Removed stray early key injection block from previous patch attempt)
 
 // Ensure single instance (prevents profile/partition LOCK conflicts)
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -157,8 +156,6 @@ const BROKERS = [
   { id: 'bet365', url: 'https://www.bet365.ee/?_h=YWr28275L1TkpH0FsQpP8g%3D%3D&btsffd=1#/IP/B151' }
 ];
 const INITIAL_URLS = BROKERS.reduce((acc,b)=>{acc[b.id]=b.url;return acc;},{});
-
-// (Removed: DataServices URL prompt overlay and blur logic)
 
 // Subtle frame CSS injected into each broker view for consistent visual borders
 const BROKER_FRAME_CSS = `body::after{content:"";position:fixed;inset:0;pointer-events:none;border:1px solid rgba(255,255,255,0.08);border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset;}body{background-clip:padding-box !important;}`;
@@ -233,8 +230,6 @@ let stageBounds = { x: 0, y: 300, width: 1600, height: 600 }; // initial placeho
 const stageBoundsRef = { value: stageBounds };
 const quittingRef = { value:false };
 statsManager = createStatsManager({ store, mainWindow: null, stageBoundsRef, quittingRef });
-
-// (Removed) forwardGsTheme – theme customization for stats table deprecated
 
 // Layout manager (needs refs defined above)
 const { createLayoutManager } = require('./modules/layout/');
@@ -427,11 +422,9 @@ function bootstrap() {
   onActiveListChanged: (list)=>{ activeBrokerIds = list; activeBrokerIdsRef.value = list; }
   });
   // Initialize broker-related IPC now that brokerManager exists
-  initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, boardWindowRef:{ value: null }, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef });
+  initBrokerIpc({ ipcMain, store, views, brokerManager, statsManager, mainWindow, boardManagerRef, brokerHealth, latestOddsRef, zoom, SNAP, stageBoundsRef });
   // Layout IPC (needs layoutManager + refs ready)
   initLayoutIpc({ ipcMain, store, layoutManager, views, stageBoundsRef, boardManager, statsManager });
-  // (Removed: DataServices prompt IPC)
-  // (Legacy Marathon migration logic removed – Marathon now treated like any other broker)
   brokerManager.createAll();
   // Board manager (virtual - no longer creates its own BrowserView)
   const { createBoardManager } = require('./modules/board');
@@ -505,7 +498,7 @@ function bootstrap() {
     }
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
   // Initialize map selection IPC (needs boardManager, statsManager, mainWindow references)
-  initMapIpc({ ipcMain, store, views, mainWindow, boardWindowRef:{ value: null }, boardManager, statsManager, extensionBridgeRef });
+  initMapIpc({ ipcMain, store, views, mainWindow, boardManager, statsManager, extensionBridgeRef });
   // Initialize periodic map re-broadcast (odds refresh auto loop)
   try {
     const { initMapAutoRefreshIpc } = require('./modules/ipc/mapAutoRefresh');
@@ -519,9 +512,9 @@ function bootstrap() {
   const { initBoardIpc } = require('./modules/ipc/board');
   initBoardIpc({ ipcMain, boardManager, statsManager });
   // Now that boardManager & statsManager are finalized, initialize IPC modules that depend on them
-  try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, boardWindowRef:{ value: null }, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
+  try { initTeamNamesIpc({ ipcMain, store, boardManager, mainWindow, statsManager, lolTeamNamesRef }); } catch(e){ console.warn('initTeamNamesIpc failed', e); }
   try { initSwapIpc({ ipcMain, store, boardManager, mainWindow, statsManager }); } catch(e){ console.warn('initSwapIpc failed', e); }
-  try { initAutoRefreshIpc({ ipcMain, store, boardWindowRef:{ value: null }, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
+  try { initAutoRefreshIpc({ ipcMain, store, mainWindow, autoRefreshEnabledRef }); } catch(e){ console.warn('initAutoRefreshIpc failed', e); }
   try { initStatsIpc({ ipcMain, statsManager, views, stageBoundsRef, mainWindow, boardManager, toggleStatsEmbedded, refs:{ statsState, lastStatsToggleTs }, store }); } catch(e){ console.warn('initStatsIpc (deferred) failed', e); }
   // -------- Excel extractor (Python + AHK) process control --------
   // Thin wiring: controller owns process lifecycle & status broadcasting.
@@ -661,7 +654,7 @@ function toggleStatsEmbedded(){
 
 app.whenReady().then(()=>{
   bootstrap();
-  initDevCssWatcher({ app, mainWindow, boardWindowRef:{ value: null }, statsManager, baseDir: __dirname });
+  initDevCssWatcher({ app, mainWindow, statsManager, baseDir: __dirname });
   // Expose manual auto-press IPC for external automation or future menus
   try {
     const { ipcMain } = require('electron');

@@ -62,7 +62,6 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // Broker picker API
   ,getBrokersForPicker: () => ipcRenderer.invoke('picker-list-brokers')
   ,addBroker: (id) => ipcRenderer.send('add-broker-selected', { id })
-  // (Removed: dataservices URL prompt API)
   // Generic low-level channels (scoped to internal dev usage). Avoid arbitrary user input.
   ,invoke: (channel, ...args) => { try { return ipcRenderer.invoke(channel, ...args); } catch(_) { return Promise.reject(new Error('invoke failed')); } }
   ,send: (channel, payload) => { try { ipcRenderer.send(channel, payload); } catch(_) { } }
