@@ -29,17 +29,12 @@ function triggerMapChange(host, map, opts={}){
       }
     } else if(/betboom\.ru$/.test(host)) {
       const buttons=[...document.querySelectorAll('button[role="radio"]')];
-      console.log('[mapNav][betboom] Found buttons:', buttons.length, buttons.map(b=>b.textContent.trim()));
       let target;
       // NOTE: Russian textContent comparisons ("Матч", "Карта") intentionally kept for site UI.
       // Bo1 special case: if map 1 + isLast, stay on "Матч" tab (match-level odds)
       if(map===0 || (map===1 && isLast)) target=buttons.find(b=>b.textContent.trim()==='Матч');
       else target=buttons.find(b=>b.textContent.trim()==='Карта '+map);
-      console.log('[mapNav][betboom] Looking for:', map===0||(map===1&&isLast) ? 'Матч' : 'Карта '+map, 'Found:', !!target);
-      if(target) {
-        console.log('[mapNav][betboom] CLICKING target');
-        target.click(); // Always click
-      }
+      if(target) target.click();
     } else if(/pari\.ru$/.test(host)) {
       const wrapper=document.querySelector('.keyboard-navigator--Zb6nL');
       if(wrapper){

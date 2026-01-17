@@ -72,8 +72,6 @@ ipcRenderer.on('set-map-config', (_e, config)=>{
     const mapChanged = !Number.isNaN(newMap) && newMap !== desiredMap;
     const isLastChanged = newIsLast !== isLast;
     
-    console.log('[broker]['+BROKER_ID+'] set-map-config:', { newMap, newIsLast, forceReselect, mapChanged, isLastChanged });
-    
     // Update state
     if(!Number.isNaN(newMap)) desiredMap = newMap;
     isLast = newIsLast;
@@ -82,14 +80,11 @@ ipcRenderer.on('set-map-config', (_e, config)=>{
     const shouldTrigger = !mapConfigInitialized || mapChanged || isLastChanged || forceReselect;
     mapConfigInitialized = true;
     
-    console.log('[broker]['+BROKER_ID+'] shouldTrigger:', shouldTrigger);
-    
     if(shouldTrigger){
       __lastOddsSig = ''; // Reset to ensure new odds are sent
-      console.log('[broker]['+BROKER_ID+'] CALLING triggerMapChange');
       triggerMapChange(HOST, desiredMap, { isLast });
     }
-  } catch(e){ console.error('[broker] set-map-config error:', e); }
+  } catch(_){ /* silent */ }
 });
 
 // Periodic odds loop with deduplication (only send if changed)
