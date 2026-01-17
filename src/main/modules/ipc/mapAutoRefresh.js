@@ -80,6 +80,8 @@ function initMapAutoRefreshIpc({ ipcMain, store, mainWindow, boardManager, stats
     try { store.set('mapAutoRefreshEnabled', stateRef.value); } catch(_){ }
     if(!stateRef.value && timer){ clearInterval(timer); timer=null; }
     ensureTimer();
+    // Immediately rebroadcast when enabled (force reselect)
+    if(stateRef.value) rebroadcastMap();
     broadcastStatus();
   });
   

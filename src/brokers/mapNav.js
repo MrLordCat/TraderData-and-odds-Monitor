@@ -1,5 +1,6 @@
 // Map navigation helpers for broker pages
 // Exports: triggerMapChange(host, map)
+// Universal logic: always click target tab to ensure correct selection
 const { deepQuery } = require('./extractors');
 
 function triggerMapChange(host, map, opts={}){
@@ -14,31 +15,31 @@ function triggerMapChange(host, map, opts={}){
       // Bo1 special case: if map 1 + isLast, click "Main" tab to show Match Winner
       if(map === 1 && isLast){
         const mainTab = document.querySelector('[data-testid="MainTab"]');
-        if(mainTab && mainTab.getAttribute('aria-selected') !== 'true'){
-          mainTab.click();
-        }
+        if(mainTab) mainTab.click(); // Always click
       } else {
         const targetTestId=`Map ${map}Tab`;
         const tab=document.querySelector(`[data-testid="${targetTestId}"]`);
         if(tab){
-          tab.click();
+          tab.click(); // Always click
         }
         else {
           const fallback=[...document.querySelectorAll('[role="tab"]')].find(t=>t.textContent.trim()==='Map '+map);
-          if(fallback){
-            fallback.click();
-          }
+          if(fallback) fallback.click();
         }
       }
     } else if(/betboom\.ru$/.test(host)) {
       const buttons=[...document.querySelectorAll('button[role="radio"]')];
+      console.log('[mapNav][betboom] Found buttons:', buttons.length, buttons.map(b=>b.textContent.trim()));
       let target;
       // NOTE: Russian textContent comparisons ("Матч", "Карта") intentionally kept for site UI.
       // Bo1 special case: if map 1 + isLast, stay on "Матч" tab (match-level odds)
       if(map===0 || (map===1 && isLast)) target=buttons.find(b=>b.textContent.trim()==='Матч');
       else target=buttons.find(b=>b.textContent.trim()==='Карта '+map);
-      // Always click target to ensure correct tab is selected (force reselect)
-      if(target) target.click();
+      console.log('[mapNav][betboom] Looking for:', map===0||(map===1&&isLast) ? 'Матч' : 'Карта '+map, 'Found:', !!target);
+      if(target) {
+        console.log('[mapNav][betboom] CLICKING target');
+        target.click(); // Always click
+      }
     } else if(/pari\.ru$/.test(host)) {
       const wrapper=document.querySelector('.keyboard-navigator--Zb6nL');
       if(wrapper){
@@ -47,7 +48,7 @@ function triggerMapChange(host, map, opts={}){
         if(map===0) target=[...wrapper.querySelectorAll('.tab--HvZxB')].find(t=>t.textContent.trim()==='Матч');
         else target=[...wrapper.querySelectorAll('.tab--HvZxB')].find(t=>t.textContent.trim()===map+'-я карта');
         if(!target && map!==0) target=[...wrapper.querySelectorAll('.tab--HvZxB')].find(t=>t.textContent.trim()==='Матч');
-        if(target && !target.classList.contains('_selected--YKWOS')) target.click();
+        if(target) target.click(); // Always click
       }
     }
   } catch(_){}
