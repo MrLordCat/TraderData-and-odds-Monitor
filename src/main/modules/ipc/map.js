@@ -4,8 +4,9 @@
 function initMapIpc({ ipcMain, store, views, mainWindow, boardManager, statsManager, extensionBridgeRef }){
   
   // Helper: broadcast map config to all views atomically
-  function broadcastMapConfig(mapVal, isLastVal){
-    const config = { map: mapVal, isLast: isLastVal };
+  // force: true tells broker.js to always trigger navigation (for periodic reselect)
+  function broadcastMapConfig(mapVal, isLastVal, force = false){
+    const config = { map: mapVal, isLast: isLastVal, force };
     const sendTo = [];
     Object.values(views).forEach(v=>{ if(v && v.webContents && !v.webContents.isDestroyed()) sendTo.push(v.webContents); });
     if (mainWindow && !mainWindow.isDestroyed()) sendTo.push(mainWindow.webContents);
@@ -26,13 +27,15 @@ function initMapIpc({ ipcMain, store, views, mainWindow, boardManager, statsMana
   }
   
   // Atomic map config handler - preferred way
-  ipcMain.on('set-map-config', (e, { map, isLast }) => {
+  // force: true for periodic reselect (from mapAutoRefresh)
+  ipcMain.on('set-map-config', (e, { map, isLast, force }) => {
     try {
       const mapVal = parseInt(map,10) || 1;
       const isLastVal = !!isLast;
+      const forceVal = !!force;
       try { store.set('lastMap', mapVal); } catch(_){ }
       try { store.set('isLast', isLastVal); } catch(_){ }
-      broadcastMapConfig(mapVal, isLastVal);
+      broadcastMapConfig(mapVal, isLastVal, forceVal);
     } catch(_err) { }
   });
   
