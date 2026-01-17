@@ -68,6 +68,7 @@ ipcRenderer.on('set-map-config', (_e, config)=>{
   try {
     const newMap = parseInt(config?.map, 10);
     const newIsLast = !!config?.isLast;
+    const forceReselect = !!config?.force; // Force flag for periodic reselect
     const mapChanged = !Number.isNaN(newMap) && newMap !== desiredMap;
     const isLastChanged = newIsLast !== isLast;
     
@@ -75,8 +76,8 @@ ipcRenderer.on('set-map-config', (_e, config)=>{
     if(!Number.isNaN(newMap)) desiredMap = newMap;
     isLast = newIsLast;
     
-    // Trigger navigation only on first init or when something actually changed
-    const shouldTrigger = !mapConfigInitialized || mapChanged || isLastChanged;
+    // Trigger navigation on: first init, value change, OR force reselect
+    const shouldTrigger = !mapConfigInitialized || mapChanged || isLastChanged || forceReselect;
     mapConfigInitialized = true;
     
     if(shouldTrigger){

@@ -37,7 +37,8 @@ function triggerMapChange(host, map, opts={}){
       // Bo1 special case: if map 1 + isLast, stay on "Матч" tab (match-level odds)
       if(map===0 || (map===1 && isLast)) target=buttons.find(b=>b.textContent.trim()==='Матч');
       else target=buttons.find(b=>b.textContent.trim()==='Карта '+map);
-      if(target && target.getAttribute('data-state')!=='on') target.click();
+      // Always click target to ensure correct tab is selected (force reselect)
+      if(target) target.click();
     } else if(/pari\.ru$/.test(host)) {
       const wrapper=document.querySelector('.keyboard-navigator--Zb6nL');
       if(wrapper){

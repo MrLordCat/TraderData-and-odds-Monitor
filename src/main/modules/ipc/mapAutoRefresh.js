@@ -46,7 +46,8 @@ function initMapAutoRefreshIpc({ ipcMain, store, mainWindow, boardManager, stats
       const mapVal = parseInt(store.get('lastMap'),10) || 1;
       const isLastVal = !!store.get('isLast');
       // Re-use existing map IPC full broadcast (includes broker views) via atomic handler
-      ipcMain.emit('set-map-config', {}, { map: mapVal, isLast: isLastVal });
+      // force: true tells broker.js to always trigger navigation (for periodic reselect)
+      ipcMain.emit('set-map-config', {}, { map: mapVal, isLast: isLastVal, force: true });
     } catch(_){ }
   }
 
