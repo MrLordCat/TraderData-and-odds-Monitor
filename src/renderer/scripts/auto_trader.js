@@ -260,6 +260,19 @@
       if(e.target && e.target.id === ids.autoBtn){
         const btn = e.target;
         const stBefore = engine && engine.state;
+        // Если авто-режим активен и есть причина паузы (кроме manual), выключаем полностью
+        if (stBefore && stBefore.active && stBefore.lastDisableReason && stBefore.lastDisableReason !== 'manual') {
+          engine.setActive(false);
+          setTimeout(()=>{
+            try {
+              const stAfter = engine && engine.state;
+              const info = computeWhyLines(stAfter);
+              showMiniToastNear(btn, info.lines, info.kind);
+            } catch(_){ }
+          }, 30);
+          return;
+        }
+        // Обычное переключение
         const wantOn = stBefore ? !stBefore.active : true;
         toggleAuto();
         if(wantOn){

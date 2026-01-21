@@ -1,6 +1,6 @@
 {
   "name": "odds-desktop",
-  "version": "0.2.3",
+  "version": "0.2.2",
   "private": true,
   "author": "MrLordCat",
   "license": "MIT",
@@ -33,12 +33,6 @@
       "package.json",
       "build-info.json"
     ],
-    "extraResources": [
-      {
-        "from": "resources/extensions/uptime",
-        "to": "extensions/uptime"
-      }
-    ],
     "extraMetadata": {
       "main": "src/main/main.js"
     },
@@ -54,12 +48,11 @@
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
-    "electron-store": "^8.1.0",
-    "ws": "^8.19.0"
+    "electron-store": "^8.1.0"
   },
   "devDependencies": {
     "electron": "^38.0.0",
-    "electron-builder": "24.13.3",
+    "electron-builder": "24.6.0",
     "electron-packager": "^17.1.2"
   }
 }
