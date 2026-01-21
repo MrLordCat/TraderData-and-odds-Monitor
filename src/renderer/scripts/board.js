@@ -504,21 +504,41 @@ if(window.desktopAPI && window.desktopAPI.onMap){
   });
 }
 
+// Track source of team names - Excel has priority
+let teamNamesSource = 'grid'; // 'grid' or 'excel'
+
+// Truncate long team names to prevent layout breaking
+function truncateName(name, maxLen = 12){
+  if(!name || typeof name !== 'string') return name;
+  const trimmed = name.trim();
+  if(trimmed.length <= maxLen) return trimmed;
+  return trimmed.substring(0, maxLen - 1) + '…';
+}
+
 // Unified team names updater (used by both initial fetch and live updates)
-function updateTeamHeaders(names){
+function updateTeamHeaders(names, source = 'grid'){
   try {
     if(!names) return;
+    // Excel has priority over grid
+    if(source === 'grid' && teamNamesSource === 'excel'){
+      console.log('[board] Ignoring grid team names (Excel has priority):', names);
+      return;
+    }
+    if(source === 'excel') teamNamesSource = 'excel';
+    
+    console.log('[board] Applying team names from', source, ':', names.team1, '/', names.team2);
+    
     const s1=document.getElementById('side1Header');
     const s2=document.getElementById('side2Header');
-    if(s1 && names.team1) s1.textContent = names.team1;
-    if(s2 && names.team2) s2.textContent = names.team2;
+    if(s1 && names.team1) s1.textContent = truncateName(names.team1);
+    if(s2 && names.team2) s2.textContent = truncateName(names.team2);
   } catch(_){ }
 }
 
 window.addEventListener('DOMContentLoaded', ()=>{
   // Initial sync from main for team names (new API)
   if(window.desktopAPI && window.desktopAPI.getTeamNames){
-    window.desktopAPI.getTeamNames().then(updateTeamHeaders).catch(()=>{});
+    window.desktopAPI.getTeamNames().then(n => updateTeamHeaders(n, 'grid')).catch(()=>{});
   }
   restoreMapAndBroadcast();
   // If external map arrived before DOM ready, enforce it now
@@ -531,9 +551,14 @@ window.addEventListener('DOMContentLoaded', ()=>{
   } catch(_){ }
 });
 
-// Listen for team name updates pushed from main via dedicated API
+// Listen for team name updates pushed from main via dedicated API (grid source)
 if(window.desktopAPI && window.desktopAPI.onTeamNames){
-  window.desktopAPI.onTeamNames(updateTeamHeaders);
+  window.desktopAPI.onTeamNames(n => updateTeamHeaders(n, 'grid'));
+}
+
+// Listen for Excel team names (priority source)
+if(window.desktopAPI && window.desktopAPI.onExcelTeamNames){
+  window.desktopAPI.onExcelTeamNames(n => updateTeamHeaders(n, 'excel'));
 }
 
 // Visual state helpers for Auto buttons (kept for board UI)

@@ -94,6 +94,7 @@ let prevMatchUrls = { A: null, B: null };
 let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
 const customTeamNames = { 1:null, 2:null }; // custom display names (live)
+let teamNamesSource = 'grid'; // 'grid' or 'excel' - Excel has priority
 let metricsOrder = ['netWorth','atakhan','firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta','winner'];
 let metricsOrderMutable = [...metricsOrder];
 const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', netWorth:'Net Worth', quadra:'Quadra', penta:'Penta', atakhan:'Atakhan', winner:'Winner' };
@@ -108,7 +109,14 @@ let swapTeams = false; // manual mode swap
 let manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats: { '1': makeEmptyGame() } };
 
 // ================= Team Header Utilities =================
-function setTeamHeader(idx, rawText){
+function setTeamHeader(idx, rawText, opts = {}){
+  const source = opts.fromExcel ? 'excel' : 'grid';
+  // Excel имена имеют приоритет - не перезаписываем если уже есть Excel
+  if(source === 'grid' && teamNamesSource === 'excel'){
+    return; // skip grid updates once Excel names are set
+  }
+  if(source === 'excel') teamNamesSource = 'excel';
+  
   const th = document.getElementById(idx===1? 'lt-team1':'lt-team2');
   if(!th) return;
   // Ensure wrapper exists (in case of dynamic rebuild)
@@ -126,11 +134,14 @@ function setTeamHeader(idx, rawText){
   wrap.textContent = text;
   wrap.title = text; // tooltip full name
   // Broadcast both team names to main so board can sync (debounced minimal overhead)
-  try {
-    const t1 = document.querySelector('#lt-team1 .teamNameWrap')?.textContent || 'Team 1';
-    const t2 = document.querySelector('#lt-team2 .teamNameWrap')?.textContent || 'Team 2';
-    ipcRenderer.send('lol-team-names-set', { team1: t1, team2: t2 });
-  } catch(_){ }
+  // Skip if this update came from Excel (Excel broadcasts directly to board)
+  if(!opts.fromExcel){
+    try {
+      const t1 = document.querySelector('#lt-team1 .teamNameWrap')?.textContent || 'Team 1';
+      const t2 = document.querySelector('#lt-team2 .teamNameWrap')?.textContent || 'Team 2';
+      ipcRenderer.send('lol-team-names-set', { team1: t1, team2: t2 });
+    } catch(_){ }
+  }
 }
 
 function makeEmptyGame(){
@@ -364,7 +375,7 @@ function clearLol(){
   });
 }
 
-ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; clearLol(); updateGameSelect(); const st=document.getElementById('lolStatus'); if(st) st.textContent='Waiting...'; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
+ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); const st=document.getElementById('lolStatus'); if(st) st.textContent='Waiting...'; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
 
 // ================= Credentials =================
 
@@ -392,8 +403,9 @@ ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
     const t1 = (team1 || '').trim() || 'Team 1';
     const t2 = (team2 || '').trim() || 'Team 2';
     console.log('[stats_panel] Parsed team names:', t1, '/', t2);
-    setTeamHeader(1, t1);
-    setTeamHeader(2, t2);
+    // fromExcel: true prevents re-broadcasting via lol-team-names-set (Excel already broadcasts to board)
+    setTeamHeader(1, t1, { fromExcel: true });
+    setTeamHeader(2, t2, { fromExcel: true });
     // Also update manual mode data for consistency
     if(manualData.team1Name !== t1 || manualData.team2Name !== t2){
       renameTeamInternal(1, t1);
@@ -517,6 +529,7 @@ function bindReset(){
       followLatestLiveGame = true;
       // Clear custom display overrides for live mode (reset requirement)
       customTeamNames[1]=null; customTeamNames[2]=null;
+      teamNamesSource = 'grid'; // reset source priority
       setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false);
       // Additional manual dataset reset if in manual mode
       if(document.getElementById('lolManualMode').checked){

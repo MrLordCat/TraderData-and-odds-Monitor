@@ -213,7 +213,13 @@ select {
 #table { table-layout: fixed; }
 
 .c-broker { width: 44%; }
-.c-odds { width: 28%; }
+.c-odds { 
+  width: 28%; 
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Cell sizing is shared via ui/odds_board_shared.css */
 

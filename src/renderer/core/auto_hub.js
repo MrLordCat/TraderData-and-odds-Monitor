@@ -480,15 +480,114 @@
         const canResumeNoMid = st.lastDisableReason === 'no-mid' && autoResumeOnMidEnabled;
         const canResumeArb = st.lastDisableReason === 'arb-spike';
         if(!st.active && st.userWanted && (canResumeNoMid || canResumeArb)){
-          eng.setActive(true);
-          st.lastDisableReason='market-resumed';
-          notifyAllUIs('onActiveChanged', true, st, { marketResumed:true });
-          // Broadcast ON so other windows reflect true state
-          try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:true }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:true }); } } } catch(_){ }
-          statusAll('Resumed: market OK');
-          sendAutoPressF21({ reason:'market:resume', resume:true });
-          try { eng.step(); } catch(_){ }
+          // Before resuming trading, align odds first (without entering trading mode)
+          // Start alignment process - this runs step() to adjust odds to MID
+          // Only enter trading after alignment is complete
+          startAlignmentBeforeResume(eng, st);
         }
+      }
+    }
+    
+    // Alignment before resume: adjust odds to MID before entering trading
+    let alignmentInProgress = false;
+    let alignmentCheckTimer = null;
+    
+    function cancelAlignment(){
+      if(alignmentInProgress){
+        alignmentInProgress = false;
+        if(alignmentCheckTimer){ clearTimeout(alignmentCheckTimer); alignmentCheckTimer = null; }
+        console.log('[autoHub] alignment cancelled');
+      }
+    }
+    
+    function startAlignmentBeforeResume(eng, st){
+      if(alignmentInProgress) return;
+      alignmentInProgress = true;
+      
+      statusAll('Aligning odds before resume...');
+      
+      // Temporarily enable engine for alignment only (without F21/trading)
+      // We'll call step() manually to adjust odds
+      eng.setActive(true);
+      st.lastDisableReason = 'aligning';
+      notifyAllUIs('onActiveChanged', true, st, { aligning: true });
+      
+      // Check alignment periodically
+      let alignAttempts = 0;
+      const maxAlignAttempts = 30; // ~15 seconds max
+      
+      function checkAlignment(){
+        if(!alignmentInProgress) return;
+        alignAttempts++;
+        
+        const mid = getMid();
+        const ex = getExcelRecord();
+        
+        if(!mid || !ex || !Array.isArray(ex.odds) || ex.odds.length !== 2){
+          // No data yet, keep trying
+          if(alignAttempts < maxAlignAttempts){
+            alignmentCheckTimer = setTimeout(checkAlignment, 500);
+          } else {
+            finishAlignment(eng, st, false, 'timeout-nodata');
+          }
+          return;
+        }
+        
+        const n1 = parseFloat(ex.odds[0]);
+        const n2 = parseFloat(ex.odds[1]);
+        if(isNaN(n1) || isNaN(n2)){
+          if(alignAttempts < maxAlignAttempts){
+            alignmentCheckTimer = setTimeout(checkAlignment, 500);
+          } else {
+            finishAlignment(eng, st, false, 'timeout-invalid');
+          }
+          return;
+        }
+        
+        // Check alignment (min side, same logic as auto_core)
+        const sideToCheck = (mid[0] <= mid[1]) ? 0 : 1;
+        const exVal = sideToCheck === 0 ? n1 : n2;
+        const midVal = mid[sideToCheck];
+        const diffPct = Math.abs(exVal - midVal) / midVal * 100;
+        
+        // Get tolerance from engine state
+        const tolerance = (eng.state && typeof eng.state.tolerancePct === 'number') ? eng.state.tolerancePct : 1.5;
+        
+        if(diffPct <= tolerance){
+          // Aligned! Now enter trading
+          finishAlignment(eng, st, true, 'aligned');
+        } else if(alignAttempts >= maxAlignAttempts){
+          // Timeout, enter trading anyway
+          finishAlignment(eng, st, true, 'timeout-forced');
+        } else {
+          // Not aligned yet, step() is running, keep checking
+          statusAll(`Aligning: ${diffPct.toFixed(2)}% (need <${tolerance.toFixed(2)}%)`);
+          alignmentCheckTimer = setTimeout(checkAlignment, 500);
+        }
+      }
+      
+      // Start checking after first step runs
+      alignmentCheckTimer = setTimeout(checkAlignment, 600);
+    }
+    
+    function finishAlignment(eng, st, success, reason){
+      alignmentInProgress = false;
+      if(alignmentCheckTimer){ clearTimeout(alignmentCheckTimer); alignmentCheckTimer = null; }
+      
+      if(success){
+        // Alignment complete, now fully resume trading
+        st.lastDisableReason = 'market-resumed';
+        notifyAllUIs('onActiveChanged', true, st, { marketResumed: true });
+        // Broadcast ON so other windows reflect true state
+        try { if(global.desktopAPI && global.desktopAPI.send){ global.desktopAPI.send('auto-active-set', { on:true }); } else if(global.require){ const { ipcRenderer } = global.require('electron'); if(ipcRenderer && ipcRenderer.send){ ipcRenderer.send('auto-active-set', { on:true }); } } } catch(_){ }
+        statusAll('Resumed: aligned & trading');
+        sendAutoPressF21({ reason: 'market:resume', resume: true });
+      } else {
+        // Alignment failed, suspend again
+        eng.setActive(false, { systemSuspend: true });
+        st.lastDisableReason = 'align-failed';
+        notifyAllUIs('onActiveChanged', false, st, { alignFailed: true });
+        statusAll('Align failed: ' + reason);
       }
     }
 
@@ -589,18 +688,35 @@
           }
           
           if(sharedEngine){
+            // Special case: if manual toggle requests ON, but Auto is in "waiting" state
+            // (userWanted=true, active=false), treat it as full OFF instead
+            let effectiveWant = want;
+            if(isManual && want && !sharedEngine.state.active && sharedEngine.state.userWanted){
+              // User clicked while in waiting/paused state - they want to fully disable
+              effectiveWant = false;
+              console.log('[autoHub] handleStateSet: waiting state detected, treating toggle as OFF');
+            }
+            
+            // Cancel any ongoing alignment if turning off
+            if(!effectiveWant){
+              cancelAlignment();
+            }
+            
             // Manual toggle: update userWanted based on action
             if(isManual){
-              sharedEngine.state.userWanted = want;
+              sharedEngine.state.userWanted = effectiveWant;
               try { 
                 const key = sharedEngine.state && 'userWantedKey' in (sharedEngine.storageKeys||{}) ? 'autoUserWanted' : null;
-                if(key) localStorage.setItem(key, want ? '1' : '0');
+                if(key) localStorage.setItem(key, effectiveWant ? '1' : '0');
               } catch(_){ }
             }
-            if(!want){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
-            if(want !== sharedEngine.state.active){ 
-              sharedEngine.setActive(want); 
-              notifyAllUIs('onActiveChanged', want, sharedEngine.state);
+            if(!effectiveWant){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
+            if(effectiveWant !== sharedEngine.state.active){ 
+              sharedEngine.setActive(effectiveWant); 
+              notifyAllUIs('onActiveChanged', effectiveWant, sharedEngine.state);
+            } else if(isManual && !effectiveWant && !sharedEngine.state.active){
+              // Force UI update even if active state didn't change (was already off, but userWanted changed)
+              notifyAllUIs('onActiveChanged', false, sharedEngine.state);
             }
           }
         };
@@ -624,7 +740,10 @@
             return;
           }
           if(sharedEngine){
-            if(!want){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
+            // Don't overwrite system disable reasons
+            const systemReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended', 'market-suspended', 'aligning'];
+            const isSystemReason = sharedEngine.state.lastDisableReason && systemReasons.includes(sharedEngine.state.lastDisableReason);
+            if(!want && !isSystemReason){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
             if(want!==sharedEngine.state.active){ sharedEngine.setActive(want); }
             notifyAllUIs('onActiveChanged', want, sharedEngine.state);
           }
@@ -659,7 +778,10 @@
               return;
             }
             if(sharedEngine){
-              if(!want){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
+              // Don't overwrite system disable reasons (no-mid, arb-spike, etc.)
+              const systemReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended', 'market-suspended', 'aligning'];
+              const isSystemReason = sharedEngine.state.lastDisableReason && systemReasons.includes(sharedEngine.state.lastDisableReason);
+              if(!want && !isSystemReason){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
               if(want!==sharedEngine.state.active){ sharedEngine.setActive(want); notifyAllUIs('onActiveChanged', want, sharedEngine.state); }
             }
           } catch(_){ }

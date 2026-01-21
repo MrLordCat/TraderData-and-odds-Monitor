@@ -237,7 +237,7 @@
         // System-triggered suspend (no-mid, arb-spike, etc.) should NOT clear userWanted
         // Only user-initiated actions should update userWanted in storage
         const isSystemSuspend = opts && opts.systemSuspend;
-        const systemReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended', 'market-suspended'];
+        const systemReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended', 'market-suspended', 'aligning'];
         const isSystemReason = state.lastDisableReason && systemReasons.includes(state.lastDisableReason);
         
         if(storage.userWantedKey){
