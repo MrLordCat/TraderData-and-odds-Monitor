@@ -547,9 +547,9 @@ function refreshAutoButtonsVisual(){
     if(sim.active){
       // Auto is actively running
       autoBtn.classList.add('on');
-    } else if(sim.userWanted){
-      // Auto is paused but may auto-resume
-      const resumableReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended'];
+    } else if(sim.userWanted && sim.lastDisableReason !== 'manual'){
+      // Auto is paused by system but may auto-resume
+      const resumableReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended', 'market-suspended'];
       if(sim.lastDisableReason && resumableReasons.includes(sim.lastDisableReason)){
         // Yellow "waiting" state - will auto-resume when conditions are met
         autoBtn.classList.add('waiting');

@@ -178,8 +178,9 @@ let __autoLast = { active:false, resume:false };
 function toggleAutoState(){
   __autoLast.active = !__autoLast.active;
   console.log('[main] toggleAutoState -> active:', __autoLast.active);
-  // Broadcast new state to all views
-  broadcastToAll(getBroadcastCtx(), 'auto-state-set', { active: __autoLast.active });
+  // Manual toggle: if turning off, clear userWanted; if turning on, set it
+  const userWanted = __autoLast.active;
+  broadcastToAll(getBroadcastCtx(), 'auto-state-set', { active: __autoLast.active, userWanted, manual: true });
 }
 
 // Set auto state explicitly

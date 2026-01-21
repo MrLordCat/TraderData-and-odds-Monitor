@@ -223,6 +223,15 @@
     function setActive(on, opts){
       if(!!on === !!state.active) return;
       state.active = !!on;
+      
+      // Reset blocking states when turning ON to prevent "stuck" auto
+      if(state.active){
+        state.waitingForExcel = false;
+        state.pulseCooldownActive = false;
+        state.excelNoChangeCount = 0;
+        state.waitToken++;
+      }
+      
       try { onActiveChanged(state.active, state); } catch(_){ }
       try {
         // System-triggered suspend (no-mid, arb-spike, etc.) should NOT clear userWanted

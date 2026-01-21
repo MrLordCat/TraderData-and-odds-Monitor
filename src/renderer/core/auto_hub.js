@@ -571,7 +571,8 @@
         // Handle state set from main process (main process owns toggle logic)
         const handleStateSet = (p)=>{
           const want = !!(p && p.active);
-          console.log('[autoHub] handleStateSet, want:', want, 'canEnable:', canEnableAuto());
+          const isManual = !!(p && p.manual);
+          console.log('[autoHub] handleStateSet, want:', want, 'manual:', isManual, 'canEnable:', canEnableAuto());
           
           if(want && !canEnableAuto()){
             try {
@@ -588,6 +589,14 @@
           }
           
           if(sharedEngine){
+            // Manual toggle: update userWanted based on action
+            if(isManual){
+              sharedEngine.state.userWanted = want;
+              try { 
+                const key = sharedEngine.state && 'userWantedKey' in (sharedEngine.storageKeys||{}) ? 'autoUserWanted' : null;
+                if(key) localStorage.setItem(key, want ? '1' : '0');
+              } catch(_){ }
+            }
             if(!want){ try { sharedEngine.state.lastDisableReason = 'manual'; } catch(_){ } }
             if(want !== sharedEngine.state.active){ 
               sharedEngine.setActive(want); 

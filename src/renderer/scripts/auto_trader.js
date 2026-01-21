@@ -186,10 +186,10 @@
           if(active){
             // Auto is actively running
             btn.classList.add('on');
-          } else if(st && st.userWanted){
-            // Auto is paused but will auto-resume (waiting for MID/conditions)
-            // Check if it's a resumable reason
-            const resumableReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended'];
+          } else if(st && st.userWanted && st.lastDisableReason !== 'manual'){
+            // Auto is paused by system but will auto-resume (waiting for MID/conditions)
+            // Only show yellow if it's a system suspend, not manual
+            const resumableReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended', 'market-suspended'];
             if(st.lastDisableReason && resumableReasons.includes(st.lastDisableReason)){
               btn.classList.add('waiting');
             }
