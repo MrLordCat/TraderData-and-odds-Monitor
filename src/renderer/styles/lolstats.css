@@ -200,9 +200,11 @@ tr.drop-target { outline: 2px dashed #3b82f6; }
 
 /* Scroll container */
 .lolTableWrap {
+  position: relative; /* Required for activity heat bars layer */
   border: 1px solid var(--gs-border);
   border-radius: 8px;
   background: var(--gs-bg);
+  overflow: visible; /* Allow heat bars to overflow if needed */
 }
 
 /* legacy animations omitted */

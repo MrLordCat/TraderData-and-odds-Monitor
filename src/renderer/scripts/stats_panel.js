@@ -10,7 +10,7 @@ if(!ipcRenderer){
   // If preload/nodeIntegration unexpectedly off, attach minimal shim so later code won't crash
   window.ipcRenderer = ipcRenderer = { send: ()=>{}, on: ()=>{}, invoke: async()=>{} };
 }
-let activityModule = (window.__activityModule)||null; if(!activityModule){ try { activityModule = require('./stats_activity'); } catch(_){ } }
+let activityModule = (window.__activityModule)||null; if(!activityModule){ try { activityModule = require('../scripts/stats_activity'); } catch(_){ } }
 function send(ch,p){ ipcRenderer.send(ch,p); }
 
 // ================= Compact Topbar (icons) =================

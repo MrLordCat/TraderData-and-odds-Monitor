@@ -35,7 +35,6 @@ function configure(opts={}){
     // If still enabled ensure loop running so new decay applies instantly
     if(!state.rafId && (state.levels[0]>0 || state.levels[1]>0)) startLoop();
   }
-  try { console.log('[activity][configure]', { prev, next:{ enabled: state.enabled, decayPerSec: state.decayPerSec, bumpAmount: state.bumpAmount } }); } catch(_){ }
 }
 
 function ensureDom(){
@@ -43,7 +42,6 @@ function ensureDom(){
   state.wrap = document.querySelector('.lolTableWrap');
   state.table = document.getElementById('lolTable');
   if(!state.wrap || !state.table) return;
-  try { console.log('[activity] ensureDom create layer'); } catch(_){ }
   const layer = document.createElement('div');
   layer.className = 'teamActivityLayer';
   const a1 = document.createElement('div'); a1.className='teamActivity team1';
@@ -94,7 +92,7 @@ function recalc(){
     const e1=state.els[0]; const e2=state.els[1];
     if(e1){ e1.style.left=left1+'px'; e1.style.width=(r1.width-pad*2)+'px'; e1.style.height=height+'px'; }
     if(e2){ e2.style.left=left2+'px'; e2.style.width=(r2.width-pad*2)+'px'; e2.style.height=height+'px'; }
-  } catch(err){ try { console.debug('[activity] recalc error', err); } catch(_){ } }
+  } catch(err){ }
 }
 // Track horizontal scroll to keep bars aligned if table scrolls (listener added after ensureDom)
 
@@ -149,8 +147,6 @@ function startLoop(){ if(!state.rafId) { state.lastTs = performance.now(); state
 function onMetricUpdate(teamIndex){ bump(teamIndex); }
 
 function init(){ if(state.initialized) return; state.initialized=true; ensureDom(); setTimeout(()=> recalc(), 120); setTimeout(()=> recalc(), 600); }
-// Development helper to inspect quickly
-try { console.log('[activity] module loaded'); } catch(_){ }
 
 module.exports = { init, onMetricUpdate, recalc, configure };
 try { window[ACTIVITY_NS] = module.exports; } catch(_){ }

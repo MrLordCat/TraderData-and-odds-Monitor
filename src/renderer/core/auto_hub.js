@@ -360,6 +360,9 @@
   // Auto Suspend based on diff% (replaces old shock detection)
   let autoSuspendThresholdPct = 40; // default, user-configurable (15-80%)
   let autoSuspendActive = false; // currently suspended due to high diff
+  // Alignment state - must be declared before guard functions
+  let alignmentInProgress = false;
+  let alignmentCheckTimer = null;
     function getMid(){ const d=state.derived; return (d && d.hasMid && Array.isArray(d.mid) && d.mid.length===2)? d.mid : null; }
 
     function computeDerived(){ try { state.derived = (global.OddsCore && global.OddsCore.computeDerivedFrom) ? global.OddsCore.computeDerivedFrom(state.records) : { hasMid:false, arbProfitPct:null, mid:null }; } catch(_){ state.derived={ hasMid:false, arbProfitPct:null, mid:null }; } }
@@ -411,6 +414,8 @@
     function applyExcelGuard(){
       const ex = getExcelRecord(); if(!ex) return;
       if(!sharedEngine || !sharedEngine.state) return;
+      // Don't interrupt alignment - let it complete
+      if(alignmentInProgress) return;
       const eng = sharedEngine;
       const st = eng.state;
       let anyDisabled=false, anyEnabled=false;
@@ -450,6 +455,8 @@
     function applyMarketGuard(){
       const d=state.derived; if(!d) return;
       if(!sharedEngine || !sharedEngine.state) return;
+      // Don't interrupt alignment - let it complete
+      if(alignmentInProgress) return;
       const eng = sharedEngine;
       const st = eng.state;
       // Check if should suspend due to no MID (only if stopOnNoMidEnabled) or ARB spike (shock threshold)
@@ -489,8 +496,7 @@
     }
     
     // Alignment before resume: adjust odds to MID before entering trading
-    let alignmentInProgress = false;
-    let alignmentCheckTimer = null;
+    // (alignmentInProgress and alignmentCheckTimer declared at top with other state vars)
     
     function cancelAlignment(){
       if(alignmentInProgress){
