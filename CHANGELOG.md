@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.4] - 2026-01-21
+
+### ✨ New Features
+- **DS Auto Mode**: Auto trading without Excel — uses DS extension as odds reference
+  - Sends `adjust-up`/`adjust-down`/`commit` commands to extension
+  - Enable via Settings → Auto Odds → "DS Auto Mode" checkbox
+- **Bo1 (Best of 1) handling**: Proper Match Winner market support for BetBoom and Thunderpick
+  - When map=1 and isLast=true, extractors use match odds instead of Map 1 odds
+  - Map navigation stays on "Матч"/"Main" tab for Bo1 matches
+- **Auto-resume on MID**: Auto mode automatically resumes when MID becomes available again
+- **Heat bars in LoL stats table**: Visual activity indicators restored after Material You migration
+- **Broker refresh settings**: New Settings section to configure broker auto-refresh behavior
+
+### ⚡ Improvements
+- **Settings UI refactored**: Split into modular structure (8 files) for better maintainability
+- **Auto Odds settings reorganized**: Split into subsections for clarity
+- **Map synchronization improved**: Atomic map config handling prevents race conditions
+- **Force map reselect**: Immediate rebroadcast on auto-refresh enable
+- **Yellow waiting state**: Now only shows for system suspends (not manual toggle)
+
+### 🐛 Bug Fixes
+- **Auto mode pause toggle**: Clicking Auto button when paused now properly disables it (was trying to enable instead)
+- **Excel team names priority**: Excel K4/N4 team names now have priority over grid-detected names
+- **Blocking states reset**: Fixed "stuck" Auto mode by resetting wait states on enable
+- **Map force flag**: Properly passed through broadcastMapConfig to broker views
+- **Heat bars visibility**: Fixed CSS and module loading for stats activity bars
+
+### 🧹 Cleanup
+- Removed deprecated code (openStatsLogWindow, contrast stubs, theme stubs, openAddBrokerDialog)
+- Removed debug logs from broker.js, mapNav.js, stats_activity.js, stats_panel.js
+- Removed automatic extension update dialog (manual updates from Settings only)
+- Updated electron-builder to v24.13.3
+
+---
+
 ## [0.2.3] - 2026-01-14
 
 ### ✨ New Features
