@@ -260,8 +260,20 @@
       if(e.target && e.target.id === ids.autoBtn){
         const btn = e.target;
         const stBefore = engine && engine.state;
-        // Если авто-режим активен и есть причина паузы (кроме manual), выключаем полностью
-        if (stBefore && stBefore.active && stBefore.lastDisableReason && stBefore.lastDisableReason !== 'manual') {
+        // Если авто-режим в паузе (userWanted=true, но active=false с причиной), выключаем полностью
+        // Также если active=true но есть причина паузы — выключаем
+        const isPaused = stBefore && stBefore.lastDisableReason && stBefore.lastDisableReason !== 'manual';
+        const userWantsAuto = stBefore && (stBefore.active || stBefore.userWanted);
+        if (isPaused && userWantsAuto) {
+          // Сбрасываем userWanted и выключаем
+          if (stBefore) {
+            stBefore.userWanted = false;
+            stBefore.lastDisableReason = 'manual';
+            try { 
+              const key = window.AutoHub && window.AutoHub.getStorageKey ? window.AutoHub.getStorageKey() : 'autoUserWanted';
+              localStorage.setItem(key, '0'); 
+            } catch(_){ }
+          }
           engine.setActive(false);
           setTimeout(()=>{
             try {
