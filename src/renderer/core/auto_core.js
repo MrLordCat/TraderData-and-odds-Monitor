@@ -220,12 +220,31 @@
       }
     }
 
-    function setActive(on){
+    function setActive(on, opts){
       if(!!on === !!state.active) return;
       state.active = !!on;
       try { onActiveChanged(state.active, state); } catch(_){ }
       try {
-        if(storage.userWantedKey){ localStorage.setItem(storage.userWantedKey, state.active? '1':'0'); }
+        // System-triggered suspend (no-mid, arb-spike, etc.) should NOT clear userWanted
+        // Only user-initiated actions should update userWanted in storage
+        const isSystemSuspend = opts && opts.systemSuspend;
+        const systemReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended', 'market-suspended'];
+        const isSystemReason = state.lastDisableReason && systemReasons.includes(state.lastDisableReason);
+        
+        if(storage.userWantedKey){
+          // If turning ON, always save userWanted=true
+          // If turning OFF due to system reason, keep userWanted=true
+          // If turning OFF manually, save userWanted=false
+          if(state.active){
+            localStorage.setItem(storage.userWantedKey, '1');
+            state.userWanted = true;
+          } else if(!isSystemSuspend && !isSystemReason){
+            // Manual turn off
+            localStorage.setItem(storage.userWantedKey, '0');
+            state.userWanted = false;
+          }
+          // System suspend: keep userWanted as is (true if was on before)
+        }
         // Preserve externally supplied disable reasons (e.g., guards from AutoHub).
         // Only mark as manual if no other reason is already set.
         if(!state.active){

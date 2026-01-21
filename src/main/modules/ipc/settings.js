@@ -328,6 +328,30 @@ function initSettingsIpc(ctx){
       }
     } catch(_){ }
   });
+
+  // === Auto Resume on MID (bool) - auto-resume when MID becomes available again after no-mid suspend ===
+  ipcMain.handle('auto-resume-on-mid-get', ()=>{
+    try {
+      const v = store.get('autoResumeOnMid');
+      if(typeof v==='boolean') return v;
+    } catch(_){ }
+    return true; // default enabled
+  });
+  ipcMain.on('auto-resume-on-mid-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.enabled==='boolean' ? payload.enabled : null;
+      if(v!==null){
+        store.set('autoResumeOnMid', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-resume-on-mid-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-resume-on-mid-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
 }
 
 module.exports = { initSettingsIpc };

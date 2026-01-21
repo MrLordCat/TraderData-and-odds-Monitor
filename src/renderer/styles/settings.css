@@ -268,6 +268,22 @@ h1 {
 .restart-notice { display: flex; align-items: center; gap: var(--md-sys-spacing-sm); padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-md); background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); border-radius: var(--md-sys-shape-corner-small); font-size: var(--md-sys-typescale-label-medium-size); margin-top: var(--md-sys-spacing-md); }
 .restart-notice button { padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-sm); }
 
+/* Subsection titles within sections */
+.subsectionTitle {
+	grid-column: 1 / -1;
+	font-size: var(--md-sys-typescale-label-large-size);
+	font-weight: 600;
+	color: var(--md-sys-color-secondary);
+	margin: var(--md-sys-spacing-sm) 0 var(--md-sys-spacing-xs);
+	padding-bottom: var(--md-sys-spacing-xs);
+	border-bottom: 1px dashed var(--md-sys-color-outline-variant);
+	letter-spacing: 0.02em;
+}
+
+.subsectionTitle:first-child {
+	margin-top: 0;
+}
+
 /* DS Auto Mode */
 .dsAutoWrap {
 	display: flex;

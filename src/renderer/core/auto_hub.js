@@ -245,9 +245,15 @@
     
     // Stop on no MID setting (default true = stop Auto when MID unavailable)
     let stopOnNoMidEnabled = true;
+    // Auto resume on MID setting (default true = resume Auto when MID becomes available again)
+    let autoResumeOnMidEnabled = true;
     
     function setStopOnNoMid(enabled){
       stopOnNoMidEnabled = enabled !== false;
+    }
+    
+    function setAutoResumeOnMid(enabled){
+      autoResumeOnMidEnabled = enabled !== false;
     }
     
     function setScriptMap(m){
@@ -410,8 +416,10 @@
       let anyDisabled=false, anyEnabled=false;
       // Suspend
       if(ex.frozen && st.active){
+        // Mark userWanted=true before suspend so we can resume later
+        st.userWanted = true;
         st.lastDisableReason='excel-suspended';
-        eng.setActive(false);
+        eng.setActive(false, { systemSuspend: true });
         anyDisabled=true;
         notifyAllUIs('onActiveChanged', false, st, { excelSuspended:true });
         statusAll('Suspended: excel');
@@ -452,12 +460,14 @@
         let anyDisabled=false;
         if(st.active){
           anyDisabled=true;
+          // Mark userWanted=true before suspend so we can resume later
+          st.userWanted = true;
           st.lastDisableReason = noMidSuspend ? 'no-mid' : 'arb-spike';
-          eng.setActive(false);
+          eng.setActive(false, { systemSuspend: true });
           notifyAllUIs('onActiveChanged', false, st, { marketSuspended:true });
         }
         if(anyDisabled){
-          try { console.log('[autoHub][marketGuard] suspend', { noMid: !d.hasMid, stopOnNoMidEnabled, arbProfitPct: d.arbProfitPct, shockThreshold: shockThresholdPct }); } catch(_){ }
+          try { console.log('[autoHub][marketGuard] suspend', { noMid: !d.hasMid, stopOnNoMidEnabled, arbProfitPct: d.arbProfitPct, shockThreshold: shockThresholdPct, userWanted: st.userWanted }); } catch(_){ }
           const reason = noMidSuspend ? 'market:no-mid' : ('market:arb-'+(typeof d.arbProfitPct==='number'? Number(d.arbProfitPct).toFixed(1): 'n/a'));
           statusAll(noMidSuspend ? 'Suspended: no mid' : ('Suspended: arb spike '+Number(d.arbProfitPct).toFixed(1)+'%'));
           sendAutoPressF21({ reason });
@@ -466,7 +476,10 @@
         }
       } else {
         // Resume if previously disabled due to market and userWanted=true
-        if(!st.active && st.userWanted && (st.lastDisableReason==='no-mid' || st.lastDisableReason==='arb-spike')){
+        // For no-mid, only resume if autoResumeOnMidEnabled is true
+        const canResumeNoMid = st.lastDisableReason === 'no-mid' && autoResumeOnMidEnabled;
+        const canResumeArb = st.lastDisableReason === 'arb-spike';
+        if(!st.active && st.userWanted && (canResumeNoMid || canResumeArb)){
           eng.setActive(true);
           st.lastDisableReason='market-resumed';
           notifyAllUIs('onActiveChanged', true, st, { marketResumed:true });
@@ -509,8 +522,10 @@
           const st = eng.state;
           if(st.active){
             autoSuspendActive = true;
-            eng.setActive(false);
+            // Mark userWanted=true before suspend so we can resume later
+            st.userWanted = true;
             st.lastDisableReason = 'diff-suspend';
+            eng.setActive(false, { systemSuspend: true });
             notifyAllUIs('onActiveChanged', false, st, { diffSuspend: true, diffPct });
             statusAll('Suspended: diff '+diffPct.toFixed(1)+'% >= '+autoSuspendThresholdPct+'%');
             try { console.log('[autoHub][diffGuard] suspend', { diffPct: diffPct.toFixed(2), threshold: autoSuspendThresholdPct }); } catch(_){ }
@@ -830,6 +845,9 @@
         ipc.invoke('auto-stop-no-mid-get').then(v=>{
           if(typeof v === 'boolean') setStopOnNoMid(v);
         }).catch(()=>{});
+        ipc.invoke('auto-resume-on-mid-get').then(v=>{
+          if(typeof v === 'boolean') setAutoResumeOnMid(v);
+        }).catch(()=>{});
         ipc.invoke('auto-shock-threshold-get').then(v=>{
           if(typeof v === 'number') setShockThreshold(v);
         }).catch(()=>{});
@@ -851,6 +869,9 @@
         // Listen for updates
         ipc.on('auto-stop-no-mid-updated', (_e, v)=>{
           if(typeof v === 'boolean') setStopOnNoMid(v);
+        });
+        ipc.on('auto-resume-on-mid-updated', (_e, v)=>{
+          if(typeof v === 'boolean') setAutoResumeOnMid(v);
         });
         ipc.on('auto-shock-threshold-updated', (_e, v)=>{
           if(typeof v === 'number') setShockThreshold(v);
@@ -884,6 +905,7 @@
       setScriptMap,
       setBoardMap,
       setStopOnNoMid,
+      setAutoResumeOnMid,
       setDsAutoMode,
       getDsAutoMode: ()=> dsAutoModeEnabled,
       isDsConnected: ()=> dsConnected,

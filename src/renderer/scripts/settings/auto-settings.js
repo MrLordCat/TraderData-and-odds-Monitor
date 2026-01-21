@@ -6,6 +6,7 @@ let autoIntervalMs = 500;
 let autoAdaptiveEnabled = true;
 let shockThresholdPct = 80;
 let stopOnNoMidEnabled = true;
+let autoResumeOnMidEnabled = true;
 let fireCooldownMs = 900;
 let maxExcelWaitMs = 1600;
 let pulseGapMs = 55;
@@ -92,6 +93,8 @@ function cacheElements() {
 		autoShockVal: document.getElementById('auto-shock-threshold-val'),
 		// Stop on no MID
 		autoStopNoMidInput: document.getElementById('auto-stop-no-mid'),
+		// Resume on MID
+		autoResumeOnMidInput: document.getElementById('auto-resume-on-mid'),
 		// Fire cooldown
 		autoFireCooldownInput: document.getElementById('auto-fire-cooldown'),
 		autoFireCooldownVal: document.getElementById('auto-fire-cooldown-val'),
@@ -262,6 +265,14 @@ function bindEvents() {
 		el.autoStopNoMidInput.addEventListener('change', () => {
 			stopOnNoMidEnabled = !!el.autoStopNoMidInput.checked;
 			try { ipcRenderer.send('auto-stop-no-mid-set', { enabled: stopOnNoMidEnabled }); } catch (_) { }
+		});
+	}
+
+	// Resume on MID
+	if (el.autoResumeOnMidInput) {
+		el.autoResumeOnMidInput.addEventListener('change', () => {
+			autoResumeOnMidEnabled = !!el.autoResumeOnMidInput.checked;
+			try { ipcRenderer.send('auto-resume-on-mid-set', { enabled: autoResumeOnMidEnabled }); } catch (_) { }
 		});
 	}
 
@@ -448,6 +459,13 @@ async function loadFromStore() {
 		if (el.autoStopNoMidInput) el.autoStopNoMidInput.checked = stopOnNoMidEnabled;
 	} catch (_) { }
 
+	// Resume on MID
+	try {
+		const v = await ipcRenderer.invoke('auto-resume-on-mid-get');
+		if (typeof v === 'boolean') autoResumeOnMidEnabled = v;
+		if (el.autoResumeOnMidInput) el.autoResumeOnMidInput.checked = autoResumeOnMidEnabled;
+	} catch (_) { }
+
 	// Burst levels
 	try {
 		const v = await ipcRenderer.invoke('auto-burst-levels-get');
@@ -527,6 +545,7 @@ function saveAll() {
 	try { ipcRenderer.send('auto-suspend-threshold-set', { pct: autoSuspendThresholdPct }); } catch (_) { }
 	try { ipcRenderer.send('auto-shock-threshold-set', { pct: shockThresholdPct }); } catch (_) { }
 	try { ipcRenderer.send('auto-stop-no-mid-set', { enabled: stopOnNoMidEnabled }); } catch (_) { }
+	try { ipcRenderer.send('auto-resume-on-mid-set', { enabled: autoResumeOnMidEnabled }); } catch (_) { }
 	try { ipcRenderer.send('auto-fire-cooldown-set', { ms: fireCooldownMs }); } catch (_) { }
 	try { ipcRenderer.send('auto-max-excel-wait-set', { ms: maxExcelWaitMs }); } catch (_) { }
 	try { ipcRenderer.send('auto-pulse-gap-set', { ms: pulseGapMs }); } catch (_) { }

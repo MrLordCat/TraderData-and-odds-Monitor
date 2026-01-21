@@ -82,6 +82,10 @@ try {
   });
 } catch(_){ }
 
+// (Removed) Capture Data prototype wiring – feature deprecated.
+
+// (Theme logic moved to stats_theme.js)
+
 // ================= Runtime State =================
 let metricVisibility = {}; // runtime copy controlling row visibility
 const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'];
@@ -100,8 +104,6 @@ const firstEventFlags = {}; // legacy safety (used for initial value flags)
 const animTimers = { delete: ()=>{}, get: ()=>null, set: ()=>{} }; // inert placeholder
 let liveDataset = null, cachedLive = null, currentLiveGame = null, currentGame = null; // game selection
 let swapTeams = false; // manual mode swap
-// Excel team names (priority over grid)
-let excelTeamNames = { team1: null, team2: null };
 // Manual mode data
 let manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats: { '1': makeEmptyGame() } };
 
@@ -383,23 +385,21 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
  } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
 
-// Team names from Excel K4/N4 (read-only, updates headers) - PRIORITY over grid
+// Team names from Excel K4/N4 (read-only, updates headers)
 ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
   try {
     console.log('[stats_panel] Received excel-team-names IPC:', { team1, team2 });
-    const t1 = (team1 || '').trim();
-    const t2 = (team2 || '').trim();
-    // Store Excel team names (even if empty to clear priority)
-    excelTeamNames.team1 = t1 || null;
-    excelTeamNames.team2 = t2 || null;
-    console.log('[stats_panel] Stored Excel team names:', excelTeamNames);
-    // Apply if non-empty
-    if(t1) setTeamHeader(1, t1);
-    if(t2) setTeamHeader(2, t2);
+    const t1 = (team1 || '').trim() || 'Team 1';
+    const t2 = (team2 || '').trim() || 'Team 2';
+    console.log('[stats_panel] Parsed team names:', t1, '/', t2);
+    setTeamHeader(1, t1);
+    setTeamHeader(2, t2);
     // Also update manual mode data for consistency
-    if(t1 && manualData.team1Name !== t1) renameTeamInternal(1, t1);
-    if(t2 && manualData.team2Name !== t2) renameTeamInternal(2, t2);
-    console.log('[stats_panel] Excel team names applied:', t1 || '(empty)', '/', t2 || '(empty)');
+    if(manualData.team1Name !== t1 || manualData.team2Name !== t2){
+      renameTeamInternal(1, t1);
+      renameTeamInternal(2, t2);
+    }
+    console.log('[stats_panel] Excel team names applied:', t1, '/', t2);
   } catch(e){ console.error('[stats_panel] excel-team-names error:', e); }
 });
 
@@ -636,7 +636,7 @@ function updateGameSelect(){
   }
   if(!any){ placeholder.selected=true; gameSelect.appendChild(placeholder); }
 }
-
+// startInlineRename removed - team names are read-only from Excel K4/N4
 function renderLol(payload, manual=false){
   try {
     ensureRows();
@@ -660,9 +660,8 @@ function renderLol(payload, manual=false){
     const t1Key = dispTeam1;
     const t2Key = dispTeam2;
     const th1=document.getElementById('lt-team1'); const th2=document.getElementById('lt-team2');
-    // Priority: Excel team names > grid team names > custom > default
-    const headerDisp1 = excelTeamNames.team1 || ((customTeamNames[1] && !manual) ? customTeamNames[1] : (dispTeam1||'Team 1'));
-    const headerDisp2 = excelTeamNames.team2 || ((customTeamNames[2] && !manual) ? customTeamNames[2] : (dispTeam2||'Team 2'));
+    const headerDisp1 = (customTeamNames[1] && !manual) ? customTeamNames[1] : (dispTeam1||'Team 1');
+    const headerDisp2 = (customTeamNames[2] && !manual) ? customTeamNames[2] : (dispTeam2||'Team 2');
   setTeamHeader(1, headerDisp1, true);
   setTeamHeader(2, headerDisp2, true);
     scheduleAdjustCols();
@@ -705,6 +704,8 @@ function renderLol(payload, manual=false){
   ensureRows();
   try { console.log('[stats_panel] after ensureRows count=', document.querySelectorAll('#lt-body tr').length); } catch(_){}
   try { activityModule && activityModule.init && activityModule.init(); } catch(_){ }
+  // Apply any pending heat bar config that arrived before DOM was ready
+  try { if(window.__applyPendingHeatBar) window.__applyPendingHeatBar(); } catch(_){ }
   applyVisibility();
   scheduleAdjustCols();
   // Setup game controls
@@ -786,6 +787,8 @@ function renderLol(payload, manual=false){
     try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ }
   });
   updateGameSelect(); if(addBtn){ addBtn.setAttribute('aria-disabled','true'); addBtn.disabled=true; }
+  // Lightweight self-test sample (only if no data after short delay)
+  // Removed mock Alpha/Beta injection sample.
   // Ensure headers initialized & dblclick bound immediately (before first data payload)
   try { setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false); } catch(_){ }
   // (embedded odds + reordering initialized by stats_boot.js)

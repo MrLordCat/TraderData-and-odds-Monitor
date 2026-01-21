@@ -541,10 +541,21 @@ function refreshAutoButtonsVisual(){
   const autoBtn = document.getElementById('autoBtn');
   const sim = window.__autoSim;
   if(autoBtn && sim){
-    autoBtn.classList.toggle('on', !!sim.active);
-    const paused = !sim.active && !!sim.userWanted && (sim.lastDisableReason && !/^manual/.test(sim.lastDisableReason));
-    autoBtn.classList.toggle('paused', paused);
-    autoBtn.classList.toggle('susp', !!sim.lastDisableReason && sim.lastDisableReason==='excel-suspended');
+    // Remove all state classes first
+    autoBtn.classList.remove('on', 'waiting');
+    
+    if(sim.active){
+      // Auto is actively running
+      autoBtn.classList.add('on');
+    } else if(sim.userWanted){
+      // Auto is paused but may auto-resume
+      const resumableReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended'];
+      if(sim.lastDisableReason && resumableReasons.includes(sim.lastDisableReason)){
+        // Yellow "waiting" state - will auto-resume when conditions are met
+        autoBtn.classList.add('waiting');
+      }
+    }
+    // If none of the above, button stays in default (off) state
   }
 }
 // Export for auto_trader.js

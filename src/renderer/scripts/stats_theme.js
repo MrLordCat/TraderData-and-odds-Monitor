@@ -24,10 +24,11 @@
   }
   if(ipcRenderer){ ipcRenderer.on('gs-theme-apply', (_e,theme)=> applyTheme(theme)); }
   // Heat bar configuration listener
-  if(ipcRenderer) ipcRenderer.on('gs-heatbar-apply', (_e, hb)=>{
-  try {
-    if(!hb || !activityModule || !activityModule.configure) return;
-    activityModule.configure({ enabled: hb.enabled!==false, decayPerSec: hb.decayPerSec, bumpAmount: hb.bumpAmount });
+  function applyHeatBarConfig(hb){
+    if(!hb || !activityModule) return;
+    // Ensure DOM is created before configuring
+    if(activityModule.init) activityModule.init();
+    if(activityModule.configure) activityModule.configure({ enabled: hb.enabled!==false, decayPerSec: hb.decayPerSec, bumpAmount: hb.bumpAmount });
     const layer=document.querySelector('.teamActivityLayer');
     if(layer){
       const els=layer.querySelectorAll('.teamActivity');
@@ -37,7 +38,18 @@
       if(els[1]){ els[1].style.background=multiStops(c2); els[1].style.boxShadow='inset 0 0 4px rgba(255,255,255,.16),0 0 6px -2px '+c2+'AA'; }
       try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ }
     }
+  }
+  let pendingHeatBar = null;
+  if(ipcRenderer) ipcRenderer.on('gs-heatbar-apply', (_e, hb)=>{
+  try {
+    pendingHeatBar = hb;
+    applyHeatBarConfig(hb);
+    // Retry after DOM is likely ready
+    setTimeout(()=> applyHeatBarConfig(hb), 150);
+    setTimeout(()=> applyHeatBarConfig(hb), 400);
   } catch(_){ }
   });
   window.__activityModule = activityModule;
+  // Expose for stats_panel.js to call after its init
+  window.__applyPendingHeatBar = ()=>{ if(pendingHeatBar) applyHeatBarConfig(pendingHeatBar); };
 })();

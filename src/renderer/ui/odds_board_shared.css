@@ -208,15 +208,15 @@
 	color: var(--md-sys-color-on-primary, #003060);
 	border-color: transparent;
 }
-.autoBtn.paused { 
-	background: var(--md-sys-color-tertiary-container, #6b5a2a);
-	color: var(--md-sys-color-on-tertiary-container, #fff);
+.autoBtn.waiting { 
+	background: var(--md-sys-color-warning-container, #ffd54f);
+	color: var(--md-sys-color-on-warning-container, #3e2723);
 	border-color: transparent;
+	animation: waitingPulse 1.5s ease-in-out infinite;
 }
-.autoBtn.susp { 
-	background: var(--md-sys-color-warning, #775c1f);
-	color: #fff;
-	border-color: transparent;
+@keyframes waitingPulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.7; }
 }
 
 /* Script map badge (shows Python hotkey controller current map) */

@@ -178,7 +178,24 @@
   const view = window.AutoHub.attachView(ids.viewId, {
     onActiveChanged(active, st){
       try {
-        const btn = byId(ids.autoBtn); if(btn) btn.classList.toggle('on', !!active);
+        const btn = byId(ids.autoBtn);
+        if(btn){
+          // Remove all state classes first
+          btn.classList.remove('on', 'waiting');
+          
+          if(active){
+            // Auto is actively running
+            btn.classList.add('on');
+          } else if(st && st.userWanted){
+            // Auto is paused but will auto-resume (waiting for MID/conditions)
+            // Check if it's a resumable reason
+            const resumableReasons = ['no-mid', 'arb-spike', 'diff-suspend', 'excel-suspended'];
+            if(st.lastDisableReason && resumableReasons.includes(st.lastDisableReason)){
+              btn.classList.add('waiting');
+            }
+          }
+          // If none of the above, button stays in default (off) state
+        }
         const row = byId(ids.indicatorsRow); if(row) row.style.display = active ? '' : 'none';
         if(ids.statusText && active){ const el = byId(ids.statusText); if(el) el.textContent = ''; }
         if(isBoard){ try { window.refreshAutoButtonsVisual && window.refreshAutoButtonsVisual(); } catch(_){ } }
