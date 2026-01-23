@@ -81,16 +81,6 @@
 					<section class="seg">
 					<h2 class="sectionTitle">Auto Odds</h2>
 					<div class="grid formGrid">
-						<!-- DS Auto Mode -->
-						<h3 class="subsectionTitle">🔌 DS Mode</h3>
-						<label for="ds-auto-mode">DS Auto Mode
-							<small class="labelHint">Use DS extension instead of Excel (no Python needed)</small>
-						</label>
-						<div class="dsAutoWrap">
-							<input id="ds-auto-mode" type="checkbox" />
-							<span id="ds-connection-status" class="ds-status disconnected">⚫ DS</span>
-						</div>
-
 						<!-- Core Settings -->
 						<h3 class="subsectionTitle">⚙️ Core</h3>
 						<label for="auto-tolerance">Tolerance (%)</label>
@@ -105,10 +95,13 @@
 							<input id="auto-interval" type="range" min="120" max="2000" step="10" />
 							<span id="auto-interval-val" class="rangeVal"></span>
 						</div>
-						<label for="auto-adaptive">Adaptive mode
-							<small class="labelHint">Wait for Excel to change before next step</small>
+						<label for="auto-pulse-step">Pulse step (%)
+							<small class="labelHint">Diff % per burst pulse (8-15); capped at 3 pulses</small>
 						</label>
-						<input id="auto-adaptive" type="checkbox" />
+						<div class="rangeWrap">
+							<input id="auto-pulse-step" type="range" min="8" max="15" step="1" />
+							<span id="auto-pulse-step-val" class="rangeVal"></span>
+						</div>
 
 						<!-- Protection / Thresholds -->
 						<h3 class="subsectionTitle">🛡️ Protection</h3>
@@ -144,59 +137,16 @@
 							<input id="auto-fire-cooldown" type="range" min="100" max="3000" step="50" />
 							<span id="auto-fire-cooldown-val" class="rangeVal"></span>
 						</div>
-						<label for="auto-max-excel-wait">Max Excel wait (ms)
-							<small class="labelHint">Timeout for Excel change in adaptive mode</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-max-excel-wait" type="range" min="500" max="5000" step="100" />
-							<span id="auto-max-excel-wait-val" class="rangeVal"></span>
-						</div>
 						<label for="auto-pulse-gap">Pulse gap (ms)
 							<small class="labelHint">Delay between burst pulses</small>
 						</label>
 						<div class="rangeWrap">
-							<input id="auto-pulse-gap" type="range" min="20" max="200" step="5" />
+							<input id="auto-pulse-gap" type="range" min="100" max="1000" step="50" />
 							<span id="auto-pulse-gap-val" class="rangeVal"></span>
 						</div>
-
-						<!-- Burst Levels -->
-						<h3 class="subsectionTitle">💥 Burst Levels</h3>
-						<label for="burst1-th">L1 threshold (%)</label>
-						<div class="rangeWrap">
-							<input id="burst1-th" type="range" min="7" max="15" step="1" />
-							<span id="burst1-th-val" class="rangeVal"></span>
-						</div>
-						<label for="burst1-pulses">L1 pulses</label>
-						<div class="rangeWrap">
-							<input id="burst1-pulses" type="range" min="1" max="5" step="1" />
-							<span id="burst1-pulses-val" class="rangeVal"></span>
-						</div>
-						<div class="subRule" aria-hidden="true"></div>
-						<label for="burst2-th">L2 threshold (%)</label>
-						<div class="rangeWrap">
-							<input id="burst2-th" type="range" min="10" max="20" step="1" />
-							<span id="burst2-th-val" class="rangeVal"></span>
-						</div>
-						<label for="burst2-pulses">L2 pulses</label>
-						<div class="rangeWrap">
-							<input id="burst2-pulses" type="range" min="1" max="5" step="1" />
-							<span id="burst2-pulses-val" class="rangeVal"></span>
-						</div>
-						<div class="subRule" aria-hidden="true"></div>
-						<label for="burst3-enabled">L3 enabled</label>
-						<input id="burst3-enabled" type="checkbox" checked />
-						<label for="burst3-th">L3 threshold (%)</label>
-						<div class="rangeWrap">
-							<input id="burst3-th" type="range" min="20" max="40" step="1" />
-							<span id="burst3-th-val" class="rangeVal"></span>
-						</div>
-						<label for="burst3-pulses">L3 pulses</label>
-						<div class="rangeWrap">
-							<input id="burst3-pulses" type="range" min="1" max="5" step="1" />
-							<span id="burst3-pulses-val" class="rangeVal"></span>
-						</div>
 					</div>
-					<div class="hint">Tolerance: diff% below this considered aligned. Step interval: polling rate. Adaptive: waits for Excel before next step. Suspend: pauses on large diff. Shock: ARB detection. Burst levels: pulses before confirm (F22).</div>
+					<div class="hint">Tolerance: diff% below this considered aligned. Step interval: polling rate. Pulse step: each step adds one pulse (max 3). Suspend: pauses on large diff. Shock: ARB detection.</div>
+					<div class="hint"><strong>Note:</strong> Excel/DS mode selection is on the Odds Board (Excel and DS buttons).</div>
 					</section>
 
 				<!-- Game Stats Theme section removed (LoL table theme controls deprecated) -->

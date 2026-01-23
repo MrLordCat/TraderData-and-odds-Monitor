@@ -257,13 +257,13 @@ function initSettingsIpc(ctx){
   });
 
   // === Pulse Gap (ms) - delay between burst pulses ===
-  function clampPulseGap(v){ return Math.max(20, Math.min(200, Math.floor(v))); }
+  function clampPulseGap(v){ return Math.max(100, Math.min(1000, Math.floor(v))); }
   ipcMain.handle('auto-pulse-gap-get', ()=>{
     try {
       const v = store.get('autoPulseGapMs');
       if(typeof v==='number' && !isNaN(v)) return clampPulseGap(v);
     } catch(_){ }
-    return 55; // default
+    return 500; // default
   });
   ipcMain.on('auto-pulse-gap-set', (_e, payload)=>{
     try {
@@ -299,6 +299,31 @@ function initSettingsIpc(ctx){
           BrowserWindow.getAllWindows().forEach(w=>{
             try { w.webContents.send('auto-burst3-enabled-updated', v); } catch(_){ }
             try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-burst3-enabled-updated', v); } catch(_){ } }); } } catch(_){ }
+          });
+        } catch(_){ }
+      }
+    } catch(_){ }
+  });
+
+  // === Pulse Step (%) - diff % per burst pulse (8-15), capped at 3 pulses ===
+  function clampPulseStep(v){ return Math.max(8, Math.min(15, Math.round(v))); }
+  ipcMain.handle('auto-pulse-step-get', ()=>{
+    try {
+      const v = store.get('autoPulseStepPct');
+      if(typeof v==='number' && !isNaN(v)) return clampPulseStep(v);
+    } catch(_){ }
+    return 10; // default
+  });
+  ipcMain.on('auto-pulse-step-set', (_e, payload)=>{
+    try {
+      const v = payload && typeof payload.pct==='number' ? clampPulseStep(payload.pct) : null;
+      if(v!=null){
+        store.set('autoPulseStepPct', v);
+        try {
+          const { BrowserWindow } = require('electron');
+          BrowserWindow.getAllWindows().forEach(w=>{
+            try { w.webContents.send('auto-pulse-step-updated', v); } catch(_){ }
+            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-pulse-step-updated', v); } catch(_){ } }); } } catch(_){ }
           });
         } catch(_){ }
       }

@@ -789,6 +789,7 @@
           ipcRenderer.on('auto-interval-updated', (_e, v) => { if (typeof v === 'number') setConfig({ intervalMs: v }); });
           ipcRenderer.on('auto-fire-cooldown-updated', (_e, v) => { if (typeof v === 'number') setConfig({ fireCooldownMs: v }); });
           ipcRenderer.on('auto-pulse-gap-updated', (_e, v) => { if (typeof v === 'number') setConfig({ pulseGapMs: v }); });
+          ipcRenderer.on('auto-pulse-step-updated', (_e, v) => { if (typeof v === 'number') setConfig({ pulseStepPct: v }); });
           ipcRenderer.on('auto-stop-no-mid-updated', (_e, v) => { if (typeof v === 'boolean') GuardSystem.setSettings({ stopOnNoMid: v }); });
           ipcRenderer.on('auto-shock-threshold-updated', (_e, v) => { if (typeof v === 'number') GuardSystem.setSettings({ shockThresholdPct: v }); });
           ipcRenderer.on('auto-suspend-threshold-updated', (_e, v) => { if (typeof v === 'number') GuardSystem.setSettings({ suspendThresholdPct: v }); });
@@ -798,6 +799,7 @@
           ipcRenderer.invoke('auto-interval-get').then(v => { if (typeof v === 'number') setConfig({ intervalMs: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-fire-cooldown-get').then(v => { if (typeof v === 'number') setConfig({ fireCooldownMs: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-pulse-gap-get').then(v => { if (typeof v === 'number') setConfig({ pulseGapMs: v }); }).catch(() => {});
+          ipcRenderer.invoke('auto-pulse-step-get').then(v => { if (typeof v === 'number') setConfig({ pulseStepPct: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-stop-no-mid-get').then(v => { if (typeof v === 'boolean') GuardSystem.setSettings({ stopOnNoMid: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-shock-threshold-get').then(v => { if (typeof v === 'number') GuardSystem.setSettings({ shockThresholdPct: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-suspend-threshold-get').then(v => { if (typeof v === 'number') GuardSystem.setSettings({ suspendThresholdPct: v }); }).catch(() => {});
