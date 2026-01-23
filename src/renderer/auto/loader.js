@@ -449,34 +449,37 @@
       if (!isSignalSender) return; // Only board window runs step loop
       
       const odds = OddsStore.getSnapshot();
-      const guardResult = GuardSystem.checkGuards(odds, state.mode);
       
       // If aligning after NO_MID recovery:
       // - Allow step while Excel suspended (to align odds)
       // - BUT abort if MID disappears again
+      // - Skip ALL other guard checks
       if (aligningAfterNoMid) {
         if (!odds.derived.hasMid) {
           aligningAfterNoMid = false;
           suspend(REASON.NO_MID, true, false);
           return;
         }
-        // Continue step even if Excel suspended (allow odds alignment)
-      } else if (!guardResult.canTrade) {
-        // Grace period after sending resume - ignore excel-suspended
-        // This allows Excel time to process the resume signal
-        const timeSinceResumeSent = Date.now() - lastResumeSentTs;
-        if (guardResult.reason === REASON.EXCEL_SUSPENDED && timeSinceResumeSent < RESUME_GRACE_PERIOD_MS) {
-          scheduleStep();
+        // Continue step - skip guard checks entirely during NO_MID recovery alignment
+      } else {
+        const guardResult = GuardSystem.checkGuards(odds, state.mode);
+        if (!guardResult.canTrade) {
+          // Grace period after sending resume - ignore excel-suspended
+          // This allows Excel time to process the resume signal
+          const timeSinceResumeSent = Date.now() - lastResumeSentTs;
+          if (guardResult.reason === REASON.EXCEL_SUSPENDED && timeSinceResumeSent < RESUME_GRACE_PERIOD_MS) {
+            scheduleStep();
+            return;
+          }
+          
+          // Normal mode: check all guards
+          // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
+          // treat it as user-initiated so Auto won't auto-resume
+          const isUserSuspend = guardResult.isUserSuspend === true;
+          // Pass canResume flag based on isSoftSuspend (true => can auto-resume)
+          suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
           return;
         }
-        
-        // Normal mode: check all guards
-        // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
-        // treat it as user-initiated so Auto won't auto-resume
-        const isUserSuspend = guardResult.isUserSuspend === true;
-        // Pass canResume flag based on isSoftSuspend (true => can auto-resume)
-        suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
-        return;
       }
       
       if (state.phase === STATE.IDLE && state.reason) {
@@ -489,7 +492,7 @@
       
       if (!mid || !target) {
         updateStatus('Нет данных');
-        scheduleStep();
+        if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
       }
       
@@ -497,13 +500,13 @@
       
       if (action.type === 'none') {
         if (action.aligned) updateStatus('Aligned ✓');
-        scheduleStep();
+        if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
       }
       
       if (engine.isOnCooldown(action, config.fireCooldownMs)) {
         updateStatus('Cooldown...');
-        scheduleStep();
+        if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
       }
       
@@ -512,7 +515,8 @@
         updateStatus(`${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
       }
       
-      scheduleStep();
+      // During ALIGNING phase, checkAlignmentProgress manages the loop
+      if (state.phase !== STATE.ALIGNING) scheduleStep();
     }
     
     function scheduleStep(delayMs) {
