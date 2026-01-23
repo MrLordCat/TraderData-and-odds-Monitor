@@ -274,9 +274,10 @@
         }
       }
       
-      // Excel frozen
+      // Excel frozen - treated as USER-INITIATED suspend (user pressed ESC in Excel)
+      // Auto should NOT auto-resume; user must manually re-enable Auto
       if (mode === MODE.EXCEL && oddsSnapshot.excel && oddsSnapshot.excel.frozen) {
-        return { canTrade: false, reason: REASON.EXCEL_SUSPENDED, isHardBlock: false, isSoftSuspend: true, details: {} };
+        return { canTrade: false, reason: REASON.EXCEL_SUSPENDED, isHardBlock: false, isSoftSuspend: true, isUserSuspend: true, details: {} };
       }
       
       // No MID
@@ -407,6 +408,13 @@
       confirmDelayMs: DEFAULTS.confirmDelayMs,
     };
     
+    // Cooldown to prevent rapid suspend/resume cycling
+    const SUSPEND_RESUME_COOLDOWN_MS = 3000;
+    let lastSuspendTs = 0;
+    let lastResumeTs = 0;
+    // Track if user manually suspended (via UI/hotkey) - Auto should wait for user to resume
+    let userSuspended = false;
+    
     const engine = createAlignEngine({ tolerancePct: config.tolerancePct, pulseStepPct: config.pulseStepPct, maxPulses: DEFAULTS.maxPulses });
     const subscribers = new Set();
     let stepTimer = null;
@@ -421,7 +429,10 @@
       const guardResult = GuardSystem.checkGuards(odds, state.mode);
       
       if (!guardResult.canTrade) {
-        suspend(guardResult.reason, !guardResult.isHardBlock);
+        // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
+        // treat it as user-initiated so Auto won't auto-resume
+        const isUserSuspend = guardResult.isUserSuspend === true;
+        suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
         return;
       }
       
@@ -552,6 +563,10 @@
         return false;
       }
       
+      // Clear user-suspended flag when user explicitly enables
+      userSuspended = false;
+      lastResumeTs = Date.now();
+      
       state.active = true;
       state.userWanted = true;
       state.reason = null;
@@ -596,7 +611,14 @@
       else enable();
     }
     
-    function suspend(reason, canResumeFlag) {
+    function suspend(reason, canResumeFlag, isUserInitiated = false) {
+      // Prevent rapid cycling: don't suspend if we just resumed
+      const timeSinceResume = Date.now() - lastResumeTs;
+      if (timeSinceResume < SUSPEND_RESUME_COOLDOWN_MS && !isUserInitiated) {
+        console.log('[AutoCoordinator] Ignoring auto-suspend, cooldown active:', timeSinceResume, 'ms since resume');
+        return;
+      }
+      
       clearTimeout(stepTimer);
       clearTimeout(alignmentTimer);
       
@@ -605,6 +627,15 @@
       state.phase = STATE.IDLE;
       state.reason = reason;
       if (!canResumeFlag) state.userWanted = false;
+      
+      // Track user-initiated suspend - Auto won't auto-resume until user action
+      if (isUserInitiated) {
+        userSuspended = true;
+        state.userWanted = false; // Fully disable Auto when user suspends
+        console.log('[AutoCoordinator] User-initiated suspend, Auto disabled until manual re-enable');
+      }
+      
+      lastSuspendTs = Date.now();
       
       if (wasActive) {
         sendSignal(reason);
@@ -689,6 +720,7 @@
         mode: state.mode,
         reason: state.reason,
         userWanted: state.userWanted,
+        userSuspended, // For debugging: true if user manually suspended
         status: lastStatus,
         config: { ...config },
         // Compatibility fields
@@ -729,7 +761,7 @@
           global.desktopAPI.onAutoActiveSet((p) => {
             const want = !!(p && p.on);
             if (want && !state.active) enable();
-            else if (!want && state.active) suspend(REASON.MANUAL, false);
+            else if (!want && state.active) suspend(REASON.MANUAL, false, true); // User-initiated
           });
         }
       } else if (global.require) {
@@ -741,7 +773,7 @@
             ipcRenderer.on('auto-active-set', (_e, p) => {
               const want = !!(p && p.on);
               if (want && !state.active) enable();
-              else if (!want && state.active) suspend(REASON.MANUAL, false);
+              else if (!want && state.active) suspend(REASON.MANUAL, false, true); // User-initiated
             });
           }
         } catch (_) {}
@@ -756,9 +788,28 @@
           const guardResult = GuardSystem.checkGuards(odds, state.mode);
           
           if (state.active && !guardResult.canTrade) {
-            suspend(guardResult.reason, !guardResult.isHardBlock);
+            // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
+            // treat it as user-initiated so Auto won't auto-resume
+            const isUserSuspend = guardResult.isUserSuspend === true;
+            suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
           } else if (!state.active && state.userWanted && guardResult.canTrade) {
+            // Only auto-resume if:
+            // 1. User didn't manually suspend
+            // 2. Cooldown has passed since last suspend
+            if (userSuspended) {
+              console.log('[AutoCoordinator] Skipping auto-resume: user suspended, waiting for manual re-enable');
+              return;
+            }
+            
+            const timeSinceSuspend = Date.now() - lastSuspendTs;
+            if (timeSinceSuspend < SUSPEND_RESUME_COOLDOWN_MS) {
+              console.log('[AutoCoordinator] Skipping auto-resume, cooldown active:', timeSinceSuspend, 'ms since suspend');
+              return;
+            }
+            
             if (GuardSystem.canResume(odds, state.mode, state.reason)) {
+              console.log('[AutoCoordinator] Auto-resuming after guard cleared');
+              lastResumeTs = Date.now();
               startAlignment();
             }
           }
@@ -775,7 +826,7 @@
         else disable();
       } else {
         if (want && !state.active) enable();
-        else if (!want && state.active) suspend(REASON.MANUAL, false);
+        else if (!want && state.active) suspend(REASON.MANUAL, false, true); // User-initiated
       }
     }
     
