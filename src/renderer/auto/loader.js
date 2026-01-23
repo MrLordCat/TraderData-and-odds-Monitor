@@ -22,11 +22,8 @@
   const isSignalSender = isStatsPanel;
   
   if (global.AutoCoordinator && global.AutoCoordinator._initialized) {
-    console.log('[AutoMode] Already initialized, skipping duplicate initialization');
     return;
   }
-  
-  console.log('[AutoMode] Initializing... href:', locationHref.slice(-50), 'isStatsPanel:', isStatsPanel, 'isSignalSender:', isSignalSender);
   
   // ============ Constants ============
   
@@ -432,8 +429,11 @@
     
     // Cooldown to prevent rapid suspend/resume cycling
     const SUSPEND_RESUME_COOLDOWN_MS = 3000;
+    // Grace period after sending resume - ignore excel-suspended during this time
+    const RESUME_GRACE_PERIOD_MS = 2000;
     let lastSuspendTs = 0;
     let lastResumeTs = 0;
+    let lastResumeSentTs = 0; // When we sent market:resume signal
     // Track if user manually suspended (via UI/hotkey) - Auto should wait for user to resume
     let userSuspended = false;
     
@@ -451,11 +451,31 @@
       const odds = OddsStore.getSnapshot();
       const guardResult = GuardSystem.checkGuards(odds, state.mode);
       
-      if (!guardResult.canTrade) {
+      // If aligning after NO_MID recovery:
+      // - Allow step while Excel suspended (to align odds)
+      // - BUT abort if MID disappears again
+      if (aligningAfterNoMid) {
+        if (!odds.derived.hasMid) {
+          aligningAfterNoMid = false;
+          suspend(REASON.NO_MID, true, false);
+          return;
+        }
+        // Continue step even if Excel suspended (allow odds alignment)
+      } else if (!guardResult.canTrade) {
+        // Grace period after sending resume - ignore excel-suspended
+        // This allows Excel time to process the resume signal
+        const timeSinceResumeSent = Date.now() - lastResumeSentTs;
+        if (guardResult.reason === REASON.EXCEL_SUSPENDED && timeSinceResumeSent < RESUME_GRACE_PERIOD_MS) {
+          scheduleStep();
+          return;
+        }
+        
+        // Normal mode: check all guards
         // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
         // treat it as user-initiated so Auto won't auto-resume
         const isUserSuspend = guardResult.isUserSuspend === true;
-        suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
+        // Pass canResume flag based on isSoftSuspend (true => can auto-resume)
+        suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
         return;
       }
       
@@ -519,18 +539,27 @@
     
     // Track if we should skip sending resume signal (user already did it)
     let pendingSkipResumeSignal = false;
+    // Track if we're aligning after NO_MID recovery (allows alignment while Excel suspended)
+    let aligningAfterNoMid = false;
     
-    function startAlignment(skipResumeSignal = false) {
+    function startAlignment(skipResumeSignal = false, afterNoMid = false) {
       // Re-check guards before starting alignment
       const odds = OddsStore.getSnapshot();
       const guardResult = GuardSystem.checkGuards(odds, state.mode);
       
-      if (!guardResult.canTrade) {
-        console.log('[AutoCoordinator] startAlignment blocked by guard:', guardResult.reason);
+      // If recovering from NO_MID, we can align even if Excel is suspended
+      // (we need to align odds before sending Resume)
+      if (!guardResult.canTrade && !afterNoMid) {
+        return;
+      }
+      
+      // If afterNoMid but NO MID again, abort
+      if (afterNoMid && !odds.derived.hasMid) {
         return;
       }
       
       pendingSkipResumeSignal = skipResumeSignal;
+      aligningAfterNoMid = afterNoMid;
       state.active = true;
       state.phase = STATE.ALIGNING;
       state.reason = REASON.ALIGNING;
@@ -543,18 +572,30 @@
     function checkAlignmentProgress() {
       if (state.phase !== STATE.ALIGNING) return;
       if (!state.active) {
-        console.log('[AutoCoordinator] checkAlignmentProgress: not active, aborting');
         return;
       }
       
       // Re-check guards during alignment
       const odds = OddsStore.getSnapshot();
       const guardResult = GuardSystem.checkGuards(odds, state.mode);
-      if (!guardResult.canTrade) {
-        console.log('[AutoCoordinator] checkAlignmentProgress: guard blocked, suspending');
-        const isUserSuspend = guardResult.isUserSuspend === true;
-        suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
-        return;
+      
+      // If aligning after NO_MID recovery:
+      // - Allow alignment while Excel suspended
+      // - BUT abort if MID disappears again
+      if (aligningAfterNoMid) {
+        if (!odds.derived.hasMid) {
+          aligningAfterNoMid = false;
+          suspend(REASON.NO_MID, true, false);
+          return;
+        }
+        // Continue alignment even if Excel suspended
+      } else {
+        // Normal alignment: check all guards
+        if (!guardResult.canTrade) {
+          const isUserSuspend = guardResult.isUserSuspend === true;
+          suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
+          return;
+        }
       }
       
       alignmentAttempts++;
@@ -586,9 +627,11 @@
     function finishAlignment(success, reason) {
       clearTimeout(alignmentTimer);
       
+      const wasAligningAfterNoMid = aligningAfterNoMid;
+      aligningAfterNoMid = false;
+      
       // Don't proceed if not active (was suspended during alignment)
       if (!state.active) {
-        console.log('[AutoCoordinator] finishAlignment: not active, skipping');
         state.phase = STATE.IDLE;
         notify();
         return;
@@ -600,9 +643,9 @@
         updateStatus('Trading');
         // Only send resume signal if not user-initiated resume
         if (!pendingSkipResumeSignal) {
+          lastResumeSentTs = Date.now(); // Mark when we sent resume for grace period
           sendSignal('market:resume');
         } else {
-          console.log('[AutoCoordinator] Skipping market:resume signal (user already did it)');
         }
         pendingSkipResumeSignal = false;
         broadcastState(true);
@@ -675,27 +718,21 @@
     }
     
     function toggle() {
-      console.log('[AutoCoordinator] toggle() called, active:', state.active, 'userWanted:', state.userWanted, 'userSuspended:', userSuspended, 'reason:', state.reason);
-      
       // If paused (not active but user wanted it), disable completely
       if (!state.active && state.userWanted) {
-        console.log('[AutoCoordinator] toggle: was paused, disabling');
         disable();
         return;
       }
       
       // If paused due to userSuspended, also disable
       if (!state.active && userSuspended) {
-        console.log('[AutoCoordinator] toggle: was user-suspended, disabling');
         disable();
         return;
       }
       
       if (state.active) {
-        console.log('[AutoCoordinator] toggle: was active, disabling');
         disable();
       } else {
-        console.log('[AutoCoordinator] toggle: was off, enabling');
         enable();
       }
     }
@@ -709,7 +746,6 @@
       // Prevent rapid cycling: don't suspend if we just resumed (unless user-initiated)
       const timeSinceResume = Date.now() - lastResumeTs;
       if (timeSinceResume < SUSPEND_RESUME_COOLDOWN_MS && !isUserInitiated && state.active) {
-        console.log('[AutoCoordinator] Ignoring auto-suspend, cooldown active:', timeSinceResume, 'ms since resume');
         return;
       }
       
@@ -735,12 +771,14 @@
       if (isUserInitiated) {
         userSuspended = true;
         // Keep userWanted = true! Auto will resume when user lifts suspend
-        console.log('[AutoCoordinator] User-initiated suspend, Auto PAUSED - waiting for user to lift suspend');
         // DON'T send signal - user already did it themselves!
       } else {
         // Auto-initiated suspend (e.g., ARB spike, no MID)
         // Auto can self-resume when condition clears
-        if (!canResumeFlag) state.userWanted = false;
+        if (!canResumeFlag) {
+          state.userWanted = false;
+        } else {
+        }
         // Send signal only for auto-initiated suspends
         sendSignal(reason);
       }
@@ -781,7 +819,6 @@
     function sendKeyPress(payload) {
       // Only board window sends actual key presses to prevent duplicates
       if (!isSignalSender) {
-        console.log('[AutoCoordinator] Skipping sendKeyPress - not signal sender');
         return;
       }
       try {
@@ -909,7 +946,6 @@
       // OddsStore reactive updates - ONLY for signal sender (board window)
       // Other windows only display state, they don't control Auto
       if (!isSignalSender) {
-        console.log('[AutoCoordinator] Not signal sender, skipping OddsStore reactive subscription');
         return;
       }
       
@@ -927,34 +963,61 @@
         const guardResult = GuardSystem.checkGuards(odds, state.mode);
         
         if (state.active && !guardResult.canTrade) {
-          // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
-          // treat it as user-initiated so Auto knows to wait for user to lift it
-          const isUserSuspend = guardResult.isUserSuspend === true;
-          console.log('[AutoCoordinator] Guard blocked trading, reason:', guardResult.reason, 'isUserSuspend:', isUserSuspend);
-          suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
-        } else if (!state.active && state.userWanted && guardResult.canTrade) {
-          // Conditions cleared - check if we can resume
-          
-          // Check cooldown first
-          const timeSinceSuspend = Date.now() - lastSuspendTs;
-          if (timeSinceSuspend < SUSPEND_RESUME_COOLDOWN_MS) {
-            console.log('[AutoCoordinator] Skipping resume, cooldown active:', timeSinceSuspend, 'ms since suspend');
+          // Grace period after sending resume - ignore excel-suspended
+          const timeSinceResumeSent = Date.now() - lastResumeSentTs;
+          if (guardResult.reason === REASON.EXCEL_SUSPENDED && timeSinceResumeSent < RESUME_GRACE_PERIOD_MS) {
             return;
           }
           
-          // If user-suspended: user lifted the suspend (frozen → false), clear flag and resume
-          // DON'T send market:resume signal - user already did it themselves!
-          let skipResumeSignal = false;
-          if (userSuspended) {
-            console.log('[AutoCoordinator] User lifted suspend (frozen cleared), resuming Auto (no signal)');
-            userSuspended = false;
-            skipResumeSignal = true; // User already sent resume
+          // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
+          // treat it as user-initiated so Auto knows to wait for user to lift it
+          const isUserSuspend = guardResult.isUserSuspend === true;
+          suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
+        } else if (!state.active && state.userWanted) {
+          // Auto is paused but user wants it on - check if we can resume
+          
+          // SPECIAL CASE: Paused due to NO_MID and MID is back
+          // We need to align odds WHILE Excel is suspended, then send Resume
+          if (state.reason === REASON.NO_MID && odds.derived.hasMid) {
+            const timeSinceSuspend = Date.now() - lastSuspendTs;
+            
+            if (timeSinceSuspend < SUSPEND_RESUME_COOLDOWN_MS) {
+              return;
+            }
+            
+            // Check resumeOnMid setting
+            if (!GuardSystem.canResume(odds, state.mode, state.reason)) {
+              return;
+            }
+            
+            // Start alignment with afterNoMid=true - this allows alignment while Excel suspended
+            // After alignment, Resume signal will be sent
+            lastResumeTs = Date.now();
+            startAlignment(false, true); // skipResumeSignal=false, afterNoMid=true
+            return;
           }
           
-          if (GuardSystem.canResume(odds, state.mode, state.reason)) {
-            console.log('[AutoCoordinator] Resuming after guard cleared, skipSignal:', skipResumeSignal);
-            lastResumeTs = Date.now();
-            startAlignment(skipResumeSignal);
+          // Normal resume: guard conditions cleared
+          if (guardResult.canTrade) {
+            // Check cooldown first
+            const timeSinceSuspend = Date.now() - lastSuspendTs;
+            if (timeSinceSuspend < SUSPEND_RESUME_COOLDOWN_MS) {
+              return;
+            }
+            
+            // If user-suspended: user lifted the suspend (frozen → false), clear flag and resume
+            // DON'T send market:resume signal - user already did it themselves!
+            let skipResumeSignal = false;
+            if (userSuspended) {
+              userSuspended = false;
+              skipResumeSignal = true; // User already sent resume
+            }
+
+            const canResumeNow = GuardSystem.canResume(odds, state.mode, state.reason);
+            if (canResumeNow) {
+              lastResumeTs = Date.now();
+              startAlignment(skipResumeSignal);
+            }
           }
         }
       });
@@ -1223,7 +1286,6 @@
       }
     });
     
-    console.log('[auto_loader] UI initialized');
   }
   
   // Auto-init after DOM ready
@@ -1233,6 +1295,5 @@
     setTimeout(initAutoUI, 0);
   }
   
-  console.log('[auto_loader] Auto Mode loaded (new architecture)');
   
 })(window);
