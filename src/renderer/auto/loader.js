@@ -254,6 +254,7 @@
     let dsState = { connected: false };
     let settings = {
       stopOnNoMid: true,
+      resumeOnMid: true,
       shockThresholdPct: DEFAULTS.shockThresholdPct,
       suspendThresholdPct: DEFAULTS.suspendThresholdPct,
       tolerancePct: DEFAULTS.tolerancePct,
@@ -297,9 +298,11 @@
         return { canTrade: false, reason: REASON.EXCEL_SUSPENDED, isHardBlock: false, isSoftSuspend: true, isUserSuspend: true, details: {} };
       }
       
-      // No MID - HARD BLOCK, cannot start Auto without MID
+      // No MID - blocks enable() but allows auto-resume when MID returns (if resumeOnMid enabled)
+      // isHardBlock: true prevents enable() without MID
+      // isSoftSuspend: true allows canResume() to work when MID returns
       if (settings.stopOnNoMid && !oddsSnapshot.derived.hasMid) {
-        return { canTrade: false, reason: REASON.NO_MID, isHardBlock: true, isSoftSuspend: false, details: {} };
+        return { canTrade: false, reason: REASON.NO_MID, isHardBlock: true, isSoftSuspend: true, details: {} };
       }
       
       // ARB spike
@@ -316,7 +319,8 @@
         case REASON.EXCEL_SUSPENDED:
           return mode === MODE.EXCEL ? !oddsSnapshot.excel?.frozen : !oddsSnapshot.ds?.frozen;
         case REASON.NO_MID:
-          return oddsSnapshot.derived.hasMid;
+          // Only auto-resume if resumeOnMid setting is enabled
+          return settings.resumeOnMid && oddsSnapshot.derived.hasMid;
         case REASON.ARB_SPIKE:
           const arbPct = oddsSnapshot.derived.arbProfitPct;
           return typeof arbPct !== 'number' || arbPct < DEFAULTS.alignmentThresholdPct;
@@ -331,6 +335,7 @@
     function setDsConnected(c) { dsState.connected = !!c; }
     function setSettings(s) {
       if (typeof s.stopOnNoMid === 'boolean') settings.stopOnNoMid = s.stopOnNoMid;
+      if (typeof s.resumeOnMid === 'boolean') settings.resumeOnMid = s.resumeOnMid;
       if (typeof s.shockThresholdPct === 'number') settings.shockThresholdPct = s.shockThresholdPct;
       if (typeof s.suspendThresholdPct === 'number') settings.suspendThresholdPct = s.suspendThresholdPct;
       if (typeof s.tolerancePct === 'number') settings.tolerancePct = s.tolerancePct;
@@ -980,6 +985,7 @@
           ipcRenderer.on('auto-pulse-gap-updated', (_e, v) => { if (typeof v === 'number') setConfig({ pulseGapMs: v }); });
           ipcRenderer.on('auto-pulse-step-updated', (_e, v) => { if (typeof v === 'number') setConfig({ pulseStepPct: v }); });
           ipcRenderer.on('auto-stop-no-mid-updated', (_e, v) => { if (typeof v === 'boolean') GuardSystem.setSettings({ stopOnNoMid: v }); });
+          ipcRenderer.on('auto-resume-on-mid-updated', (_e, v) => { if (typeof v === 'boolean') GuardSystem.setSettings({ resumeOnMid: v }); });
           ipcRenderer.on('auto-shock-threshold-updated', (_e, v) => { if (typeof v === 'number') GuardSystem.setSettings({ shockThresholdPct: v }); });
           ipcRenderer.on('auto-suspend-threshold-updated', (_e, v) => { if (typeof v === 'number') GuardSystem.setSettings({ suspendThresholdPct: v }); });
           
@@ -990,6 +996,7 @@
           ipcRenderer.invoke('auto-pulse-gap-get').then(v => { if (typeof v === 'number') setConfig({ pulseGapMs: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-pulse-step-get').then(v => { if (typeof v === 'number') setConfig({ pulseStepPct: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-stop-no-mid-get').then(v => { if (typeof v === 'boolean') GuardSystem.setSettings({ stopOnNoMid: v }); }).catch(() => {});
+          ipcRenderer.invoke('auto-resume-on-mid-get').then(v => { if (typeof v === 'boolean') GuardSystem.setSettings({ resumeOnMid: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-shock-threshold-get').then(v => { if (typeof v === 'number') GuardSystem.setSettings({ shockThresholdPct: v }); }).catch(() => {});
           ipcRenderer.invoke('auto-suspend-threshold-get').then(v => { if (typeof v === 'number') GuardSystem.setSettings({ suspendThresholdPct: v }); }).catch(() => {});
         } catch (_) {}
@@ -1102,7 +1109,7 @@
     setScriptMap: (m) => GuardSystem.setScriptMap(m),
     setBoardMap: (m) => GuardSystem.setBoardMap(m),
     setStopOnNoMid: (v) => GuardSystem.setSettings({ stopOnNoMid: v }),
-    setAutoResumeOnMid: () => {},
+    setAutoResumeOnMid: (v) => GuardSystem.setSettings({ resumeOnMid: v }),
     setDsAutoMode: (v) => AutoCoordinator.setMode(v ? MODE.DS : MODE.EXCEL),
     getDsAutoMode: () => AutoCoordinator.getMode() === MODE.DS,
     isDsConnected: () => false,
