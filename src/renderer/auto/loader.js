@@ -927,6 +927,113 @@
   global.AutoCore = AutoCore;
   global.AutoHub = AutoHub;
   
+  // ============ UI Initialization ============
+  
+  /**
+   * Initialize Auto UI bindings for buttons and indicators.
+   * Called automatically after DOM is ready.
+   */
+  function initAutoUI() {
+    // Button ID patterns for board and embedded stats
+    const uiConfigs = [
+      { prefix: '', autoBtnId: 'autoBtn', excelModeId: 'excelModeBtn', dsModeId: 'dsModeBtn', reasonBadgeId: 'autoReasonBadge' },
+      { prefix: 'embedded', autoBtnId: 'embeddedAutoBtn', excelModeId: 'embeddedExcelModeBtn', dsModeId: 'embeddedDsModeBtn', reasonBadgeId: 'embeddedAutoReason' },
+    ];
+    
+    uiConfigs.forEach(cfg => {
+      const autoBtn = document.getElementById(cfg.autoBtnId);
+      const excelModeBtn = document.getElementById(cfg.excelModeId);
+      const dsModeBtn = document.getElementById(cfg.dsModeId);
+      const reasonBadge = document.getElementById(cfg.reasonBadgeId);
+      
+      // Auto button click handler
+      if (autoBtn) {
+        autoBtn.addEventListener('click', () => {
+          AutoCoordinator.toggle();
+        });
+      }
+      
+      // Excel mode button click handler
+      if (excelModeBtn) {
+        excelModeBtn.addEventListener('click', () => {
+          AutoCoordinator.setMode(MODE.EXCEL);
+        });
+      }
+      
+      // DS mode button click handler
+      if (dsModeBtn) {
+        dsModeBtn.addEventListener('click', () => {
+          AutoCoordinator.setMode(MODE.DS);
+        });
+      }
+    });
+    
+    // Subscribe to state changes and update all UI elements
+    AutoCoordinator.subscribe((st) => {
+      // Update window.__autoSim for backward compatibility with board.js
+      global.__autoSim = {
+        active: st.active,
+        userWanted: st.userWanted,
+        lastDisableReason: st.reason,
+        tolerancePct: st.config.tolerancePct,
+        stepMs: st.config.intervalMs,
+      };
+      
+      // Update all Auto buttons
+      ['autoBtn', 'embeddedAutoBtn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        
+        btn.classList.remove('on', 'waiting');
+        
+        if (st.active) {
+          btn.classList.add('on');
+        } else if (st.userWanted && st.reason !== REASON.MANUAL) {
+          const resumableReasons = [REASON.NO_MID, REASON.ARB_SPIKE, REASON.DIFF_SUSPEND, REASON.EXCEL_SUSPENDED, REASON.ALIGNING];
+          if (resumableReasons.includes(st.reason)) {
+            btn.classList.add('waiting');
+          }
+        }
+      });
+      
+      // Update mode buttons
+      const isExcelMode = st.mode === MODE.EXCEL;
+      ['excelModeBtn', 'embeddedExcelModeBtn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.toggle('on', isExcelMode);
+      });
+      ['dsModeBtn', 'embeddedDsModeBtn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.toggle('on', !isExcelMode);
+      });
+      
+      // Update reason badges
+      ['autoReasonBadge', 'embeddedAutoReason'].forEach(id => {
+        const badge = document.getElementById(id);
+        if (!badge) return;
+        
+        const label = getReasonLabel(st.reason);
+        badge.textContent = label;
+        badge.title = st.reason || '';
+        badge.style.display = label ? '' : 'none';
+      });
+      
+      // Call legacy refresh function if exists
+      if (typeof global.refreshAutoButtonsVisual === 'function') {
+        try { global.refreshAutoButtonsVisual(); } catch (_) {}
+      }
+    });
+    
+    console.log('[auto_loader] UI initialized');
+  }
+  
+  // Auto-init after DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAutoUI, { once: true });
+  } else {
+    setTimeout(initAutoUI, 0);
+  }
+  
   console.log('[auto_loader] Auto Mode loaded (new architecture)');
   
 })(window);
