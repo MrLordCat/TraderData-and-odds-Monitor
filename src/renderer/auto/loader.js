@@ -11,6 +11,23 @@
 (function(global) {
   'use strict';
   
+  // ============ Singleton Check ============
+  // Only one instance of AutoCoordinator should send signals
+  // Stats panel is the "master" that displays odds and sends signals
+  // (Board is now virtual - embedded in stats_panel)
+  const locationHref = (global.location && global.location.href) || '';
+  const isStatsPanel = locationHref.includes('stats_panel.html') || locationHref.includes('stats_panel%2Ehtml');
+  const isSettingsPage = locationHref.includes('settings.html') || locationHref.includes('settings%2Ehtml');
+  // Stats panel is the signal sender (primary Auto controller)
+  const isSignalSender = isStatsPanel;
+  
+  if (global.AutoCoordinator && global.AutoCoordinator._initialized) {
+    console.log('[AutoMode] Already initialized, skipping duplicate initialization');
+    return;
+  }
+  
+  console.log('[AutoMode] Initializing... href:', locationHref.slice(-50), 'isStatsPanel:', isStatsPanel, 'isSignalSender:', isSignalSender);
+  
   // ============ Constants ============
   
   const REASON = Object.freeze({
@@ -280,9 +297,9 @@
         return { canTrade: false, reason: REASON.EXCEL_SUSPENDED, isHardBlock: false, isSoftSuspend: true, isUserSuspend: true, details: {} };
       }
       
-      // No MID
+      // No MID - HARD BLOCK, cannot start Auto without MID
       if (settings.stopOnNoMid && !oddsSnapshot.derived.hasMid) {
-        return { canTrade: false, reason: REASON.NO_MID, isHardBlock: false, isSoftSuspend: true, details: {} };
+        return { canTrade: false, reason: REASON.NO_MID, isHardBlock: true, isSoftSuspend: false, details: {} };
       }
       
       // ARB spike
@@ -424,6 +441,7 @@
     
     function step() {
       if (!state.active) return;
+      if (!isSignalSender) return; // Only board window runs step loop
       
       const odds = OddsStore.getSnapshot();
       const guardResult = GuardSystem.checkGuards(odds, state.mode);
@@ -494,7 +512,21 @@
       engine.recordFire(action);
     }
     
-    function startAlignment() {
+    // Track if we should skip sending resume signal (user already did it)
+    let pendingSkipResumeSignal = false;
+    
+    function startAlignment(skipResumeSignal = false) {
+      // Re-check guards before starting alignment
+      const odds = OddsStore.getSnapshot();
+      const guardResult = GuardSystem.checkGuards(odds, state.mode);
+      
+      if (!guardResult.canTrade) {
+        console.log('[AutoCoordinator] startAlignment blocked by guard:', guardResult.reason);
+        return;
+      }
+      
+      pendingSkipResumeSignal = skipResumeSignal;
+      state.active = true;
       state.phase = STATE.ALIGNING;
       state.reason = REASON.ALIGNING;
       alignmentAttempts = 0;
@@ -505,6 +537,20 @@
     
     function checkAlignmentProgress() {
       if (state.phase !== STATE.ALIGNING) return;
+      if (!state.active) {
+        console.log('[AutoCoordinator] checkAlignmentProgress: not active, aborting');
+        return;
+      }
+      
+      // Re-check guards during alignment
+      const odds = OddsStore.getSnapshot();
+      const guardResult = GuardSystem.checkGuards(odds, state.mode);
+      if (!guardResult.canTrade) {
+        console.log('[AutoCoordinator] checkAlignmentProgress: guard blocked, suspending');
+        const isUserSuspend = guardResult.isUserSuspend === true;
+        suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
+        return;
+      }
       
       alignmentAttempts++;
       
@@ -535,12 +581,28 @@
     function finishAlignment(success, reason) {
       clearTimeout(alignmentTimer);
       
+      // Don't proceed if not active (was suspended during alignment)
+      if (!state.active) {
+        console.log('[AutoCoordinator] finishAlignment: not active, skipping');
+        state.phase = STATE.IDLE;
+        notify();
+        return;
+      }
+      
       if (success) {
         state.phase = STATE.TRADING;
         state.reason = null;
         updateStatus('Trading');
-        sendSignal('market:resume');
+        // Only send resume signal if not user-initiated resume
+        if (!pendingSkipResumeSignal) {
+          sendSignal('market:resume');
+        } else {
+          console.log('[AutoCoordinator] Skipping market:resume signal (user already did it)');
+        }
+        pendingSkipResumeSignal = false;
         broadcastState(true);
+        // Start the step loop!
+        step();
       } else {
         state.phase = STATE.IDLE;
         state.reason = REASON.ALIGN_FAILED;
@@ -577,17 +639,22 @@
         updateStatus('Trading');
       } else {
         state.phase = STATE.IDLE;
+        updateStatus('Waiting...');
       }
       
       notify();
       broadcastState(true);
-      step();
+      
+      // Only start step loop if we can actually trade
+      if (guardResult.canTrade) {
+        step();
+      }
       
       return true;
     }
     
     function disable() {
-      if (!state.active && !state.userWanted) return;
+      if (!state.active && !state.userWanted && !userSuspended) return;
       
       clearTimeout(stepTimer);
       clearTimeout(alignmentTimer);
@@ -596,56 +663,86 @@
       state.userWanted = false;
       state.phase = STATE.IDLE;
       state.reason = REASON.MANUAL;
+      userSuspended = false; // Clear suspend flag on full disable
       
       notify();
       broadcastState(false);
     }
     
     function toggle() {
+      console.log('[AutoCoordinator] toggle() called, active:', state.active, 'userWanted:', state.userWanted, 'userSuspended:', userSuspended, 'reason:', state.reason);
+      
+      // If paused (not active but user wanted it), disable completely
       if (!state.active && state.userWanted) {
+        console.log('[AutoCoordinator] toggle: was paused, disabling');
         disable();
         return;
       }
       
-      if (state.active) disable();
-      else enable();
+      // If paused due to userSuspended, also disable
+      if (!state.active && userSuspended) {
+        console.log('[AutoCoordinator] toggle: was user-suspended, disabling');
+        disable();
+        return;
+      }
+      
+      if (state.active) {
+        console.log('[AutoCoordinator] toggle: was active, disabling');
+        disable();
+      } else {
+        console.log('[AutoCoordinator] toggle: was off, enabling');
+        enable();
+      }
     }
     
     function suspend(reason, canResumeFlag, isUserInitiated = false) {
-      // Prevent rapid cycling: don't suspend if we just resumed
+      // Already suspended - don't spam signals
+      if (!state.active && state.reason === reason) {
+        return;
+      }
+      
+      // Prevent rapid cycling: don't suspend if we just resumed (unless user-initiated)
       const timeSinceResume = Date.now() - lastResumeTs;
-      if (timeSinceResume < SUSPEND_RESUME_COOLDOWN_MS && !isUserInitiated) {
+      if (timeSinceResume < SUSPEND_RESUME_COOLDOWN_MS && !isUserInitiated && state.active) {
         console.log('[AutoCoordinator] Ignoring auto-suspend, cooldown active:', timeSinceResume, 'ms since resume');
+        return;
+      }
+      
+      const wasActive = state.active;
+      
+      // Only proceed if we were actually active
+      if (!wasActive) {
+        // Just update reason if already suspended
+        state.reason = reason;
+        if (isUserInitiated) userSuspended = true;
         return;
       }
       
       clearTimeout(stepTimer);
       clearTimeout(alignmentTimer);
       
-      const wasActive = state.active;
       state.active = false;
       state.phase = STATE.IDLE;
       state.reason = reason;
       
       // User-initiated suspend (e.g., pressed suspend hotkey/button)
-      // Auto stays in "wanted" state and will resume when user lifts suspend
+      // Auto is PAUSED - waits for user to lift suspend (resume), then continues
       if (isUserInitiated) {
         userSuspended = true;
-        // Keep userWanted = true! User still wants Auto, just paused
-        console.log('[AutoCoordinator] User-initiated suspend, Auto paused - will resume when user lifts suspend');
+        // Keep userWanted = true! Auto will resume when user lifts suspend
+        console.log('[AutoCoordinator] User-initiated suspend, Auto PAUSED - waiting for user to lift suspend');
+        // DON'T send signal - user already did it themselves!
       } else {
         // Auto-initiated suspend (e.g., ARB spike, no MID)
         // Auto can self-resume when condition clears
         if (!canResumeFlag) state.userWanted = false;
+        // Send signal only for auto-initiated suspends
+        sendSignal(reason);
       }
       
       lastSuspendTs = Date.now();
       
-      if (wasActive) {
-        sendSignal(reason);
-        broadcastState(false);
-      }
-      
+      broadcastState(false);
       notify();
     }
     
@@ -677,6 +774,11 @@
     }
     
     function sendKeyPress(payload) {
+      // Only board window sends actual key presses to prevent duplicates
+      if (!isSignalSender) {
+        console.log('[AutoCoordinator] Skipping sendKeyPress - not signal sender');
+        return;
+      }
       try {
         if (global.desktopAPI && global.desktopAPI.invoke) {
           return global.desktopAPI.invoke('send-auto-press', payload);
@@ -689,6 +791,8 @@
     }
     
     function sendSignal(reason) {
+      // Only send signal once per reason change
+      if (!isSignalSender) return;
       sendKeyPress({ key: KEYS.SIGNAL, direction: reason, noConfirm: true });
     }
     
@@ -712,9 +816,20 @@
       return () => subscribers.delete(fn);
     }
     
+    // Guard against re-entrant notify calls
+    let isNotifying = false;
     function notify() {
-      const snapshot = getState();
-      subscribers.forEach(fn => { try { fn(snapshot); } catch (_) {} });
+      if (isNotifying) {
+        console.warn('[AutoCoordinator] Re-entrant notify detected, skipping');
+        return;
+      }
+      isNotifying = true;
+      try {
+        const snapshot = getState();
+        subscribers.forEach(fn => { try { fn(snapshot); } catch (_) {} });
+      } finally {
+        isNotifying = false;
+      }
     }
     
     function getState() {
@@ -786,39 +901,55 @@
       // Settings updates
       attachSettingsListeners();
       
-      // OddsStore reactive updates
+      // OddsStore reactive updates - ONLY for signal sender (board window)
+      // Other windows only display state, they don't control Auto
+      if (!isSignalSender) {
+        console.log('[AutoCoordinator] Not signal sender, skipping OddsStore reactive subscription');
+        return;
+      }
+      
+      // OddsStore reactive updates with throttle to prevent spam
+      let oddsThrottleTimer = null;
+      const ODDS_THROTTLE_MS = 200;
+      
       OddsStore.subscribe((odds) => {
-        if (state.active || state.userWanted) {
-          const guardResult = GuardSystem.checkGuards(odds, state.mode);
+        // Throttle the callback to prevent rapid-fire processing
+        if (oddsThrottleTimer) return;
+        oddsThrottleTimer = setTimeout(() => { oddsThrottleTimer = null; }, ODDS_THROTTLE_MS);
+        
+        if (!state.active && !state.userWanted) return;
+        
+        const guardResult = GuardSystem.checkGuards(odds, state.mode);
+        
+        if (state.active && !guardResult.canTrade) {
+          // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
+          // treat it as user-initiated so Auto knows to wait for user to lift it
+          const isUserSuspend = guardResult.isUserSuspend === true;
+          console.log('[AutoCoordinator] Guard blocked trading, reason:', guardResult.reason, 'isUserSuspend:', isUserSuspend);
+          suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
+        } else if (!state.active && state.userWanted && guardResult.canTrade) {
+          // Conditions cleared - check if we can resume
           
-          if (state.active && !guardResult.canTrade) {
-            // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
-            // treat it as user-initiated so Auto knows to wait for user to lift it
-            const isUserSuspend = guardResult.isUserSuspend === true;
-            suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
-          } else if (!state.active && state.userWanted && guardResult.canTrade) {
-            // Conditions cleared - check if we can resume
-            
-            // If user-suspended: user lifted the suspend (frozen → false)
-            // So we should clear userSuspended and resume
-            if (userSuspended) {
-              console.log('[AutoCoordinator] User lifted suspend (frozen cleared), resuming Auto');
-              userSuspended = false;
-              // Fall through to resume logic below
-            }
-            
-            // Check cooldown
-            const timeSinceSuspend = Date.now() - lastSuspendTs;
-            if (timeSinceSuspend < SUSPEND_RESUME_COOLDOWN_MS) {
-              console.log('[AutoCoordinator] Skipping resume, cooldown active:', timeSinceSuspend, 'ms since suspend');
-              return;
-            }
-            
-            if (GuardSystem.canResume(odds, state.mode, state.reason)) {
-              console.log('[AutoCoordinator] Resuming after guard cleared');
-              lastResumeTs = Date.now();
-              startAlignment();
-            }
+          // Check cooldown first
+          const timeSinceSuspend = Date.now() - lastSuspendTs;
+          if (timeSinceSuspend < SUSPEND_RESUME_COOLDOWN_MS) {
+            console.log('[AutoCoordinator] Skipping resume, cooldown active:', timeSinceSuspend, 'ms since suspend');
+            return;
+          }
+          
+          // If user-suspended: user lifted the suspend (frozen → false), clear flag and resume
+          // DON'T send market:resume signal - user already did it themselves!
+          let skipResumeSignal = false;
+          if (userSuspended) {
+            console.log('[AutoCoordinator] User lifted suspend (frozen cleared), resuming Auto (no signal)');
+            userSuspended = false;
+            skipResumeSignal = true; // User already sent resume
+          }
+          
+          if (GuardSystem.canResume(odds, state.mode, state.reason)) {
+            console.log('[AutoCoordinator] Resuming after guard cleared, skipSignal:', skipResumeSignal);
+            lastResumeTs = Date.now();
+            startAlignment(skipResumeSignal);
           }
         }
       });
@@ -984,6 +1115,7 @@
   global.GuardSystem = GuardSystem;
   global.createAlignEngine = createAlignEngine;
   global.AutoCoordinator = AutoCoordinator;
+  global.AutoCoordinator._initialized = true; // Mark as initialized to prevent duplicates
   global.AutoCore = AutoCore;
   global.AutoHub = AutoHub;
   

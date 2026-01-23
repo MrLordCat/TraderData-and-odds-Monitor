@@ -174,23 +174,22 @@ const getBroadcastCtx = () => ({ mainWindow, boardManager, statsManager });
 // Requirement: Auto Resume (R) must start OFF on every app launch.
 let __autoLast = { active:false, resume:false };
 
-// Toggle auto state and broadcast to all views
+// Toggle auto state - just broadcast toggle command, let renderer decide
 function toggleAutoState(){
-  __autoLast.active = !__autoLast.active;
-  console.log('[main] toggleAutoState -> active:', __autoLast.active);
-  // Manual toggle: if turning off, clear userWanted; if turning on, set it
-  const userWanted = __autoLast.active;
-  broadcastToAll(getBroadcastCtx(), 'auto-state-set', { active: __autoLast.active, userWanted, manual: true });
+  console.log('[main] toggleAutoState - broadcasting toggle command');
+  // Don't track state here - renderer is source of truth
+  // Just send toggle command
+  broadcastToAll(getBroadcastCtx(), 'auto-toggle-all', {});
 }
 
-// Set auto state explicitly
+// Set auto state explicitly (from renderer callback)
 function setAutoState(active){
   __autoLast.active = !!active;
   console.log('[main] setAutoState ->', __autoLast.active);
-  broadcastToAll(getBroadcastCtx(), 'auto-state-set', { active: __autoLast.active });
+  // Don't broadcast - this is just to sync main's cache
 }
 
-// Unified broadcast for auto-toggle-all (triggers toggle in main, then broadcasts state)
+// Unified broadcast for auto-toggle-all (triggers toggle in renderer)
 function broadcastAutoToggleAll(){
   console.log('[main] broadcastAutoToggleAll called');
   toggleAutoState();

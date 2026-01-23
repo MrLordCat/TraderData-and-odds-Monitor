@@ -1,205 +1,136 @@
 # Auto Mode (Auto Trading) – How It Works
 
-This document describes the current Auto Mode implementation in OddsMoni and notes planned refactor changes where relevant.
+This document describes the **refactored** Auto Mode implementation in OddsMoni.
 
 Auto Mode is an **odds alignment loop**: it continuously compares a *reference price* (MID) with a *target price* (Excel odds or DS odds) and sends hotkey-style commands to adjust the target until it matches the reference within a configured tolerance.
 
-> Note: Auto Mode currently aligns only the **min side** (the side with the lower MID odds). This is an intentional design choice in the current logic.
+> Note: Auto Mode aligns only the **min side** (the side with the lower MID odds). This is an intentional design choice.
 
 ---
 
-## 0) Architecture Review & Refactor Proposal
+## 0) Architecture Overview (Implemented)
 
-This section summarizes the problems in the current implementation and proposes a clean architecture for a full rewrite.
+The Auto Mode has been completely rewritten into a **unified module** located at `src/renderer/auto/loader.js`. This single file (~1200 lines) contains all Auto Mode logic and replaces the previous scattered implementation across `auto_core.js`, `auto_hub.js`, and `auto_trader.js`.
 
-### 0.1 Current Problems ("костыли")
+### 0.1 Key Components (all in loader.js)
 
-#### A. AutoHub is a 1050+ line monolith
+| Component | Responsibility |
+|-----------|----------------|
+| `OddsStore` | Subscribes to OddsCore, tracks all broker odds, derives MID/ARB |
+| `GuardSystem` | Unified guard logic with priority: Excel > Market > Frozen > NoMID > ARB |
+| `createAlignEngine()` | Pure function: computes action based on MID vs target |
+| `AutoCoordinator` | Main coordinator: state machine, step loop, suspend/resume logic |
+| `AutoCore/AutoHub` | Backward-compatibility shims that delegate to AutoCoordinator |
 
-`auto_hub.js` mixes too many responsibilities:
-
-- Odds subscription (OddsCore bridge)
-- Excel process status tracking
-- DS Auto Mode (separate step loop)
-- Three overlapping guard systems: `applyExcelGuard()`, `applyMarketGuard()`, `maybeAutoSuspendByDiff()`
-- Alignment-before-resume flow (separate timer, counter, flags)
-- Script/board map tracking
-- 12+ settings channels
-- Engine lifecycle + IPC broadcasting
-
-**Result**: hard to reason about, easy to break.
-
-#### B. AutoCore has mixed concerns
-
-`auto_core.js` combines:
-
-- State machine (active/waiting)
-- Multiple cooldown systems (fire cooldown, pulse cooldown, adaptive wait)
-- Key press scheduling
-- Excel change detection + failure counter
-
-These should be separate, composable pieces.
-
-#### C. Duplicated state management
-
-- `userWanted`, `lastDisableReason` tracked in both AutoCore and AutoHub
-- localStorage persistence scattered across files
-- `active` state synced via multiple IPC channels with subtle differences
-
-#### D. Guard systems are tangled
-
-Three separate guard functions that overlap:
-
-| Guard | Trigger | Suspend reason | Resume condition |
-|-------|---------|----------------|------------------|
-| `applyExcelGuard` | `ex.frozen` | `excel-suspended` | `!ex.frozen` |
-| `applyMarketGuard` | `!hasMid` or `arbProfitPct >= shockThreshold` | `no-mid` / `arb-spike` | MID restored or ARB gone |
-| `maybeAutoSuspendByDiff` | `diffPct >= autoSuspendThresholdPct` | `diff-suspend` | `diffPct < threshold/2` |
-
-Each has its own suspend/resume logic, F21 signaling, and IPC broadcast.
-
-#### E. DS Auto Mode is tacked on
-
-- Separate step loop (`dsAutoStep`) runs parallel to main engine
-- Different timing constants (`dsAutoStepMs`, `dsAutoFireCooldownMs`)
-- Duplicates min-side logic from AutoCore
-- Not unified with Excel mode
-
-#### F. IPC channel explosion
-
-- 5+ broadcast channels for "Auto state": `auto-state-set`, `auto-active-set`, `auto-toggle-all`, `auto-set-all`, `auto-disable-all`
-- Legacy handlers kept "for compatibility"
-- Settings sync via 12+ individual channels
-
-#### G. auto_trader.js contains business logic
-
-- `computeWhyLines()` interprets engine state and guard reasons
-- Reason code mapping duplicated
-- Should be pure UI binding
-
----
-
-### 0.2 Proposed Clean Architecture
+### 0.2 State Machine
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         MAIN PROCESS                                │
-├─────────────────────────────────────────────────────────────────────┤
-│  AutoController                                                     │
-│  ├─ owns global Auto ON/OFF state                                   │
-│  ├─ handles hotkeys (F1/Numpad5)                                    │
-│  ├─ executes key injection (F21-F24)                                │
-│  └─ single IPC channel: 'auto-state' { active, mode, reason }       │
-│                                                                     │
-│  SettingsStore                                                      │
-│  └─ single IPC channel: 'auto-settings' { tolerance, interval, … }  │
-└─────────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │ IPC
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         RENDERER                                    │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐             │
-│  │  OddsStore   │   │  GuardSystem │   │  AlignEngine │             │
-│  │  (records,   │──▶│  (Excel,     │──▶│  (state      │             │
-│  │   derived)   │   │   Market,    │   │   machine,   │             │
-│  └──────────────┘   │   Diff)      │   │   pulses,    │             │
-│                     └──────────────┘   │   timing)    │             │
-│                                        └──────────────┘             │
-│                              │                │                     │
-│                              ▼                ▼                     │
-│                     ┌─────────────────────────────────┐             │
-│                     │       AutoCoordinator           │             │
-│                     │  ├─ single source of truth      │             │
-│                     │  ├─ mode: 'excel' | 'ds'        │             │
-│                     │  ├─ state: idle|aligning|trading│             │
-│                     │  └─ emits: { state, reason }    │             │
-│                     └─────────────────────────────────┘             │
-│                                        │                            │
-│                                        ▼                            │
-│                     ┌─────────────────────────────────┐             │
-│                     │        AutoUI (pure view)       │             │
-│                     │  ├─ button, dots, status text   │             │
-│                     │  └─ no business logic           │             │
-│                     └─────────────────────────────────┘             │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+        ┌─────────┐
+        │  IDLE   │◄────── disable() / guard hard block
+        └────┬────┘
+             │ enable() + canTrade
+             ▼
+        ┌─────────┐
+        │ALIGNING │◄────── startAlignment()
+        └────┬────┘
+             │ finishAlignment(success)
+             ▼
+        ┌─────────┐
+        │ TRADING │──────► step() loop runs here
+        └─────────┘
 ```
 
----
+### 0.3 Signal Sender Architecture
 
-### 0.3 Module Breakdown (Refactored)
+**Critical**: Only the stats_panel window sends signals to prevent duplicates.
 
-#### Main Process
+```javascript
+const isStatsPanel = locationHref.includes('stats_panel.html');
+const isSignalSender = isStatsPanel;
+```
 
-| Module | Responsibility |
-|--------|----------------|
-| `AutoController` | Global ON/OFF state, hotkeys, key injection, single `auto-state` channel |
-| `SettingsStore` | Persist & broadcast settings via single `auto-settings` channel |
+- `sendKeyPress()` and `sendSignal()` only execute if `isSignalSender = true`
+- Other windows (settings, etc.) only display state, don't control Auto
+- OddsStore reactive subscription only runs for signal sender
 
-#### Renderer
+### 0.4 User vs Auto Suspend
 
-| Module | Responsibility |
-|--------|----------------|
-| `OddsStore` | Subscribe to OddsCore, expose `records`, `derived` (MID, ARB) |
-| `GuardSystem` | Unified guard logic with priority: Excel > Market > Diff |
-| `AlignEngine` | Pure state machine: idle → aligning → trading; handles pulses, cooldowns |
-| `AutoCoordinator` | Glue: reads OddsStore, applies GuardSystem, drives AlignEngine |
-| `AutoUI` | Pure view binding: button, dots, reason badge, tooltip |
+The system distinguishes between **user-initiated** and **auto-initiated** suspends:
 
----
+| Type | Trigger | `userSuspended` | `userWanted` | Resume |
+|------|---------|-----------------|--------------|--------|
+| User suspend | User presses suspend hotkey | `true` | `true` | Auto resumes when user lifts suspend (frozen → false) |
+| User disable | User presses F1/Numpad5 to turn off | `false` | `false` | User must press F1/Numpad5 again |
+| Auto suspend | ARB spike, etc. | `false` | `true` | Auto resumes when condition clears |
 
-### 0.4 Key Design Decisions
+**Key behaviors:**
+- When user suspends during active Auto → Auto **pauses** (doesn't send duplicate signal)
+- When user lifts suspend → Auto **resumes** (doesn't send duplicate signal)
+- When user presses F1/Numpad5 while paused → Auto **disables** completely
+- `userSuspended` flag is cleared when Auto is disabled
 
-1. **Single state channel**: `auto-state` replaces 5+ legacy channels.
+### 0.5 Guard System Priority
 
-2. **Unified guard system**: One function that returns `{ canTrade: bool, reason: string | null }` with priority order.
+Guards are checked in order, first match wins:
 
-3. **AlignEngine is pure**: No IPC, no DOM, no OddsCore dependency. Receives `{ mid, target, tolerance }` and returns `{ action, key, pulses }`.
+1. **Excel Unknown** (hard block) - Excel status not yet known
+2. **Excel Installing** (hard block) - Excel script being installed
+3. **Excel Starting** (hard block) - Excel script starting up
+4. **Excel Off** (hard block) - Excel script not running
+5. **DS Not Connected** (hard block, DS mode only) - Extension not connected
+6. **Map Mismatch** (hard block, Excel mode only) - Script map ≠ board map
+7. **Excel Frozen** (soft suspend, user-initiated) - User pressed suspend in Excel
+8. **No MID** (hard block) - Cannot start Auto without MID
+9. **ARB Spike** (soft suspend) - Arbitrage opportunity detected
 
-4. **Mode is explicit**: `mode: 'excel' | 'ds'` is a first-class property, not a bolt-on.
+**Hard block** = Cannot enable Auto, must wait for condition to clear
+**Soft suspend** = Auto pauses, resumes automatically when condition clears
 
-5. **Alignment is a state, not a side-effect**: `state: 'idle' | 'aligning' | 'trading'` with clear transitions.
+### 0.6 Cooldown System
 
-6. **Settings are batched**: Single `auto-settings` object replaces 12+ individual channels.
+To prevent rapid suspend/resume cycling:
 
-7. **Reason codes are centralized**: One enum/map in `GuardSystem`, UI just displays.
+```javascript
+const SUSPEND_RESUME_COOLDOWN_MS = 3000;
+let lastSuspendTs = 0;
+let lastResumeTs = 0;
+```
 
----
+- After suspend: wait 3 seconds before allowing resume
+- After resume: wait 3 seconds before allowing suspend (unless user-initiated)
 
-### 0.5 Migration Path
-
-1. **Phase 1**: Create new modules (`OddsStore`, `GuardSystem`, `AlignEngine`) alongside old code.
-2. **Phase 2**: Wire `AutoCoordinator` to new modules, keep old IPC for backward compat.
-3. **Phase 3**: Migrate UI to new `AutoUI`, remove legacy handlers.
-4. **Phase 4**: Remove old `auto_core.js`, `auto_hub.js`, simplify main-process IPC.
-
----
-
-### 0.6 File Structure (Proposed)
+### 0.7 File Structure (Current)
 
 ```
 src/renderer/
 ├── auto/
-│   ├── index.js              # exports AutoCoordinator
-│   ├── OddsStore.js          # reactive odds state
-│   ├── GuardSystem.js        # unified guards
-│   ├── AlignEngine.js        # pure state machine
-│   ├── AutoCoordinator.js    # glue module
-│   └── constants.js          # reason codes, defaults
-├── ui/
-│   └── auto_ui.js            # pure view binding
+│   └── loader.js             # Unified Auto Mode module (~1200 lines)
 └── core/
-    └── (delete auto_core.js, auto_hub.js after migration)
+    └── odds_core.js          # OddsCore (unchanged)
 
-src/main/modules/
-├── auto/
-│   ├── AutoController.js     # state + hotkeys + key injection
-│   └── SettingsStore.js      # persistence
-└── ipc/
-    └── auto.js               # single 'auto-state' + 'auto-settings' handlers
+src/main/
+├── main.js                   # Hotkey handlers, broadcasts 'auto-toggle-all'
+└── modules/
+    ├── hotkeys/index.js      # F1 handler
+    └── ipc/settings.js       # Auto settings persistence
+```
+
+### 0.8 Main Process Integration
+
+Main process handles:
+- **Hotkeys**: F1 (window-level), Numpad5 (global)
+- **Broadcast**: `auto-toggle-all` event to all renderer windows
+- **Key injection**: F21/F22 via PowerShell SendInput
+
+**Important**: Main process does NOT track Auto state. Renderer is the source of truth.
+
+```javascript
+// main.js - toggleAutoState()
+function toggleAutoState() {
+  // Just broadcast toggle, don't track state
+  // Renderer handles toggle logic (enable vs disable)
+  broadcastToAllViews('auto-toggle-all');
+}
 ```
 
 ---

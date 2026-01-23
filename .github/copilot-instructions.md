@@ -89,7 +89,7 @@ docs/                          # Documentation
 3. Odds updates broadcast via `webContents.send('odds-update', payload)` to main window / board / stats panel; board aggregates best, mid, arb calculations.
 4. Layout presets convert pattern strings like `2x3` -> row distribution. Empty cells become `slot-*` BrowserViews.
 5. **Excel Watcher** monitors `current_state.json` (produced by Python), broadcasts odds and team names to all views.
-6. **Auto Core** (`renderer/core/auto_core.js`) handles automated trading logic with configurable tolerance and burst levels.
+6. **Auto Mode** (`renderer/auto/loader.js`) handles automated trading logic with configurable tolerance and burst levels. Only stats_panel is the signal sender.
 7. **Addon Manager** loads enabled addons at startup, injects sidebar modules into the sidebar loader.
 
 ## 4. IPC & Conventions
@@ -139,11 +139,44 @@ To add a bookmaker:
 - Board docking manipulates stage via `layoutManager.setDockOffsets`.
 - Stats panel receives odds via IPC, supports manual mode with stored game data.
 
-## 8. Auto Trading System
-- **Auto Core** (`renderer/core/auto_core.js`): Single shared engine for board + embedded stats.
-- **Auto Hub** (`renderer/core/auto_hub.js`): Coordinates engine instances, broadcasts state.
-- **Auto Trader** (`renderer/scripts/auto_trader.js`): UI bindings for Auto button, status indicators.
-- **Excel Status** (`renderer/ui/excel_status.js`): Shared module for Excel status display.
+## 8. Auto Trading System (Refactored)
+Auto Mode has been completely rewritten into a **unified module** at `src/renderer/auto/loader.js`.
+
+### Architecture
+- **loader.js** (~1200 lines): Single unified module containing OddsStore, GuardSystem, AlignEngine, AutoCoordinator
+- **OddsStore**: Subscribes to OddsCore, tracks all broker odds, derives MID/ARB
+- **GuardSystem**: Unified guard logic with priority: Excel > Market > Frozen > NoMID > ARB
+- **AutoCoordinator**: State machine (idle → aligning → trading), step loop, suspend/resume logic
+- **AutoCore/AutoHub**: Backward-compatibility shims that delegate to AutoCoordinator
+
+### Signal Sender Architecture
+**Critical**: Only stats_panel window sends signals to prevent duplicates:
+```javascript
+const isStatsPanel = locationHref.includes('stats_panel.html');
+const isSignalSender = isStatsPanel;  // Only stats_panel controls Auto
+```
+
+### User vs Auto Suspend
+| Type | Trigger | `userSuspended` | `userWanted` | Resume |
+|------|---------|-----------------|--------------|--------|
+| User suspend | User presses suspend | `true` | `true` | Auto resumes when user lifts suspend |
+| User disable | F1/Numpad5 to turn off | `false` | `false` | User must press F1/Numpad5 again |
+| Auto suspend | ARB spike, etc. | `false` | `true` | Auto resumes when condition clears |
+
+### Guard Priority (first match wins)
+1. Excel Unknown (hard block)
+2. Excel Installing (hard block)
+3. Excel Starting (hard block)
+4. Excel Off (hard block)
+5. DS Not Connected (hard block, DS mode)
+6. Map Mismatch (hard block, Excel mode)
+7. Excel Frozen (soft suspend, user-initiated)
+8. No MID (hard block)
+9. ARB Spike (soft suspend)
+
+### Cooldown System
+- `SUSPEND_RESUME_COOLDOWN_MS = 3000` - prevents rapid suspend/resume cycling
+- 200ms throttle on OddsStore subscription
 
 Key settings (stored in electron-store):
 - `autoTolerancePct` - Tolerance threshold (%)
@@ -157,15 +190,6 @@ When Excel is not available, Auto can work directly with DS extension:
 - Requires DS extension connected (green status indicator)
 - Compares MID (from brokers) with DS odds
 - Sends `adjust-up`/`adjust-down` + `commit` commands to extension
-- Extension simulates DS page hotkeys (spinner buttons + commit)
-- DS page native hotkeys: `ESC` = suspend, `Shift+ESC` = trade
-
-**Commands sent to extension:**
-- `adjust-up` - Click spinner up button
-- `adjust-down` - Click spinner down button
-- `commit` - Click commit prices button
-- `suspend` - Simulate ESC key
-- `trade` - Simulate Shift+ESC
 
 ## 9. Excel / Python Integration
 - **excel_watcher.py**: Reads Excel cells (including K4/N4 for team names), writes `current_state.json`.
