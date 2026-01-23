@@ -626,13 +626,17 @@
       state.active = false;
       state.phase = STATE.IDLE;
       state.reason = reason;
-      if (!canResumeFlag) state.userWanted = false;
       
-      // Track user-initiated suspend - Auto won't auto-resume until user action
+      // User-initiated suspend (e.g., pressed suspend hotkey/button)
+      // Auto stays in "wanted" state and will resume when user lifts suspend
       if (isUserInitiated) {
         userSuspended = true;
-        state.userWanted = false; // Fully disable Auto when user suspends
-        console.log('[AutoCoordinator] User-initiated suspend, Auto disabled until manual re-enable');
+        // Keep userWanted = true! User still wants Auto, just paused
+        console.log('[AutoCoordinator] User-initiated suspend, Auto paused - will resume when user lifts suspend');
+      } else {
+        // Auto-initiated suspend (e.g., ARB spike, no MID)
+        // Auto can self-resume when condition clears
+        if (!canResumeFlag) state.userWanted = false;
       }
       
       lastSuspendTs = Date.now();
@@ -789,26 +793,29 @@
           
           if (state.active && !guardResult.canTrade) {
             // If guard indicates user-initiated suspend (e.g., Excel frozen from ESC),
-            // treat it as user-initiated so Auto won't auto-resume
+            // treat it as user-initiated so Auto knows to wait for user to lift it
             const isUserSuspend = guardResult.isUserSuspend === true;
             suspend(guardResult.reason, !guardResult.isHardBlock, isUserSuspend);
           } else if (!state.active && state.userWanted && guardResult.canTrade) {
-            // Only auto-resume if:
-            // 1. User didn't manually suspend
-            // 2. Cooldown has passed since last suspend
+            // Conditions cleared - check if we can resume
+            
+            // If user-suspended: user lifted the suspend (frozen → false)
+            // So we should clear userSuspended and resume
             if (userSuspended) {
-              console.log('[AutoCoordinator] Skipping auto-resume: user suspended, waiting for manual re-enable');
-              return;
+              console.log('[AutoCoordinator] User lifted suspend (frozen cleared), resuming Auto');
+              userSuspended = false;
+              // Fall through to resume logic below
             }
             
+            // Check cooldown
             const timeSinceSuspend = Date.now() - lastSuspendTs;
             if (timeSinceSuspend < SUSPEND_RESUME_COOLDOWN_MS) {
-              console.log('[AutoCoordinator] Skipping auto-resume, cooldown active:', timeSinceSuspend, 'ms since suspend');
+              console.log('[AutoCoordinator] Skipping resume, cooldown active:', timeSinceSuspend, 'ms since suspend');
               return;
             }
             
             if (GuardSystem.canResume(odds, state.mode, state.reason)) {
-              console.log('[AutoCoordinator] Auto-resuming after guard cleared');
+              console.log('[AutoCoordinator] Resuming after guard cleared');
               lastResumeTs = Date.now();
               startAlignment();
             }
