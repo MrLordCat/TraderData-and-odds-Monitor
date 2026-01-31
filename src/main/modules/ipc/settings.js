@@ -37,9 +37,10 @@ function initSettingsIpc(ctx){
   const DEFAULT_TOLERANCE_PCT = 1.5;
   ipcMain.handle('auto-tolerance-get', ()=>{
     try {
-      const v = store.get('autoTolerancePct');\n      if(typeof v === 'number' && !isNaN(v)) return clampTol(v);
+      const v = store.get('autoTolerancePct');
+      if(typeof v === 'number' && !isNaN(v)) return clampTol(v);
     } catch(_){ }
-    return DEFAULT_TOLERANCE_PCT; // Return default instead of null
+    return DEFAULT_TOLERANCE_PCT; // Return default only if not saved
   });
   ipcMain.on('auto-tolerance-set', (_e, payload)=>{
     try {
