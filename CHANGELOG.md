@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.5] - 2026-01-31
+
+### 🏗️ Major Refactor
+- **Auto Mode completely rewritten**: Unified architecture in single `loader.js` (~1300 lines)
+  - **OddsStore**: Centralized odds state management with OddsCore integration
+  - **GuardSystem**: Unified guard logic with priority-based blocking (Excel > Market > Frozen > NoMID > ARB)
+  - **AlignEngine**: Pulse-based alignment with configurable tolerance and cooldown
+  - **AutoCoordinator**: State machine (idle → aligning → trading) with suspend/resume logic
+
+### ✨ New Features
+- **NO_MID Recovery**: Auto mode now properly recovers when MID returns after being suspended
+  - Alignment continues while Excel is still suspended (frozen)
+  - Resume signal sent only after alignment completes
+  - Protects against premature interruption during recovery alignment
+
+### 🐛 Bug Fixes
+- **Alignment stuck after NO_MID**: Fixed issue where alignment would do only one step and freeze
+  - Root cause 1: Cooldown not reset when starting alignment after suspend
+  - Root cause 2: OddsStore subscription callback was interrupting recovery alignment
+  - Root cause 3: Alignment interval was shorter than fire cooldown
+- **Cooldown reset on alignment start**: Engine cooldown now properly reset to allow immediate actions
+- **Alignment interval respects cooldown**: Uses `max(alignmentCheckIntervalMs, fireCooldownMs + 100)` to prevent spam
+
+### ⚡ Improvements
+- **User vs Auto suspend distinction**: Clear separation between user-initiated and auto-initiated suspends
+  - User suspend (ESC in Excel): Auto waits for user to resume
+  - Auto suspend (NO_MID, ARB spike): Auto self-resumes when condition clears
+- **Suspend/Resume cooldown**: 3-second cooldown prevents rapid cycling
+- **Grace period after resume**: 2-second grace ignores Excel-suspended state while Excel processes signal
+- **Re-entrant notify guard**: Prevents recursive notification loops
+
+### 🧹 Cleanup
+- Removed legacy `auto_core.js`, `auto_hub.js`, `align_engine.js` modules
+- Backward-compatible shims (AutoCore, AutoHub) for existing code
+- Cleaner state management with single source of truth
+
+---
+
 ## [0.2.4] - 2026-01-21
 
 ### ✨ New Features

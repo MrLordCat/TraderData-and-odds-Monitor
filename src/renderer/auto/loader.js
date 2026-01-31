@@ -568,6 +568,12 @@
       state.phase = STATE.ALIGNING;
       state.reason = REASON.ALIGNING;
       alignmentAttempts = 0;
+      
+      // Reset cooldown to allow immediate alignment actions
+      // This is critical for NO_MID recovery - old cooldown from before suspend
+      // would otherwise block alignment progress
+      engine.resetCooldown();
+      
       updateStatus('Aligning...');
       notify();
       checkAlignmentProgress();
@@ -624,7 +630,10 @@
         finishAlignment(true, 'timeout-forced');
       } else {
         step();
-        alignmentTimer = setTimeout(checkAlignmentProgress, DEFAULTS.alignmentCheckIntervalMs);
+        // Use longer interval during alignment to respect cooldown
+        // fireCooldownMs (900) + buffer ensures we don't spam step() during cooldown
+        const alignInterval = Math.max(DEFAULTS.alignmentCheckIntervalMs, config.fireCooldownMs + 100);
+        alignmentTimer = setTimeout(checkAlignmentProgress, alignInterval);
       }
     }
     
@@ -967,6 +976,19 @@
         const guardResult = GuardSystem.checkGuards(odds, state.mode);
         
         if (state.active && !guardResult.canTrade) {
+          // CRITICAL: Don't interrupt alignment after NO_MID recovery!
+          // During this special alignment, Excel is still suspended (frozen),
+          // but we need to complete alignment before sending Resume signal.
+          if (aligningAfterNoMid) {
+            // Only abort if MID disappears again
+            if (!odds.derived.hasMid) {
+              aligningAfterNoMid = false;
+              suspend(REASON.NO_MID, true, false);
+            }
+            // Otherwise, let alignment continue - don't check other guards
+            return;
+          }
+          
           // Grace period after sending resume - ignore excel-suspended
           const timeSinceResumeSent = Date.now() - lastResumeSentTs;
           if (guardResult.reason === REASON.EXCEL_SUSPENDED && timeSinceResumeSent < RESUME_GRACE_PERIOD_MS) {
