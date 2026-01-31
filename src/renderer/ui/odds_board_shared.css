@@ -219,6 +219,39 @@
 	50% { opacity: 0.7; }
 }
 
+/* Mode buttons (Excel / DS mode selection) */
+.modeBtn {
+	background: var(--md-sys-color-surface-container-highest, #353d48);
+	border: 1px solid var(--md-sys-color-outline, #8b9198);
+	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
+	padding: 0 var(--md-sys-spacing-sm, 8px);
+	height: 24px;
+	min-width: 40px;
+	font-size: var(--md-sys-typescale-label-small-size, 11px);
+	font-weight: var(--md-sys-typescale-label-large-weight, 500);
+	line-height: 24px;
+	border-radius: var(--md-sys-shape-corner-small, 8px);
+	cursor: pointer;
+	box-sizing: border-box;
+	transition: all var(--md-sys-motion-duration-short2, 200ms) var(--md-sys-motion-easing-standard);
+}
+.modeBtn.on {
+	background: var(--md-sys-color-secondary-container, #3d5a80);
+	color: var(--md-sys-color-on-secondary-container, #d1e4ff);
+	border-color: var(--md-sys-color-secondary, #98c1d9);
+}
+.modeBtn:hover:not(.on) {
+	background: var(--md-sys-color-surface-container-high, #424b56);
+}
+
+/* DS controls row alignment */
+.dsControls {
+	display: flex;
+	align-items: center;
+	gap: var(--md-sys-spacing-xs, 4px);
+	height: 24px;
+}
+
 /* Script map badge (shows Python hotkey controller current map) */
 .scriptMapBadge {
   display:inline-flex;
