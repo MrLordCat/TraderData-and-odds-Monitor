@@ -16,12 +16,22 @@ All notable changes to this project will be documented in this file.
   - Alignment continues while Excel is still suspended (frozen)
   - Resume signal sent only after alignment completes
   - Protects against premature interruption during recovery alignment
+- **Pulse-Wait mechanism**: Auto now waits for Excel to update odds before sending next pulse
+  - Prevents multiple pulses being sent before Excel can react
+  - Eliminates oscillation caused by rapid-fire pulses
+  - 3-second timeout fallback if Excel doesn't respond
 
 ### 🐛 Bug Fixes
+- **Double-pulse oscillation**: Fixed issue where Auto sent multiple pulses without waiting for Excel to react
+  - Root cause: step() was called every ~500ms without checking if Excel processed previous pulse
+  - Solution: New pulse-wait mechanism tracks Excel odds changes before allowing next pulse
 - **Alignment stuck after NO_MID**: Fixed issue where alignment would do only one step and freeze
   - Root cause 1: Cooldown not reset when starting alignment after suspend
   - Root cause 2: OddsStore subscription callback was interrupting recovery alignment
   - Root cause 3: Alignment interval was shorter than fire cooldown
+- **Tolerance badge not showing**: Badge now displays on startup without requiring settings save
+  - Added `__embeddedAutoSim` global object for compatibility with stats_embedded.js
+  - IPC `auto-tolerance-get` now returns default value (1.5%) instead of null
 - **Cooldown reset on alignment start**: Engine cooldown now properly reset to allow immediate actions
 - **Alignment interval respects cooldown**: Uses `max(alignmentCheckIntervalMs, fireCooldownMs + 100)` to prevent spam
 

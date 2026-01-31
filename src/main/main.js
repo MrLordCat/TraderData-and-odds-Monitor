@@ -660,16 +660,15 @@ app.whenReady().then(()=>{
       // Use very short window (25ms) to catch only true duplicates but allow intentional burst pulses (~50ms apart)
       let __lastDirKeySentAt = 0;
       let __lastDirKeySig = '';
-      const DIR_KEY_DEDUP_MS = 25; // only collapse near-simultaneous duplicates (<25ms), allow burst pulses
+      const DIR_KEY_DEDUP_MS = 25;
       ipcMain.handle('send-auto-press', (_e, payload)=>{
-        let side = 0; // default
-        let vk = null; // explicit virtual key if provided (0x86 F23 / 0x87 F24)
+        let side = 0;
+        let vk = null;
         let keyLabel = null;
         let direction = null;
         let diffPct = null;
-        let noConfirm = false; // if true, skip auto F22 scheduling (renderer will trigger confirm itself)
-        let isRetry = false; // renderer may flag retry
-        // Backward compat: numeric or undefined -> treat as side index like before (0->F23,1->F24)
+        let noConfirm = false;
+        let isRetry = false;
         if(typeof payload === 'number'){
           side = (payload===1?1:0);
         } else if(payload && typeof payload === 'object'){
@@ -712,19 +711,16 @@ app.whenReady().then(()=>{
             __lastF21SentAt = nowTs;
           }
         }
-        // De-duplication for F23/F24/F22 directional/confirm keys (prevent dual-engine double sends)
+        // De-duplication for F23/F24/F22 directional/confirm keys
         if(keyLabel === 'F23' || keyLabel === 'F24' || keyLabel === 'F22'){
           const nowTs = Date.now();
           const sig = keyLabel + '|' + side + '|' + direction;
           if(sig === __lastDirKeySig && (nowTs - __lastDirKeySentAt) < DIR_KEY_DEDUP_MS){
-            try { console.log('[auto-press][ipc][dedupe] suppress duplicate', { key: keyLabel, side, direction, elapsed: nowTs - __lastDirKeySentAt }); } catch(_){ }
             return true;
           }
           __lastDirKeySig = sig;
           __lastDirKeySentAt = nowTs;
         }
-        const ts = Date.now();
-        try { console.log('[auto-press][ipc] request', { side, key:keyLabel, vk: '0x'+vk.toString(16), direction, diffPct, ts }); } catch(_){ }
         // Broadcast to all views (board, main, stats)
         try { broadcastToAll(getBroadcastCtx(), 'auto-press', { side, key:keyLabel, direction }); } catch(err){ try { console.warn('[auto-press][ipc] send fail', err); } catch(_){ } }
         let sent=false;

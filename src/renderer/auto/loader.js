@@ -61,7 +61,7 @@
   
   const DEFAULTS = Object.freeze({
     tolerancePct: 1.5,
-    intervalMs: 500,
+    intervalMs: 1000,      // Step interval - should be >= fireCooldownMs to avoid wasted cycles
     pulseStepPct: 10,
     pulseGapMs: 500,
     maxPulses: 3,
@@ -69,7 +69,7 @@
     shockThresholdPct: 80,
     arbSpikeThresholdPct: 80,
     alignmentThresholdPct: 15,
-    fireCooldownMs: 900,
+    fireCooldownMs: 900,   // Cooldown between pulses
     confirmDelayMs: 100,
     alignmentTimeoutMs: 15000,
     alignmentCheckIntervalMs: 500,
@@ -378,10 +378,7 @@
     function isOnCooldown(action, cooldownMs) {
       if (action.type !== 'pulse') return false;
       const elapsed = Date.now() - state.lastFireTs;
-      if (state.lastFireSide === action.side && state.lastFireKey === action.key) {
-        return elapsed < cooldownMs;
-      }
-      return false;
+      return elapsed < cooldownMs;
     }
     
     function recordFire(action) {
@@ -404,6 +401,10 @@
       state.lastFireTs = 0;
     }
     
+    function getLastFireTs() {
+      return state.lastFireTs;
+    }
+    
     function checkAlignment(input) {
       if (!input.mid || !input.target) return { aligned: false, diffPct: Infinity, side: 0 };
       const minSide = input.mid[0] <= input.mid[1] ? 0 : 1;
@@ -411,7 +412,7 @@
       return { aligned: diffPct <= cfg.tolerancePct, diffPct, side: minSide };
     }
     
-    return { computeAction, isOnCooldown, recordFire, setConfig, resetCooldown, checkAlignment, get state() { return { ...state }; }, getConfig: () => ({ ...cfg }) };
+    return { computeAction, isOnCooldown, recordFire, setConfig, resetCooldown, getLastFireTs, checkAlignment, get state() { return { ...state }; }, getConfig: () => ({ ...cfg }) };
   }
   
   // ============ AutoCoordinator ============
@@ -443,11 +444,57 @@
     let alignmentTimer = null;
     let alignmentAttempts = 0;
     let lastStatus = '';
+    // Guard against concurrent step() calls from multiple sources (timers, subscriptions)
+    let isStepping = false;
     
+    // === PULSE-WAIT MECHANISM ===
+    // After sending a pulse, we wait for Excel odds to change before allowing next pulse
+    // This prevents sending multiple pulses before Excel has time to react
+    let waitingForExcelUpdate = false;
+    let excelOddsBeforePulse = null;
+    let waitStartTs = 0;
+    const EXCEL_UPDATE_TIMEOUT_MS = 3000; // Max wait time for Excel to update
+    const EXCEL_UPDATE_CHECK_INTERVAL_MS = 100; // How often to check for Excel update
+    
+    function startWaitingForExcelUpdate() {
+      const currentExcel = OddsStore.getExcelOdds();
+      excelOddsBeforePulse = currentExcel ? [...currentExcel] : null;
+      waitingForExcelUpdate = true;
+      waitStartTs = Date.now();
+    }
+    
+    function checkExcelUpdated() {
+      if (!waitingForExcelUpdate) return true;
+      
+      const elapsed = Date.now() - waitStartTs;
+      if (elapsed > EXCEL_UPDATE_TIMEOUT_MS) {
+        waitingForExcelUpdate = false;
+        excelOddsBeforePulse = null;
+        return true;
+      }
+      
+      const currentExcel = OddsStore.getExcelOdds();
+      if (!currentExcel || !excelOddsBeforePulse) {
+        return false;
+      }
+      
+      const changed = currentExcel[0] !== excelOddsBeforePulse[0] || currentExcel[1] !== excelOddsBeforePulse[1];
+      if (changed) {
+        waitingForExcelUpdate = false;
+        excelOddsBeforePulse = null;
+        return true;
+      }
+      
+      return false;
+    }
+
     function step() {
       if (!state.active) return;
-      if (!isSignalSender) return; // Only board window runs step loop
+      if (!isSignalSender) return;
+      if (isStepping) return;
+      isStepping = true;
       
+      try {
       const odds = OddsStore.getSnapshot();
       
       // If aligning after NO_MID recovery:
@@ -504,6 +551,15 @@
         return;
       }
       
+      // === PULSE-WAIT: Check if we're still waiting for Excel to update from previous pulse ===
+      if (!checkExcelUpdated()) {
+        updateStatus('Waiting Excel...');
+        if (state.phase !== STATE.ALIGNING) {
+          scheduleStep(EXCEL_UPDATE_CHECK_INTERVAL_MS);
+        }
+        return;
+      }
+      
       if (engine.isOnCooldown(action, config.fireCooldownMs)) {
         updateStatus('Cooldown...');
         if (state.phase !== STATE.ALIGNING) scheduleStep();
@@ -512,11 +568,15 @@
       
       if (action.type === 'pulse') {
         executeAction(action);
+        startWaitingForExcelUpdate();
         updateStatus(`${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
       }
       
       // During ALIGNING phase, checkAlignmentProgress manages the loop
       if (state.phase !== STATE.ALIGNING) scheduleStep();
+      } finally {
+        isStepping = false;
+      }
     }
     
     function scheduleStep(delayMs) {
@@ -532,7 +592,9 @@
       
       for (let i = 0; i < pulses; i++) {
         const delay = i * config.pulseGapMs;
-        setTimeout(() => sendKeyPress({ key, side, direction, diffPct, noConfirm: true }), delay);
+        setTimeout(() => {
+          sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
+        }, delay);
       }
       
       const confirmDelay = (pulses - 1) * config.pulseGapMs + config.confirmDelayMs;
@@ -830,10 +892,7 @@
     }
     
     function sendKeyPress(payload) {
-      // Only board window sends actual key presses to prevent duplicates
-      if (!isSignalSender) {
-        return;
-      }
+      if (!isSignalSender) return;
       try {
         if (global.desktopAPI && global.desktopAPI.invoke) {
           return global.desktopAPI.invoke('send-auto-press', payload);
@@ -1211,9 +1270,21 @@
   global.GuardSystem = GuardSystem;
   global.createAlignEngine = createAlignEngine;
   global.AutoCoordinator = AutoCoordinator;
-  global.AutoCoordinator._initialized = true; // Mark as initialized to prevent duplicates
+  global.AutoCoordinator._initialized = true;
   global.AutoCore = AutoCore;
   global.AutoHub = AutoHub;
+  
+  // Compatibility: Create global object for tolerance badge (used by stats_embedded.js)
+  // This object is kept in sync with AutoCoordinator state
+  global.__embeddedAutoSim = { tolerancePct: DEFAULTS.tolerancePct };
+  global.__autoSim = global.__embeddedAutoSim;
+  
+  // Update tolerance when config changes
+  AutoCoordinator.subscribe((st) => {
+    if (st.config && typeof st.config.tolerancePct === 'number') {
+      global.__embeddedAutoSim.tolerancePct = st.config.tolerancePct;
+    }
+  });
   
   // ============ UI Initialization ============
   
