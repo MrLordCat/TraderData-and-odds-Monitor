@@ -876,6 +876,10 @@
       if (typeof updates.tolerancePct === 'number') {
         config.tolerancePct = Math.max(1, Math.min(10, updates.tolerancePct));
         engine.setConfig({ tolerancePct: config.tolerancePct });
+        // Update global compatibility object for tolerance badge
+        if (global.__embeddedAutoSim) {
+          global.__embeddedAutoSim.tolerancePct = config.tolerancePct;
+        }
       }
       if (typeof updates.intervalMs === 'number') {
         config.intervalMs = Math.max(120, Math.min(10000, updates.intervalMs));
