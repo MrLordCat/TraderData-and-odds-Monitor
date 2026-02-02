@@ -30,6 +30,7 @@
 	border-collapse: separate;
 	border-spacing: 0;
 	font-size: var(--md-sys-typescale-body-small-size, 12px);
+	table-layout: fixed;
 }
 
 .embeddedOddsTable th, .embeddedOddsTable td,
@@ -131,6 +132,33 @@
 	text-shadow:none;
 }
 
+/* ===== Movement color indicators (2s duration) ===== */
+.embeddedOddsTable td.odds-up,
+#table td.odds-up {
+	color: var(--md-sys-color-success, #4ade80);
+	background: rgba(74, 222, 128, 0.12);
+	transition: color 0.3s, background 0.3s;
+}
+
+.embeddedOddsTable td.odds-down,
+#table td.odds-down {
+	color: var(--md-sys-color-error, #f87171);
+	background: rgba(248, 113, 113, 0.12);
+	transition: color 0.3s, background 0.3s;
+}
+
+/* ===== DS / Excel row no-data state ===== */
+#embeddedDsRow.no-data td,
+#dsRow.no-data td {
+	opacity: 0.4;
+	font-style: italic;
+}
+
+#embeddedDsRow.no-data th,
+#dsRow.no-data th {
+	opacity: 0.5;
+}
+
 /* ===== Swap button (M3 chip style) ===== */
 .eo-swapBtn,
 .swapBtn {
@@ -224,13 +252,13 @@
 	background: var(--md-sys-color-surface-container-highest, #353d48);
 	border: 1px solid var(--md-sys-color-outline, #8b9198);
 	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
-	padding: 0 var(--md-sys-spacing-sm, 8px);
-	height: 24px;
-	min-width: 40px;
+	padding: 0 var(--md-sys-spacing-xs, 4px);
+	height: 22px;
+	min-width: 28px;
 	font-size: var(--md-sys-typescale-label-small-size, 11px);
 	font-weight: var(--md-sys-typescale-label-large-weight, 500);
-	line-height: 24px;
-	border-radius: var(--md-sys-shape-corner-small, 8px);
+	line-height: 22px;
+	border-radius: var(--md-sys-shape-corner-small, 6px);
 	cursor: pointer;
 	box-sizing: border-box;
 	transition: all var(--md-sys-motion-duration-short2, 200ms) var(--md-sys-motion-easing-standard);

@@ -3,6 +3,52 @@ function toNum(v){
   return Number.isFinite(n) ? n : NaN;
 }
 
+// Movement tracking for color indicators
+const MOVEMENT_DURATION_MS = 2000;
+const previousOdds = new Map(); // broker -> { odds1, odds2, time1, time2 }
+const movementTimers = new Map(); // broker -> { timer1, timer2 }
+
+function getMovementClass(broker, side, currentValue){
+  const prev = previousOdds.get(broker);
+  if(!prev) return '';
+  const prevVal = side === 1 ? prev.odds1 : prev.odds2;
+  const prevTime = side === 1 ? prev.time1 : prev.time2;
+  if(prevVal === undefined || prevTime === undefined) return '';
+  if(Date.now() - prevTime > MOVEMENT_DURATION_MS) return '';
+  const current = toNum(currentValue);
+  if(Number.isNaN(current) || Number.isNaN(prevVal)) return '';
+  if(current > prevVal) return 'odds-up';
+  if(current < prevVal) return 'odds-down';
+  return '';
+}
+
+function trackOddsMovement(broker, odds1, odds2){
+  const n1 = toNum(odds1);
+  const n2 = toNum(odds2);
+  const prev = previousOdds.get(broker) || {};
+  const now = Date.now();
+  const timers = movementTimers.get(broker) || {};
+  
+  // Track odds1 changes
+  if(Number.isFinite(n1) && prev.odds1 !== n1){
+    prev.odds1 = n1;
+    prev.time1 = now;
+    if(timers.timer1) clearTimeout(timers.timer1);
+    timers.timer1 = setTimeout(()=>{ prev.time1 = 0; }, MOVEMENT_DURATION_MS);
+  }
+  
+  // Track odds2 changes
+  if(Number.isFinite(n2) && prev.odds2 !== n2){
+    prev.odds2 = n2;
+    prev.time2 = now;
+    if(timers.timer2) clearTimeout(timers.timer2);
+    timers.timer2 = setTimeout(()=>{ prev.time2 = 0; }, MOVEMENT_DURATION_MS);
+  }
+  
+  previousOdds.set(broker, prev);
+  movementTimers.set(broker, timers);
+}
+
 function calcBestNonFrozen(records){
   const live = (records||[]).filter(r=> r && !r.frozen && Array.isArray(r.odds));
   const nums1 = live.map(r=>toNum(r.odds[0])).filter(n=>!Number.isNaN(n));
@@ -51,22 +97,30 @@ function buildRowsHtml(records, opts){
     const frozenCls = r.frozen ? 'frozen' : '';
     const bestCls1 = (!r.frozen && Number.isFinite(o1) && o1===best1) ? 'best' : '';
     const bestCls2 = (!r.frozen && Number.isFinite(o2) && o2===best2) ? 'best' : '';
+    
+    // Track movement and get color classes (only for non-frozen brokers)
+    let moveCls1 = '', moveCls2 = '';
+    if(!r.frozen){
+      trackOddsMovement(broker, d1, d2);
+      moveCls1 = getMovementClass(broker, 1, d1);
+      moveCls2 = getMovementClass(broker, 2, d2);
+    }
 
     if(variant === 'embedded'){
       const swapBtn = `<button class=\"eo-swapBtn ${swappedOn?'on':''}\" data-broker=\"${broker}\" title=\"Swap sides\">⇄</button>`;
       const suspTag = r.frozen ? ' eo-broker-label' : ' eo-broker-label';
       return `<tr class=\"${frozenCls}\">`+
         `<td class=\"eo-broker\"><span class=\"${suspTag}\" title=\"${r.frozen?'Suspended / stale':''}\">${broker}</span></td>`+
-        `<td class=\"${bestCls1} ${frozenCls}\">${d1}</td>`+
+        `<td class=\"${bestCls1} ${frozenCls} ${moveCls1}\">${d1}</td>`+
         `<td class=\"eo-swap-cell\">${swapBtn}</td>`+
-        `<td class=\"${bestCls2} ${frozenCls}\">${d2}</td>`+
+        `<td class=\"${bestCls2} ${frozenCls} ${moveCls2}\">${d2}</td>`+
       `</tr>`;
     }
 
     // default: board
     return `<tr class=\"${frozenCls}\"><td><div class=\"brokerCell\"><span class=\"bName eo-broker-label\" title=\"${broker}\">${broker}</span><button class=\"swapBtn ${swappedOn?'on':''}\" data-broker=\"${broker}\" title=\"Swap sides\">⇄</button></div></td>`+
-           `<td class=\"${bestCls1} ${frozenCls}\">${d1}</td>`+
-           `<td class=\"${bestCls2} ${frozenCls}\">${d2}</td></tr>`;
+           `<td class=\"${bestCls1} ${frozenCls} ${moveCls1}\">${d1}</td>`+
+           `<td class=\"${bestCls2} ${frozenCls} ${moveCls2}\">${d2}</td></tr>`;
   }).join('');
 
   return { html, best1, best2, liveNums1, liveNums2 };

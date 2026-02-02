@@ -562,32 +562,36 @@ small {
 .oddsHeaderControls {
 	display: flex;
 	align-items: center;
-	gap: var(--md-sys-spacing-sm);
+	gap: var(--md-sys-spacing-xs);
 	margin-left: auto;
-	font-size: var(--md-sys-typescale-label-medium-size);
+	font-size: var(--md-sys-typescale-label-small-size);
 }
 
 .oddsHeaderControls .mapLabel {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--md-sys-spacing-xs);
+	gap: 2px;
 	color: var(--md-sys-color-on-surface-variant);
+	font-size: 11px;
 }
 
-/* Unified button height for all controls - M3 chips style */
-.oddsToolBtn, .oddsToggleBtn, .oddsToolSelect {
-	height: 32px;
-	padding: 0 var(--md-sys-spacing-md);
-	font-size: var(--md-sys-typescale-label-medium-size);
+/* Unified button style for all controls */
+.oddsToolBtn, .oddsToggleBtn, .oddsToolSelect, .oddsTolBadge {
+	height: 28px;
+	min-width: 28px;
+	padding: 0 8px;
+	font-size: 11px;
 	background: var(--md-sys-color-surface-container-highest);
 	border: 1px solid var(--md-sys-color-outline);
-	border-radius: var(--md-sys-shape-corner-small);
+	border-radius: 6px;
 	color: var(--md-sys-color-on-surface);
 	cursor: pointer;
 	transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 	white-space: nowrap;
 	box-sizing: border-box;
 	position: relative;
+	line-height: 26px;
+	text-align: center;
 }
 
 .oddsToolBtn::before, .oddsToggleBtn::before {
@@ -618,31 +622,27 @@ small {
 	background: var(--md-sys-color-on-primary);
 }
 
+/* Tolerance badge - same style as buttons */
 .oddsTolBadge {
-	height: 32px;
-	line-height: 30px;
-	padding: 0 var(--md-sys-spacing-md);
-	font-size: var(--md-sys-typescale-label-small-size);
 	background: var(--md-sys-color-surface-container);
-	border-radius: var(--md-sys-shape-corner-full);
 	color: var(--md-sys-color-on-surface-variant);
-	box-sizing: border-box;
+	font-weight: 500;
 }
 
 /* ================= Unified Panel Toolbar - M3 ================= */
 .embeddedOddsToolbar {
 	display: flex;
 	align-items: center;
-	gap: var(--md-sys-spacing-md);
-	padding: var(--md-sys-spacing-sm) 0;
+	gap: var(--md-sys-spacing-sm);
+	padding: var(--md-sys-spacing-xs) 0;
 	border-bottom: 1px solid var(--md-sys-color-outline-variant);
-	margin-bottom: var(--md-sys-spacing-sm);
+	margin-bottom: var(--md-sys-spacing-xs);
 }
 
 .embeddedOddsToolbar .toolbarGroup {
 	display: flex;
 	align-items: center;
-	gap: var(--md-sys-spacing-sm);
+	gap: var(--md-sys-spacing-xs);
 }
 
 /* Arb row styling - only show when arbitrage exists */

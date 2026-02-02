@@ -212,10 +212,10 @@ select {
 /* ================= Table Structure ================= */
 #table { table-layout: fixed; }
 
-.c-broker { width: 44%; }
+/* Broker column width defined in odds_board_shared.css (30%) */
 .c-odds { 
-  width: 28%; 
-  max-width: 80px;
+  width: 35%; 
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

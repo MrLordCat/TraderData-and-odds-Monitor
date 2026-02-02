@@ -270,10 +270,11 @@ function renderBoard(){
   const dsOddsKey = getOddsKey(dsRecord);
   
   if(dsRow && dsCell){
+    // DS row is always visible
     if(dsOddsKey){
       dsCell.textContent = `${dsRecord.odds[0]} / ${dsRecord.odds[1]}`;
-      dsRow.style.display = '';
       dsRow.classList.toggle('frozen', !!dsRecord.frozen);
+      dsRow.classList.remove('no-data');
       
       // If DS odds match Excel, clear mismatch
       const excelOddsKey = getOddsKey(excelRecord);
@@ -282,8 +283,10 @@ function renderBoard(){
         if(dsMismatchTimer){ clearTimeout(dsMismatchTimer); dsMismatchTimer = null; }
       }
     } else {
-      dsRow.style.display = 'none';
-      dsRow.classList.remove('ds-mismatch');
+      // Show placeholder when no DS data
+      dsCell.textContent = '— / —';
+      dsRow.classList.remove('frozen', 'ds-mismatch');
+      dsRow.classList.add('no-data');
     }
   }
   

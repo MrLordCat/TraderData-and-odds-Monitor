@@ -1,4 +1,5 @@
-// Embedded odds board + section reorder extracted
+// Odds Board - embedded odds table in stats panel
+// Handles: odds display, map selection, broker swap, DS/Excel modes, Auto trading UI, section reorder
 // Note: stats panel BrowserView does NOT use the main preload (no window.desktopAPI)
 // desktop_api_shim.js is loaded via script tag in stats_panel.html before this file
 
@@ -286,10 +287,11 @@ function renderEmbeddedOdds(){
     const hasDsOdds = dsRec && Array.isArray(dsRec.odds) && dsRec.odds[0] !== '-';
     
     if(dsCell && dsRow){
+      // DS row is always visible
       if(hasDsOdds){
         dsCell.textContent = `${dsRec.odds[0]} / ${dsRec.odds[1]}`;
-        dsRow.style.display = '';
         dsRow.classList.toggle('frozen', !!dsRec.frozen);
+        dsRow.classList.remove('no-data');
         
         // If DS odds now match Excel, clear mismatch highlight and cancel timer
         if(excelRec && Array.isArray(excelRec.odds) && excelRec.odds[0] !== '-'){
@@ -302,8 +304,10 @@ function renderEmbeddedOdds(){
           }
         }
       } else {
-        dsRow.style.display = 'none';
-        dsRow.classList.remove('ds-mismatch');
+        // Show placeholder when no DS data
+        dsCell.textContent = '— / —';
+        dsRow.classList.remove('frozen', 'ds-mismatch');
+        dsRow.classList.add('no-data');
       }
     }
   } catch(_){ }
@@ -523,7 +527,7 @@ try {
       // Priority: IPC value > engine state > default
       if (typeof v === 'number' && !isNaN(v)) lastIpcTol = v;
       const val = lastIpcTol ?? getEngTol();
-      el.textContent = (val!=null) ? `Tol: ${val.toFixed(2)}%` : 'Tol: —';
+      el.textContent = (val!=null) ? `${val.toFixed(1)}%` : '—%';
     } catch(_){ }
   }
   if(ipcRenderer){
