@@ -5,48 +5,49 @@ function toNum(v){
 
 // Movement tracking for color indicators
 const MOVEMENT_DURATION_MS = 2000;
-const previousOdds = new Map(); // broker -> { odds1, odds2, time1, time2 }
-const movementTimers = new Map(); // broker -> { timer1, timer2 }
+const previousOdds = new Map(); // broker -> { odds1, odds2 }
+const movementState = new Map(); // broker -> { dir1, dir2, time1, time2 }
 
-function getMovementClass(broker, side, currentValue){
-  const prev = previousOdds.get(broker);
-  if(!prev) return '';
-  const prevVal = side === 1 ? prev.odds1 : prev.odds2;
-  const prevTime = side === 1 ? prev.time1 : prev.time2;
-  if(prevVal === undefined || prevTime === undefined) return '';
-  if(Date.now() - prevTime > MOVEMENT_DURATION_MS) return '';
-  const current = toNum(currentValue);
-  if(Number.isNaN(current) || Number.isNaN(prevVal)) return '';
-  if(current > prevVal) return 'odds-up';
-  if(current < prevVal) return 'odds-down';
-  return '';
+function getMovementClass(broker, side){
+  const state = movementState.get(broker);
+  if(!state) return '';
+  const dir = side === 1 ? state.dir1 : state.dir2;
+  const time = side === 1 ? state.time1 : state.time2;
+  if(!dir || !time) return '';
+  if(Date.now() - time > MOVEMENT_DURATION_MS) return '';
+  return dir;
 }
 
 function trackOddsMovement(broker, odds1, odds2){
   const n1 = toNum(odds1);
   const n2 = toNum(odds2);
-  const prev = previousOdds.get(broker) || {};
+  const prev = previousOdds.get(broker) || { odds1: NaN, odds2: NaN };
+  const state = movementState.get(broker) || { dir1: '', dir2: '', time1: 0, time2: 0 };
   const now = Date.now();
-  const timers = movementTimers.get(broker) || {};
   
-  // Track odds1 changes
-  if(Number.isFinite(n1) && prev.odds1 !== n1){
-    prev.odds1 = n1;
-    prev.time1 = now;
-    if(timers.timer1) clearTimeout(timers.timer1);
-    timers.timer1 = setTimeout(()=>{ prev.time1 = 0; }, MOVEMENT_DURATION_MS);
+  // Compare with previous and set direction
+  if(Number.isFinite(n1) && Number.isFinite(prev.odds1) && n1 !== prev.odds1){
+    state.dir1 = n1 > prev.odds1 ? 'odds-up' : 'odds-down';
+    state.time1 = now;
+    // Clear direction after timeout
+    setTimeout(()=>{ 
+      const s = movementState.get(broker);
+      if(s) { s.dir1 = ''; s.time1 = 0; }
+    }, MOVEMENT_DURATION_MS);
   }
   
-  // Track odds2 changes
-  if(Number.isFinite(n2) && prev.odds2 !== n2){
-    prev.odds2 = n2;
-    prev.time2 = now;
-    if(timers.timer2) clearTimeout(timers.timer2);
-    timers.timer2 = setTimeout(()=>{ prev.time2 = 0; }, MOVEMENT_DURATION_MS);
+  if(Number.isFinite(n2) && Number.isFinite(prev.odds2) && n2 !== prev.odds2){
+    state.dir2 = n2 > prev.odds2 ? 'odds-up' : 'odds-down';
+    state.time2 = now;
+    setTimeout(()=>{ 
+      const s = movementState.get(broker);
+      if(s) { s.dir2 = ''; s.time2 = 0; }
+    }, MOVEMENT_DURATION_MS);
   }
   
-  previousOdds.set(broker, prev);
-  movementTimers.set(broker, timers);
+  // Update stored values AFTER comparison
+  previousOdds.set(broker, { odds1: n1, odds2: n2 });
+  movementState.set(broker, state);
 }
 
 function calcBestNonFrozen(records){
@@ -102,8 +103,8 @@ function buildRowsHtml(records, opts){
     let moveCls1 = '', moveCls2 = '';
     if(!r.frozen){
       trackOddsMovement(broker, d1, d2);
-      moveCls1 = getMovementClass(broker, 1, d1);
-      moveCls2 = getMovementClass(broker, 2, d2);
+      moveCls1 = getMovementClass(broker, 1);
+      moveCls2 = getMovementClass(broker, 2);
     }
 
     if(variant === 'embedded'){
