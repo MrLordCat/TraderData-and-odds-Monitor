@@ -20,6 +20,9 @@
     "build:renderer": "node scripts/build-renderer.js",
     "build:renderer:dev": "node scripts/build-renderer.js --dev",
     "build:renderer:watch": "node scripts/build-renderer.js --dev --watch",
+    "predist": "npm run build:renderer",
+    "predist:dir": "npm run build:renderer",
+    "predist:portable": "npm run build:renderer",
     "dist": "electron-builder --dir",
     "dist:dir": "electron-builder --dir",
     "dist:zip": "electron-builder --dir && powershell -NoProfile -Command Compress-Archive -Force dist/win-unpacked/* dist/OddsMoni-portable.zip",
@@ -51,11 +54,12 @@
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "electron": "^38.0.0",
-    "electron-builder": "24.6.0",
+    "electron-builder": "26.7.0",
     "electron-packager": "^17.1.2",
     "esbuild": "^0.27.2"
   }

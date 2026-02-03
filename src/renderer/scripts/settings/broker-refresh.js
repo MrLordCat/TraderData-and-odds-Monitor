@@ -130,4 +130,4 @@ function init() {
 	loadFromStore();
 }
 
-module.exports = { init, loadFromStore, saveAll };
+export { init, loadFromStore, saveAll };

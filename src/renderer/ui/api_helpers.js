@@ -140,8 +140,13 @@ function bindSelectToApi(selId, getMethod, setMethod){
   } catch(_){ }
 }
 
-// Export
-if(typeof module !== 'undefined' && module.exports){
-  module.exports = { invoke, send, on, callApi, bindBtnToApi, bindCheckboxToApi, bindSelectToApi };
+// ES module exports
+export { invoke, send, on, callApi, bindBtnToApi, bindCheckboxToApi, bindSelectToApi };
+
+const ApiHelpers = { invoke, send, on, callApi, bindBtnToApi, bindCheckboxToApi, bindSelectToApi };
+export default ApiHelpers;
+
+// Backward compatibility
+if (typeof window !== 'undefined') {
+  window.ApiHelpers = ApiHelpers;
 }
-try { window.ApiHelpers = { invoke, send, on, callApi, bindBtnToApi, bindCheckboxToApi, bindSelectToApi }; } catch(_){ }

@@ -236,8 +236,13 @@ function bindExcelStatusButton(opts){
   return { applyStatus, refreshBadgeMatch };
 }
 
-// Export
-if(typeof module !== 'undefined' && module.exports){
-  module.exports = { parseStatus, getStatusText, computeStatusSig, isImportantChange, showToast, clearToast, bindExcelStatusButton };
+// ES module exports
+export { parseStatus, getStatusText, computeStatusSig, isImportantChange, showToast, clearToast, bindExcelStatusButton };
+
+const ExcelStatusUI = { parseStatus, getStatusText, computeStatusSig, isImportantChange, showToast, clearToast, bindExcelStatusButton };
+export default ExcelStatusUI;
+
+// Backward compatibility
+if (typeof window !== 'undefined') {
+  window.ExcelStatusUI = ExcelStatusUI;
 }
-try { window.ExcelStatusUI = { parseStatus, getStatusText, computeStatusSig, isImportantChange, showToast, clearToast, bindExcelStatusButton }; } catch(_){ }

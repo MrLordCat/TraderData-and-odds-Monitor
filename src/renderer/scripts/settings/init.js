@@ -56,4 +56,4 @@ function init() {
 	initDevToolsButtons();
 }
 
-module.exports = { init };
+export { init };

@@ -220,4 +220,4 @@ function init() {
 	loadUpdaterState();
 }
 
-module.exports = { init };
+export { init };

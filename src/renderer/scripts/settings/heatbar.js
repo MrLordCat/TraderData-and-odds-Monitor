@@ -169,4 +169,4 @@ function init() {
 	bindEvents();
 }
 
-module.exports = { init, applyConfig, reset, save };
+export { init, applyConfig, reset, save };

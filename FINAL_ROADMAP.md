@@ -145,25 +145,31 @@ src/brokers/
 
 ---
 
-### 2.2 📦 Модульная структура renderer
+### 2.2 📦 Модульная структура renderer ✅ DONE
 
 **Проблема:** Много глобальных переменных и связей через `window.*`
 
 **Решение:**
 - [x] Внедрить минимальный bundler (esbuild) для renderer ✅
 - [x] ES modules экспорты с backward compatibility ✅
-- [ ] Постепенная миграция модулей на ES imports
-- [ ] Убрать `window.*` зависимости (поэтапно)
-- [ ] TypeScript для критичных модулей (опционально)
+- [x] Постепенная миграция модулей на ES imports ✅
+- [x] `stats_panel.html` — полный бандл (1 скрипт вместо 12+) ✅
+- [ ] TypeScript для критичных модулей (опционально, низкий приоритет)
 
 **Реализовано:**
-- esbuild build pipeline (`npm run build:renderer`)
+- esbuild build pipeline (`npm run build:renderer`, `build:renderer:dev`, `build:renderer:watch`)
+- Entry points pattern: `src/renderer/entries/*.entry.js`
 - Hybrid ES/IIFE pattern: модули работают и через import, и через window.*
-- `odds_core.js` и `odds_board_shared.js` мигрированы на ES exports
-- Development/production/watch modes
-- Bundled output в `src/renderer/dist/`
+- Мигрированные модули:
+  - `odds_core.js`, `odds_board_shared.js` — core odds logic
+  - `toast.js`, `api_helpers.js`, `excel_status.js` — UI utilities
+  - `stats_config.js`, `stats_theme.js`, `stats_collapse.js` — stats panel
+  - `devcss-reload.js` — dev utility
+- `stats_panel.html` использует единый бандл `stats-panel.bundle.js` (89kb prod)
+- `predist` hooks в package.json для автоматической сборки
+- Остальные страницы (index, settings, error) — простые, не требуют бандлинга
 
-**Сложность:** 🔴 Высокая (~20-30 часов) → **Фаза 1 выполнена** ✅
+**Сложность:** 🔴 Высокая (~20-30 часов) → **ВЫПОЛНЕНО** ✅
 
 ---
 

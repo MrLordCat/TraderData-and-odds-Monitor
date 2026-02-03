@@ -59,8 +59,13 @@ function clearToast(){
  */
 function getActiveToast(){ return _activeToast; }
 
-// Export for CommonJS (Electron renderer) and also attach to window for inline scripts
-if(typeof module !== 'undefined' && module.exports){
-  module.exports = { showMiniToastNear, clearToast, getActiveToast };
+// ES module exports
+export { showMiniToastNear, clearToast, getActiveToast };
+
+const MiniToast = { showMiniToastNear, clearToast, getActiveToast };
+export default MiniToast;
+
+// Backward compatibility: attach to window
+if (typeof window !== 'undefined') {
+  window.MiniToast = MiniToast;
 }
-try { window.MiniToast = { showMiniToastNear, clearToast, getActiveToast }; } catch(_){ }

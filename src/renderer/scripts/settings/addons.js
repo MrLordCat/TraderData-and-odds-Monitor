@@ -332,4 +332,4 @@ function init() {
 	loadAddons();
 }
 
-module.exports = { init };
+export { init };

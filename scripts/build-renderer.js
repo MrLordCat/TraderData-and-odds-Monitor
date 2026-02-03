@@ -10,19 +10,19 @@ const isDev = process.argv.includes('--dev');
 const isWatch = process.argv.includes('--watch');
 
 // Entry points for bundling
-// Each entry creates a separate bundle loaded by its HTML page
-const entries = {
-  // Core shared modules (loaded by multiple pages)
+// Main entry points (one per HTML page that uses bundled scripts)
+const pageEntries = {
+  'stats-panel': 'src/renderer/entries/stats-panel.entry.js',
+  'index': 'src/renderer/entries/index.entry.js',
+  'settings': 'src/renderer/entries/settings.entry.js',
+  'error': 'src/renderer/entries/error.entry.js',
+  'add-broker': 'src/renderer/entries/add-broker.entry.js',
+};
+
+// Standalone modules (can be loaded individually or bundled)
+const moduleEntries = {
   'odds-core': 'src/renderer/core/odds_core.js',
   'odds-board-shared': 'src/renderer/ui/odds_board_shared.js',
-  
-  // Page-specific bundles
-  'board': 'src/renderer/scripts/board.js',
-  'odds-board': 'src/renderer/scripts/odds_board.js',
-  'stats-panel': 'src/renderer/scripts/stats_panel.js',
-  'index': 'src/renderer/scripts/index.js',
-  
-  // UI utilities
   'toast': 'src/renderer/ui/toast.js',
   'excel-status': 'src/renderer/ui/excel_status.js',
   'api-helpers': 'src/renderer/ui/api_helpers.js',
@@ -45,8 +45,19 @@ const commonOptions = {
   minify: !isDev,
   logLevel: 'info',
   
-  // External modules that shouldn't be bundled
-  external: ['electron'],
+  // External modules that shouldn't be bundled (Node.js built-ins + Electron)
+  external: [
+    'electron',
+    'fs',
+    'path',
+    'os',
+    'child_process',
+    'crypto',
+    'stream',
+    'util',
+    'events',
+    'buffer',
+  ],
   
   // Define globals for conditional code
   define: {
@@ -59,40 +70,52 @@ const commonOptions = {
   },
 };
 
+async function buildEntry(name, entry, isPage = false) {
+  const entryPath = path.join(__dirname, '..', entry);
+  
+  // Skip if entry doesn't exist yet
+  if (!fs.existsSync(entryPath)) {
+    console.log(`⚠️  Skipping ${name}: ${entry} not found`);
+    return false;
+  }
+  
+  const outfile = path.join(outdir, `${name}.bundle.js`);
+  
+  if (isWatch) {
+    const ctx = await esbuild.context({
+      ...commonOptions,
+      entryPoints: [entryPath],
+      outfile,
+    });
+    await ctx.watch();
+    console.log(`👀 Watching: ${name}${isPage ? ' (page bundle)' : ''}`);
+  } else {
+    await esbuild.build({
+      ...commonOptions,
+      entryPoints: [entryPath],
+      outfile,
+    });
+    console.log(`✅ Built: ${name}.bundle.js${isPage ? ' (page bundle)' : ''}`);
+  }
+  return true;
+}
+
 async function build() {
   console.log(`\n🔨 Building renderer modules (${isDev ? 'dev' : 'prod'})...\n`);
   
   const startTime = Date.now();
   
   try {
-    // Build each entry point
-    for (const [name, entry] of Object.entries(entries)) {
-      const entryPath = path.join(__dirname, '..', entry);
-      
-      // Skip if entry doesn't exist yet
-      if (!fs.existsSync(entryPath)) {
-        console.log(`⚠️  Skipping ${name}: ${entry} not found`);
-        continue;
-      }
-      
-      if (isWatch) {
-        // Watch mode - rebuild on changes
-        const ctx = await esbuild.context({
-          ...commonOptions,
-          entryPoints: [entryPath],
-          outfile: path.join(outdir, `${name}.bundle.js`),
-        });
-        await ctx.watch();
-        console.log(`👀 Watching: ${name}`);
-      } else {
-        // Single build
-        await esbuild.build({
-          ...commonOptions,
-          entryPoints: [entryPath],
-          outfile: path.join(outdir, `${name}.bundle.js`),
-        });
-        console.log(`✅ Built: ${name}.bundle.js`);
-      }
+    // Build page entry points (full bundles with all dependencies)
+    console.log('📦 Page bundles:');
+    for (const [name, entry] of Object.entries(pageEntries)) {
+      await buildEntry(name, entry, true);
+    }
+    
+    // Build standalone modules (for pages that load scripts individually)
+    console.log('\n📚 Standalone modules:');
+    for (const [name, entry] of Object.entries(moduleEntries)) {
+      await buildEntry(name, entry, false);
     }
     
     const elapsed = Date.now() - startTime;

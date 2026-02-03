@@ -184,21 +184,13 @@
   <!-- Addon Modules Container -->
   <div id="addonModulesContainer"></div>
 
+  <!-- Desktop API Shim (required before bundle) -->
   <script src="../ui/desktop_api_shim.js"></script>
-  <script src="../scripts/devcss-reload.js"></script>
-  <script src="../scripts/stats_config.js"></script>
-  <script src="../scripts/stats_theme.js"></script>
-  <script src="../scripts/stats_collapse.js"></script>
-  <script src="../ui/odds_board_shared.js"></script>
-  <script src="../core/odds_core.js"></script>
-  <!-- Auto Mode: New architecture (single unified loader) -->
-  <script src="../auto/loader.js"></script>
-  <script src="../ui/toast.js"></script>
-  <script src="../ui/excel_status.js"></script>
-  <script src="../scripts/odds_board.js"></script>
-  <script src="../scripts/stats_panel.js"></script>
-  <script src="../scripts/stats_boot.js"></script>
-  <script src="../scripts/addon_loader.js"></script>
+  
+  <!-- Single bundled script replaces multiple script tags -->
+  <script src="../dist/stats-panel.bundle.js"></script>
+  
+  <!-- DevTools button handlers (inline, page-specific) -->
   <script>
     (function(){
       function bind(id, payload){ const el=document.getElementById(id); if(!el) return; el.addEventListener('click', ()=>{ try { if(window.require){ const { ipcRenderer } = require('electron'); ipcRenderer.send('stats-open-devtools', payload); } } catch(e){ console.warn('[devtools] send failed', e); } }); }

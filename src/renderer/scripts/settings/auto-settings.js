@@ -317,4 +317,4 @@ function init() {
 	bindEvents();
 }
 
-module.exports = { init, loadFromStore, saveAll };
+export { init, loadFromStore, saveAll };
