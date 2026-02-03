@@ -281,13 +281,7 @@ function ensureRows(){
   attachManualHandlers();
   initDragAndDrop();
   try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ }
-  scheduleAdjustCols();
 }
-
-// ================= Adaptive Column Width =================
-let colWidthDebounce=null; let lastTeamWidth=null;
-function adjustColumnWidths(){ /* no-op: fixed layout enforced via CSS */ }
-function scheduleAdjustCols(){ if(colWidthDebounce) cancelAnimationFrame(colWidthDebounce); colWidthDebounce = requestAnimationFrame(adjustColumnWidths); }
 
 // ================= Animations & Cell Updates =================
 function setText(id, side, val){
@@ -677,7 +671,6 @@ function renderLol(payload, manual=false){
     const headerDisp2 = (customTeamNames[2] && !manual) ? customTeamNames[2] : (dispTeam2||'Team 2');
   setTeamHeader(1, headerDisp1, true);
   setTeamHeader(2, headerDisp2, true);
-    scheduleAdjustCols();
   function setBinary(field, filledSet){ const v=s[field]; if(!v) return; filledSet.add(field); const idx = v===t1Key?1:(v===t2Key?2:0); if(!idx) return; setText(field,'t1', idx===1 ? '✓' : '✗'); setText(field,'t2', idx===2 ? '✓' : '✗'); }
     const DEFAULT_ZERO_COUNT_FIELDS = ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
     function setCount(field){ const bucket = s[field] || {}; const has1 = Object.prototype.hasOwnProperty.call(bucket, dispTeam1); const has2 = Object.prototype.hasOwnProperty.call(bucket, dispTeam2); if(!has1 && !has2){ if(DEFAULT_ZERO_COUNT_FIELDS.includes(field)){ ['t1','t2'].forEach(side=>{ const key=field+':'+side; if(!__prevValues[key]) __prevValues[key]='0'; firstEventFlags['fe:'+key]=true; setText(field, side, '0'); }); } else { setText(field,'t1',''); setText(field,'t2',''); } return; } let v1 = has1 ? bucket[dispTeam1] : 0; let v2 = has2 ? bucket[dispTeam2] : 0; if(v1 === undefined || v1 === null || isNaN(v1)) v1 = 0; if(v2 === undefined || v2 === null || isNaN(v2)) v2 = 0; setText(field,'t1', v1 === 0 ? '0' : v1); setText(field,'t2', v2 === 0 ? '0' : v2); }
@@ -720,7 +713,6 @@ function renderLol(payload, manual=false){
   // Apply any pending heat bar config that arrived before DOM was ready
   try { if(window.__applyPendingHeatBar) window.__applyPendingHeatBar(); } catch(_){ }
   applyVisibility();
-  scheduleAdjustCols();
   // Setup game controls
   headerH1 = document.querySelector('#stats h1');
   // Prefer static elements if present (added to HTML for stability)
@@ -766,7 +758,6 @@ function renderLol(payload, manual=false){
       const snap = liveDataset || cachedLive; 
       if(snap) renderLol(snap); 
     } 
-    scheduleAdjustCols(); 
     try { 
       const t1 = document.querySelector('#lt-team1 .teamNameWrap')?.textContent || 'Team 1';
       const t2 = document.querySelector('#lt-team2 .teamNameWrap')?.textContent || 'Team 2';
@@ -774,7 +765,6 @@ function renderLol(payload, manual=false){
     } catch(_){ }
     applyWinLose();
   };
-  window.addEventListener('resize', ()=> scheduleAdjustCols());
   document.getElementById('swapTeamsBtn').title='Swap display order of teams';
   // Local Detach button (stats window separation)
   // detach button not present

@@ -31,15 +31,11 @@ hub.subscribe(state => {
 });
 ```
 
-### AutoCore / AutoHub
+### Auto Mode
 
-- `auto_core.js`: Per-view auto engine; steps odds presses; uses providers.
-- `auto_hub.js`: Central orchestrator for auto engines; guards (excel/market/shock); cross-window sync.
-- `auto_ipc.js`: Thin wrapper to call main IPC for auto presses.
+Auto Mode has been **unified** into a single module at `src/renderer/auto/loader.js` (~1200 lines).
 
-Key points:
-- No DOM parsing here — only logic and IPC.
-- Guards use F21 (suspend) with a single retry; main dedupes duplicates across windows.
+See `docs/AUTO_MODE.md` for complete documentation.
 
 ## Build System
 
