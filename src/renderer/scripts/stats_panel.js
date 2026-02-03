@@ -233,8 +233,6 @@ function animationsAllowed(){
 }
 function cell(id, side){ return document.getElementById(`${id}-${side}`); }
 function sendPersist(){ send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, metricVisibility, metricOrder: metricsOrderMutable }); }
-// Persist animation settings (no-op)
-function persistAnim(){}
 
 // ================= Metrics UI =================
 function buildMetricToggles(){ const wrap=document.getElementById('metricToggles'); if(!wrap) return; wrap.innerHTML=''; metricsOrder.forEach(id=>{ const label=document.createElement('label'); label.className='metricToggle'; const cb=document.createElement('input'); cb.type='checkbox'; cb.checked = metricVisibility[id] !== false; cb.onchange=()=>{ metricVisibility[id]=cb.checked; sendPersist(); applyVisibility(); }; label.appendChild(cb); label.appendChild(document.createTextNode(metricLabels[id]||id)); wrap.appendChild(label); }); }
