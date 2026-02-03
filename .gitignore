@@ -11,6 +11,7 @@ package-lock.json
 dist/
 dist-pack/
 release/
+src/renderer/dist/
 *.asar
 *.asar.unpacked/
 build-info.json
