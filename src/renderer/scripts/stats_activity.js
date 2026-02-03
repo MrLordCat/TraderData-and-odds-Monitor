@@ -21,7 +21,6 @@ const state = {
 };
 
 function configure(opts={}){
-  const prev = { enabled: state.enabled, decayPerSec: state.decayPerSec, bumpAmount: state.bumpAmount };
   if(opts.enabled!=null) state.enabled = !!opts.enabled;
   if(typeof opts.decayPerSec === 'number' && opts.decayPerSec>0) state.decayPerSec = opts.decayPerSec;
   if(typeof opts.bumpAmount === 'number' && opts.bumpAmount>0) state.bumpAmount = opts.bumpAmount;

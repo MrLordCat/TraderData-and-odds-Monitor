@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### ✨ New Features
+- **Sound notifications for LoL match events**
+  - Plays audio for game start, first blood, first tower, quadra, penta kills
+  - Game start detection via ban phase (Grid sends start notification late)
+  - 5-second debounce for grouping ban events into phases
+  - Settings UI for enabling/disabling sounds and adjusting volume (0-100%)
+  - Automatic settings reload when user saves preferences
+  - **Protection against historical log spam**: Ignores old events when Grid loads match history
+    - 5-second grace period after initialization (no sounds during initial load)
+    - Events older than 15 seconds are ignored (prevents sound shock from history dump)
+
+### 🔧 Implementation Details
+- `stats_sounds.js`: Core sound notification module (~300 lines)
+  - Audio player pool with caching
+  - Ban phase detection logic with debouncing
+  - Integration with Grid live logs via 'lol-live-log-update' CustomEvent
+  - Settings management (soundsEnabled, soundsVolume)
+- `settings/sounds.js`: Settings module for sound preferences
+- Settings IPC: 'settings-saved' broadcast to all windows on save
+- Store keys: `soundsEnabled` (boolean), `soundsVolume` (0-100)
+
 ## [0.2.5] - 2026-01-31
 
 ### 🏗️ Major Refactor

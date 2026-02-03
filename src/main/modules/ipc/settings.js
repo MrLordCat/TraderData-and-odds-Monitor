@@ -5,6 +5,25 @@ function initSettingsIpc(ctx){
   const { ipcMain, store, settingsOverlay, statsManager } = ctx;
   ipcMain.on('open-settings', ()=> settingsOverlay.open());
   ipcMain.on('close-settings', ()=> settingsOverlay.close());
+  
+  // Broadcast settings-updated to all windows when settings are saved
+  ipcMain.on('settings-saved', () => {
+    try {
+      const { BrowserWindow } = require('electron');
+      BrowserWindow.getAllWindows().forEach(w => {
+        try { w.webContents.send('settings-updated'); } catch(_){ }
+        // Also send to BrowserViews (stats panel when docked)
+        try {
+          if(typeof w.getBrowserViews === 'function'){
+            w.getBrowserViews().forEach(vw => {
+              try { vw.webContents.send('settings-updated'); } catch(_){ }
+            });
+          }
+        } catch(_){ }
+      });
+    } catch(e){ console.error('[settings] broadcast settings-updated failed:', e); }
+  });
+  
   function forwardHeatBar(cfg){
     try { if(statsManager && statsManager.views && statsManager.views.panel){ statsManager.views.panel.webContents.send('gs-heatbar-apply', cfg); } } catch(_){ }
   }

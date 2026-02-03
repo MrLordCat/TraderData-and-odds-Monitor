@@ -15,6 +15,7 @@ import { init as initUpdater } from '../scripts/settings/updater.js';
 import { init as initExtension } from '../scripts/settings/extension.js';
 import { init as initGameSelector } from '../scripts/settings/game-selector.js';
 import { init as initAddons } from '../scripts/settings/addons.js';
+import { initSounds, gatherSettings as gatherSoundsSettings, resetToDefaults as resetSounds } from '../scripts/settings/sounds.js';
 
 // Buffer for config that arrives before DOM ready
 let pendingConfig = null;
@@ -49,6 +50,7 @@ function initAll() {
   try { initExtension(); } catch (e) { console.error('[settings] extension init failed:', e); }
   try { initGameSelector(); } catch (e) { console.error('[settings] gameSelector init failed:', e); }
   try { initAddons(); } catch (e) { console.error('[settings] addons init failed:', e); }
+  try { initSounds(); } catch (e) { console.error('[settings] sounds init failed:', e); }
 
   // ===== Main buttons =====
   const resetBtn = document.getElementById('reset');
@@ -56,13 +58,28 @@ function initAll() {
   const closeBtn = document.getElementById('close');
   const backdrop = document.getElementById('backdrop');
 
-  if (resetBtn) resetBtn.onclick = () => resetHeatbar();
+  if (resetBtn) resetBtn.onclick = () => {
+    resetHeatbar();
+    resetSounds();
+  };
 
   if (saveBtn) {
-    saveBtn.onclick = () => {
+    saveBtn.onclick = async () => {
       saveHeatbar();
       saveAutoSettings();
       saveBrokerRefresh();
+      
+      // Save sounds settings
+      const soundsSettings = gatherSoundsSettings();
+      try {
+        ipcRenderer.send('set-setting', { key: 'soundsEnabled', value: soundsSettings.soundsEnabled });
+        ipcRenderer.send('set-setting', { key: 'soundsVolume', value: soundsSettings.soundsVolume });
+      } catch (e) {
+        console.error('[settings] save sounds failed:', e);
+      }
+      
+      // Notify all windows to reload settings
+      ipcRenderer.send('settings-saved');
       ipcRenderer.send('close-settings');
     };
   }

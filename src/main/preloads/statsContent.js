@@ -40,6 +40,11 @@ window.addEventListener('message', (e) => {
   if(d.source === 'lol-live-stats' || d.source === 'lol-multikill' || d.source==='lol-netWorth' || d.source==='lol-debug' || d.source==='lol-reset-trigger') {
     ipcRenderer.send('lol-stats-raw', { slot: __slot, data: d });
   }
+  // Forward sound events to main process for stats_panel
+  if(d.source === 'lol-sound-event') {
+    console.log('[statsContent] 📢 Forwarding sound event:', d.type);
+    ipcRenderer.send('lol-sound-event', { type: d.type, timestamp: d.timestamp });
+  }
 });
 
 // ================= Credential Auto-Fill & Capture =================

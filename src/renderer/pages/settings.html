@@ -78,76 +78,92 @@
 					<div class="hint">Tab/F1/F2/F3 are handled only when the app is active. Num5 is a global hotkey (if registered with the OS).</div>
 					</section>
 
-					<section class="seg">
-					<h2 class="sectionTitle">Auto Odds</h2>
-					<div class="grid formGrid">
-						<!-- Core Settings -->
-						<h3 class="subsectionTitle">⚙️ Core</h3>
-						<label for="auto-tolerance">Tolerance (%)</label>
-						<div class="rangeWrap">
-							<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />
-							<span id="auto-tolerance-val" class="rangeVal"></span>
-						</div>
-						<label for="auto-interval">Step interval (ms)
-							<small class="labelHint">How often Auto checks alignment</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-interval" type="range" min="120" max="2000" step="10" />
-							<span id="auto-interval-val" class="rangeVal"></span>
-						</div>
-						<label for="auto-pulse-step">Pulse step (%)
-							<small class="labelHint">Diff % per burst pulse (8-15); capped at 3 pulses</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-pulse-step" type="range" min="8" max="15" step="1" />
-							<span id="auto-pulse-step-val" class="rangeVal"></span>
-						</div>
-
-						<!-- Protection / Thresholds -->
-						<h3 class="subsectionTitle">🛡️ Protection</h3>
-						<label for="auto-suspend-threshold">Auto Suspend threshold (%)
-							<small class="labelHint">Pauses auto when diff ≥ this; resumes at half</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-suspend-threshold" type="range" min="15" max="80" step="1" />
-							<span id="auto-suspend-threshold-val" class="rangeVal"></span>
-						</div>
-						<label for="auto-shock-threshold">Shock threshold (%)
-							<small class="labelHint">Large odds shift detection (ARB protection)</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-shock-threshold" type="range" min="40" max="120" step="1" />
-							<span id="auto-shock-threshold-val" class="rangeVal"></span>
-						</div>
-						<label for="auto-stop-no-mid">Stop on no MID
-							<small class="labelHint">Disable Auto when MID data unavailable</small>
-						</label>
-						<input id="auto-stop-no-mid" type="checkbox" checked />
-						<label for="auto-resume-on-mid">Resume on MID
-							<small class="labelHint">Auto-resume when MID becomes available</small>
-						</label>
-						<input id="auto-resume-on-mid" type="checkbox" checked />
-
-						<!-- Timing Settings -->
-						<h3 class="subsectionTitle">⏱️ Timing</h3>
-						<label for="auto-fire-cooldown">Fire cooldown (ms)
-							<small class="labelHint">Min delay between keypresses</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-fire-cooldown" type="range" min="100" max="3000" step="50" />
-							<span id="auto-fire-cooldown-val" class="rangeVal"></span>
-						</div>
-						<label for="auto-pulse-gap">Pulse gap (ms)
-							<small class="labelHint">Delay between burst pulses</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-pulse-gap" type="range" min="100" max="1000" step="50" />
-							<span id="auto-pulse-gap-val" class="rangeVal"></span>
-						</div>
+				<section class="seg">
+				<h2 class="sectionTitle">Sound Notifications</h2>
+				<div class="grid formGrid">
+					<label for="sounds-enabled">Enable sounds
+						<small class="labelHint">Play sounds for match events (first blood, towers, etc.)</small>
+					</label>
+					<input id="sounds-enabled" type="checkbox" checked />
+					<label for="sounds-volume">Volume</label>
+					<div class="rangeWrap">
+						<input id="sounds-volume" type="range" min="0" max="100" step="5" value="70" />
+						<span id="sounds-volume-val" class="rangeVal">70%</span>
 					</div>
-					<div class="hint">Tolerance: diff% below this considered aligned. Step interval: polling rate. Pulse step: each step adds one pulse (max 3). Suspend: pauses on large diff. Shock: ARB detection.</div>
-					<div class="hint"><strong>Note:</strong> Excel/DS mode selection is on the Odds Board (Excel and DS buttons).</div>
-					</section>
+				</div>
+				<div class="hint">Sounds play for game start (based on ban phase), first blood, first tower, quadra and penta kills. Volume adjusts all notification sounds.</div>
+				</section>
+
+				<section class="seg">
+				<h2 class="sectionTitle">Auto Odds</h2>
+				<div class="grid formGrid">
+					<!-- Core Settings -->
+					<h3 class="subsectionTitle">⚙️ Core</h3>
+					<label for="auto-tolerance">Tolerance (%)</label>
+					<div class="rangeWrap">
+						<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />
+						<span id="auto-tolerance-val" class="rangeVal"></span>
+					</div>
+					<label for="auto-interval">Step interval (ms)
+						<small class="labelHint">How often Auto checks alignment</small>
+					</label>
+					<div class="rangeWrap">
+						<input id="auto-interval" type="range" min="120" max="2000" step="10" />
+						<span id="auto-interval-val" class="rangeVal"></span>
+					</div>
+					<label for="auto-pulse-step">Pulse step (%)
+						<small class="labelHint">Diff % per burst pulse (8-15); capped at 3 pulses</small>
+					</label>
+					<div class="rangeWrap">
+						<input id="auto-pulse-step" type="range" min="8" max="15" step="1" />
+						<span id="auto-pulse-step-val" class="rangeVal"></span>
+					</div>
+
+					<!-- Protection / Thresholds -->
+					<h3 class="subsectionTitle">🛡️ Protection</h3>
+					<label for="auto-suspend-threshold">Auto Suspend threshold (%)
+						<small class="labelHint">Pauses auto when diff ≥ this; resumes at half</small>
+					</label>
+					<div class="rangeWrap">
+						<input id="auto-suspend-threshold" type="range" min="15" max="80" step="1" />
+						<span id="auto-suspend-threshold-val" class="rangeVal"></span>
+					</div>
+					<label for="auto-shock-threshold">Shock threshold (%)
+						<small class="labelHint">Large odds shift detection (ARB protection)</small>
+					</label>
+					<div class="rangeWrap">
+						<input id="auto-shock-threshold" type="range" min="40" max="120" step="1" />
+						<span id="auto-shock-threshold-val" class="rangeVal"></span>
+					</div>
+					<label for="auto-stop-no-mid">Stop on no MID
+						<small class="labelHint">Disable Auto when MID data unavailable</small>
+					</label>
+					<input id="auto-stop-no-mid" type="checkbox" checked />
+					<label for="auto-resume-on-mid">Resume on MID
+						<small class="labelHint">Auto-resume when MID becomes available</small>
+					</label>
+					<input id="auto-resume-on-mid" type="checkbox" checked />
+
+					<!-- Timing Settings -->
+					<h3 class="subsectionTitle">⏱️ Timing</h3>
+					<label for="auto-fire-cooldown">Fire cooldown (ms)
+						<small class="labelHint">Min delay between keypresses</small>
+					</label>
+					<div class="rangeWrap">
+						<input id="auto-fire-cooldown" type="range" min="100" max="3000" step="50" />
+						<span id="auto-fire-cooldown-val" class="rangeVal"></span>
+					</div>
+					<label for="auto-pulse-gap">Pulse gap (ms)
+						<small class="labelHint">Delay between burst pulses</small>
+					</label>
+					<div class="rangeWrap">
+						<input id="auto-pulse-gap" type="range" min="100" max="1000" step="50" />
+						<span id="auto-pulse-gap-val" class="rangeVal"></span>
+					</div>
+				</div>
+				<div class="hint">Tolerance: diff% below this considered aligned. Step interval: polling rate. Pulse step: each step adds one pulse (max 3). Suspend: pauses on large diff. Shock: ARB detection.</div>
+				<div class="hint"><strong>Note:</strong> Excel/DS mode selection is on the Odds Board (Excel and DS buttons).</div>
+				</section>
 
 				<!-- Game Stats Theme section removed (LoL table theme controls deprecated) -->
 					<section class="seg">
@@ -174,7 +190,7 @@
 					<h2 class="sectionTitle">Activity Heat Bar</h2>
 					<div class="grid formGrid">
 						<label for="hb-enabled">Enabled</label><input id="hb-enabled" type="checkbox" />
-						<label for="hb-decay">Decay (/sec)</label><input id="hb-decay" type="number" min="0.01" max="2" step="0.01" />
+						<label for="hb-decay">Fade time (sec)</label><input id="hb-decay" type="number" min="0.5" max="30" step="0.5" />
 						<label for="hb-bump">Bump (+)</label><input id="hb-bump" type="number" min="0.01" max="1" step="0.01" />
 						<label for="hb-color1">Team 1 color</label><input id="hb-color1" type="color" />
 						<label for="hb-color2">Team 2 color</label><input id="hb-color2" type="color" />

@@ -2,6 +2,7 @@
 const { ipcRenderer } = require('electron');
 
 // ===== State =====
+// NOTE: decayPerSec is stored internally, but UI shows "fade time" in seconds (fadeSec = 1/decayPerSec)
 let currentHeatBar = { enabled: true, decayPerSec: 0.18, bumpAmount: 0.22, color1: '#3c78ff', color2: '#ff4646' };
 let currentStatsConfig = { winLoseEnabled: true, heatBarOpacity: 0.55 };
 
@@ -66,13 +67,17 @@ function updateStatsConfigFromInputs(immediate) {
 }
 
 function applyHeatBarInputs() {
-	const decayRaw = hb.decay ? hb.decay.value.trim() : '';
+	// UI shows "fade time" in seconds; convert to decayPerSec = 1/fadeSec
+	const fadeSecRaw = hb.decay ? hb.decay.value.trim() : '';
 	const bumpRaw = hb.bump ? hb.bump.value.trim() : '';
-	const decayNum = Number(decayRaw);
+	const fadeSecNum = Number(fadeSecRaw);
 	const bumpNum = Number(bumpRaw);
+	// Clamp fade time: 0.5s to 30s -> decayPerSec: 2 to 0.033
+	const fadeSec = Math.max(0.5, Math.min(30, !isNaN(fadeSecNum) && fadeSecNum > 0 ? fadeSecNum : 5.5));
+	const decayPerSec = 1 / fadeSec;
 	currentHeatBar = {
 		enabled: hb.enabled ? !!hb.enabled.checked : currentHeatBar.enabled,
-		decayPerSec: Math.max(0.01, Math.min(2, !isNaN(decayNum) ? decayNum : currentHeatBar.decayPerSec)),
+		decayPerSec: decayPerSec,
 		bumpAmount: Math.max(0.01, Math.min(1, !isNaN(bumpNum) ? bumpNum : currentHeatBar.bumpAmount)),
 		color1: (hb.color1 && hb.color1.value) || currentHeatBar.color1,
 		color2: (hb.color2 && hb.color2.value) || currentHeatBar.color2
@@ -115,7 +120,7 @@ function bindEvents() {
 // ===== Actions =====
 function reset() {
 	if (hb.enabled) hb.enabled.checked = true;
-	if (hb.decay) hb.decay.value = '0.18';
+	if (hb.decay) hb.decay.value = '5.5';  // 5.5 sec fade time = decayPerSec ~0.18
 	if (hb.bump) hb.bump.value = '0.22';
 	if (hb.color1) hb.color1.value = '#3c78ff';
 	if (hb.color2) hb.color2.value = '#ff4646';
@@ -128,7 +133,8 @@ function save() {
 	applyHeatBarInputs();
 	currentHeatBar.decayPerSec = +Number(currentHeatBar.decayPerSec).toFixed(3);
 	currentHeatBar.bumpAmount = +Number(currentHeatBar.bumpAmount).toFixed(3);
-	if (hb.decay) hb.decay.value = String(currentHeatBar.decayPerSec);
+	// UI shows fade time (sec), not decayPerSec
+	if (hb.decay) hb.decay.value = String((1 / currentHeatBar.decayPerSec).toFixed(1));
 	if (hb.bump) hb.bump.value = String(currentHeatBar.bumpAmount);
 	ipcRenderer.send('gs-heatbar-save', currentHeatBar);
 	updateStatsConfigFromInputs(false);
@@ -141,7 +147,9 @@ function applyConfig(cfg) {
 		currentHeatBar = { ...currentHeatBar, ...cfg.gsHeatBar };
 	}
 	if (hb.enabled) hb.enabled.checked = !!currentHeatBar.enabled;
-	if (hb.decay) hb.decay.value = String(currentHeatBar.decayPerSec);
+	// UI shows fade time (sec) = 1/decayPerSec
+	const fadeSec = currentHeatBar.decayPerSec > 0 ? (1 / currentHeatBar.decayPerSec) : 5.5;
+	if (hb.decay) hb.decay.value = String(fadeSec.toFixed(1));
 	if (hb.bump) hb.bump.value = String(currentHeatBar.bumpAmount);
 	if (hb.color1) hb.color1.value = currentHeatBar.color1;
 	if (hb.color2) hb.color2.value = currentHeatBar.color2;

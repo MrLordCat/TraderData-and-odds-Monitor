@@ -6,6 +6,9 @@ const { BrowserView, Menu, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Module-level flag to prevent duplicate IPC registration
+let soundIpcRegistered = false;
+
 function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardManagerRef: initialBoardRef }) {
   // --- Persistent + session state ---------------------------------------------------------
   const { STATS_PANEL_WIDTH: DEFAULT_PANEL_WIDTH } = require('../utils/constants');
@@ -36,6 +39,18 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   let statsActive = false;    // Stats mode (A/B views visible)
 
   let hotkeysRef = hotkeys || null;
+
+  // Register sound event IPC early (before Grid loads) - only once per process
+  if (!soundIpcRegistered) {
+    soundIpcRegistered = true;
+    const { ipcMain } = require('electron');
+    ipcMain.on('lol-sound-event', (_e, { type, timestamp }) => {
+      console.log('[stats] 📢 Sound event received:', type, 'panel=', !!views.panel);
+      if(views.panel) {
+        try { views.panel.webContents.send('lol-sound-event', { type, timestamp }); } catch(err){ console.error('[stats] send failed:', err); }
+      }
+    });
+  }
 
   // Temporary cover for stats mode
   const COVER_BG = '#0d0f17';
@@ -267,7 +282,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
       lolStats.handleRaw(data); 
       broadcast(lolStats.snapshot()); 
     }); 
-    ipcMain.on('lol-stats-reset',()=>{ if(lolStats){ lolStats.reset(); broadcast(lolStats.snapshot()); } }); 
+    ipcMain.on('lol-stats-reset',()=>{ if(lolStats){ lolStats.reset(); broadcast(lolStats.snapshot()); } });
+    // Note: lol-sound-event IPC is registered early in createStatsManager initialization
   }
   function maybeAutoReset(slot,url){ if(!lolStats) return; if(!/portal\.grid\.gg/i.test(url)) return; if(lastPortal[slot] && lastPortal[slot]!==url){ try { lolStats.reset(); lolStats.reinject && lolStats.reinject(views[slot]); views[slot].webContents.executeJavaScript(`window.postMessage({ type:'restart_data_collection', reason:'url-change' }, '*');`).catch(()=>{}); broadcast(lolStats.snapshot()); } catch(_){ } } lastPortal[slot]=url; }
   
@@ -277,8 +293,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     ensureLolStats();
     try { view.webContents.send('identify-slot', slot); } catch(_){ }
     try {
+      // Only call init - it already injects the bundle. Don't call reinject here!
       lolStats.init(view, slot, (snap)=> broadcast(snap));
-      lolStats.reinject && lolStats.reinject(view);
     } catch(e){ console.error('[stats] Injection error:', e); }
   }
   
@@ -372,7 +388,14 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
       try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','..','renderer','pages','stats_panel.html')); } catch(_){ }
       views.panel.webContents.on('did-finish-load', ()=>{ 
         try { 
-          const hb = store.get('gsHeatBar'); 
+          let hb = store.get('gsHeatBar'); 
+          // Migration: if decayPerSec > 1, user likely entered "seconds" in old UI
+          // Convert: old value was "2" meaning "2 seconds", so decayPerSec should be 1/2 = 0.5
+          if(hb && typeof hb.decayPerSec === 'number' && hb.decayPerSec > 1) {
+            console.log('[stats] Migrating gsHeatBar.decayPerSec from', hb.decayPerSec, 'to', 1/hb.decayPerSec);
+            hb = { ...hb, decayPerSec: 1 / hb.decayPerSec };
+            store.set('gsHeatBar', hb);
+          }
           views.panel.webContents.send('stats-init', { 
             urls, mode, side, panelWidth, 
             lolManualMode, lolMetricVisibility, lolMetricOrder, 

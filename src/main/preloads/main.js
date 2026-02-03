@@ -146,6 +146,9 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ,dsAutoCommand: (command, opts) => ipcRenderer.invoke('ds-auto-command', command, opts)
   ,dsConnectionStatus: () => ipcRenderer.invoke('ds-connection-status')
   ,dsGetLastOdds: () => ipcRenderer.invoke('ds-get-last-odds')
+
+  // --- LoL Sound Events API ---
+  ,onLolSoundEvent: (cb) => withUnsub('lol-sound-event', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

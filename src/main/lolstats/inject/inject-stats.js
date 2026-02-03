@@ -1,9 +1,9 @@
-// ORIGINAL EXTENSION SOURCE (copied)
-// ...existing code...
 // inject-stats.js (per-game with team-level tower/inhib)
 (() => {
 
   const RX_GAME_START = /^Game\s+(\d+)\s+started$/i;
+  const RX_SERIES_START = /^Series\s+started$/i;
+  const RX_SERIES_END = /^Series\s+ended$/i;
   const RX_KILL       = /\bkilled\b/i;
   const RX_TOWER      = /destroyed\s+tower/i;
   const RX_INHIB      = /destroyed\s+(?:inhibitor|fortifier)/i;
@@ -11,6 +11,7 @@
   const RX_DRAGON     = /slaydragon/i;
   const RX_DRAKE      = /slay\w*drake/i;
   const RX_ATAKHAN    = /slaythornboundatakhan/i; // Atakhan objective
+  const RX_BANNED     = /\bbanned\b/i; // Ban detection
   // Strict single-line winner detection: "<Team Name> won Game <N>"
   const RX_GAME_WIN_SINGLE = /^\s*(.*?)\s+won\s+Game\s+(\d+)\s*$/i;
   // Multi-kill timing thresholds
@@ -27,6 +28,32 @@
   let __publishTimer = null; const PUBLISH_DEBOUNCE_MS = 120;
   function schedulePublish(){ if(__publishTimer) return; __publishTimer = setTimeout(()=>{ __publishTimer=null; try { publish(); } catch(_){ } }, PUBLISH_DEBOUNCE_MS); }
   // Note: multi-line/block-based winner inference removed to prevent false positives.
+
+  // Sound suppression: don't play sounds during initial backlog processing (historical data)
+  let soundsEnabled = false; // Will be enabled after backlog processing completes
+  const SOUND_ENABLE_DELAY_MS = 2000; // Wait 2 seconds after backlog before enabling sounds
+
+  // Sound notification helper - sends message to be picked up by preload/main
+  // Always use Date.now() for timestamp - game timestamps are relative and unusable for freshness checks
+  function playSound(soundType) {
+    if (!soundsEnabled) {
+      console.log(`[inject-stats] 🔇 Sound suppressed (backlog): ${soundType}`);
+      return;
+    }
+    try {
+      const eventTs = Date.now();
+      console.log(`[inject-stats] 🔊 playSound: ${soundType} (ts=${eventTs})`);
+      
+      // Send via postMessage - will be picked up by preload script
+      window.postMessage({
+        source: 'lol-sound-event',
+        type: soundType,
+        timestamp: eventTs
+      }, '*');
+    } catch(e) {
+      console.warn('[inject-stats] Sound trigger failed:', e);
+    }
+  }
 
   const gameStats = {};
   let currentGame = null;
@@ -120,6 +147,9 @@
     dragonTimestamps.clear();
     currentGame = null;
     
+    // Ensure sounds are disabled during backlog processing
+    soundsEnabled = false;
+    
     let processedCount = 0;
   backlog.forEach(entry => {
       const entryKey = `${entry.text}-${entry.ts}`;
@@ -131,6 +161,12 @@
     });
     
     publish();
+    
+    // Enable sounds after a delay (to skip any remaining queued events)
+    setTimeout(() => {
+      soundsEnabled = true;
+      console.log('[inject-stats] 🔊 Sounds enabled (backlog processing complete)');
+    }, SOUND_ENABLE_DELAY_MS);
   }
 
   // 2) live-log entry
@@ -161,9 +197,24 @@
       return;
     }
     
-  // 2.1) Game N started? + detect win pattern
+  // 2.1) Game N started? + detect win pattern + Series events
   const chunks0 = raw.body?.entryToAdd?.sentenceChunks || [];
     const head = chunks0.map(c=>c.text).join(' ').trim();
+    
+    // Series started - reset sound state for new series
+    if (RX_SERIES_START.test(head)) {
+      console.log('[inject-stats] Series started - resetting sound state');
+      playSound('seriesStart');
+      return;
+    }
+    
+    // Series ended - notify parent
+    if (RX_SERIES_END.test(head)) {
+      console.log('[inject-stats] Series ended');
+      playSound('seriesEnd');
+      return;
+    }
+    
     const mStart = RX_GAME_START.exec(head);
     if (mStart) {
       currentGame = mStart[1];
@@ -174,6 +225,8 @@
       dragonTimestamps.clear();
   // Reset multi streaks for new map
   multiStreaks.clear();
+      // Play game start sound
+      playSound('gameStart');
   // Immediately publish new empty game so popup can react (overlay animation)
   publish();
       return;
@@ -230,6 +283,8 @@
         if (!stats.firstKill) {
           stats.firstKill   = team;
           stats.firstKillAt = ts;
+          // Play first blood sound
+          playSound('firstBlood');
         }
         // общий счёт
         stats.killCount[team] = (stats.killCount[team]||0) + 1;
@@ -252,8 +307,17 @@
   let cnt;
   if(!prev || delta > threshold){ cnt=1; } else { cnt = prev.count + 1; }
   multiStreaks.set(killer, { count: cnt, lastMs: nowMs });
-  if(cnt === 4 && !stats.quadra){ stats.quadra = playerToTeam.get(killer) || team; stats.quadraAt = ts; }
-  else if(cnt === 5 && !stats.penta){ stats.penta = playerToTeam.get(killer) || team; stats.pentaAt = ts; multiStreaks.set(killer, { count: 0, lastMs: nowMs }); }
+  if(cnt === 4 && !stats.quadra){ 
+    stats.quadra = playerToTeam.get(killer) || team; 
+    stats.quadraAt = ts;
+    playSound('quadraKill');
+  }
+  else if(cnt === 5 && !stats.penta){ 
+    stats.penta = playerToTeam.get(killer) || team; 
+    stats.pentaAt = ts; 
+    playSound('pentaKill');
+    multiStreaks.set(killer, { count: 0, lastMs: nowMs }); 
+  }
       }
     }
 
@@ -262,6 +326,7 @@
       if (!stats.firstTower) {
         stats.firstTower   = team;
         stats.firstTowerAt = ts;
+        playSound('firstTower');
       }
       stats.towerCount[team] = (stats.towerCount[team]||0) + 1;
     }

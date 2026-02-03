@@ -34,7 +34,12 @@ function createSettingsOverlay(ctx){
     } catch(_){ }
     try { settingsView.webContents.loadFile(path.join(__dirname,'..','..','..','renderer','pages','settings.html')); } catch(_){ }
     settingsView.webContents.on('did-finish-load', ()=>{ try {
-      const gsHeatBar = ctx.store ? ctx.store.get('gsHeatBar') : null;
+      let gsHeatBar = ctx.store ? ctx.store.get('gsHeatBar') : null;
+      // Migration: if decayPerSec > 1, user likely entered "seconds" in old UI
+      if(gsHeatBar && typeof gsHeatBar.decayPerSec === 'number' && gsHeatBar.decayPerSec > 1) {
+        gsHeatBar = { ...gsHeatBar, decayPerSec: 1 / gsHeatBar.decayPerSec };
+        if(ctx.store) ctx.store.set('gsHeatBar', gsHeatBar);
+      }
       const statsConfig = ctx.store ? ctx.store.get('statsConfig') : null;
       settingsView.webContents.send('settings-init', { gsHeatBar, statsConfig });
     } catch(_){ } });

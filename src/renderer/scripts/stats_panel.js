@@ -82,6 +82,17 @@ try {
   });
 } catch(_){ }
 
+// Listen for settings updates to reload sound preferences
+try {
+  ipcRenderer.on('settings-updated', ()=>{
+    try {
+      if(window.__STATS_SOUNDS__ && typeof window.__STATS_SOUNDS__.loadSettings === 'function'){
+        window.__STATS_SOUNDS__.loadSettings();
+      }
+    } catch(e){ console.warn('[stats_panel] Failed to reload sound settings:', e); }
+  });
+} catch(_){ }
+
 // (Removed) Capture Data prototype wiring – feature deprecated.
 
 // (Theme logic moved to stats_theme.js)
