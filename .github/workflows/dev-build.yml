@@ -6,6 +6,7 @@
 name: Dev Build
 
 on:
+  workflow_dispatch:  # Allow manual trigger
   push:
     branches:
       - main
