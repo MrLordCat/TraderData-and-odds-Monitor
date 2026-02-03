@@ -1,7 +1,7 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen, Menu, globalShortcut, dialog } = require('electron');
 
 // Enable WebGL for addons (Power Towers TD)
-// Build trigger: extractors refactoring (2.1) complete
+// v0.2.5 dev build - extractors modular, esbuild bundles
 app.commandLine.appendSwitch('ignore-gpu-blacklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
