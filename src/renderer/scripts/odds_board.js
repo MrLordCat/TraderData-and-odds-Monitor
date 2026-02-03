@@ -225,9 +225,9 @@ function renderEmbeddedOdds(){
   const vals=Object.values(embeddedOddsData).filter(r=>r.broker!=='excel' && r.broker!=='ds');
   let liveNums1 = [];
   let liveNums2 = [];
-  if(window.OddsBoardShared && window.OddsBoardShared.buildRowsHtml){
-    const out = window.OddsBoardShared.buildRowsHtml(vals, { variant:'embedded', isSwapped: (b)=> !!(window.__swappedBrokers && window.__swappedBrokers.has(b)) });
-    rowsEl.innerHTML = out.html;
+  // Use smart incremental update instead of full rebuild
+  if(window.OddsBoardShared && window.OddsBoardShared.updateOddsTable){
+    const out = window.OddsBoardShared.updateOddsTable(rowsEl, vals, { variant:'embedded', isSwapped: (b)=> !!(window.__swappedBrokers && window.__swappedBrokers.has(b)) });
     embeddedBest1 = out.best1;
     embeddedBest2 = out.best2;
     liveNums1 = out.liveNums1 || [];

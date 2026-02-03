@@ -223,11 +223,12 @@ function renderBoard(){
     .filter(r => r.broker !== 'excel' && r.broker !== 'ds')
     .sort((a, b) => a.broker.localeCompare(b.broker));
   
-  if(window.OddsBoardShared?.buildRowsHtml){
-    tb.innerHTML = window.OddsBoardShared.buildRowsHtml(vals, { 
+  // Use smart incremental update instead of full rebuild
+  if(window.OddsBoardShared?.updateOddsTable){
+    window.OddsBoardShared.updateOddsTable(tb, vals, { 
       variant: 'board', 
       isSwapped: b => swapped.has(b) 
-    }).html;
+    });
   }
   
   // Update Excel row

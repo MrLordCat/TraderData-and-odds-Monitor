@@ -133,24 +133,34 @@
 }
 
 /* ===== Movement color indicators (2s duration, smooth fade) ===== */
-/* Base transition on all odds cells for smooth fade-out */
-.embeddedOddsTable td:not(.eo-broker):not(.eo-swap-cell),
-#table td:not(:first-child) {
-	transition: color 0.4s ease-out, background 0.5s ease-out;
+/* Use CSS animation instead of transition (innerHTML rebuild breaks transitions) */
+
+@keyframes odds-flash-up {
+	0% { background: rgba(74, 222, 128, 0); color: inherit; }
+	15% { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+	85% { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+	100% { background: rgba(74, 222, 128, 0); color: inherit; }
+}
+
+@keyframes odds-flash-down {
+	0% { background: rgba(248, 113, 113, 0); color: inherit; }
+	15% { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+	85% { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+	100% { background: rgba(248, 113, 113, 0); color: inherit; }
 }
 
 .embeddedOddsTable td.odds-up,
+.embeddedOddsTable .odds-cell-1.odds-up,
+.embeddedOddsTable .odds-cell-2.odds-up,
 #table td.odds-up {
-	color: var(--md-sys-color-success, #4ade80);
-	background: rgba(74, 222, 128, 0.15);
-	transition: color 0.15s ease-in, background 0.15s ease-in;
+	animation: odds-flash-up 2s ease-out forwards;
 }
 
 .embeddedOddsTable td.odds-down,
+.embeddedOddsTable .odds-cell-1.odds-down,
+.embeddedOddsTable .odds-cell-2.odds-down,
 #table td.odds-down {
-	color: var(--md-sys-color-error, #f87171);
-	background: rgba(248, 113, 113, 0.15);
-	transition: color 0.15s ease-in, background 0.15s ease-in;
+	animation: odds-flash-down 2s ease-out forwards;
 }
 
 /* ===== DS / Excel row no-data state ===== */
