@@ -26,10 +26,4 @@ import '../auto/loader.js';
 // Addon loader
 import '../scripts/addon_loader.js';
 
-// Ensure globals are available for legacy code
-if (typeof window !== 'undefined') {
-  window.OddsCore = OddsCore;
-  window.OddsBoardShared = OddsBoardShared;
-}
-
 console.log('[stats-panel-bundle] Loaded');

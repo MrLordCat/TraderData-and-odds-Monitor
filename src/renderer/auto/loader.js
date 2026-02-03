@@ -1,12 +1,12 @@
 /**
  * Auto Mode Loader
  * 
- * Non-module entry point that loads all Auto Mode modules
- * and attaches them to window for use by existing code.
+ * ES module that loads all Auto Mode modules.
  * 
- * This file uses IIFE pattern (not ES modules) for compatibility
- * with existing script tag loading.
+ * This file is loaded as part of the bundle - imports OddsCore directly.
  */
+
+import OddsCore from '../core/odds_core.js';
 
 (function(global) {
   'use strict';
@@ -124,8 +124,8 @@
     
     function init() {
       if (oddsHub) return;
-      if (global.OddsCore && global.OddsCore.createOddsHub) {
-        oddsHub = global.OddsCore.createOddsHub();
+      if (OddsCore && OddsCore.createOddsHub) {
+        oddsHub = OddsCore.createOddsHub();
         oddsHub.subscribe(onOddsUpdate);
         oddsHub.start();
       }
@@ -139,8 +139,8 @@
     }
     
     function computeDerived() {
-      if (global.OddsCore && global.OddsCore.computeDerivedFrom) {
-        state.derived = global.OddsCore.computeDerivedFrom(state.records);
+      if (OddsCore && OddsCore.computeDerivedFrom) {
+        state.derived = OddsCore.computeDerivedFrom(state.records);
       } else {
         state.derived = { hasMid: false, mid: null, arbProfitPct: null };
       }

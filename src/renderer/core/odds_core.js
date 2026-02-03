@@ -1,5 +1,5 @@
 // Shared Odds Core
-// ES module with backward-compatible window.OddsCore export
+// ES module exporting OddsCore
 // Provides:
 //  - createOddsHub(): subscribe to odds-update and keep shared state
 //  - computeDerivedFrom(records): compute hasMid/arb/mid from any records map
@@ -149,11 +149,6 @@ export function createOddsHub() {
 
 // Public API
 const OddsCore = { createOddsHub, computeDerivedFrom };
-
-// Backward compatibility: attach to window for script tag usage
-if (typeof window !== 'undefined') {
-  window.OddsCore = OddsCore;
-}
 
 // Default export for ES modules
 export default OddsCore;

@@ -145,8 +145,3 @@ export { invoke, send, on, callApi, bindBtnToApi, bindCheckboxToApi, bindSelectT
 
 const ApiHelpers = { invoke, send, on, callApi, bindBtnToApi, bindCheckboxToApi, bindSelectToApi };
 export default ApiHelpers;
-
-// Backward compatibility
-if (typeof window !== 'undefined') {
-  window.ApiHelpers = ApiHelpers;
-}

@@ -64,8 +64,3 @@ export { showMiniToastNear, clearToast, getActiveToast };
 
 const MiniToast = { showMiniToastNear, clearToast, getActiveToast };
 export default MiniToast;
-
-// Backward compatibility: attach to window
-if (typeof window !== 'undefined') {
-  window.MiniToast = MiniToast;
-}

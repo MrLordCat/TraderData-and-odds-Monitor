@@ -1,11 +1,11 @@
 // Shared Excel Extractor status UI logic
 // Eliminates duplication between board.js and stats_embedded.js
 
-// Lazy getter for MiniToast - resolves at call time, not load time
+import MiniToast from './toast.js';
+
+// Getter for MiniToast - now uses direct import
 function getMiniToast(){
-  if(typeof window !== 'undefined' && window.MiniToast) return window.MiniToast;
-  try { return require('./toast'); } catch(_){ }
-  return null;
+  return MiniToast;
 }
 
 /**
@@ -241,8 +241,3 @@ export { parseStatus, getStatusText, computeStatusSig, isImportantChange, showTo
 
 const ExcelStatusUI = { parseStatus, getStatusText, computeStatusSig, isImportantChange, showToast, clearToast, bindExcelStatusButton };
 export default ExcelStatusUI;
-
-// Backward compatibility
-if (typeof window !== 'undefined') {
-  window.ExcelStatusUI = ExcelStatusUI;
-}

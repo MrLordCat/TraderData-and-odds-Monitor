@@ -260,8 +260,3 @@ export {
 };
 
 export default OddsBoardShared;
-
-// Backward compatibility: attach to window for script tag usage
-if (typeof window !== 'undefined') {
-  window.OddsBoardShared = OddsBoardShared;
-}
