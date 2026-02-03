@@ -5,6 +5,9 @@
   "author": "MrLordCat",
   "license": "MIT",
   "description": "Desktop odds monitor (Electron prototype)",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MrLordCat/TraderData-and-odds-Monitor.git"
@@ -27,7 +30,7 @@
     "dist:dir": "electron-builder --dir",
     "dist:zip": "electron-builder --dir && powershell -NoProfile -Command Compress-Archive -Force dist/win-unpacked/* dist/OddsMoni-portable.zip",
     "dist:portable": "electron-builder --dir && powershell -NoProfile -Command \"$name = (Get-Content package.json | ConvertFrom-Json).build.productName; $ver = (Get-Content package.json | ConvertFrom-Json).version; $arch=$env:PROCESSOR_ARCHITECTURE; Compress-Archive -Force dist/win-unpacked/* \"dist/$name-$ver-$arch-portable.zip\"\"",
-    "pack:win": "electron-packager . OddsMoni --platform=win32 --arch=x64 --out=dist-pack --overwrite --prune=true",
+    "pack:win": "npx @electron/packager . OddsMoni --platform=win32 --arch=x64 --out=dist-pack --overwrite --prune=true",
     "pack:zip": "npm run -s pack:win && powershell -NoProfile -Command \"Compress-Archive -Force dist-pack/OddsMoni-win32-x64/* dist-pack/OddsMoni-win32-x64-portable.zip\""
   },
   "build": {
@@ -58,8 +61,8 @@
   },
   "devDependencies": {
     "electron": "^38.0.0",
-    "electron-builder": "26.7.0",
-    "electron-packager": "^17.1.2",
+    "electron-builder": "^26.0.0",
+    "@electron/packager": "^18.3.5",
     "esbuild": "^0.27.2"
   }
 }
