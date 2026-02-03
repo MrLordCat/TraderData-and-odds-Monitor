@@ -9,7 +9,7 @@ try {
     ipcRenderer = require('electron').ipcRenderer;
     if (typeof window !== 'undefined') window.ipcRenderer = ipcRenderer;
   }
-} catch (_) { /* no ipc */ }
+} catch (_) { /* no ipc  */ }
 
 let activityModule = null;
 try { activityModule = require('./stats_activity'); } catch (_) { }
