@@ -62,7 +62,17 @@ src/
 │   ├── ui/                    # UI components (toast, excel_status, api_helpers)
 │   └── lolstats/              # LoL stats embeds
 ├── brokers/
-│   ├── extractors.js          # DOM parsers per bookmaker
+│   ├── extractors.js          # Backward-compat re-export wrapper
+│   ├── extractors/            # Modular extractor architecture
+│   │   ├── base.js            # Shared utilities (deepQuery, normalizeGame, etc.)
+│   │   ├── index.js           # Router/registry with EXTRACTOR_TABLE
+│   │   ├── rivalry.js         # Rivalry extractor (~220 lines)
+│   │   ├── bet365.js          # Bet365 extractor (~135 lines)
+│   │   ├── gg.js              # GG.bet extractor
+│   │   ├── thunderpick.js     # Thunderpick extractor (Bo1 support)
+│   │   ├── betboom.js         # Betboom extractor (Russian, Bo1)
+│   │   ├── pari.js            # Pari.ru extractor (Russian)
+│   │   └── marathon.js        # Marathon extractor
 │   └── mapNav.js              # Map navigation helpers
 └── assets/                    # Fonts, images
 
@@ -122,13 +132,20 @@ IPC is modular under `src/main/modules/ipc/*.js`:
 - Board docking uses `layoutManager.setDockOffsets({ side, width })`.
 
 ## 6. Broker Extension Pattern
+Extractors are modular under `src/brokers/extractors/`.
+
 To add a bookmaker:
 1. Add to `BROKERS` array in `src/main/main.js` (id + default URL).
-2. In `src/brokers/extractors.js`: implement `extractFoo(mapNum, game, opts)` returning `{ odds:[s1,s2], frozen }`.
-3. Add `test` regex + `fn` entry in `EXTRACTOR_TABLE`; update `getBrokerId` hostname mapping.
-   - Если экстрактору нужен `opts` (например, `opts.isLast` для Bo1), добавьте `passOpts: true`.
-   - Пример: `{ test: /thunderpick\.io$/i, fn: extractThunder, passOpts: true }`
+2. Create `src/brokers/extractors/<broker>.js` implementing `extractFoo(mapNum, game, opts)` returning `{ odds:[s1,s2], frozen }`.
+   - Import utilities from `./base.js`: `emptyResult()`, `deepQuery()`, `ordinalSuffix()`, etc.
+3. Register in `src/brokers/extractors/index.js`:
+   - Import: `const { extractFoo } = require('./foo');`
+   - Add to `EXTRACTOR_TABLE`: `{ test: /foo\.com$/i, fn: extractFoo, passOpts: true }`
+   - Add to `getBrokerId()` hostname mapping.
+   - Export from `module.exports`.
 4. Prefer stable selectors (data attributes) over brittle class names.
+
+**passOpts flag:** If extractor needs `opts` (e.g., `opts.isLast` for Bo1), set `passOpts: true`.
 
 **Bo1 handling (BetBoom, Thunderpick):**
 - При `mapNum === 1 && opts.isLast === true` экстрактор возвращает матчевые коэффициенты ("Исход матча"/"Match Winner").
