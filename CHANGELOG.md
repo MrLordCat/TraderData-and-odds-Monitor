@@ -15,6 +15,17 @@ All notable changes to this project will be documented in this file.
     - 5-second grace period after initialization (no sounds during initial load)
     - Events older than 15 seconds are ignored (prevents sound shock from history dump)
 
+### 🔧 Improvements
+- **Heat bar "Fade time" UX improvement**
+  - Changed UI from "Decay (/sec)" to "Fade time (sec)" for intuitive input
+  - User enters seconds until full fade (e.g., 2 = bar disappears in 2 seconds)
+  - Auto-migration: old values > 1 are automatically converted to correct format
+  - Formula: `decayPerSec = 1 / fadeTimeSec`
+
+### 🐛 Bug Fixes
+- **Fixed sound event duplication**: Removed redundant `reinject()` call in `maybeEarlyInject()`
+- **Fixed heat bar instant fade**: Migrated incorrectly stored decayPerSec values
+
 ### 🔧 Implementation Details
 - `stats_sounds.js`: Core sound notification module (~300 lines)
   - Audio player pool with caching

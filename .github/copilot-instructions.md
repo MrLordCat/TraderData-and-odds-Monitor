@@ -53,6 +53,7 @@ src/
 │   │       ├── init.js        # Version display, DevTools buttons
 │   │       ├── auto-settings.js # Auto trading settings
 │   │       ├── heatbar.js     # Heat bar & animations config
+│   │       ├── sounds.js      # Sound notification settings
 │   │       ├── updater.js     # Updates section
 │   │       ├── extension.js   # Edge Extension section
 │   │       ├── game-selector.js # Game selector
@@ -74,7 +75,8 @@ src/
 │   │   ├── pari.js            # Pari.ru extractor (Russian)
 │   │   └── marathon.js        # Marathon extractor
 │   └── mapNav.js              # Map navigation helpers
-└── assets/                    # Fonts, images
+└── assets/                    # Fonts, images, sounds
+    └── *.mp3                  # Sound notifications (GameOneStarted, FirstBlood, etc.)
 
 resources/extensions/uptime/   # Edge extension for DS uptime tracking
 ├── manifest.json              # Extension manifest v3
@@ -155,6 +157,12 @@ To add a bookmaker:
 - Stats modes: `hidden|embedded|window` in `statsState.mode`.
 - Board docking manipulates stage via `layoutManager.setDockOffsets`.
 - Stats panel receives odds via IPC, supports manual mode with stored game data.
+
+**Activity Heat Bar:**
+- Visual indicator of team activity in LoL stats table
+- UI setting: "Fade time (sec)" = seconds until full decay (e.g., 2 = 2 seconds)
+- Internal: `decayPerSec = 1 / fadeTimeSec` (stored in `gsHeatBar`)
+- Auto-migration: values > 1 are converted (old format was direct decayPerSec)
 
 ## 8. Auto Trading System (Refactored)
 Auto Mode has been completely rewritten into a **unified module** at `src/renderer/auto/loader.js`.
@@ -239,10 +247,41 @@ electron-store keys:
 - `lolTeamNames`, `autoRefreshEnabled`
 - `autoTolerancePct`, `autoSuspendThresholdPct`, `autoBurstLevels`
 - `gsHeatBar`, `statsConfig`, `lolManualData`
+- `soundsEnabled`, `soundsVolume` - Sound notification settings
 - Updater: `lastUpdateCheck`, `updateChannel`
 - Addons: `enabledAddons` (array of addon IDs)
 
 Always wrap fragile calls in `try/catch`.
+
+## 12.1 Sound Notifications
+Audio notifications for LoL match events (stats_panel only).
+
+**Architecture:**
+- `src/renderer/scripts/stats_sounds.js` - Sound playback module
+- `src/renderer/scripts/settings/sounds.js` - Settings UI module
+- `src/main/lolstats/inject/inject-stats.js` - Event detection + `playSound()` trigger
+- `src/main/preloads/statsContent.js` - IPC forwarding (`lol-sound-event`)
+
+**Sound Assets (`src/assets/`):**
+- `GameOneStarted.mp3` - `GameFiveStarted.mp3` (game start per map)
+- `FirstBlood.mp3`, `FirstTower.mp3` (early game events)
+- `QuadraKill.mp3`, `PentaKill.mp3` (multi-kills)
+
+**Event Flow:**
+1. inject-stats.js parses Grid live logs → detects event
+2. `playSound(type, ts)` → postMessage to statsContent.js preload
+3. statsContent.js → IPC `lol-sound-event` → main process
+4. main process → stats_panel webContents.send
+5. stats_sounds.js receives IPC, plays audio
+
+**Backlog Protection:**
+- `soundsEnabled = false` during initial Grid load
+- Enabled after 2-second delay post-backlog
+- Prevents spam from historical events when loading match in progress
+
+**Settings (electron-store):**
+- `soundsEnabled` (boolean, default: true)
+- `soundsVolume` (0-100, default: 80)
 
 ## 13. Extension Bridge (DS Uptime)
 WebSocket bridge for Edge extension communication:
