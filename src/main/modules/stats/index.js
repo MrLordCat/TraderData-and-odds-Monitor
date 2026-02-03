@@ -504,9 +504,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
       });
     }
   }
-  function detachToWindow(){ /* noop (removed) */ }
-  
-  function handleStageResized(){ 
+
+  function handleStageResized(){
     try { 
       const sy = stageBoundsRef && stageBoundsRef.value ? Number(stageBoundsRef.value.y) : embedOffsetY; 
       if(!isNaN(sy) && sy !== embedOffsetY) embedOffsetY = sy; 
@@ -589,7 +588,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     views, 
     createEmbedded, 
     destroyEmbedded, 
-    detachToWindow, 
     handleStageResized, 
     ensureTopmost, 
     setUrl, 

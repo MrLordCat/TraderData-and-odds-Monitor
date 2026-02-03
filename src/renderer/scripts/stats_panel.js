@@ -766,8 +766,6 @@ function renderLol(payload, manual=false){
     applyWinLose();
   };
   document.getElementById('swapTeamsBtn').title='Swap display order of teams';
-  // Local Detach button (stats window separation)
-  // detach button not present
   // Team names are read-only (from Excel K4/N4) - no dblclick editing
   // Manual toggle logic extension
   document.getElementById('lolManualMode').addEventListener('change', ()=>{ const on=document.getElementById('lolManualMode').checked; if(on){ if(cachedLive){ manualData.team1Name=cachedLive.team1Name||manualData.team1Name; manualData.team2Name=cachedLive.team2Name||manualData.team2Name; manualData.gameStats = JSON.parse(JSON.stringify(cachedLive.gameStats||manualData.gameStats)); } ensureRows(); attachManualHandlers(); updateGameSelect(); renderManual(); } else { updateGameSelect(); if(liveDataset) renderLol(liveDataset); } try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ } });

@@ -260,7 +260,7 @@ const { initUpdaterIpc } = require('./modules/ipc/updater');
 // Addon Manager for loading external modules
 const { createAddonManager } = require('./modules/addonManager');
 const { registerAddonIpc } = require('./modules/ipc/addons');
-// Module detach for sidebar modules
+// Module detach for sidebar modules (used by addons)
 const { registerModuleDetachIpc, closeAllDetachedWindows } = require('./modules/ipc/moduleDetach');
 // Extension Bridge for Edge upTime extension
 const { createExtensionBridge } = require('./modules/extensionBridge');
@@ -310,8 +310,7 @@ function createMainWindow() {
   } catch(_) {}
   mainWindow.on('close', () => {
     try { store.set('mainBounds', mainWindow.getBounds()); } catch(e) {}
-    // Close all detached module windows when main window closes
-    try { closeAllDetachedWindows(); } catch(e) { console.warn('[mainWindow.close] closeAllDetachedWindows error:', e.message); }
+    try { closeAllDetachedWindows(); } catch(e) {}
   });
   // Auto-focus mainWindow webContents after load so hotkeys work immediately
   mainWindow.webContents.once('did-finish-load', () => {
@@ -906,7 +905,6 @@ app.on('browser-window-created', (_e, win)=>{
 });
 app.on('before-quit', ()=>{ 
   quittingRef.value=true; 
-  // Close all detached module windows to prevent zombie processes
-  try { closeAllDetachedWindows(); } catch(e){ console.warn('[before-quit] closeAllDetachedWindows error:', e.message); }
+  try { closeAllDetachedWindows(); } catch(e){}
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
