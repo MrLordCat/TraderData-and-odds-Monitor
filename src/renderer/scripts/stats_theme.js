@@ -1,5 +1,6 @@
 // Theme & heat bar logic extracted from original stats_panel.js
 // ES module with backward compatibility
+// v0.2.5-dev build
 
 let ipcRenderer = null;
 try {
