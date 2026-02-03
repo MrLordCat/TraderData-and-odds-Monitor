@@ -16,7 +16,6 @@ const pageEntries = {
   'index': 'src/renderer/entries/index.entry.js',
   'settings': 'src/renderer/entries/settings.entry.js',
   'error': 'src/renderer/entries/error.entry.js',
-  'add-broker': 'src/renderer/entries/add-broker.entry.js',
 };
 
 // Standalone modules (can be loaded individually or bundled)
