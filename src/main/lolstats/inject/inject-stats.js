@@ -12,6 +12,7 @@
   const RX_DRAKE      = /slay\w*drake/i;
   const RX_ATAKHAN    = /slaythornboundatakhan/i; // Atakhan objective
   const RX_BANNED     = /\bbanned\b/i; // Ban detection
+  const RX_GAME_END   = /^Game\s+(\d+)\s+ended$/i; // Game end detection for ban phase logic
   // Strict single-line winner detection: "<Team Name> won Game <N>"
   const RX_GAME_WIN_SINGLE = /^\s*(.*?)\s+won\s+Game\s+(\d+)\s*$/i;
   // Multi-kill timing thresholds
@@ -24,6 +25,11 @@
   let processedEntries = new Set(); // Track processed entries to prevent duplicates
   let dragonTimestamps = new Map(); // Track dragon events by timestamp to prevent double counting
   const multiStreaks = new Map(); // killer(lower) -> { count, lastMs }
+  
+  // Ban phase detection for game start sounds
+  let lastCompletedGame = 0; // Last game that ended (0 = none, 1-5 = completed games)
+  let banPhaseTriggered = false; // Flag to prevent multiple gameStart sounds per ban phase
+  let seriesActive = false; // Flag to track if a series is in progress (for first game detection)
   // Debounce publish to avoid sequential flood during backlog replay
   let __publishTimer = null; const PUBLISH_DEBOUNCE_MS = 120;
   function schedulePublish(){ if(__publishTimer) return; __publishTimer = setTimeout(()=>{ __publishTimer=null; try { publish(); } catch(_){ } }, PUBLISH_DEBOUNCE_MS); }
@@ -131,6 +137,9 @@
       playerToTeam = newPlayerToTeam;
       [team1Name, team2Name] = [newTeam1Name, newTeam2Name];
       mappingReady = true;
+      // Mark series as active when we get first valid mapping
+      // This handles cases where user opens a match in progress (no "Series started" event)
+      seriesActive = true;
       processAllBacklogEntries();
     } else {
       // Subsequent mapping change (e.g. late roster fill) – only process new backlog entries
@@ -204,6 +213,9 @@
     // Series started - reset sound state for new series
     if (RX_SERIES_START.test(head)) {
       console.log('[inject-stats] Series started - resetting sound state');
+      lastCompletedGame = 0;
+      banPhaseTriggered = false;
+      seriesActive = true; // Mark series as active for first game ban detection
       playSound('seriesStart');
       return;
     }
@@ -211,13 +223,42 @@
     // Series ended - notify parent
     if (RX_SERIES_END.test(head)) {
       console.log('[inject-stats] Series ended');
+      seriesActive = false;
       playSound('seriesEnd');
       return;
+    }
+    
+    // Game ended - mark for ban phase detection
+    const mEnd = RX_GAME_END.exec(head);
+    if (mEnd) {
+      const endedGameNum = parseInt(mEnd[1], 10);
+      console.log(`[inject-stats] Game ${endedGameNum} ended - waiting for ban phase`);
+      lastCompletedGame = endedGameNum;
+      banPhaseTriggered = false; // Reset for next ban phase
+      return;
+    }
+    
+    // Ban detection - trigger game start sound when ban phase begins
+    // Works for: 1) First game of series (seriesActive && lastCompletedGame===0)
+    //            2) Subsequent games (lastCompletedGame > 0)
+    if (RX_BANNED.test(text)) {
+      if (!banPhaseTriggered) {
+        // First game: series is active but no games completed yet
+        // Next games: a game has ended
+        if ((seriesActive && lastCompletedGame === 0) || lastCompletedGame > 0) {
+          const nextGame = lastCompletedGame + 1;
+          console.log(`[inject-stats] 🎮 Ban phase detected - Game ${nextGame} starting!`);
+          banPhaseTriggered = true;
+          playSound('gameStart');
+        }
+      }
+      return; // Ban events don't need further processing
     }
     
     const mStart = RX_GAME_START.exec(head);
     if (mStart) {
       currentGame = mStart[1];
+      const gameNum = parseInt(currentGame, 10);
       gameStats[currentGame] = makeStats();
       // Clear processed entries for new game to allow fresh processing
       processedEntries.clear();
@@ -225,8 +266,17 @@
       dragonTimestamps.clear();
   // Reset multi streaks for new map
   multiStreaks.clear();
-      // Play game start sound
-      playSound('gameStart');
+      // Play game start sound ONLY if not already triggered via ban phase
+      // Also handles first game of series (lastCompletedGame=0) 
+      if (!banPhaseTriggered) {
+        console.log(`[inject-stats] 🎮 Game ${gameNum} started (via Grid event, no prior ban phase)`);
+        playSound('gameStart');
+      } else {
+        console.log(`[inject-stats] Game ${gameNum} started (sound already played via ban phase)`);
+      }
+      // Update state: this game is now "in progress", so next bans will be for game N+1
+      lastCompletedGame = gameNum - 1; // Set to current-1 so ban detection works correctly for NEXT game
+      banPhaseTriggered = true; // Mark as triggered since this game has started
   // Immediately publish new empty game so popup can react (overlay animation)
   publish();
       return;
@@ -336,13 +386,18 @@
       if (!stats.firstInhibitor) {
         stats.firstInhibitor   = team;
         stats.firstInhibitorAt = ts;
+        playSound('firstInhibitor');
       }
       stats.inhibitorCount[team] = (stats.inhibitorCount[team]||0) + 1;
     }
 
     // Baron
     if (RX_BARON.test(t)) {
-      if (!stats.firstBaron)     { stats.firstBaron   = team; stats.firstBaronAt   = ts; }
+      if (!stats.firstBaron) { 
+        stats.firstBaron   = team; 
+        stats.firstBaronAt = ts; 
+        playSound('firstBaron');
+      }
       stats.baronCount[team] = (stats.baronCount[team]||0) + 1;
     }
 
@@ -398,6 +453,11 @@
       // Don't clear processedEntries immediately - clear after a delay to prevent duplicate processing
       // processedEntries.clear(); 
       dragonTimestamps.clear();
+      
+      // Reset ban phase state
+      lastCompletedGame = 0;
+      banPhaseTriggered = false;
+      seriesActive = false;
       
       Object.keys(gameStats).forEach(key => delete gameStats[key]);
       currentGame = null;

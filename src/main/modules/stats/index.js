@@ -8,6 +8,8 @@ const fs = require('fs');
 
 // Module-level flag to prevent duplicate IPC registration
 let soundIpcRegistered = false;
+// Module-level ref to current statsManager instance (for IPC handler to use latest instance)
+let currentStatsManagerRef = { views: null, panelActive: false, createPanel: null, embedOffsetY: 0, panelReadyForSounds: false, pendingSoundEvents: [], flushPendingSoundEvents: null };
 
 function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardManagerRef: initialBoardRef }) {
   // --- Persistent + session state ---------------------------------------------------------
@@ -40,17 +42,63 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
 
   let hotkeysRef = hotkeys || null;
 
+  // Queue for sound events that arrive before panel is ready
+  const pendingSoundEvents = [];
+  let panelReadyForSounds = false;
+  
+  // Update module-level ref so IPC handler can access this instance
+  currentStatsManagerRef.views = views;
+  currentStatsManagerRef.pendingSoundEvents = pendingSoundEvents;
+
   // Register sound event IPC early (before Grid loads) - only once per process
   if (!soundIpcRegistered) {
     soundIpcRegistered = true;
     const { ipcMain } = require('electron');
     ipcMain.on('lol-sound-event', (_e, { type, timestamp }) => {
-      console.log('[stats] 📢 Sound event received:', type, 'panel=', !!views.panel);
-      if(views.panel) {
-        try { views.panel.webContents.send('lol-sound-event', { type, timestamp }); } catch(err){ console.error('[stats] send failed:', err); }
+      // Use module-level ref to get current instance's values
+      const ref = currentStatsManagerRef;
+      console.log('[stats] 📢 Sound event received:', type, 'panel=', !!ref.views?.panel, 'panelActive=', ref.panelActive, 'ready=', ref.panelReadyForSounds);
+      
+      // If panel doesn't exist yet, create it to handle sounds
+      if (ref.views && !ref.views.panel && !ref.panelActive && ref.createPanel) {
+        console.log('[stats] 📢 Creating panel for sound playback');
+        ref.createPanel(ref.embedOffsetY);
+      }
+      
+      // If panel is ready, send immediately; otherwise queue
+      if (ref.panelReadyForSounds && ref.views?.panel && !ref.views.panel.webContents.isDestroyed()) {
+        try { 
+          ref.views.panel.webContents.send('lol-sound-event', { type, timestamp }); 
+          console.log('[stats] 📢 Sound event sent to panel');
+        } catch(err){ 
+          console.error('[stats] send to panel failed:', err); 
+        }
+      } else if (ref.pendingSoundEvents) {
+        // Queue the event for when panel is ready
+        ref.pendingSoundEvents.push({ type, timestamp });
+        console.log('[stats] 📢 Sound event queued, queue size:', ref.pendingSoundEvents.length);
       }
     });
   }
+  
+  // Function to flush pending sound events (called when panel is ready)
+  function flushPendingSoundEvents() {
+    if (!views.panel || views.panel.webContents.isDestroyed()) return;
+    panelReadyForSounds = true;
+    currentStatsManagerRef.panelReadyForSounds = true;
+    while (pendingSoundEvents.length > 0) {
+      const event = pendingSoundEvents.shift();
+      try {
+        views.panel.webContents.send('lol-sound-event', event);
+        console.log('[stats] 📢 Flushed queued sound event:', event.type);
+      } catch(err) {
+        console.error('[stats] flush sound event failed:', err);
+      }
+    }
+  }
+  
+  // Store flushPendingSoundEvents in ref for IPC handler
+  currentStatsManagerRef.flushPendingSoundEvents = flushPendingSoundEvents;
 
   // Temporary cover for stats mode
   const COVER_BG = '#0d0f17';
@@ -369,7 +417,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     if(!mainWindow || mainWindow.isDestroyed()) return;
     
     if(!views.panel){
-      views.panel = new BrowserView({ 
+      views.panel = new BrowserView({
         webPreferences:{ 
           partition:'persist:statsPanel', 
           contextIsolation:false, 
@@ -415,12 +463,20 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
               global.__excelWatcher.rebroadcastTeamNames();
             }
           } catch(_){ }
+          
+          // Flush any pending sound events now that panel is ready
+          // Small delay to ensure stats_sounds.js has initialized
+          setTimeout(() => {
+            try { flushPendingSoundEvents(); } catch(_){ }
+          }, 500);
         } catch(_){ } 
       });
     }
     
     panelActive = true;
+    currentStatsManagerRef.panelActive = true;
     embedOffsetY = typeof offsetY === 'number' ? offsetY : embedOffsetY;
+    currentStatsManagerRef.embedOffsetY = embedOffsetY;
     layout();
     setTimeout(layout, 60);
     
@@ -428,6 +484,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     try { if(views.panel) mainWindow.setTopBrowserView(views.panel); } catch(_){ }
     [0,80,200].forEach(d=> setTimeout(()=>{ try { ensureTopmost(); } catch(_){ } }, d));
   }
+  
+  // Update module-level ref with createPanel function now that it's defined
+  currentStatsManagerRef.createPanel = createPanel;
   
   // --- Stats views (A/B) lifecycle -------------------------------------------------------
   function createStatsViews(offsetY){

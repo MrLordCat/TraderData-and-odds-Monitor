@@ -256,32 +256,40 @@ Always wrap fragile calls in `try/catch`.
 ## 12.1 Sound Notifications
 Audio notifications for LoL match events (stats_panel only).
 
-**Architecture:**
-- `src/renderer/scripts/stats_sounds.js` - Sound playback module
-- `src/renderer/scripts/settings/sounds.js` - Settings UI module
-- `src/main/lolstats/inject/inject-stats.js` - Event detection + `playSound()` trigger
+**Architecture (Simplified 03.02.2026):**
+- `src/main/lolstats/inject/inject-stats.js` - Event detection, ban phase tracking, backlog protection
 - `src/main/preloads/statsContent.js` - IPC forwarding (`lol-sound-event`)
+- `src/main/modules/stats/index.js` - Routes sound events to stats_panel (with pending queue)
+- `src/renderer/scripts/stats_sounds.js` - Audio playback (~200 lines, simplified)
+- `src/renderer/scripts/settings/sounds.js` - Settings UI module
 
 **Sound Assets (`src/assets/`):**
 - `GameOneStarted.mp3` - `GameFiveStarted.mp3` (game start per map)
 - `FirstBlood.mp3`, `FirstTower.mp3` (early game events)
+- `FirstBaron.mp3`, `FirstInhibitor.mp3` (late game objectives)
 - `QuadraKill.mp3`, `PentaKill.mp3` (multi-kills)
 
 **Event Flow:**
-1. inject-stats.js parses Grid live logs → detects event
-2. `playSound(type, ts)` → postMessage to statsContent.js preload
-3. statsContent.js → IPC `lol-sound-event` → main process
-4. main process → stats_panel webContents.send
-5. stats_sounds.js receives IPC, plays audio
+1. inject-stats.js parses Grid live logs → detects event (ban phase, kills, objectives)
+2. `playSound(type)` → postMessage to statsContent.js preload
+3. statsContent.js → IPC `lol-sound-event` → main process stats/index.js
+4. If panel not ready → queue in `pendingSoundEvents`, create panel
+5. stats_panel webContents.send → stats_sounds.js `triggerSound()`
+
+**Ban Phase Detection (Game Start):**
+- `RX_BANNED` regex detects champion bans
+- `lastCompletedGame` tracks finished games (via `RX_GAME_END`)
+- `banPhaseTriggered` prevents duplicate sounds within same phase
+- When ban detected after game end → triggers next game start sound
 
 **Backlog Protection:**
 - `soundsEnabled = false` during initial Grid load
-- Enabled after 2-second delay post-backlog
+- Enabled after 2-second delay (`SOUND_ENABLE_DELAY_MS`)
 - Prevents spam from historical events when loading match in progress
 
 **Settings (electron-store):**
 - `soundsEnabled` (boolean, default: true)
-- `soundsVolume` (0-100, default: 80)
+- `soundsVolume` (0-100, default: 70)
 
 ## 13. Extension Bridge (DS Uptime)
 WebSocket bridge for Edge extension communication:
