@@ -372,6 +372,7 @@ const { initMapIpc } = require('./modules/ipc/map');
 const { initSettingsIpc } = require('./modules/ipc/settings');
 const { initBrokerIpc } = require('./modules/ipc/brokers');
 const { initLayoutIpc } = require('./modules/ipc/layout');
+const { initThemeIpc } = require('./modules/ipc/theme');
 
 // inline dev watcher removed (moved to modules/dev/devCssWatcher.js)
 
@@ -413,6 +414,8 @@ function bootstrap() {
   settingsOverlay = createSettingsOverlay({ mainWindow, views, store });
   // Initialize settings-related IPC now (requires settingsOverlay)
   initSettingsIpc({ ipcMain, store, settingsOverlay, statsManager });
+  // Initialize theme IPC
+  initThemeIpc({ store });
   brokerManager = createBrokerManager({
     BROKERS, store, views, zoom, layoutManager, scheduleMapReapply,
     broadcastPlaceholderOdds, SNAP, GAP, stageBoundsRef, activeBrokerIdsRef,

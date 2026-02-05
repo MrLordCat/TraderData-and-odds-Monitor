@@ -1,5 +1,9 @@
 // Modular activity heat bar for LoL stats panel
 // Exports: init(), onMetricUpdate(teamIndex), recalc(), configure(opts)
+// 
+// Decay uses quadratic ease-out: bars decay faster when full, much slower near zero
+// At level=1.0: 100% decay speed, level=0.5: 36%, level→0: 15% (85% max slowdown)
+// This makes small activity bumps significantly more visible
 
 const ACTIVITY_NS = '__statsActivity';
 
@@ -121,7 +125,12 @@ function loop(){
   for(let i=0;i<2;i++){
     const prev = state.levels[i];
     if(prev>0){
-      const decayed = prev - state.decayPerSec * dt;
+      // Ease-out decay with quadratic curve: much slower as level approaches 0
+      // At level=1.0: 100% speed, at level=0.5: 36%, at level→0: 15% (85% slower)
+      const easeMultiplier = 0.15 + 0.85 * prev * prev;
+      const decayed = prev - state.decayPerSec * easeMultiplier * dt;
+      // Debug log every ~1 second
+      if(Math.random() < 0.02) console.log(`[heat-bar] level=${prev.toFixed(2)}, ease=${easeMultiplier.toFixed(2)}, decay=${(state.decayPerSec * easeMultiplier).toFixed(3)}/s`);
       state.levels[i] = decayed>state.minVisible? decayed : 0;
       if(state.levels[i]>0) any = true;
       const el = state.els[i];

@@ -58,9 +58,9 @@ body { -webkit-font-smoothing: antialiased; }
 /* Base buttons */
 /* Buttons */
 .btn {
-  background: var(--panel-alt);
-  color: var(--text);
-  border: 1px solid #2c3649;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 6px;
   padding: 6px 12px;
   font-family: var(--font-sans);
@@ -73,14 +73,14 @@ body { -webkit-font-smoothing: antialiased; }
 }
 
 .btn:hover {
-  background: #233041;
-  border-color: #3a4960;
-  box-shadow: 0 0 0 1px #2c3649, 0 0 10px -2px rgba(63, 134, 255, .35);
+  background: var(--md-sys-color-surface-container-highest);
+  border-color: var(--md-sys-color-outline);
+  box-shadow: 0 0 0 1px var(--md-sys-color-outline-variant), 0 0 10px -2px color-mix(in srgb, var(--md-sys-color-primary) 35%, transparent);
 }
 
 .btn:active {
   transform: translateY(1px);
-  box-shadow: 0 0 0 1px #36517a, 0 0 6px -1px rgba(63, 134, 255, .55);
+  box-shadow: 0 0 0 1px var(--md-sys-color-primary), 0 0 6px -1px color-mix(in srgb, var(--md-sys-color-primary) 55%, transparent);
 }
 
 .btn:focus-visible {
@@ -129,7 +129,7 @@ select,
 input[type=number] {
   background: var(--panel-alt);
   color: var(--text);
-  border: 1px solid #2c3649;
+  border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 6px;
   padding: 4px 8px;
   font-family: var(--font-sans);

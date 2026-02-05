@@ -23,11 +23,11 @@
 body {
 	margin: 0;
 	font: 13px var(--font-sans);
-	background: linear-gradient(135deg, #0b0e15, #141b29);
-	color: var(--text);
+	background: var(--md-sys-color-surface);
+	color: var(--md-sys-color-on-surface);
 	-webkit-font-smoothing: antialiased;
 	filter: contrast(calc(var(--ui-contrast) * 1)) brightness(calc(0.9 + (var(--ui-contrast) - 1) * 0.25));
-	transition: filter .25s ease;
+	transition: filter .25s ease, background-color 375ms ease-out;
 }
 body.overlay-blur {
 	filter: blur(18px) contrast(calc(var(--ui-contrast) * 1)) brightness(calc(0.9 + (var(--ui-contrast) - 1) * 0.25));

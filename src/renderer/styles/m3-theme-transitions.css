@@ -1,0 +1,184 @@
+/**
+ * Theme Transitions & Light Elevations
+ * 
+ * v0.3.0 - Global theme toggle support
+ * - Light theme elevation tokens (softer shadows)
+ * - Diagonal wipe animation for theme switching
+ * - Stats panel variables (--gs-*) mapped to M3 tokens
+ */
+
+/* ============================================
+   LIGHT THEME ELEVATION TOKENS
+   Softer shadows for light backgrounds
+   ============================================ */
+[data-theme="light"] {
+  /* Level 0 - No elevation */
+  --md-sys-elevation-0: none;
+  
+  /* Level 1 - Cards, Sheets */
+  --md-sys-elevation-1: 
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  
+  /* Level 2 - Buttons, FAB resting */
+  --md-sys-elevation-2: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+  
+  /* Level 3 - Navigation, FAB hover */
+  --md-sys-elevation-3: 
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.08);
+  
+  /* Level 4 - Menus */
+  --md-sys-elevation-4: 
+    0 6px 12px rgba(0, 0, 0, 0.12),
+    0 3px 6px rgba(0, 0, 0, 0.08);
+  
+  /* Level 5 - Dialogs, Modals */
+  --md-sys-elevation-5: 
+    0 8px 16px rgba(0, 0, 0, 0.15),
+    0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   STATS PANEL VARIABLES (--gs-*)
+   Mapped to M3 surface tokens for both themes
+   ============================================ */
+:root,
+[data-theme="dark"] {
+  --gs-bg: var(--md-sys-color-surface-container);
+  --gs-border: var(--md-sys-color-outline-variant);
+  --gs-head: var(--md-sys-color-surface-container-high);
+  --gs-text: var(--md-sys-color-on-surface);
+  --gs-text-dim: var(--md-sys-color-on-surface-variant);
+  --gs-accent: var(--md-sys-color-primary);
+  --gs-row-odd: var(--md-sys-color-surface-container-low);
+  --gs-row-even: var(--md-sys-color-surface-container);
+}
+
+[data-theme="light"] {
+  --gs-bg: var(--md-sys-color-surface-container);
+  --gs-border: var(--md-sys-color-outline-variant);
+  --gs-head: var(--md-sys-color-surface-container-high);
+  --gs-text: var(--md-sys-color-on-surface);
+  --gs-text-dim: var(--md-sys-color-on-surface-variant);
+  --gs-accent: var(--md-sys-color-primary);
+  --gs-row-odd: var(--md-sys-color-surface-container-low);
+  --gs-row-even: var(--md-sys-color-surface-container);
+}
+
+/* ============================================
+   THEME TRANSITION ANIMATIONS
+   ============================================ */
+
+/* Diagonal wipe animation for smooth theme switch */
+@keyframes theme-wipe {
+  from {
+    clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
+  }
+  to {
+    clip-path: polygon(0 0, 200% 0, 200% 100%, 0 100%);
+  }
+}
+
+/* Reverse wipe for dark → light */
+@keyframes theme-wipe-reverse {
+  from {
+    clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
+  }
+  to {
+    clip-path: polygon(-100% 0, 100% 0, 100% 100%, -100% 100%);
+  }
+}
+
+/* Class applied during theme transition */
+.theme-transitioning {
+  animation: theme-wipe 350ms ease-out forwards;
+}
+
+.theme-transitioning-reverse {
+  animation: theme-wipe-reverse 350ms ease-out forwards;
+}
+
+/* Smooth color transitions for themed elements */
+html {
+  transition: background-color 375ms ease-out;
+}
+
+/* Only transition on container elements - NOT on many small elements like th/td/button 
+   This prevents performance issues from hundreds of simultaneous transitions */
+body,
+.panel,
+.seg,
+.head,
+.foot,
+.content,
+.sectionCard,
+.spTopbar,
+.lolTableWrap,
+.statsControls {
+  transition: 
+    background-color 375ms ease-out,
+    border-color 375ms ease-out;
+}
+
+/* Table gets instant color change - no transition on many cells */
+#stats table,
+#stats table th,
+#stats table td {
+  transition: none;
+}
+
+/* Disable transitions during initial load to prevent flash */
+html.no-transitions,
+html.no-transitions * {
+  transition: none !important;
+}
+
+/* ============================================
+   THEME TOGGLE BUTTON STYLES
+   ============================================ */
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full, 50%);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.theme-toggle-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 8%, transparent);
+}
+
+.theme-toggle-btn:active {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 12%, transparent);
+}
+
+.theme-toggle-btn .theme-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* Sun icon for dark mode (click to switch to light) */
+[data-theme="dark"] .theme-toggle-btn .icon-sun {
+  display: inline;
+}
+[data-theme="dark"] .theme-toggle-btn .icon-moon {
+  display: none;
+}
+
+/* Moon icon for light mode (click to switch to dark) */
+[data-theme="light"] .theme-toggle-btn .icon-sun {
+  display: none;
+}
+[data-theme="light"] .theme-toggle-btn .icon-moon {
+  display: inline;
+}

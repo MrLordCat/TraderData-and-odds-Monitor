@@ -2,39 +2,72 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-02-05
 
 ### ✨ New Features
-- **Sound notifications for LoL match events**
-  - Plays audio for game start, first blood, first tower, quadra, penta kills
+- **Global Light/Dark Theme Toggle** 
+  - New theme toggle button in Stats Panel topbar (sun ☀️ / moon 🌙 icons)
+  - Smooth theme transition animation (375ms)
+  - Persisted in electron-store (`appTheme` key)
+  - Synchronized across all windows/views via IPC broadcast
+  - Full light theme support: all UI elements adapt to selected theme
+  - Light theme elevations (softer shadows for light backgrounds)
+
+- **Sound Notifications for LoL Match Events**
+  - Audio alerts for: Game Start, First Blood, First Tower, First Baron, First Inhib, Quadra Kill, Penta Kill
   - Game start detection via ban phase (Grid sends start notification late)
-  - 5-second debounce for grouping ban events into phases
-  - Settings UI for enabling/disabling sounds and adjusting volume (0-100%)
-  - Automatic settings reload when user saves preferences
-  - **Protection against historical log spam**: Ignores old events when Grid loads match history
-    - 5-second grace period after initialization (no sounds during initial load)
-    - Events older than 15 seconds are ignored (prevents sound shock from history dump)
+  - **Freshness detection**: Only real-time events trigger sounds, not historical backlog
+  - Settings UI: Enable/disable sounds, volume slider (0-100%)
 
 ### 🔧 Improvements
-- **Heat bar "Fade time" UX improvement**
-  - Changed UI from "Decay (/sec)" to "Fade time (sec)" for intuitive input
-  - User enters seconds until full fade (e.g., 2 = bar disappears in 2 seconds)
-  - Auto-migration: old values > 1 are automatically converted to correct format
-  - Formula: `decayPerSec = 1 / fadeTimeSec`
+- **Heat Bar Ease-Out Decay**: Bar fades slower as it approaches zero
+  - Quadratic curve: at full level 100% speed, at 50% → 36% speed, near zero → 15% speed
+  - Makes small activity bumps significantly more visible and easier to track
+
+- **Heat Bar Slider UI**: Replaced number inputs with intuitive sliders
+  - Fade time: 1-10 seconds slider with real-time preview
+  - Bump amount: 10-50% slider
+  - Auto-migration: old values converted automatically
+
+- **Sound Burst Detection**: Improved backlog detection for sound notifications
+  - Detects rapid event bursts (5+ events in 500ms) as backlog loading
+  - Deferred gameStart sound (400ms) cancelled if burst follows
+  - Auto-disables sounds during burst, re-enables after 2 seconds
+  - Prevents false positives when loading completed games
+
+- **M3 Design System Integration**
+  - `--gs-*` CSS variables mapped to M3 surface tokens
+  - All buttons, inputs, table cells use theme-aware colors
+  - Proper hover states visible in both light and dark themes
+
+- **Performance Optimizations**
+  - Removed expensive blur filter from settings overlay
+  - Theme transitions only on container elements (not individual cells)
+  - `will-change` only on actively animating elements
+  - Optimized cell glow animation (static blur instead of animated)
+
+- **Settings Overlay**: Simplified architecture, backdrop handles dimming
 
 ### 🐛 Bug Fixes
-- **Fixed sound event duplication**: Removed redundant `reinject()` call in `maybeEarlyInject()`
-- **Fixed heat bar instant fade**: Migrated incorrectly stored decayPerSec values
+- **Theme persistence**: Theme now saved and restored on app restart
+- **Settings theme sync**: Settings overlay receives correct theme when opened
+- **Slot views theme**: Empty slot placeholders adapt to light/dark theme
+- **Main window background**: Fixed hardcoded dark background, now uses M3 tokens
+- **Table header colors**: Fixed hardcoded dark colors in Game Stats table
+- **Button hover visibility**: Fixed invisible hover states in light theme
+- **Sound event duplication**: Fixed redundant `reinject()` call
+- **Heat bar instant fade**: Migrated incorrectly stored decayPerSec values
 
-### 🔧 Implementation Details
-- `stats_sounds.js`: Core sound notification module (~300 lines)
-  - Audio player pool with caching
-  - Ban phase detection logic with debouncing
-  - Integration with Grid live logs via 'lol-live-log-update' CustomEvent
-  - Settings management (soundsEnabled, soundsVolume)
-- `settings/sounds.js`: Settings module for sound preferences
-- Settings IPC: 'settings-saved' broadcast to all windows on save
-- Store keys: `soundsEnabled` (boolean), `soundsVolume` (0-100)
+### 🔧 Technical Details
+- `src/main/modules/ipc/theme.js`: Theme IPC module (get/set/toggle handlers)
+- `src/renderer/scripts/theme_toggle.js`: Unified theme logic with ipcRenderer fallback
+- `src/renderer/scripts/theme_settings.js`: Theme sync for settings overlay
+- `src/renderer/styles/m3-theme-transitions.css`: Theme transitions and light elevations
+- `src/main/preloads/slot.js`: Added theme API for slot views
+- `stats_sounds.js`: Sound notification module with freshness detection
+- Theme support in: index, stats_panel, settings, slot pages
+
+---
 
 ## [0.2.5] - 2026-01-31
 

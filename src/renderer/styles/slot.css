@@ -1,7 +1,19 @@
-html,body { margin:0; height:100%; background:transparent; font:12px var(--font-sans); color:var(--muted); }
+html,body { margin:0; height:100%; background:transparent; font:12px var(--font-sans); color:var(--md-sys-color-on-surface-variant); }
 .slotOutline { position:absolute; inset:0; padding:6px; box-sizing:border-box; display:flex; }
-.slotInner { flex:1; border:1px dashed #2d3a4c; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(22,27,40,0.35); backdrop-filter:blur(4px) saturate(1.1); position:relative; transition:border-color .25s, background .25s; }
-.slotInner:hover { border-color:#3d4f63; background:rgba(26,32,46,0.42); }
+.slotInner { 
+  flex:1; 
+  border:1px dashed var(--md-sys-color-outline-variant); 
+  border-radius:10px; 
+  display:flex; 
+  flex-direction:column; 
+  align-items:center; 
+  justify-content:center; 
+  background: color-mix(in srgb, var(--md-sys-color-surface-container) 50%, transparent);
+  backdrop-filter:blur(4px) saturate(1.1); 
+  position:relative; 
+  transition:border-color .25s, background .25s; 
+}
+.slotInner:hover { border-color: var(--md-sys-color-outline); background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 55%, transparent); }
 .placeholderLabel { font-size:11px; letter-spacing:.8px; text-transform:uppercase; opacity:.55; }
-.presetTag { position:absolute; bottom:4px; right:6px; font:10px/1.2 monospace; color:#41576f; opacity:.8; }
+.presetTag { position:absolute; bottom:4px; right:6px; font:10px/1.2 monospace; color:var(--md-sys-color-on-surface-variant); opacity:.6; }
 @media (max-width:800px){ .placeholderLabel { font-size:10px; } }

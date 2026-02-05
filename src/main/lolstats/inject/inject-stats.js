@@ -45,19 +45,82 @@
   // Sound suppression: don't play sounds during initial backlog processing (historical data)
   let soundsEnabled = false; // Will be enabled after backlog processing completes
   const SOUND_ENABLE_DELAY_MS = 2000; // Wait 2 seconds after backlog before enabling sounds
-
-  // Sound notification helper - sends message to be picked up by preload/main
-  // Always use Date.now() for timestamp - game timestamps are relative and unusable for freshness checks
-  function playSound(soundType) {
-    if (!soundsEnabled) {
-      console.log(`[inject-stats] 🔇 Sound suppressed (backlog): ${soundType}`);
-      return;
+  
+  // Backlog burst detection: if many events arrive in quick succession, it's backlog not real-time
+  // Track recent event arrivals to detect burst loading
+  const BURST_WINDOW_MS = 500; // Window to count events
+  const BURST_THRESHOLD = 5; // If more than N events in window, it's a backlog burst
+  let recentEventTimestamps = []; // timestamps of recent event arrivals
+  
+  // Deferred gameStart sound - wait to see if burst follows
+  let pendingGameStartSound = null; // { timeout, gameNum }
+  const GAME_START_DEFER_MS = 400; // Wait this long before playing gameStart
+  
+  // Track when events are received (real-time) vs processed from backlog
+  // Events are fresh only if: 1) sounds enabled AND 2) not in a burst of events
+  const FRESH_EVENT_WINDOW_MS = 3000; // 3 seconds
+  const eventReceiveTimestamps = new Map(); // entryKey -> receiveTimestamp
+  
+  // Check if we're currently in a burst of events (backlog loading)
+  function isInEventBurst() {
+    const now = Date.now();
+    // Clean old timestamps
+    recentEventTimestamps = recentEventTimestamps.filter(t => now - t < BURST_WINDOW_MS);
+    return recentEventTimestamps.length >= BURST_THRESHOLD;
+  }
+  
+  // Record event arrival for burst detection
+  function recordEventArrival() {
+    recentEventTimestamps.push(Date.now());
+    // If burst detected, disable sounds and cancel pending gameStart
+    if (isInEventBurst()) {
+      if (soundsEnabled) {
+        console.log(`[inject-stats] 🔇 Burst detected - disabling sounds (backlog loading)`);
+        soundsEnabled = false;
+        // Re-enable after delay when burst ends
+        setTimeout(() => {
+          if (!isInEventBurst()) {
+            soundsEnabled = true;
+            console.log('[inject-stats] 🔊 Sounds re-enabled (burst ended)');
+          }
+        }, SOUND_ENABLE_DELAY_MS);
+      }
+      if (pendingGameStartSound) {
+        console.log(`[inject-stats] 🔇 Cancelling pending gameStart (burst detected)`);
+        clearTimeout(pendingGameStartSound.timeout);
+        pendingGameStartSound = null;
+      }
     }
+  }
+  
+  // Schedule gameStart sound with delay (to detect if burst follows)
+  function scheduleGameStartSound(gameNum, entryKey) {
+    // Cancel any existing pending sound
+    if (pendingGameStartSound) {
+      clearTimeout(pendingGameStartSound.timeout);
+    }
+    
+    const timeout = setTimeout(() => {
+      // Check again if we're in burst (events may have arrived during delay)
+      if (isInEventBurst()) {
+        console.log(`[inject-stats] 🔇 gameStart cancelled after delay (burst): Game ${gameNum}`);
+        pendingGameStartSound = null;
+        return;
+      }
+      console.log(`[inject-stats] 🔊 Playing deferred gameStart: Game ${gameNum}`);
+      actuallyPlaySound('gameStart', entryKey);
+      pendingGameStartSound = null;
+    }, GAME_START_DEFER_MS);
+    
+    pendingGameStartSound = { timeout, gameNum };
+    console.log(`[inject-stats] ⏳ Scheduled gameStart sound for Game ${gameNum} (${GAME_START_DEFER_MS}ms delay)`);
+  }
+  
+  // Actually send sound event to preload
+  function actuallyPlaySound(soundType, entryKey = null) {
     try {
       const eventTs = Date.now();
       console.log(`[inject-stats] 🔊 playSound: ${soundType} (ts=${eventTs})`);
-      
-      // Send via postMessage - will be picked up by preload script
       window.postMessage({
         source: 'lol-sound-event',
         type: soundType,
@@ -66,6 +129,37 @@
     } catch(e) {
       console.warn('[inject-stats] Sound trigger failed:', e);
     }
+  }
+
+  // Sound notification helper - sends message to be picked up by preload/main
+  // Always use Date.now() for timestamp - game timestamps are relative and unusable for freshness checks
+  function playSound(soundType, entryKey = null) {
+    // ALWAYS check for burst - even if soundsEnabled (user may load new game after previous finished)
+    const inBurst = isInEventBurst();
+    
+    if (inBurst) {
+      console.log(`[inject-stats] 🔇 Sound suppressed (burst detected): ${soundType}`);
+      return;
+    }
+    
+    // If sounds not enabled yet, check freshness
+    if (!soundsEnabled) {
+      const receivedRecently = entryKey && eventReceiveTimestamps.has(entryKey) && 
+        (Date.now() - eventReceiveTimestamps.get(entryKey)) < FRESH_EVENT_WINDOW_MS;
+      
+      if (!receivedRecently) {
+        console.log(`[inject-stats] 🔇 Sound suppressed (not recent): ${soundType}`);
+        return;
+      }
+      
+      // For gameStart, use deferred playback to detect burst that follows ban phase
+      if (soundType === 'gameStart') {
+        scheduleGameStartSound(lastCompletedGame + 1, entryKey);
+        return;
+      }
+    }
+    
+    actuallyPlaySound(soundType, entryKey);
   }
 
   const gameStats = {};
@@ -151,7 +245,7 @@
     } else {
       // Subsequent mapping change (e.g. late roster fill) – only process new backlog entries
       playerToTeam = newPlayerToTeam; [team1Name, team2Name] = [newTeam1Name, newTeam2Name];
-      let added=0; backlog.forEach(entry=>{ const k=`${entry.text}-${entry.ts}`; if(!processedEntries.has(k)){ handleEntry(entry); processedEntries.add(k); added++; } }); if(added) schedulePublish();
+      let added=0; backlog.forEach(entry=>{ const k=`${entry.text}-${entry.ts}`; if(!processedEntries.has(k)){ handleEntry(entry, k); processedEntries.add(k); added++; } }); if(added) schedulePublish();
     }
   });
   
@@ -161,6 +255,7 @@
     Object.keys(gameStats).forEach(key => delete gameStats[key]);
     processedEntries.clear();
     dragonTimestamps.clear();
+    eventReceiveTimestamps.clear(); // Clear freshness timestamps for backlog
     currentGame = null;
     
     // Ensure sounds are disabled during backlog processing
@@ -170,7 +265,7 @@
   backlog.forEach(entry => {
       const entryKey = `${entry.text}-${entry.ts}`;
       if (!processedEntries.has(entryKey)) {
-        handleEntry(entry);
+        handleEntry(entry, entryKey); // Pass entryKey for freshness check
         processedEntries.add(entryKey);
         processedCount++;
       }
@@ -189,6 +284,14 @@
   window.addEventListener('lol-live-log-update', e => {
     const entryKey = `${e.detail.text}-${e.detail.ts}`;
     
+    // Record event arrival for burst detection (backlog vs real-time)
+    recordEventArrival();
+    
+    // Record when this event was received (for freshness detection)
+    if (!eventReceiveTimestamps.has(entryKey)) {
+      eventReceiveTimestamps.set(entryKey, Date.now());
+    }
+    
     // Always add to backlog first
     backlog.push(e.detail);
     
@@ -199,7 +302,7 @@
     
     // If mapping is ready, process immediately
     if (mappingReady && playerToTeam.size > 0 && team1Name && team2Name) {
-  handleEntry(e.detail);
+  handleEntry(e.detail, entryKey);
   processedEntries.add(entryKey);
   schedulePublish();
     } else {
@@ -207,7 +310,7 @@
     }
   });
 
-  function handleEntry({ text, ts, raw }) {
+  function handleEntry({ text, ts, raw }, entryKey = null) {
     // Ensure we have proper team mapping before processing any entries
     if (!mappingReady || !team1Name || !team2Name || playerToTeam.size === 0) {
       return;
@@ -223,7 +326,7 @@
       lastCompletedGame = 0;
       banPhaseTriggered = false;
       seriesActive = true; // Mark series as active for first game ban detection
-      playSound('seriesStart');
+      playSound('seriesStart', entryKey);
       return;
     }
     
@@ -231,7 +334,7 @@
     if (RX_SERIES_END.test(head)) {
       console.log('[inject-stats] Series ended');
       seriesActive = false;
-      playSound('seriesEnd');
+      playSound('seriesEnd', entryKey);
       return;
     }
     
@@ -248,6 +351,7 @@
     // Ban detection - trigger game start sound when ban phase begins
     // Works for: 1) First game of series (seriesActive && lastCompletedGame===0)
     //            2) Subsequent games (lastCompletedGame > 0)
+    // Uses entryKey for freshness detection - only plays if event was received recently
     if (RX_BANNED.test(text)) {
       if (!banPhaseTriggered) {
         // First game: series is active but no games completed yet
@@ -256,7 +360,7 @@
           const nextGame = lastCompletedGame + 1;
           console.log(`[inject-stats] 🎮 Ban phase detected - Game ${nextGame} starting!`);
           banPhaseTriggered = true;
-          playSound('gameStart');
+          playSound('gameStart', entryKey); // Uses freshness detection via entryKey
         }
       }
       return; // Ban events don't need further processing

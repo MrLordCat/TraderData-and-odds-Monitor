@@ -149,6 +149,12 @@ contextBridge.exposeInMainWorld('desktopAPI', {
 
   // --- LoL Sound Events API ---
   ,onLolSoundEvent: (cb) => withUnsub('lol-sound-event', cb)
+
+  // --- Theme API ---
+  ,themeGet: () => ipcRenderer.invoke('theme-get')
+  ,themeSet: (theme) => ipcRenderer.invoke('theme-set', theme)
+  ,themeToggle: () => ipcRenderer.invoke('theme-toggle')
+  ,onThemeChanged: (cb) => withUnsub('theme-changed', cb)
 });
 
 // ---------- Console forwarding (selective) ----------

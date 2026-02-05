@@ -5,23 +5,8 @@ const path = require('path');
 function createSettingsOverlay(ctx){
   let settingsView = null;
   let attached = false; // track if attached to mainWindow
-  const overlayBlur = { active:false, cssKeys:{} };
 
-  function applyBlurToBrokers(){
-    if (overlayBlur.active) return; overlayBlur.active=true; overlayBlur.cssKeys={};
-    const css = 'html,body{filter:blur(18px) brightness(0.75) saturate(1.15)!important;transition:filter .18s ease;}';
-    for (const [id,v] of Object.entries(ctx.views)){
-      try { v.webContents.insertCSS(css).then(key=>{ overlayBlur.cssKeys[id]=key; }); } catch(_){ }
-    }
-  }
-  function clearBlurFromBrokers(){
-    if(!overlayBlur.active) return; overlayBlur.active=false;
-    for (const [id,v] of Object.entries(ctx.views)){
-      const key = overlayBlur.cssKeys[id];
-      if(key) { try { v.webContents.removeInsertedCSS(key); } catch(_){ } }
-    }
-    overlayBlur.cssKeys={};
-  }
+  // Note: No blur on brokers needed - settings backdrop overlay covers everything
 
   function ensureCreated(){
     if(settingsView) return;
@@ -42,8 +27,12 @@ function createSettingsOverlay(ctx){
       }
       const statsConfig = ctx.store ? ctx.store.get('statsConfig') : null;
       settingsView.webContents.send('settings-init', { gsHeatBar, statsConfig });
+      // Send current theme to settings
+      const theme = ctx.store ? ctx.store.get('appTheme') || 'dark' : 'dark';
+      settingsView.webContents.send('theme-changed', theme);
     } catch(_){ } });
   }
+  
   function open(){
     ensureCreated();
     // Reattach if detached (should not normally happen)
@@ -54,14 +43,18 @@ function createSettingsOverlay(ctx){
     } catch(_){ }
     // Bring settings to top (above all other BrowserViews including sidebar and stats)
     try { ctx.mainWindow.setTopBrowserView(settingsView); } catch(_){ }
-    applyBlurToBrokers();
+    // Send current theme every time settings is opened
+    try {
+      const theme = ctx.store ? ctx.store.get('appTheme') || 'dark' : 'dark';
+      settingsView.webContents.send('theme-changed', theme);
+    } catch(_){ }
     try { ctx.mainWindow.webContents.send('ui-blur-on'); } catch(_){ }
   }
+  
   function close(){
     if(!settingsView) return;
-    // Instead of destroying (вызывало повторные addBrowserView), просто схлопываем.
-  hideView(settingsView);
-    clearBlurFromBrokers();
+    // Instead of destroying, just hide
+    hideView(settingsView);
     try { ctx.mainWindow.webContents.send('ui-blur-off'); } catch(_){ }
   }
 

@@ -8,6 +8,16 @@ contextBridge.exposeInMainWorld('__oddsMoniLolEmit', (slot, data) => {
   try { ipcRenderer.send('lol-stats-raw', { slot, data }); } catch(e) {}
 });
 
+// Expose desktopAPI for theme support in stats_panel
+contextBridge.exposeInMainWorld('desktopAPI', {
+  themeGet: () => ipcRenderer.invoke('theme-get'),
+  themeSet: (theme) => ipcRenderer.invoke('theme-set', theme),
+  themeToggle: () => ipcRenderer.invoke('theme-toggle'),
+  onThemeChanged: (cb) => {
+    ipcRenderer.on('theme-changed', (_, theme) => cb(theme));
+  }
+});
+
 // Also passive listener: if extension uses window.postMessage with source markers
 // we trap them here and forward automatically (slot supplied later via identify message).
 let __slot = null;
