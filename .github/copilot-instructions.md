@@ -34,7 +34,8 @@ src/
 │       ├── hotkeys/           # Unified hotkey manager (TAB/F1/F3)
 │       ├── ipc/               # IPC handlers (see section 4)
 │       ├── layout/            # Layout preset system
-│       ├── settingsOverlay/   # Settings modal
+│       ├── settingsOverlay/   # Settings modal (with warmup)
+│       ├── splash/            # Splash screen with progress-based loading
 │       ├── staleMonitor/      # Auto-refresh stale brokers
 │       ├── stats/             # Stats panel manager
 │       ├── updater/           # Auto-update system
@@ -46,6 +47,7 @@ src/
 │   ├── pages/                 # HTML pages
 │   │   ├── index.html         # Main window
 │   │   ├── settings.html      # Settings overlay (incl. Addons section)
+│   │   ├── splash.html        # Splash screen with progress bar
 │   │   └── stats_panel.html   # Stats panel (Odds Board + Game Stats embedded)
 │   ├── scripts/               # Page-specific JS
 │   │   └── settings/          # Settings modules (modular structure)
@@ -118,10 +120,11 @@ IPC is modular under `src/main/modules/ipc/*.js`:
 - `swap.js` - Broker swap positions
 - `excelExtractor.js` - Python script control
 - `updater.js` - Auto-update system
+- `theme.js` - Theme toggle (light/dark)
 
 **Conventions:**
 - Mutable shared objects passed as `{ value: ... }` refs (e.g. `stageBoundsRef`, `activeBrokerIdsRef`).
-- IPC channels: `odds-update`, `excel-team-names`, `auto-toggle-all`, `auto-state-updated`, `ui-blur-on/off`.
+- IPC channels: `odds-update`, `excel-team-names`, `auto-toggle-all`, `auto-state-updated`, `ui-blur-on/off`, `theme-changed`.
 - Avoid global shortcuts; use `before-input-event` handlers.
 
 **Bo1 (isLast) flow:**
@@ -162,7 +165,53 @@ To add a bookmaker:
 - Visual indicator of team activity in LoL stats table
 - UI setting: "Fade time (sec)" = seconds until full decay (e.g., 2 = 2 seconds)
 - Internal: `decayPerSec = 1 / fadeTimeSec` (stored in `gsHeatBar`)
+- Quadratic ease-out decay: faster at full level, slower near zero (15% speed at minimum)
 - Auto-migration: values > 1 are converted (old format was direct decayPerSec)
+
+## 7.1 Theme System
+Global light/dark theme with smooth transitions.
+
+**Architecture:**
+- `src/main/modules/ipc/theme.js` - IPC handlers (theme-get, theme-set, theme-toggle)
+- `src/renderer/scripts/theme_toggle.js` - Unified theme logic for stats_panel
+- `src/renderer/scripts/theme_settings.js` - Theme sync for settings overlay
+- `src/renderer/styles/m3-tokens.css` - M3 Design System tokens
+- `src/renderer/styles/m3-theme-transitions.css` - Theme transitions and light elevations
+
+**Theme Storage:** `appTheme` key in electron-store ('dark' | 'light')
+
+**Theme Sync Flow:**
+1. User clicks toggle → `theme-toggle` IPC → store updated
+2. Main process broadcasts `theme-changed` to all webContents
+3. Each window/view receives and applies `data-theme` attribute
+
+**CSS Variables:**
+- `--gs-*` variables mapped to M3 surface tokens
+- All UI elements use theme-aware colors
+- Transitions only on container elements (375ms ease-out)
+
+## 7.2 Splash Screen & Warm-up
+Eliminates "cold start" lag by pre-warming animations before showing main window.
+
+**Architecture:**
+- `src/main/modules/splash/index.js` - Task-based loading manager
+- `src/renderer/pages/splash.html` - Progress bar UI
+- `src/renderer/scripts/warmup.js` - Animation warm-up for stats panel
+
+**Loading Flow:**
+1. `bootstrap()` creates splash window first (main window hidden)
+2. Tasks registered: main window load, settings warmup, stats panel load, animation warmup
+3. Each task runs sequentially with progress updates
+4. Theme transition is triggered with hidden opacity to compile CSS
+5. After all tasks complete, splash fades out, main window shows
+
+**Warm-up Tasks:**
+- Creating main window (10%)
+- Preparing settings overlay (creates BrowserView early)
+- Initializing stats panel (waits for did-finish-load)
+- Warming up animations (runs theme toggle with opacity:0)
+
+**Safety:** 8-second timeout forces main window show if warmup hangs.
 
 ## 8. Auto Trading System (Refactored)
 Auto Mode has been completely rewritten into a **unified module** at `src/renderer/auto/loader.js`.
@@ -248,6 +297,7 @@ electron-store keys:
 - `autoTolerancePct`, `autoSuspendThresholdPct`, `autoBurstLevels`
 - `gsHeatBar`, `statsConfig`, `lolManualData`
 - `soundsEnabled`, `soundsVolume` - Sound notification settings
+- `appTheme` - Theme preference ('dark' | 'light')
 - Updater: `lastUpdateCheck`, `updateChannel`
 - Addons: `enabledAddons` (array of addon IDs)
 

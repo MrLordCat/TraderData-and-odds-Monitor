@@ -5,6 +5,7 @@ const path = require('path');
 function createSettingsOverlay(ctx){
   let settingsView = null;
   let attached = false; // track if attached to mainWindow
+  let warmedUp = false; // track if warm-up completed
 
   // Note: No blur on brokers needed - settings backdrop overlay covers everything
 
@@ -33,6 +34,16 @@ function createSettingsOverlay(ctx){
     } catch(_){ } });
   }
   
+  // Warm-up: pre-create settings view hidden to avoid cold-start lag
+  function warmup(){
+    if(warmedUp) return;
+    ensureCreated();
+    // Hide it immediately (but GPU layers are now created)
+    hideView(settingsView);
+    warmedUp = true;
+    console.log('[settingsOverlay] Warm-up complete');
+  }
+  
   function open(){
     ensureCreated();
     // Reattach if detached (should not normally happen)
@@ -58,7 +69,7 @@ function createSettingsOverlay(ctx){
     try { ctx.mainWindow.webContents.send('ui-blur-off'); } catch(_){ }
   }
 
-  return { open, close };
+  return { open, close, warmup };
 }
 
 module.exports = { createSettingsOverlay };

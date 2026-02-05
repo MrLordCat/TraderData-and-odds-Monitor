@@ -20,6 +20,9 @@ import '../scripts/odds_board.js';
 import '../scripts/stats_panel.js';
 import '../scripts/stats_boot.js';
 
+// Animation warm-up (prevents cold-start lag)
+import '../scripts/warmup.js';
+
 // Auto mode
 import '../auto/loader.js';
 

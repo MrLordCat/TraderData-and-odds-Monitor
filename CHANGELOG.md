@@ -19,6 +19,12 @@ All notable changes to this project will be documented in this file.
   - **Freshness detection**: Only real-time events trigger sounds, not historical backlog
   - Settings UI: Enable/disable sounds, volume slider (0-100%)
 
+- **Splash Screen with Smart Loading**
+  - Progress bar shows loading status during startup
+  - Task-based system: window creation, settings warmup, stats panel, animations
+  - Eliminates "cold start" lag by pre-warming UI components
+  - 8-second safety timeout ensures app always starts
+
 ### 🔧 Improvements
 - **Heat Bar Ease-Out Decay**: Bar fades slower as it approaches zero
   - Quadratic curve: at full level 100% speed, at 50% → 36% speed, near zero → 15% speed
@@ -41,6 +47,9 @@ All notable changes to this project will be documented in this file.
   - Proper hover states visible in both light and dark themes
 
 - **Performance Optimizations**
+  - **Splash screen with smart loading**: Shows progress while warming up UI components
+  - Pre-creates settings overlay, stats panel, and GPU layers before showing main window
+  - Eliminates "cold start" lag on first theme toggle, tab switch, or settings open
   - Removed expensive blur filter from settings overlay
   - Theme transitions only on container elements (not individual cells)
   - `will-change` only on actively animating elements
@@ -59,6 +68,9 @@ All notable changes to this project will be documented in this file.
 - **Heat bar instant fade**: Migrated incorrectly stored decayPerSec values
 
 ### 🔧 Technical Details
+- `src/main/modules/splash/index.js`: Splash screen manager with task-based loading
+- `src/renderer/pages/splash.html`: Splash screen UI with progress bar
+- `src/renderer/scripts/warmup.js`: Animation warm-up module for stats panel
 - `src/main/modules/ipc/theme.js`: Theme IPC module (get/set/toggle handlers)
 - `src/renderer/scripts/theme_toggle.js`: Unified theme logic with ipcRenderer fallback
 - `src/renderer/scripts/theme_settings.js`: Theme sync for settings overlay

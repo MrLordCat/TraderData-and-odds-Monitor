@@ -132,8 +132,11 @@ body,
 
 /* Disable transitions during initial load to prevent flash */
 html.no-transitions,
-html.no-transitions * {
+html.no-transitions *,
+html.warmup-no-transition,
+html.warmup-no-transition * {
   transition: none !important;
+  animation: none !important;
 }
 
 /* ============================================

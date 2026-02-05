@@ -274,7 +274,9 @@ let updateManager = null; // initialized in bootstrap()
 // External Excel odds JSON watcher (pseudo broker 'excel')
 const { createExcelWatcher } = require('./modules/excelWatcher');
 const { createExcelExtractorController } = require('./modules/excelExtractorController');
+const { createSplashManager } = require('./modules/splash');
 let excelExtractorController = null; // initialized in bootstrap()
+let splashManager = null; // splash screen manager
 const lolTeamNamesRef = { value: lolTeamNames };
 const autoRefreshEnabledRef = { value: autoRefreshEnabled };
 function createMainWindow() {
@@ -285,29 +287,30 @@ function createMainWindow() {
     height: saved ? saved.height : defaults.height,
     x: saved ? saved.x : undefined,
     y: saved ? saved.y : undefined,
+    show: false, // Hidden initially, shown after splash warm-up
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preloads', 'main.js') }
   });
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'pages', 'index.html'));
-  // Auto-maximize on first launch or if user hasn't explicitly sized window (no saved bounds)
+  // Determine if we should maximize (but don't do it yet - splash will handle it)
+  let shouldMaximize = false;
   try {
     if (!saved) {
-      mainWindow.once('ready-to-show', () => {
-        try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.maximize(); } catch(_) {}
-      });
+      shouldMaximize = true;
     } else {
       // If saved size is significantly smaller than available work area (>85% rule), still respect user size; else maximize.
       const primary = screen.getPrimaryDisplay().workArea;
       if (saved.width < primary.width * 0.55 || saved.height < primary.height * 0.55) {
         // Probably user used a small window intentionally; do nothing.
+        shouldMaximize = false;
       } else if (saved.width >= primary.width * 0.90 && saved.height >= primary.height * 0.90) {
         // Saved bounds already near full screen; just maximize to remove borders.
-        mainWindow.once('ready-to-show', () => {
-          try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.maximize(); } catch(_) {}
-        });
+        shouldMaximize = true;
       }
     }
   } catch(_) {}
+  // Store maximize flag for splash to use
+  mainWindow.__shouldMaximize = shouldMaximize;
   mainWindow.on('close', () => {
     try { store.set('mainBounds', mainWindow.getBounds()); } catch(e) {}
     try { closeAllDetachedWindows(); } catch(e) {}
@@ -377,6 +380,10 @@ const { initThemeIpc } = require('./modules/ipc/theme');
 // inline dev watcher removed (moved to modules/dev/devCssWatcher.js)
 
 function bootstrap() {
+  // --- Show Splash Screen ---
+  splashManager = createSplashManager({ app });
+  splashManager.create();
+  
   // First-run defaults: don't auto-open any brokers.
   // Also handle upgrades/migrations where `disabledBrokers` key might be missing.
   try {
@@ -391,7 +398,13 @@ function bootstrap() {
     // Cleanup deprecated keys from older builds (dataservices overlay remnants)
     try { if(store.get('lastDataservicesUrl')!==undefined) store.delete('lastDataservicesUrl'); } catch(_) {}
   } catch(_) {}
+  
+  // Update splash progress
+  splashManager.updateProgress(10, 'Creating main window...');
+  
   createMainWindow();
+  splashManager.setMainWindow(mainWindow);
+  
   // Remove application menu (hidden UI footprint)
   try { Menu.setApplicationMenu(null); } catch(_){}
 
@@ -614,6 +627,78 @@ function bootstrap() {
     });
     console.log('[addons] AddonManager initialized');
   } catch(e){ console.warn('[addons] createAddonManager failed', e.message); }
+  
+  // --- Splash Warm-up Tasks ---
+  // Register warm-up tasks and run them before showing main window
+  splashManager.updateProgress(60, 'Warming up UI...');
+  
+  // Task 1: Wait for main window to finish loading
+  splashManager.registerTask('Loading main window...', () => {
+    return new Promise(resolve => {
+      if (mainWindow.webContents.isLoading()) {
+        mainWindow.webContents.once('did-finish-load', resolve);
+      } else {
+        resolve();
+      }
+    });
+  });
+  
+  // Task 2: Pre-create settings overlay
+  splashManager.registerTask('Preparing settings...', () => {
+    return new Promise(resolve => {
+      try { 
+        if(settingsOverlay && settingsOverlay.warmup) settingsOverlay.warmup(); 
+      } catch(e){ console.warn('[warmup] settings warmup failed', e.message); }
+      // Give it time to load
+      setTimeout(resolve, 300);
+    });
+  });
+  
+  // Task 3: Wait for stats panel to be ready
+  splashManager.registerTask('Initializing stats panel...', () => {
+    return new Promise(resolve => {
+      const panelView = statsManager && statsManager.getPanelView && statsManager.getPanelView();
+      if (panelView && panelView.webContents) {
+        if (panelView.webContents.isLoading()) {
+          panelView.webContents.once('did-finish-load', () => setTimeout(resolve, 200));
+        } else {
+          setTimeout(resolve, 200);
+        }
+      } else {
+        resolve();
+      }
+    });
+  });
+  
+  // Task 4: Warm-up theme toggle in stats panel (with actual transition)
+  splashManager.registerTask('Warming up animations...', () => {
+    return new Promise(resolve => {
+      try {
+        const panelView = statsManager && statsManager.getPanelView && statsManager.getPanelView();
+        if (panelView && panelView.webContents && !panelView.webContents.isDestroyed()) {
+          // Trigger warmup in stats panel - includes theme transition
+          panelView.webContents.executeJavaScript('if(window.__warmup) window.__warmup();').catch(() => {});
+        }
+      } catch(_){}
+      // Wait for theme transition warmup to complete (opacity hidden during this)
+      setTimeout(resolve, 300);
+    });
+  });
+  
+  // Run all tasks and show main window when done
+  splashManager.runTasks().catch(e => {
+    console.warn('[splash] runTasks error:', e.message);
+    splashManager.forceClose();
+  });
+  
+  // Safety timeout - if warm-up takes too long (>8 sec), force show
+  setTimeout(() => {
+    if (!splashManager.isReady) {
+      console.warn('[splash] Force closing due to timeout');
+      splashManager.forceClose();
+    }
+  }, 8000);
+  
   // Menu intentionally suppressed (user prefers F12 only)
   // Removed broker-id partition probing to avoid creating unused persistent profiles
 }
