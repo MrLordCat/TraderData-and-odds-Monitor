@@ -15,7 +15,9 @@ function cacheElements() {
 	hb = {
 		enabled: document.getElementById('hb-enabled'),
 		decay: document.getElementById('hb-decay'),
+		decayVal: document.getElementById('hb-decay-val'),
 		bump: document.getElementById('hb-bump'),
+		bumpVal: document.getElementById('hb-bump-val'),
 		color1: document.getElementById('hb-color1'),
 		color2: document.getElementById('hb-color2'),
 		opacity: document.getElementById('hb-opacity')
@@ -67,18 +69,25 @@ function updateStatsConfigFromInputs(immediate) {
 }
 
 function applyHeatBarInputs() {
-	// UI shows "fade time" in seconds; convert to decayPerSec = 1/fadeSec
-	const fadeSecRaw = hb.decay ? hb.decay.value.trim() : '';
-	const bumpRaw = hb.bump ? hb.bump.value.trim() : '';
-	const fadeSecNum = Number(fadeSecRaw);
-	const bumpNum = Number(bumpRaw);
-	// Clamp fade time: 0.5s to 30s -> decayPerSec: 2 to 0.033
-	const fadeSec = Math.max(0.5, Math.min(30, !isNaN(fadeSecNum) && fadeSecNum > 0 ? fadeSecNum : 5.5));
-	const decayPerSec = 1 / fadeSec;
+	// Decay slider: value is fade time in seconds (1-10)
+	const fadeSec = hb.decay ? parseFloat(hb.decay.value) : 5;
+	// Bump slider: value is percentage (10-50), convert to decimal (0.1-0.5)
+	const bumpPct = hb.bump ? parseFloat(hb.bump.value) : 22;
+	const bumpAmount = bumpPct / 100;
+	
+	// Clamp values
+	const fadeSecClamped = Math.max(1, Math.min(10, isNaN(fadeSec) ? 5 : fadeSec));
+	const bumpAmountClamped = Math.max(0.1, Math.min(0.5, isNaN(bumpAmount) ? 0.22 : bumpAmount));
+	const decayPerSec = 1 / fadeSecClamped;
+	
+	// Update display values
+	if (hb.decayVal) hb.decayVal.textContent = fadeSecClamped.toFixed(1) + 's';
+	if (hb.bumpVal) hb.bumpVal.textContent = Math.round(bumpAmountClamped * 100) + '%';
+	
 	currentHeatBar = {
 		enabled: hb.enabled ? !!hb.enabled.checked : currentHeatBar.enabled,
 		decayPerSec: decayPerSec,
-		bumpAmount: Math.max(0.01, Math.min(1, !isNaN(bumpNum) ? bumpNum : currentHeatBar.bumpAmount)),
+		bumpAmount: bumpAmountClamped,
 		color1: (hb.color1 && hb.color1.value) || currentHeatBar.color1,
 		color2: (hb.color2 && hb.color2.value) || currentHeatBar.color2
 	};
@@ -120,8 +129,10 @@ function bindEvents() {
 // ===== Actions =====
 function reset() {
 	if (hb.enabled) hb.enabled.checked = true;
-	if (hb.decay) hb.decay.value = '5.5';  // 5.5 sec fade time = decayPerSec ~0.18
-	if (hb.bump) hb.bump.value = '0.22';
+	if (hb.decay) hb.decay.value = '5';  // 5 sec fade time
+	if (hb.decayVal) hb.decayVal.textContent = '5.0s';
+	if (hb.bump) hb.bump.value = '22';   // 22% bump
+	if (hb.bumpVal) hb.bumpVal.textContent = '22%';
 	if (hb.color1) hb.color1.value = '#3c78ff';
 	if (hb.color2) hb.color2.value = '#ff4646';
 	if (hb.opacity) hb.opacity.value = '0.55';
@@ -133,9 +144,12 @@ function save() {
 	applyHeatBarInputs();
 	currentHeatBar.decayPerSec = +Number(currentHeatBar.decayPerSec).toFixed(3);
 	currentHeatBar.bumpAmount = +Number(currentHeatBar.bumpAmount).toFixed(3);
-	// UI shows fade time (sec), not decayPerSec
-	if (hb.decay) hb.decay.value = String((1 / currentHeatBar.decayPerSec).toFixed(1));
-	if (hb.bump) hb.bump.value = String(currentHeatBar.bumpAmount);
+	// Update slider display values
+	const fadeSec = currentHeatBar.decayPerSec > 0 ? (1 / currentHeatBar.decayPerSec) : 5;
+	if (hb.decay) hb.decay.value = String(fadeSec.toFixed(1));
+	if (hb.decayVal) hb.decayVal.textContent = fadeSec.toFixed(1) + 's';
+	if (hb.bump) hb.bump.value = String(Math.round(currentHeatBar.bumpAmount * 100));
+	if (hb.bumpVal) hb.bumpVal.textContent = Math.round(currentHeatBar.bumpAmount * 100) + '%';
 	ipcRenderer.send('gs-heatbar-save', currentHeatBar);
 	updateStatsConfigFromInputs(false);
 	queueStatsConfigSend();
@@ -147,10 +161,14 @@ function applyConfig(cfg) {
 		currentHeatBar = { ...currentHeatBar, ...cfg.gsHeatBar };
 	}
 	if (hb.enabled) hb.enabled.checked = !!currentHeatBar.enabled;
-	// UI shows fade time (sec) = 1/decayPerSec
-	const fadeSec = currentHeatBar.decayPerSec > 0 ? (1 / currentHeatBar.decayPerSec) : 5.5;
+	// Slider: fade time (sec) = 1/decayPerSec, clamp to 1-10
+	const fadeSec = currentHeatBar.decayPerSec > 0 ? Math.min(10, Math.max(1, 1 / currentHeatBar.decayPerSec)) : 5;
 	if (hb.decay) hb.decay.value = String(fadeSec.toFixed(1));
-	if (hb.bump) hb.bump.value = String(currentHeatBar.bumpAmount);
+	if (hb.decayVal) hb.decayVal.textContent = fadeSec.toFixed(1) + 's';
+	// Slider: bump as percentage (10-50)
+	const bumpPct = Math.min(50, Math.max(10, Math.round(currentHeatBar.bumpAmount * 100)));
+	if (hb.bump) hb.bump.value = String(bumpPct);
+	if (hb.bumpVal) hb.bumpVal.textContent = bumpPct + '%';
 	if (hb.color1) hb.color1.value = currentHeatBar.color1;
 	if (hb.color2) hb.color2.value = currentHeatBar.color2;
 

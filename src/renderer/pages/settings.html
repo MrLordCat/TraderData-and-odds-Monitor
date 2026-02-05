@@ -190,8 +190,16 @@
 					<h2 class="sectionTitle">Activity Heat Bar</h2>
 					<div class="grid formGrid">
 						<label for="hb-enabled">Enabled</label><input id="hb-enabled" type="checkbox" />
-						<label for="hb-decay">Fade time (sec)</label><input id="hb-decay" type="number" min="0.5" max="30" step="0.5" />
-						<label for="hb-bump">Bump (+)</label><input id="hb-bump" type="number" min="0.01" max="1" step="0.01" />
+						<label for="hb-decay">Fade time</label>
+						<div class="rangeWrap">
+							<input id="hb-decay" type="range" min="1" max="10" step="0.5" value="5" />
+							<span id="hb-decay-val" class="rangeVal">5s</span>
+						</div>
+						<label for="hb-bump">Bump amount</label>
+						<div class="rangeWrap">
+							<input id="hb-bump" type="range" min="10" max="50" step="2" value="22" />
+							<span id="hb-bump-val" class="rangeVal">22%</span>
+						</div>
 						<label for="hb-color1">Team 1 color</label><input id="hb-color1" type="color" />
 						<label for="hb-color2">Team 2 color</label><input id="hb-color2" type="color" />
 						<label for="hb-opacity">Opacity</label><input id="hb-opacity" type="range" min="0" max="1" step="0.01" />

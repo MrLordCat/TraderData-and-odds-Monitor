@@ -1,5 +1,13 @@
 // inject-spa-watch.js - detect in-page (history.pushState) match changes on portal.grid.gg
 (() => {
+  // Guard against multiple injections
+  if (window.__lolSpaWatchInjected) {
+    console.log('[inject-spa-watch] Already injected, skipping');
+    return;
+  }
+  window.__lolSpaWatchInjected = true;
+  console.log('[inject-spa-watch] Initializing URL watcher...');
+
   if(!/portal\.grid\.gg/i.test(location.host)) return;
   let last = location.pathname + location.search + location.hash;
   function check(){

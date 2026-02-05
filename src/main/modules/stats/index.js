@@ -341,8 +341,12 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     ensureLolStats();
     try { view.webContents.send('identify-slot', slot); } catch(_){ }
     try {
-      // Only call init - it already injects the bundle. Don't call reinject here!
+      // Always call init first (sets up sendFn, adds to injectedViews)
       lolStats.init(view, slot, (snap)=> broadcast(snap));
+      // ALWAYS reinject on dom-ready - this handles page reloads where init() is skipped
+      // because view is already in injectedViews. Without this, reload breaks data collection.
+      lolStats.reinject(view);
+      console.log('[stats] Grid injection complete for slot', slot);
     } catch(e){ console.error('[stats] Injection error:', e); }
   }
   
@@ -365,6 +369,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     view.webContents.on('dom-ready', ()=>{
       try {
         const cur = view.webContents.getURL();
+        console.log(`[stats] dom-ready for slot ${slot}: ${cur}`);
         maybeEarlyInject(slot, view, cur);
       } catch(e){ console.error('[stats] dom-ready error:', e); }
     });

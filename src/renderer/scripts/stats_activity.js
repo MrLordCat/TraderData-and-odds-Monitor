@@ -24,6 +24,11 @@ function configure(opts={}){
   if(opts.enabled!=null) state.enabled = !!opts.enabled;
   if(typeof opts.decayPerSec === 'number' && opts.decayPerSec>0) state.decayPerSec = opts.decayPerSec;
   if(typeof opts.bumpAmount === 'number' && opts.bumpAmount>0) state.bumpAmount = opts.bumpAmount;
+  
+  // Log heat bar settings for debugging
+  const fadeTimeSec = state.decayPerSec > 0 ? (1 / state.decayPerSec).toFixed(1) : 'Infinity';
+  console.log(`[heat-bar] configure: decayPerSec=${state.decayPerSec.toFixed(3)}, fadeTime=${fadeTimeSec}s (UI setting), bumpAmount=${state.bumpAmount}, enabled=${state.enabled}`);
+  
   // If decay speed changed, reset timestamp so effect is immediate & no big jump
   state.lastTs = performance.now();
   // If disabled -> stop loop & clear bars

@@ -1,5 +1,13 @@
 // Enhanced inject-map.js with broader extraction
 (() => {
+  // Guard against multiple injections
+  if (window.__lolMapInjected) {
+    console.log('[inject-map] Already injected, skipping');
+    return;
+  }
+  window.__lolMapInjected = true;
+  console.log('[inject-map] Initializing...');
+
   const playerToTeam = new Map();
   const pending = []; // queue of { service, seg }
   let flushing = false;

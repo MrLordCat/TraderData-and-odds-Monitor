@@ -39,9 +39,14 @@ function createLolStatsModule(persist={}){
   }
 
   function init(view, slot, emit){
-    if(!view || injectedViews.has(view)) return;
+    if(!view) return;
     sendFn = emit || sendFn;
+    if(injectedViews.has(view)) {
+      console.log('[lolStats] init: view already tracked, skipping bundle injection (will use reinject)');
+      return;
+    }
     const bundle = buildBundle();
+    console.log('[lolStats] init: injecting bundle into view');
     view.webContents.executeJavaScript(bundle).catch(()=>{});
     injectedViews.add(view);
   }
@@ -49,6 +54,7 @@ function createLolStatsModule(persist={}){
   function reinject(view){
     if(!view) return;
     const bundle = buildBundle();
+    console.log('[lolStats] reinject: injecting bundle (reload/reinit)');
     try { view.webContents.executeJavaScript(bundle).catch(()=>{}); } catch(_){ }
   }
 

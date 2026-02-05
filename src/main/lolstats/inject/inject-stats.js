@@ -1,5 +1,12 @@
 // inject-stats.js (per-game with team-level tower/inhib)
 (() => {
+  // Guard against multiple injections (e.g., on page reload)
+  if (window.__lolStatsInjected) {
+    console.log('[inject-stats] Already injected, skipping re-initialization');
+    return;
+  }
+  window.__lolStatsInjected = true;
+  console.log('[inject-stats] Initializing...');
 
   const RX_GAME_START = /^Game\s+(\d+)\s+started$/i;
   const RX_SERIES_START = /^Series\s+started$/i;

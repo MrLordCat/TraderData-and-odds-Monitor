@@ -1,5 +1,13 @@
 // inject-live-log.js (ported from original extension)
 (() => {
+  // Guard against multiple injections
+  if (window.__lolLiveLogInjected) {
+    console.log('[inject-live-log] Already injected, skipping');
+    return;
+  }
+  window.__lolLiveLogInjected = true;
+  console.log('[inject-live-log] Initializing WebSocket interceptor...');
+
   const NativeWS = window.WebSocket;
   window.WebSocket = function(url, protocols) {
     const ws = protocols ? new NativeWS(url, protocols) : new NativeWS(url);

@@ -47,6 +47,11 @@ export function applyTheme(t) {
 
 export function applyHeatBarConfig(hb) {
   if (!hb || !activityModule) return;
+  
+  // Log incoming config for debugging
+  const fadeTimeSec = hb.decayPerSec > 0 ? (1 / hb.decayPerSec).toFixed(1) : 'Infinity';
+  console.log(`[heat-bar] applyHeatBarConfig: decayPerSec=${hb.decayPerSec}, fadeTime=${fadeTimeSec}s (UI setting), bumpAmount=${hb.bumpAmount}, enabled=${hb.enabled}`);
+  
   // Ensure DOM is created before configuring
   if (activityModule.init) activityModule.init();
   if (activityModule.configure) activityModule.configure({ 
@@ -83,12 +88,14 @@ export function applyHeatBarConfig(hb) {
 // IPC listeners
 if (ipcRenderer) {
   ipcRenderer.on('gs-theme-apply', (_e, theme) => applyTheme(theme));
+  console.log('[stats_theme] IPC listener gs-theme-apply registered');
 }
 
 let pendingHeatBar = null;
 
 if (ipcRenderer) {
   ipcRenderer.on('gs-heatbar-apply', (_e, hb) => {
+    console.log('[heat-bar] IPC gs-heatbar-apply received:', hb);
     try {
       pendingHeatBar = hb;
       applyHeatBarConfig(hb);
@@ -97,6 +104,9 @@ if (ipcRenderer) {
       setTimeout(() => applyHeatBarConfig(hb), 400);
     } catch (_) { }
   });
+  console.log('[stats_theme] IPC listener gs-heatbar-apply registered');
+} else {
+  console.warn('[stats_theme] ipcRenderer not available, IPC listeners not registered');
 }
 
 export function applyPendingHeatBar() {
