@@ -12,6 +12,16 @@ function createBrokerManager(ctx){
   const brokerHealth = ctx.brokerHealth;
   const loadFailures = ctx.loadFailures;
 
+  /** Send stored credentials to a view if available for its current URL */
+  function tryAutoFillCreds(view, url){
+    try {
+      const credsAll = store.get('siteCredentials') || {};
+      const host = new URL(url || view.webContents.getURL()).hostname;
+      const creds = credsAll[host];
+      if(creds) view.webContents.send('apply-credentials', { hostname: host, username: creds.username, password: creds.password });
+    } catch(_){ }
+  }
+
   function createAll(){
     const disabled = store.get('disabledBrokers', []);
     const layout = store.get('layout', {});
@@ -98,17 +108,7 @@ function createBrokerManager(ctx){
     view.webContents.on('did-finish-load', ()=>{
       try { view.webContents.insertCSS(ctx.BROKER_FRAME_CSS); } catch(_){}
       scheduleMapReapply(view);
-      // Apply stored credentials (auto-fill) if available
-      try {
-        const credsAll = store.get('siteCredentials') || {};
-        const curUrl = view.webContents.getURL();
-        const host = new URL(curUrl).hostname;
-        const creds = credsAll[host];
-        if(creds){
-          try { console.log('[cred][brokerManager] apply creds host', host, 'user='+creds.username); } catch(_){ }
-          view.webContents.send('apply-credentials', { hostname: host, username: creds.username, password: creds.password });
-        }
-      } catch(_){ }
+      tryAutoFillCreds(view);
     });
     view.webContents.on('did-fail-load', (e, errorCode, errorDesc, validatedURL, isMainFrame)=>{
       if(errorCode === -3) return;
@@ -125,25 +125,13 @@ function createBrokerManager(ctx){
     view.webContents.on('did-navigate', (e,url)=>{
       try { const lu=store.get('lastUrls',{}); lu[brokerDef.id]=url; store.set('lastUrls', lu); } catch(_){}
       scheduleMapReapply(view);
-  // Try to auto-fill credentials on login/redirect pages
-      try {
-        const credsAll = store.get('siteCredentials') || {};
-        const host = new URL(url).hostname;
-        const creds = credsAll[host];
-        if(creds){ view.webContents.send('apply-credentials', { hostname: host, username: creds.username, password: creds.password }); }
-      } catch(_){ }
+      tryAutoFillCreds(view, url);
     });
     view.webContents.on('did-navigate-in-page', (e,url,isMainFrame)=>{
       if(!isMainFrame) return;
       try { const lu=store.get('lastUrls',{}); lu[brokerDef.id]=url; store.set('lastUrls', lu); } catch(_){}
       scheduleMapReapply(view);
-      // Re-apply credentials for SPA route changes where login form mounts late
-      try {
-        const credsAll = store.get('siteCredentials') || {};
-        const host = new URL(url).hostname;
-        const creds = credsAll[host];
-        if(creds){ view.webContents.send('apply-credentials', { hostname: host, username: creds.username, password: creds.password }); }
-      } catch(_){ }
+      tryAutoFillCreds(view, url);
     });
 
     // Attach context menu (right-click) once

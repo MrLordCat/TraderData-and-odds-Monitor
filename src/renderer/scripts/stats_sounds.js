@@ -99,65 +99,26 @@
   // MAIN ENTRY POINT - TRIGGER SOUND BY TYPE
   // ═══════════════════════════════════════════════════════════════════
   
+  // Lookup table for simple sound types (type → SOUNDS key)
+  const SOUND_MAP = {
+    firstBlood: 'firstBlood', firstTower: 'firstTower', firstBaron: 'firstBaron',
+    firstInhibitor: 'firstInhibitor', quadraKill: 'quadraKill', pentaKill: 'pentaKill'
+  };
+
   function triggerSound(soundType, _eventTimestamp) {
     console.log(`[stats-sounds] 🔔 triggerSound: ${soundType}`);
-    
-    if (!soundsEnabled) {
-      console.log('[stats-sounds] ⏸️ SKIPPED: sounds disabled');
+    if (!soundsEnabled) { console.log('[stats-sounds] ⏸️ SKIPPED: sounds disabled'); return; }
+
+    if (soundType === 'seriesStart') { currentGame = 0; return; }
+    if (soundType === 'seriesEnd') return;
+    if (soundType === 'gameStart') {
+      currentGame++;
+      if (currentGame >= 1 && currentGame <= 5) playSound(SOUNDS.gameStart[currentGame]);
       return;
     }
-    
-    switch (soundType) {
-      case 'seriesStart':
-        console.log('[stats-sounds] 🆕 Series started - resetting game counter');
-        currentGame = 0;
-        break;
-      
-      case 'seriesEnd':
-        console.log('[stats-sounds] 🏁 Series ended');
-        break;
-      
-      case 'gameStart':
-        currentGame++;
-        if (currentGame >= 1 && currentGame <= 5) {
-          console.log(`[stats-sounds] 🎮 Game ${currentGame} start`);
-          playSound(SOUNDS.gameStart[currentGame]);
-        }
-        break;
-      
-      case 'firstBlood':
-        console.log('[stats-sounds] 🩸 First blood');
-        playSound(SOUNDS.firstBlood);
-        break;
-      
-      case 'firstTower':
-        console.log('[stats-sounds] 🏰 First tower');
-        playSound(SOUNDS.firstTower);
-        break;
-      
-      case 'firstBaron':
-        console.log('[stats-sounds] 👑 First baron');
-        playSound(SOUNDS.firstBaron);
-        break;
-      
-      case 'firstInhibitor':
-        console.log('[stats-sounds] 💎 First inhibitor');
-        playSound(SOUNDS.firstInhibitor);
-        break;
-      
-      case 'quadraKill':
-        console.log('[stats-sounds] 💀 Quadra kill');
-        playSound(SOUNDS.quadraKill);
-        break;
-      
-      case 'pentaKill':
-        console.log('[stats-sounds] ☠️ Penta kill');
-        playSound(SOUNDS.pentaKill);
-        break;
-      
-      default:
-        console.warn(`[stats-sounds] Unknown sound type: ${soundType}`);
-    }
+    const key = SOUND_MAP[soundType];
+    if (key) { playSound(SOUNDS[key]); return; }
+    console.warn(`[stats-sounds] Unknown sound type: ${soundType}`);
   }
 
   // ═══════════════════════════════════════════════════════════════════

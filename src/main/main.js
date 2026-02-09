@@ -176,31 +176,22 @@ const getBroadcastCtx = () => ({ mainWindow, boardManager, statsManager });
 // Requirement: Auto Resume (R) must start OFF on every app launch.
 let __autoLast = { active:false, resume:false };
 
-// Toggle auto state - just broadcast toggle command, let renderer decide
-function toggleAutoState(){
-  console.log('[main] toggleAutoState - broadcasting toggle command');
-  // Don't track state here - renderer is source of truth
-  // Just send toggle command
-  broadcastToAll(getBroadcastCtx(), 'auto-toggle-all', {});
-}
-
-// Set auto state explicitly (from renderer callback)
-function setAutoState(active){
-  __autoLast.active = !!active;
-  console.log('[main] setAutoState ->', __autoLast.active);
-  // Don't broadcast - this is just to sync main's cache
-}
-
 // Unified broadcast for auto-toggle-all (triggers toggle in renderer)
 function broadcastAutoToggleAll(){
   console.log('[main] broadcastAutoToggleAll called');
-  toggleAutoState();
+  broadcastToAll(getBroadcastCtx(), 'auto-toggle-all', {});
 }
 // BrowserView registry & state caches (restored after accidental removal in refactor)
 const views = {}; // id -> BrowserView
 let activeBrokerIds = []; // ordered list of currently opened broker ids
 const latestOdds = {}; // brokerId -> last odds payload
 const latestOddsRef = { value: latestOdds };
+// Shared odds forwarding (board + stats panel + latestOddsRef cache)
+function forwardOdds(p){
+  try { if(boardManager && boardManager.sendOdds) boardManager.sendOdds(p); } catch(_){ }
+  try { if(statsManager?.views?.panel?.webContents && !statsManager.views.panel.webContents.isDestroyed()) statsManager.views.panel.webContents.send('odds-update', p); } catch(_){ }
+  try { if(latestOddsRef.value) latestOddsRef.value[p.broker] = p; } catch(_){ }
+}
 // LoL team names shared with board & stats
 let lolTeamNames = { team1: 'Team 1', team2: 'Team 2' };
 try {
@@ -483,16 +474,7 @@ function bootstrap() {
   try {
     if(!global.__excelWatcher){
       const forward = (p)=>{
-        // Forward to docked/window board
-        try { if(boardManager && boardManager.sendOdds) boardManager.sendOdds(p); } catch(_){ }
-        // Also forward directly into stats panel (embedded/window) so Excel odds appear there (was missing before)
-        try {
-          if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
-            statsManager.views.panel.webContents.send('odds-update', p);
-          }
-        } catch(_){ }
-        // Persist into latestOddsRef cache so future replays (board detach/load) include Excel without re-selecting map
-        try { if(latestOddsRef && latestOddsRef.value) latestOddsRef.value[p.broker] = p; } catch(_){ }
+        forwardOdds(p);
         // Keep a global last Excel odds snapshot for stats panel late load replay
         try { global.__lastExcelOdds = p; } catch(_){ }
       };
@@ -564,13 +546,7 @@ function bootstrap() {
       port: 9876,
       onOddsUpdate: (payload) => {
         // Forward DS odds like any other broker
-        try { if(boardManager && boardManager.sendOdds) boardManager.sendOdds(payload); } catch(_){ }
-        try {
-          if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
-            statsManager.views.panel.webContents.send('odds-update', payload);
-          }
-        } catch(_){ }
-        try { if(latestOddsRef && latestOddsRef.value) latestOddsRef.value[payload.broker] = payload; } catch(_){ }
+        forwardOdds(payload);
         // Broadcast to main window as well
         try { if(mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('odds-update', payload); } catch(_){ }
       },
@@ -617,60 +593,34 @@ function bootstrap() {
   } catch(e){ console.warn('[addons] createAddonManager failed', e.message); }
   
   // --- Splash Warm-up Tasks ---
-  // Register warm-up tasks and run them before showing main window
   splashManager.updateProgress(60, 'Warming up UI...');
-  
-  // Task 1: Wait for main window to finish loading
-  splashManager.registerTask('Loading main window...', () => {
+
+  /** Wait for webContents to finish loading, then delay */
+  function waitForLoad(wc, delayMs) {
     return new Promise(resolve => {
-      if (mainWindow.webContents.isLoading()) {
-        mainWindow.webContents.once('did-finish-load', resolve);
-      } else {
-        resolve();
-      }
+      if (!wc || !wc.isLoading()) return setTimeout(resolve, delayMs || 0);
+      wc.once('did-finish-load', () => setTimeout(resolve, delayMs || 0));
     });
-  });
-  
-  // Task 2: Pre-create settings overlay
+  }
+
+  splashManager.registerTask('Loading main window...', () => waitForLoad(mainWindow.webContents));
+
   splashManager.registerTask('Preparing settings...', () => {
-    return new Promise(resolve => {
-      try { 
-        if(settingsOverlay && settingsOverlay.warmup) settingsOverlay.warmup(); 
-      } catch(e){ console.warn('[warmup] settings warmup failed', e.message); }
-      // Give it time to load
-      setTimeout(resolve, 300);
-    });
+    try { if(settingsOverlay?.warmup) settingsOverlay.warmup(); } catch(e){ console.warn('[warmup] settings warmup failed', e.message); }
+    return new Promise(resolve => setTimeout(resolve, 300));
   });
-  
-  // Task 3: Wait for stats panel to be ready
-  splashManager.registerTask('Initializing stats panel...', () => {
-    return new Promise(resolve => {
-      const panelView = statsManager && statsManager.getPanelView && statsManager.getPanelView();
-      if (panelView && panelView.webContents) {
-        if (panelView.webContents.isLoading()) {
-          panelView.webContents.once('did-finish-load', () => setTimeout(resolve, 200));
-        } else {
-          setTimeout(resolve, 200);
-        }
-      } else {
-        resolve();
-      }
-    });
-  });
-  
-  // Task 4: Warm-up theme toggle in stats panel (with actual transition)
+
+  const panelView = statsManager?.getPanelView?.();
+  splashManager.registerTask('Initializing stats panel...', () => waitForLoad(panelView?.webContents, 200));
+
   splashManager.registerTask('Warming up animations...', () => {
-    return new Promise(resolve => {
-      try {
-        const panelView = statsManager && statsManager.getPanelView && statsManager.getPanelView();
-        if (panelView && panelView.webContents && !panelView.webContents.isDestroyed()) {
-          // Trigger warmup in stats panel - includes theme transition
-          panelView.webContents.executeJavaScript('if(window.__warmup) window.__warmup();').catch(() => {});
-        }
-      } catch(_){}
-      // Wait for theme transition warmup to complete (opacity hidden during this)
-      setTimeout(resolve, 300);
-    });
+    try {
+      const pv = statsManager?.getPanelView?.();
+      if (pv?.webContents && !pv.webContents.isDestroyed()) {
+        pv.webContents.executeJavaScript('if(window.__warmup) window.__warmup();').catch(() => {});
+      }
+    } catch(_){}
+    return new Promise(resolve => setTimeout(resolve, 300));
   });
   
   // Run all tasks and show main window when done

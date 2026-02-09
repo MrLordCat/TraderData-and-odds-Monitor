@@ -92,9 +92,32 @@ function getStatsWebContentsList(ctx){
   return out;
 }
 
+/**
+ * Broadcast to ALL BrowserWindows + their BrowserViews (simple, no ctx needed).
+ * Use for settings IPC where every renderer must get the update.
+ * @param {string} channel
+ * @param {*} [data]
+ */
+function broadcastGlobal(channel, data) {
+  try {
+    const { BrowserWindow } = require('electron');
+    BrowserWindow.getAllWindows().forEach(w => {
+      try { w.webContents.send(channel, data); } catch (_) { }
+      try {
+        if (typeof w.getBrowserViews === 'function') {
+          w.getBrowserViews().forEach(vw => {
+            try { vw.webContents.send(channel, data); } catch (_) { }
+          });
+        }
+      } catch (_) { }
+    });
+  } catch (_) { }
+}
+
 module.exports = {
   broadcastToAll,
   createBroadcaster,
   getBoardWebContents,
-  getStatsWebContentsList
+  getStatsWebContentsList,
+  broadcastGlobal
 };

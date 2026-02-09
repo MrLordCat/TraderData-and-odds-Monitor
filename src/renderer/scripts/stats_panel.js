@@ -97,6 +97,7 @@ try {
 let metricVisibility = {}; // runtime copy controlling row visibility
 const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'];
 const COUNT_METRICS = ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
+function parseTs(raw){ if(raw==null) return Infinity; if(typeof raw==='number'&&!isNaN(raw)) return raw>36000?Math.floor(raw/1000):raw; if(typeof raw==='string'){ const v=raw.trim(); if(/^\d+$/.test(v)){ const n=Number(v); return n>36000?Math.floor(n/1000):n; } if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(v)){ const p=v.split(':').map(n=>Number(n)||0); if(p.length===2) return p[0]*60+p[1]; if(p.length===3) return p[0]*3600+p[1]*60+p[2]; } } return Infinity; }
 let prevMatchUrls = { A: null, B: null };
 let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
@@ -175,56 +176,28 @@ function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: m
 
 function applyRaceFromKills(gs){ const bucket = gs.killCount||{}; [ ['race5',5], ['race10',10], ['race15',15], ['race20',20] ].forEach(([key,n])=>{ if(!gs[key]){ const t1=bucket[manualData.team1Name]||0; const t2=bucket[manualData.team2Name]||0; if(t1===n || t2===n) gs[key]= t1===n? manualData.team1Name: manualData.team2Name; } }); }
 
-function handleManualClick(metric, side){
+function handleManualAction(metric, side, isRemove){
   const g = manualData.gameStats[currentGame]; if(!g) return;
   const team = side==='t1'? manualData.team1Name: manualData.team2Name;
-  // Order matters: dragonCount must be handled BEFORE generic COUNT_METRICS branch
   if(BINARY_METRICS.includes(metric)){
-    if(!g[metric]) g[metric]=team; else if(g[metric]!==team) g[metric]=team;
-  }
-  else if(metric==='dragonCount'){
-    const bucket=g.dragonCount ||= {};
-    bucket[team]=(bucket[team]||0)+1;
-    (g.dragonOrderSequence ||= []).push(team);
-    syncDragonCounts(g);
-  }
-  else if(COUNT_METRICS.includes(metric)){
+    if(isRemove){ if(g[metric]===team) g[metric]=null; } else { g[metric]=team; }
+  } else if(metric==='dragonCount'){
+    const bucket=g.dragonCount ||= {}; const seq = g.dragonOrderSequence ||= [];
+    if(isRemove){ if(bucket[team]>0){ bucket[team]--; for(let i=seq.length-1;i>=0;i--){ if(seq[i]===team){ seq.splice(i,1); break; } } syncDragonCounts(g); } }
+    else { bucket[team]=(bucket[team]||0)+1; seq.push(team); syncDragonCounts(g); }
+  } else if(COUNT_METRICS.includes(metric)){
     const bucket=g[metric] ||= {};
-    bucket[team]=(bucket[team]||0)+1;
-    if(metric==='killCount') applyRaceFromKills(g);
-  }
-  else if(metric==='netWorth'){
+    if(isRemove){ if(bucket[team]>0) bucket[team]--; }
+    else { bucket[team]=(bucket[team]||0)+1; if(metric==='killCount') applyRaceFromKills(g); }
+  } else if(metric==='netWorth'){
     const bucket=g.netWorth ||= {};
-    const val=prompt('Net Worth for '+team, bucket[team]||0);
-    if(val!=null) bucket[team]=Number(val)||0;
+    if(isRemove) bucket[team]=0;
+    else { const val=prompt('Net Worth for '+team, bucket[team]||0); if(val!=null) bucket[team]=Number(val)||0; }
   }
   renderManual();
 }
-
-function handleManualRightClick(metric, side){
-  const g=manualData.gameStats[currentGame]; if(!g) return;
-  const team = side==='t1'? manualData.team1Name: manualData.team2Name;
-  if(BINARY_METRICS.includes(metric)){
-    if(g[metric]===team) g[metric]=null;
-  }
-  else if(metric==='dragonCount'){
-    const bucket=g.dragonCount ||= {};
-    if(bucket[team]>0){
-      bucket[team]--;
-      const seq = (g.dragonOrderSequence ||= []);
-      for(let i=seq.length-1;i>=0;i--){ if(seq[i]===team){ seq.splice(i,1); break; } }
-      syncDragonCounts(g);
-    }
-  }
-  else if(COUNT_METRICS.includes(metric)){
-    const bucket=g[metric]||{};
-    if(bucket[team]>0) bucket[team]--;
-  }
-  else if(metric==='netWorth'){
-    const bucket=g.netWorth||{}; bucket[team]=0;
-  }
-  renderManual();
-}
+function handleManualClick(metric, side){ handleManualAction(metric, side, false); }
+function handleManualRightClick(metric, side){ handleManualAction(metric, side, true); }
 
 function syncDragonCounts(g){ const t1=manualData.team1Name, t2=manualData.team2Name; g.dragonCount[t1]=g.dragonOrderSequence.filter(t=>t===t1).length; g.dragonCount[t2]=g.dragonOrderSequence.filter(t=>t===t2).length; }
 
@@ -268,8 +241,8 @@ function ensureRows(){
   metricsOrderMutable.forEach(id=>{
     const tr=document.createElement('tr');
     tr.dataset.metric=id;
-  if(BINARY_METRICS.includes(id) || ['dragonOrders','netWorth','quadra','penta','atakhan','winner'].includes(id)) tr.dataset.type='binary';
-    else if(COUNT_METRICS.includes(id) || ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].includes(id)) tr.dataset.type='count';
+  if(BINARY_METRICS.includes(id) || id==='dragonOrders' || id==='netWorth') tr.dataset.type='binary';
+    else if(COUNT_METRICS.includes(id)) tr.dataset.type='count';
     tr.draggable=true;
     // IMPORTANT: no escaped quotes here – previous refactor inserted backslashes so query selectors failed
   // Per‑game checkbox (default unchecked). State stored in window.__LOL_CHECK_STATE[game][metric]
@@ -354,7 +327,7 @@ ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(document.getElementById('l
 function clearLol(){
   metricsOrder.forEach(id=>{
     const isCount = COUNT_METRICS.includes(id);
-    const isBinary = BINARY_METRICS.includes(id) || ['quadra','penta','atakhan','dragonOrders','firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20'].includes(id);
+    const isBinary = BINARY_METRICS.includes(id) || id==='dragonOrders';
     ['t1','t2'].forEach(side=>{
       const c=document.getElementById(`${id}-${side}`);
       if(!c) return;
@@ -436,9 +409,9 @@ function applyWinLose(){
       const t1 = (c1.textContent||'').trim();
       const t2 = (c2.textContent||'').trim();
       let n1=0, n2=0;
-      if(BINARY_METRICS.includes(id) || ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','quadra','penta','atakhan'].includes(id)){
+      if(BINARY_METRICS.includes(id)){
         n1 = t1==='✓'?1:0; n2 = t2==='✓'?1:0;
-      } else if(COUNT_METRICS.includes(id) || ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].includes(id)){
+      } else if(COUNT_METRICS.includes(id)){
         n1 = parseInt(t1,10); n2 = parseInt(t2,10); if(isNaN(n1)) n1=0; if(isNaN(n2)) n2=0;
       } else if(id==='netWorth'){
         n1 = parseFloat(t1)||0; n2 = parseFloat(t2)||0;
@@ -504,10 +477,9 @@ function bindBasic(){
     // Expose for initial apply from stats-init
     window.__applySingleWindowUi = applyUi;
   })();
-  safe('modeSplit', el=> el.onclick = ()=>{ send('stats-layout',{mode:'split'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='split'; });
-  safe('modeVertical', el=> el.onclick = ()=>{ send('stats-layout',{mode:'vertical'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='vertical'; });
-  safe('modeA', el=> el.onclick = ()=>{ send('stats-layout',{mode:'focusA'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='focusA'; });
-  safe('modeB', el=> el.onclick = ()=>{ send('stats-layout',{mode:'focusB'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='focusB'; });
+  [['modeSplit','split'],['modeVertical','vertical'],['modeA','focusA'],['modeB','focusB']].forEach(([id,mode])=>{
+    safe(id, el=> el.onclick = ()=>{ send('stats-layout',{mode}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent=mode; });
+  });
   safe('toggleSide', el=> el.onclick = ()=>{ send('stats-toggle-side'); const d=byId('dbgSide'); if(d) d.textContent = d.textContent==='left'?'right':'left'; });
 
   // Observe global game changes (placeholder: console + optional badge later)
@@ -581,31 +553,10 @@ function initDragAndDrop(){ const body=document.getElementById('lt-body'); if(!b
   ensureRows(); if(document.getElementById('lolManualMode').checked) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
 function getAfterRow(body,y){ const rows=[...body.querySelectorAll('tr:not(.dragging)')]; return rows.find(r=> y <= r.getBoundingClientRect().top + r.getBoundingClientRect().height/2); }
 let addBtn; let gameSelect; let headerH1;
-// Compute a simple winner for a given game's stats snapshot, mirroring applyWinLose comparisons
-function computeGameWinnerSimple(snapshot, team1Name, team2Name){
-  if(!snapshot) return null;
-  let score1=0, score2=0;
-  function cmpBinary(field){ const v=snapshot[field]; if(!v) return; if(v===team1Name) score1++; else if(v===team2Name) score2++; }
-  function cmpCount(field){ const b=snapshot[field]||{}; const v1=b[team1Name]||0; const v2=b[team2Name]||0; if(v1>v2) score1++; else if(v2>v1) score2++; }
-  // Binary metrics
-  ['firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20','quadra','penta','atakhan'].forEach(cmpBinary);
-  // Counts
-  ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].forEach(cmpCount);
-  // Dragon orders / times
-  try {
-    let o1=[], o2=[];
-    if(snapshot.dragonOrders){ o1 = snapshot.dragonOrders[team1Name]||[]; o2 = snapshot.dragonOrders[team2Name]||[]; }
-    else if(snapshot.dragonTimes){
-      const parseTs=(raw)=>{ if(raw==null) return Infinity; if(typeof raw==='number'&&!isNaN(raw)) return raw>36000?Math.floor(raw/1000):raw; if(typeof raw==='string'){ const v=raw.trim(); if(/^\d+$/.test(v)) return Number(v); if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(v)){ const parts=v.split(':').map(n=>Number(n)||0); if(parts.length===2){ const [m,s]=parts; return m*60+s; } if(parts.length===3){ const [h,m,s]=parts; return h*3600+m*60+s; } } } return Infinity; };
-      const arr=[]; (snapshot.dragonTimes[team1Name]||[]).forEach(ts=> arr.push({ team: team1Name, ts: parseTs(ts) })); (snapshot.dragonTimes[team2Name]||[]).forEach(ts=> arr.push({ team: team2Name, ts: parseTs(ts) }));
-      arr.sort((a,b)=> a.ts-b.ts); let idx=1; const map={}; arr.forEach(e=>{ if(!isFinite(e.ts)) return; (map[e.team]=map[e.team]||[]).push(idx++); }); o1 = map[team1Name]||[]; o2 = map[team2Name]||[];
-    }
-    if(o1.length>o2.length) score1++; else if(o2.length>o1.length) score2++;
-  } catch(_){ }
-  // Net worth
-  try { const nw=snapshot.netWorth||{}; const n1 = Number(nw[team1Name]||0); const n2 = Number(nw[team2Name]||0); if(n1>n2) score1++; else if(n2>n1) score2++; } catch(_){ }
-  if(score1===0 && score2===0) return null; // insufficient data
-  if(score1>score2) return 1; if(score2>score1) return 2; return 'tie';
+/** Convert dragonTimes to ordered indices per team */
+function dragonTimesToOrders(dragonTimes, t1, t2){
+  const arr=[]; (dragonTimes[t1]||[]).forEach(ts=> arr.push({ team: t1, ts: parseTs(ts) })); (dragonTimes[t2]||[]).forEach(ts=> arr.push({ team: t2, ts: parseTs(ts) }));
+  arr.sort((a,b)=> a.ts-b.ts); let idx=1; const map={}; arr.forEach(e=>{ if(!isFinite(e.ts)) return; (map[e.team]=map[e.team]||[]).push(idx++); }); return map;
 }
 function updateGameSelect(){
   if(!gameSelect) return;
@@ -614,26 +565,6 @@ function updateGameSelect(){
   const placeholder=document.createElement('option');
   placeholder.value=''; placeholder.disabled=true; placeholder.textContent='Game -';
   let any=false;
-  // Helper: detect if a snapshot has any meaningful signals beyond empty defaults
-  function hasAnySignal(snapshot, team1Name, team2Name){
-    try {
-      if(!snapshot || typeof snapshot!== 'object') return false;
-      // Any binary set
-      const binaries=['firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20','quadra','penta','atakhan'];
-      if(binaries.some(k=> snapshot[k]===team1Name || snapshot[k]===team2Name)) return true;
-      // Any counts > 0
-      const counts=['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
-      for(const k of counts){ const b=snapshot[k]||{}; if((b[team1Name]||0)>0 || (b[team2Name]||0)>0) return true; }
-      // Dragon orders / times
-      try {
-        if(snapshot.dragonOrders){ const o1=snapshot.dragonOrders[team1Name]||[]; const o2=snapshot.dragonOrders[team2Name]||[]; if((o1.length||0)>0 || (o2.length||0)>0) return true; }
-        if(snapshot.dragonTimes){ const t1=snapshot.dragonTimes[team1Name]||[]; const t2=snapshot.dragonTimes[team2Name]||[]; if((t1.length||0)>0 || (t2.length||0)>0) return true; }
-      } catch(_){ }
-      // Net worth present and non-zero
-      try { const nw=snapshot.netWorth||{}; const n1=Number(nw[team1Name]||0); const n2=Number(nw[team2Name]||0); if(n1!==0 || n2!==0) return true; } catch(_){ }
-    } catch(_){ }
-    return false;
-  }
   if(manualOn){
     const games=Object.keys(manualData.gameStats||{}).filter(k=>/^[0-9]+$/.test(k)).map(Number).sort((a,b)=>a-b);
     games.forEach(g=>{ const o=document.createElement('option'); o.value=String(g); const label='Game '+g; o.textContent=label; if(String(g)===String(currentGame||'1')) o.selected=true; gameSelect.appendChild(o); any=true; });
@@ -680,20 +611,12 @@ function renderLol(payload, manual=false){
     function setCount(field){ const bucket = s[field] || {}; const has1 = Object.prototype.hasOwnProperty.call(bucket, dispTeam1); const has2 = Object.prototype.hasOwnProperty.call(bucket, dispTeam2); if(!has1 && !has2){ if(DEFAULT_ZERO_COUNT_FIELDS.includes(field)){ ['t1','t2'].forEach(side=>{ const key=field+':'+side; if(!__prevValues[key]) __prevValues[key]='0'; firstEventFlags['fe:'+key]=true; setText(field, side, '0'); }); } else { setText(field,'t1',''); setText(field,'t2',''); } return; } let v1 = has1 ? bucket[dispTeam1] : 0; let v2 = has2 ? bucket[dispTeam2] : 0; if(v1 === undefined || v1 === null || isNaN(v1)) v1 = 0; if(v2 === undefined || v2 === null || isNaN(v2)) v2 = 0; setText(field,'t1', v1 === 0 ? '0' : v1); setText(field,'t2', v2 === 0 ? '0' : v2); }
   // winner header highlight omitted
     const filledBinary = new Set();
-    setBinary('firstKill', filledBinary);
-    setCount('killCount');
-    ['race5','race10','race15','race20'].forEach(r=> setBinary(r, filledBinary));
-    setBinary('firstTower', filledBinary);
-    setBinary('firstInhibitor', filledBinary);
-    setBinary('firstBaron', filledBinary);
-    setCount('towerCount');
-    setCount('inhibitorCount');
-    setCount('baronCount');
-  setCount('dragonCount');
+    ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron'].forEach(f=> setBinary(f, filledBinary));
+    COUNT_METRICS.forEach(setCount);
   // Winner (live only). Manual mode can also toggle if user wants.
   if(s.winner){ setBinary('winner', filledBinary); }
     // Dragon orders
-    (function(){ function parseTs(raw){ if(raw==null) return Infinity; if(typeof raw==='number' && !isNaN(raw)) return raw; if(typeof raw==='string'){ const val=raw.trim(); if(/^\d+$/.test(val)){ const num=Number(val); if(num>3600*10) return Math.floor(num/1000); return num; } if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(val)){ const parts=val.split(':').map(n=>Number(n)||0); if(parts.length===2){ const [m,s]=parts; return m*60+s; } if(parts.length===3){ const [h,m,s]=parts; return h*3600+m*60+s; } } } return Infinity; } let orders1=[], orders2=[]; if(s.dragonOrders){ orders1 = s.dragonOrders[dispTeam1]||[]; orders2 = s.dragonOrders[dispTeam2]||[]; } else if(s.dragonTimes){ const arr=[]; (s.dragonTimes[team1Name]||[]).forEach(ts=> arr.push({ team: team1Name, ts: parseTs(ts) })); (s.dragonTimes[team2Name]||[]).forEach(ts=> arr.push({ team: team2Name, ts: parseTs(ts) })); arr.sort((a,b)=> a.ts-b.ts); let idx=1; const map={}; arr.forEach(e=>{ if(!isFinite(e.ts)) return; (map[e.team]=map[e.team]||[]).push(idx++); }); orders1 = map[dispTeam1]||[]; orders2 = map[dispTeam2]||[]; } setText('dragonOrders','t1', orders1.join(' ')); setText('dragonOrders','t2', orders2.join(' ')); })();
+    (function(){ let orders1=[], orders2=[]; if(s.dragonOrders){ orders1 = s.dragonOrders[dispTeam1]||[]; orders2 = s.dragonOrders[dispTeam2]||[]; } else if(s.dragonTimes){ const map = dragonTimesToOrders(s.dragonTimes, team1Name, team2Name); orders1 = map[dispTeam1]||[]; orders2 = map[dispTeam2]||[]; } setText('dragonOrders','t1', orders1.join(' ')); setText('dragonOrders','t2', orders2.join(' ')); })();
     // Net worth
   const nw = s.netWorth || {}; const hasNw1 = Object.prototype.hasOwnProperty.call(nw, t1Key); const hasNw2 = Object.prototype.hasOwnProperty.call(nw, t2Key); const nw1 = hasNw1 ? nw[t1Key] : ''; const nw2 = hasNw2 ? nw[t2Key] : ''; setText('netWorth','t1', nw1); setText('netWorth','t2', nw2);
     if(s.quadra) setBinary('quadra', filledBinary); if(s.penta) setBinary('penta', filledBinary); if(s.atakhan) setBinary('atakhan', filledBinary);

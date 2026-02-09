@@ -1,6 +1,7 @@
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { broadcastGlobal } = require('./utils/broadcast');
 
 function createExcelExtractorController({
   app,
@@ -36,30 +37,7 @@ function createExcelExtractorController({
     }
   }
 
-  function broadcast(channel, payload) {
-    try {
-      const mainWindow = getMainWindow && getMainWindow();
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        try { mainWindow.webContents.send(channel, payload); } catch (_) { }
-      }
-    } catch (_) { }
-
-    try {
-      const bwc = getBoardWebContents && getBoardWebContents();
-      if (bwc && !bwc.isDestroyed()) {
-        try { bwc.send(channel, payload); } catch (_) { }
-      }
-    } catch (_) { }
-
-    try {
-      const list = getStatsWebContentsList ? getStatsWebContentsList() : [];
-      (list || []).forEach(wc => {
-        try {
-          if (wc && !wc.isDestroyed()) wc.send(channel, payload);
-        } catch (_) { }
-      });
-    } catch (_) { }
-  }
+  function broadcast(channel, payload) { broadcastGlobal(channel, payload); }
 
   function excelLog() {
     // Debug logging disabled
@@ -125,34 +103,26 @@ function createExcelExtractorController({
     return path.join(getAppRoot(), 'Excel Extractor');
   }
 
-  function resolveExcelScriptPath() {
-    try {
-      const custom = store.get('excelScriptPath');
-      if (custom && typeof custom === 'string' && fs.existsSync(custom.trim())) return custom.trim();
-    } catch (_) { }
-
-    const base = getExcelExtractorDir();
-    const candidates = [
-      path.join(base, 'excel_watcher.py'),
-      path.join(base, 'excel-watcher.py'),
-      path.join(base, 'excelWatcher.py'),
-    ];
-    for (const p of candidates) {
-      try { if (fs.existsSync(p)) return p; } catch (_) { }
+  function resolveScript(storeKey, candidates) {
+    if (storeKey) {
+      try { const c = store.get(storeKey); if (c && typeof c === 'string' && fs.existsSync(c.trim())) return c.trim(); } catch (_) { }
     }
+    for (const p of candidates) { try { if (fs.existsSync(p)) return p; } catch (_) { } }
     return null;
+  }
+
+  function resolveExcelScriptPath() {
+    const base = getExcelExtractorDir();
+    return resolveScript('excelScriptPath', [
+      path.join(base, 'excel_watcher.py'), path.join(base, 'excel-watcher.py'), path.join(base, 'excelWatcher.py'),
+    ]);
   }
 
   function resolveHotkeyControllerPath() {
     const base = getExcelExtractorDir();
-    const candidates = [
-      path.join(base, 'excel_hotkey_controller.py'),
-      path.join(base, 'excel-hotkey-controller.py'),
-    ];
-    for (const p of candidates) {
-      try { if (fs.existsSync(p)) return p; } catch (_) { }
-    }
-    return null;
+    return resolveScript(null, [
+      path.join(base, 'excel_hotkey_controller.py'), path.join(base, 'excel-hotkey-controller.py'),
+    ]);
   }
 
   // Проверка и установка pip зависимостей
@@ -278,82 +248,60 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     });
   }
 
+  function readJsonSafe(filePath) {
+    try { if (!fs.existsSync(filePath)) return null; return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch (_) { return null; }
+  }
+
   function readAhkFromCurrentState() {
     try {
       const file = (() => {
-        try {
-          const custom = store.get('excelDumpPath');
-          if (custom && typeof custom === 'string') return custom;
-        } catch (_) { }
+        try { const custom = store.get('excelDumpPath'); if (custom && typeof custom === 'string') return custom; } catch (_) { }
         return path.join(getExcelExtractorDir(), 'current_state.json');
       })();
-
-      if (!file || !fs.existsSync(file)) return;
-      const txt = fs.readFileSync(file, 'utf8');
-      const data = JSON.parse(txt);
-      if (!data || typeof data !== 'object') return;
+      const data = readJsonSafe(file);
+      if (!data) return;
       const ahk = data.ahk;
       if (!ahk || typeof ahk !== 'object') return;
-
-      const next = {
-        running: !!ahk.running,
-        starting: false,
+      state.ahkStatus = Object.assign({}, state.ahkStatus, {
+        running: !!ahk.running, starting: false,
         error: ahk.error != null ? String(ahk.error) : null,
         pid: (ahk.pid != null && !isNaN(Number(ahk.pid))) ? Number(ahk.pid) : null,
-        exe: 'python',
-        script: ahk.script != null ? String(ahk.script) : null,
-        managed: !!ahk.managed,
-        cwd: null,
-        lastStderr: null,
-      };
-
-      state.ahkStatus = Object.assign({}, state.ahkStatus, next);
+        exe: 'python', script: ahk.script != null ? String(ahk.script) : null,
+        managed: !!ahk.managed, cwd: null, lastStderr: null,
+      });
     } catch (_) { }
   }
 
-  const ahkPoll = setInterval(() => {
-    try {
-      readAhkFromCurrentState();
-      broadcastExcelStatus();
-    } catch (_) { }
-  }, 1200);
+  const ahkPoll = setInterval(() => { try { readAhkFromCurrentState(); broadcastExcelStatus(); } catch (_) { } }, 1200);
 
   function readHotkeyStatus() {
-    try {
-      const file = path.join(getExcelExtractorDir(), 'hotkey_status.json');
-      if (!fs.existsSync(file)) return null;
-      const txt = fs.readFileSync(file, 'utf8');
-      const data = JSON.parse(txt);
-      if (!data || typeof data !== 'object') return null;
-      return {
-        currentMap: typeof data.currentMap === 'number' ? data.currentMap : null,
-        maxMaps: typeof data.maxMaps === 'number' ? data.maxMaps : null,
-        connected: !!data.connected,
-        ts: data.ts || null,
-      };
-    } catch (_) { return null; }
-  }
-
-  function broadcastExcelStatus() {
-    try { readAhkFromCurrentState(); } catch (_) { }
-    const hotkeyStatus = readHotkeyStatus();
-    const payload = {
-      running: !!state.excelProc,
-      starting: !!state.excelProcStarting,
-      error: state.excelProcError,
-      installing: !!state.excelDepsInstalling,
-      ahk: Object.assign({}, state.ahkStatus, { lastStderr: short(state.ahkStatus.lastStderr, 220) }),
-      hotkey: {
-        running: !!state.hotkeyProc,
-        error: state.hotkeyProcError,
-      },
-      scriptMap: hotkeyStatus ? hotkeyStatus.currentMap : null,
-      scriptMaxMaps: hotkeyStatus ? hotkeyStatus.maxMaps : null,
-      scriptConnected: hotkeyStatus ? hotkeyStatus.connected : false,
+    const data = readJsonSafe(path.join(getExcelExtractorDir(), 'hotkey_status.json'));
+    if (!data) return null;
+    return {
+      currentMap: typeof data.currentMap === 'number' ? data.currentMap : null,
+      maxMaps: typeof data.maxMaps === 'number' ? data.maxMaps : null,
+      connected: !!data.connected, ts: data.ts || null,
     };
-
-    broadcast('excel-extractor-status', payload);
   }
+
+  function buildStatusPayload(truncateStderr) {
+    try { readAhkFromCurrentState(); } catch (_) { }
+    const hs = readHotkeyStatus();
+    return {
+      running: !!state.excelProc, starting: !!state.excelProcStarting,
+      error: state.excelProcError, installing: !!state.excelDepsInstalling,
+      ahk: Object.assign({}, state.ahkStatus, truncateStderr ? { lastStderr: short(state.ahkStatus.lastStderr, 220) } : {}),
+      hotkey: { running: !!state.hotkeyProc, error: state.hotkeyProcError },
+      scriptMap: hs ? hs.currentMap : null, scriptMaxMaps: hs ? hs.maxMaps : null,
+      scriptConnected: hs ? hs.connected : false,
+    };
+  }
+
+  function broadcastExcelStatus() { broadcast('excel-extractor-status', buildStatusPayload(true)); }
+
+  const PYTHON_ENV = { PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' };
+  function pySpawnEnv() { return Object.assign({}, process.env, PYTHON_ENV); }
+  function abortStart(msg) { state.excelProcError = msg; state.excelProcStarting = false; broadcastExcelStatus(); }
 
   function startExcelExtractor() {
     if (state.excelProc || state.excelProcStarting || state.excelDepsInstalling) return;
@@ -369,9 +317,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     try {
       const scriptPath = resolveExcelScriptPath();
       if (!scriptPath) {
-        state.excelProcError = 'excel_watcher.py not found in "Excel Extractor"';
-        state.excelProcStarting = false;
-        broadcastExcelStatus();
+        abortStart('excel_watcher.py not found in "Excel Extractor"');
         return;
       }
 
@@ -380,9 +326,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       // Сначала проверяем и устанавливаем зависимости
       checkAndInstallDeps(py, (depsErr) => {
         if (depsErr) {
-          state.excelProcError = 'Deps install failed: ' + depsErr.message;
-          state.excelProcStarting = false;
-          broadcastExcelStatus();
+          abortStart('Deps install failed: ' + depsErr.message);
           return;
         }
 
@@ -391,9 +335,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       });
 
     } catch (err) {
-      state.excelProcError = 'Startup error: ' + (err && err.message ? err.message : String(err));
-      state.excelProcStarting = false;
-      broadcastExcelStatus();
+      abortStart('Startup error: ' + (err && err.message ? err.message : String(err)));
     }
   }
 
@@ -421,17 +363,13 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
             : null;
 
           if (!picked || !picked.length) {
-            state.excelProcError = 'Excel file not selected';
-            state.excelProcStarting = false;
-            broadcastExcelStatus();
+            abortStart('Excel file not selected');
             return;
           }
 
           workbookPath = String(picked[0] || '').trim();
           if (!workbookPath) {
-            state.excelProcError = 'Excel file not selected';
-            state.excelProcStarting = false;
-            broadcastExcelStatus();
+            abortStart('Excel file not selected');
             return;
           }
 
@@ -439,9 +377,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
           excelLog('excelWorkbookPath set', workbookPath);
         }
       } catch (err) {
-        state.excelProcError = 'File picker failed: ' + (err && err.message ? err.message : String(err));
-        state.excelProcStarting = false;
-        broadcastExcelStatus();
+        abortStart('File picker failed: ' + (err && err.message ? err.message : String(err)));
         return;
       }
 
@@ -450,10 +386,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
 
       excelLog('spawn attempt', JSON.stringify({ python: py, args, cwd, scriptPath }));
 
-      const spawnEnv = Object.assign({}, process.env, {
-        PYTHONUNBUFFERED: '1',
-        PYTHONIOENCODING: 'utf-8',
-      });
+      const spawnEnv = pySpawnEnv();
 
       state.excelProc = spawn(py, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: spawnEnv });
       excelLog('spawned pid', state.excelProc.pid, 'script', scriptPath);
@@ -556,24 +489,14 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
 
     excelLog('[hotkey] starting', scriptPath);
 
-    const spawnEnv = Object.assign({}, process.env, {
-      PYTHONUNBUFFERED: '1',
-      PYTHONIOENCODING: 'utf-8',
-    });
-
     try {
-      state.hotkeyProc = spawn(py, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: spawnEnv, windowsHide: true });
+      state.hotkeyProc = spawn(py, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: pySpawnEnv(), windowsHide: true });
       state.hotkeyProcError = null;
 
       excelLog('[hotkey] spawned pid', state.hotkeyProc.pid);
 
-      state.hotkeyProc.stdout.on('data', d => {
-        try { excelLog('[hotkey][stdout]', d.toString().trim()); } catch (_) { }
-      });
-
-      state.hotkeyProc.stderr.on('data', d => {
-        try { excelLog('[hotkey][stderr]', d.toString().trim()); } catch (_) { }
-      });
+      state.hotkeyProc.stdout.on('data', d => { try { excelLog('[hotkey][stdout]', d.toString().trim()); } catch (_) { } });
+      state.hotkeyProc.stderr.on('data', d => { try { excelLog('[hotkey][stderr]', d.toString().trim()); } catch (_) { } });
 
       state.hotkeyProc.on('exit', (code, sig) => {
         excelLog('[hotkey] exit code', code, 'sig', sig || '');
@@ -706,19 +629,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     }
   }
 
-  function getStatus() {
-    const hotkeyStatus = readHotkeyStatus();
-    return {
-      running: !!state.excelProc,
-      starting: !!state.excelProcStarting,
-      error: state.excelProcError,
-      installing: !!state.excelDepsInstalling,
-      ahk: Object.assign({}, state.ahkStatus),
-      scriptMap: hotkeyStatus ? hotkeyStatus.currentMap : null,
-      scriptMaxMaps: hotkeyStatus ? hotkeyStatus.maxMaps : null,
-      scriptConnected: hotkeyStatus ? hotkeyStatus.connected : false,
-    };
-  }
+  function getStatus() { return buildStatusPayload(false); }
 
   function dispose() {
     try { clearInterval(ahkPoll); } catch (_) { }

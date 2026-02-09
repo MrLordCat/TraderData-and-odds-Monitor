@@ -1,28 +1,59 @@
 // Settings & theme IPC extracted from main.js
 // initSettingsIpc({ ipcMain, store, settingsOverlay, statsManager })
 
+const { broadcastGlobal } = require('../utils/broadcast');
+
+/**
+ * Factory: register a get/set IPC pair with broadcast.
+ * @param {object} ipcMain
+ * @param {object} store
+ * @param {string} storeKey        - electron-store key
+ * @param {string} channel         - base channel name (e.g. 'auto-tolerance')
+ * @param {object} opts
+ * @param {Function} opts.clamp    - (v) => clamped value (for numbers)
+ * @param {*}      opts.default    - default fallback
+ * @param {'number'|'boolean'} opts.type - value type
+ * @param {string} opts.payloadKey - key inside payload object (default: from type)
+ */
+function createSettingIpc(ipcMain, store, storeKey, channel, opts = {}) {
+  const { clamp, type = 'number' } = opts;
+  const defaultVal = opts.default ?? null;
+
+  ipcMain.handle(`${channel}-get`, () => {
+    try {
+      const v = store.get(storeKey);
+      if (type === 'boolean' && typeof v === 'boolean') return v;
+      if (type === 'number' && typeof v === 'number' && !isNaN(v)) return clamp ? clamp(v) : v;
+    } catch (_) { }
+    return defaultVal;
+  });
+
+  ipcMain.on(`${channel}-set`, (_e, payload) => {
+    try {
+      let v = null;
+      if (type === 'boolean') {
+        const key = opts.payloadKey || 'enabled';
+        v = payload && typeof payload[key] === 'boolean' ? payload[key] : null;
+      } else {
+        const key = opts.payloadKey || Object.keys(payload || {}).find(k => k !== 'type') || 'value';
+        const raw = payload && payload[key];
+        v = typeof raw === 'number' ? (clamp ? clamp(raw) : raw) : null;
+      }
+      if (v !== null) {
+        store.set(storeKey, v);
+        broadcastGlobal(`${channel}-updated`, v);
+      }
+    } catch (_) { }
+  });
+}
+
 function initSettingsIpc(ctx){
   const { ipcMain, store, settingsOverlay, statsManager } = ctx;
   ipcMain.on('open-settings', ()=> settingsOverlay.open());
   ipcMain.on('close-settings', ()=> settingsOverlay.close());
   
   // Broadcast settings-updated to all windows when settings are saved
-  ipcMain.on('settings-saved', () => {
-    try {
-      const { BrowserWindow } = require('electron');
-      BrowserWindow.getAllWindows().forEach(w => {
-        try { w.webContents.send('settings-updated'); } catch(_){ }
-        // Also send to BrowserViews (stats panel when docked)
-        try {
-          if(typeof w.getBrowserViews === 'function'){
-            w.getBrowserViews().forEach(vw => {
-              try { vw.webContents.send('settings-updated'); } catch(_){ }
-            });
-          }
-        } catch(_){ }
-      });
-    } catch(e){ console.error('[settings] broadcast settings-updated failed:', e); }
-  });
+  ipcMain.on('settings-saved', () => { broadcastGlobal('settings-updated'); });
   
   function forwardHeatBar(cfg){
     try { if(statsManager && statsManager.views && statsManager.views.panel){ statsManager.views.panel.webContents.send('gs-heatbar-apply', cfg); } } catch(_){ }
@@ -42,44 +73,7 @@ function initSettingsIpc(ctx){
     try {
       const game = sanitizeGame(payload && payload.game);
       store.set('selectedGame', game);
-      // Broadcast to all BrowserWindows and their BrowserViews
-      const { BrowserWindow } = require('electron');
-      BrowserWindow.getAllWindows().forEach(w=>{
-        try { w.webContents.send('game-changed', game); } catch(_){ }
-        try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('game-changed', game); } catch(_){ } }); } } catch(_){ }
-      });
-    } catch(_){ }
-  });
-
-  // Auto odds tolerance (percent). Persist under key 'autoTolerancePct'.
-  function clampTol(v){ return Math.max(0.5, Math.min(10, v)); }
-  const DEFAULT_TOLERANCE_PCT = 1.5;
-  ipcMain.handle('auto-tolerance-get', ()=>{
-    try {
-      const v = store.get('autoTolerancePct');
-      if(typeof v === 'number' && !isNaN(v)) return clampTol(v);
-    } catch(_){ }
-    return DEFAULT_TOLERANCE_PCT; // Return default only if not saved
-  });
-  ipcMain.on('auto-tolerance-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.tolerancePct==='number'? clampTol(payload.tolerancePct): null;
-      if(v){
-        store.set('autoTolerancePct', v);
-        // Broadcast to all BrowserWindows AND their BrowserViews (board & embedded stats are BrowserViews when docked)
-        try {
-          const { BrowserWindow } = require('electron');
-          const bw = BrowserWindow.getAllWindows();
-            bw.forEach(w=>{
-              try { w.webContents.send('auto-tolerance-updated', v); } catch(_){ }
-              try {
-                if(typeof w.getBrowserViews === 'function'){
-                  w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-tolerance-updated', v); } catch(_){ } });
-                }
-              } catch(_){ }
-            });
-        } catch(_){ }
-      }
+      broadcastGlobal('game-changed', game);
     } catch(_){ }
   });
 
@@ -101,7 +95,6 @@ function initSettingsIpc(ctx){
       return uniq.slice(0,3); // cap to 3 (UI uses 3)
     } catch(_){ return null; }
   }
-  function defaultBurstLevels(){ return null; }
   ipcMain.handle('auto-burst-levels-get', ()=>{
     try {
       const v = store.get('autoBurstLevels');
@@ -115,287 +108,47 @@ function initSettingsIpc(ctx){
       const s = sanitizeBurstLevels(levels);
       if(s){
         store.set('autoBurstLevels', s);
-        // Broadcast update
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-burst-levels-updated', s); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-burst-levels-updated', s); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
+        broadcastGlobal('auto-burst-levels-updated', s);
       }
     } catch(_){ }
   });
 
-  // === Auto interval (ms) ===
-  function clampInterval(v){ return Math.max(120, Math.min(10000, Math.floor(v))); }
-  ipcMain.handle('auto-interval-get', ()=>{
-    try {
-      const v = store.get('autoIntervalMs');
-      if(typeof v==='number' && !isNaN(v)) return clampInterval(v);
-    } catch(_){ }
-    return null; // no default on first run
+  // === All numeric/boolean auto settings via factory ===
+  createSettingIpc(ipcMain, store, 'autoTolerancePct', 'auto-tolerance', {
+    clamp: v => Math.max(0.5, Math.min(10, v)), default: 1.5, payloadKey: 'tolerancePct'
   });
-  ipcMain.on('auto-interval-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.intervalMs==='number'? clampInterval(payload.intervalMs): null;
-      if(v){
-        store.set('autoIntervalMs', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-interval-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-interval-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
+  createSettingIpc(ipcMain, store, 'autoIntervalMs', 'auto-interval', {
+    clamp: v => Math.max(120, Math.min(10000, Math.floor(v))), default: null, payloadKey: 'intervalMs'
   });
-
-  // === Auto adaptive mode (bool) ===
-  ipcMain.handle('auto-adaptive-get', ()=>{
-    try {
-      const v = store.get('autoAdaptiveEnabled');
-      if(typeof v==='boolean') return v;
-    } catch(_){ }
-    return null; // no default on first run
+  createSettingIpc(ipcMain, store, 'autoAdaptiveEnabled', 'auto-adaptive', {
+    type: 'boolean', default: null, payloadKey: 'enabled'
   });
-  ipcMain.on('auto-adaptive-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.enabled==='boolean'? payload.enabled: null;
-      if(v!==null){
-        store.set('autoAdaptiveEnabled', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-adaptive-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-adaptive-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
+  createSettingIpc(ipcMain, store, 'autoSuspendThresholdPct', 'auto-suspend-threshold', {
+    clamp: v => Math.max(15, Math.min(80, Math.round(v))), default: 40, payloadKey: 'pct'
   });
-
-  // === Auto Suspend threshold (%) - suspend when diff >= threshold, resume when < threshold/2 ===
-  function clampAutoSuspend(v){ return Math.max(15, Math.min(80, Math.round(v))); }
-  ipcMain.handle('auto-suspend-threshold-get', ()=>{
-    try {
-      const v = store.get('autoSuspendThresholdPct');
-      if(typeof v==='number' && !isNaN(v)) return clampAutoSuspend(v);
-    } catch(_){ }
-    return 40; // default
+  createSettingIpc(ipcMain, store, 'autoShockThresholdPct', 'auto-shock-threshold', {
+    clamp: v => Math.max(40, Math.min(120, Math.round(v))), default: 80, payloadKey: 'pct'
   });
-  ipcMain.on('auto-suspend-threshold-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.pct==='number' ? clampAutoSuspend(payload.pct) : null;
-      if(v!=null){
-        store.set('autoSuspendThresholdPct', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-suspend-threshold-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-suspend-threshold-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
+  createSettingIpc(ipcMain, store, 'autoFireCooldownMs', 'auto-fire-cooldown', {
+    clamp: v => Math.max(100, Math.min(5000, Math.floor(v))), default: 900, payloadKey: 'ms'
   });
-
-  // === Shock Threshold (%) - large odds shift detection (ARB protection) ===
-  function clampShock(v){ return Math.max(40, Math.min(120, Math.round(v))); }
-  ipcMain.handle('auto-shock-threshold-get', ()=>{
-    try {
-      const v = store.get('autoShockThresholdPct');
-      if(typeof v==='number' && !isNaN(v)) return clampShock(v);
-    } catch(_){ }
-    return 80; // default
+  createSettingIpc(ipcMain, store, 'autoMaxExcelWaitMs', 'auto-max-excel-wait', {
+    clamp: v => Math.max(500, Math.min(5000, Math.floor(v))), default: 1600, payloadKey: 'ms'
   });
-  ipcMain.on('auto-shock-threshold-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.pct==='number' ? clampShock(payload.pct) : null;
-      if(v!=null){
-        store.set('autoShockThresholdPct', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-shock-threshold-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-shock-threshold-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
+  createSettingIpc(ipcMain, store, 'autoPulseGapMs', 'auto-pulse-gap', {
+    clamp: v => Math.max(100, Math.min(1000, Math.floor(v))), default: 500, payloadKey: 'ms'
   });
-
-  // === Fire Cooldown (ms) - minimum delay between keypresses ===
-  function clampCooldown(v){ return Math.max(100, Math.min(5000, Math.floor(v))); }
-  ipcMain.handle('auto-fire-cooldown-get', ()=>{
-    try {
-      const v = store.get('autoFireCooldownMs');
-      if(typeof v==='number' && !isNaN(v)) return clampCooldown(v);
-    } catch(_){ }
-    return 900; // default
+  createSettingIpc(ipcMain, store, 'autoBurst3Enabled', 'auto-burst3-enabled', {
+    type: 'boolean', default: true, payloadKey: 'enabled'
   });
-  ipcMain.on('auto-fire-cooldown-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.ms==='number' ? clampCooldown(payload.ms) : null;
-      if(v!=null){
-        store.set('autoFireCooldownMs', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-fire-cooldown-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-fire-cooldown-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
+  createSettingIpc(ipcMain, store, 'autoPulseStepPct', 'auto-pulse-step', {
+    clamp: v => Math.max(8, Math.min(15, Math.round(v))), default: 10, payloadKey: 'pct'
   });
-
-  // === Max Excel Wait (ms) - max adaptive wait for Excel change ===
-  function clampMaxWait(v){ return Math.max(500, Math.min(5000, Math.floor(v))); }
-  ipcMain.handle('auto-max-excel-wait-get', ()=>{
-    try {
-      const v = store.get('autoMaxExcelWaitMs');
-      if(typeof v==='number' && !isNaN(v)) return clampMaxWait(v);
-    } catch(_){ }
-    return 1600; // default
+  createSettingIpc(ipcMain, store, 'autoStopOnNoMid', 'auto-stop-no-mid', {
+    type: 'boolean', default: true, payloadKey: 'enabled'
   });
-  ipcMain.on('auto-max-excel-wait-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.ms==='number' ? clampMaxWait(payload.ms) : null;
-      if(v!=null){
-        store.set('autoMaxExcelWaitMs', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-max-excel-wait-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-max-excel-wait-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
-  });
-
-  // === Pulse Gap (ms) - delay between burst pulses ===
-  function clampPulseGap(v){ return Math.max(100, Math.min(1000, Math.floor(v))); }
-  ipcMain.handle('auto-pulse-gap-get', ()=>{
-    try {
-      const v = store.get('autoPulseGapMs');
-      if(typeof v==='number' && !isNaN(v)) return clampPulseGap(v);
-    } catch(_){ }
-    return 500; // default
-  });
-  ipcMain.on('auto-pulse-gap-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.ms==='number' ? clampPulseGap(payload.ms) : null;
-      if(v!=null){
-        store.set('autoPulseGapMs', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-pulse-gap-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-pulse-gap-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
-  });
-
-  // === Burst L3 Enabled (bool) - ability to disable highest burst level ===
-  ipcMain.handle('auto-burst3-enabled-get', ()=>{
-    try {
-      const v = store.get('autoBurst3Enabled');
-      if(typeof v==='boolean') return v;
-    } catch(_){ }
-    return true; // default enabled
-  });
-  ipcMain.on('auto-burst3-enabled-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.enabled==='boolean' ? payload.enabled : null;
-      if(v!==null){
-        store.set('autoBurst3Enabled', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-burst3-enabled-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-burst3-enabled-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
-  });
-
-  // === Pulse Step (%) - diff % per burst pulse (8-15), capped at 3 pulses ===
-  function clampPulseStep(v){ return Math.max(8, Math.min(15, Math.round(v))); }
-  ipcMain.handle('auto-pulse-step-get', ()=>{
-    try {
-      const v = store.get('autoPulseStepPct');
-      if(typeof v==='number' && !isNaN(v)) return clampPulseStep(v);
-    } catch(_){ }
-    return 10; // default
-  });
-  ipcMain.on('auto-pulse-step-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.pct==='number' ? clampPulseStep(payload.pct) : null;
-      if(v!=null){
-        store.set('autoPulseStepPct', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-pulse-step-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-pulse-step-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
-  });
-
-  // === Stop on No MID (bool) - disable Auto when MID data unavailable ===
-  ipcMain.handle('auto-stop-no-mid-get', ()=>{
-    try {
-      const v = store.get('autoStopOnNoMid');
-      if(typeof v==='boolean') return v;
-    } catch(_){ }
-    return true; // default enabled
-  });
-  ipcMain.on('auto-stop-no-mid-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.enabled==='boolean' ? payload.enabled : null;
-      if(v!==null){
-        store.set('autoStopOnNoMid', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-stop-no-mid-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-stop-no-mid-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
-  });
-
-  // === Auto Resume on MID (bool) - auto-resume when MID becomes available again after no-mid suspend ===
-  ipcMain.handle('auto-resume-on-mid-get', ()=>{
-    try {
-      const v = store.get('autoResumeOnMid');
-      if(typeof v==='boolean') return v;
-    } catch(_){ }
-    return true; // default enabled
-  });
-  ipcMain.on('auto-resume-on-mid-set', (_e, payload)=>{
-    try {
-      const v = payload && typeof payload.enabled==='boolean' ? payload.enabled : null;
-      if(v!==null){
-        store.set('autoResumeOnMid', v);
-        try {
-          const { BrowserWindow } = require('electron');
-          BrowserWindow.getAllWindows().forEach(w=>{
-            try { w.webContents.send('auto-resume-on-mid-updated', v); } catch(_){ }
-            try { if(typeof w.getBrowserViews==='function'){ w.getBrowserViews().forEach(vw=>{ try { vw.webContents.send('auto-resume-on-mid-updated', v); } catch(_){ } }); } } catch(_){ }
-          });
-        } catch(_){ }
-      }
-    } catch(_){ }
+  createSettingIpc(ipcMain, store, 'autoResumeOnMid', 'auto-resume-on-mid', {
+    type: 'boolean', default: true, payloadKey: 'enabled'
   });
 }
 

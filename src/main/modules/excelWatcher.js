@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { broadcastGlobal } = require('./utils/broadcast');
 let electronApp = null;
 try { ({ app: electronApp } = require('electron')); } catch(_){ }
 
@@ -132,24 +133,7 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
         if(team1 !== lastTeamNames.team1 || team2 !== lastTeamNames.team2){
           lastTeamNames.team1 = team1;
           lastTeamNames.team2 = team2;
-          // Broadcast to main window
-          if(win && !win.isDestroyed()){
-            try { win.webContents.send('excel-team-names', { team1, team2 }); } catch(_){ }
-          }
-          // Broadcast to stats panel (separate BrowserView)
-          try {
-            if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
-              statsManager.views.panel.webContents.send('excel-team-names', { team1, team2 });
-              log('sent excel-team-names to stats panel');
-            }
-          } catch(e){ log('stats panel send failed:', e.message); }
-          // Broadcast to board
-          try {
-            if(boardManager && boardManager.getWebContents){
-              const bwc = boardManager.getWebContents();
-              if(bwc && !bwc.isDestroyed()) bwc.send('excel-team-names', { team1, team2 });
-            }
-          } catch(_){ }
+          broadcastGlobal('excel-team-names', { team1, team2 });
           log('team names from Excel:', team1, '/', team2);
         }
       } catch(_){ }
@@ -279,11 +263,7 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
       const team1 = lastTeamNames.team1 || 'Team 1';
       const team2 = lastTeamNames.team2 || 'Team 2';
       log('rebroadcast team names:', team1, '/', team2);
-      try {
-        if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
-          statsManager.views.panel.webContents.send('excel-team-names', { team1, team2 });
-        }
-      } catch(_){ }
+      broadcastGlobal('excel-team-names', { team1, team2 });
     }
   }
 

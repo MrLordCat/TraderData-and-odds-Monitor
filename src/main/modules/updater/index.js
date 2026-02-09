@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { checkForUpdates, getLatestRelease, getDevRelease } = require('./githubApi');
 const { downloadUpdate, extractUpdate } = require('./downloader');
+const { isNewer } = require('../utils/version');
 
 const REPO_OWNER = 'MrLordCat';
 const REPO_NAME = 'TraderData-and-odds-Monitor';
@@ -63,33 +64,6 @@ function createUpdateManager({ store, mainWindow }) {
     return { channel: 'stable', commit: null, commitShort: null, buildTime: null };
   }
 
-  // Compare versions (semver-like)
-  function isNewerVersion(remote, local) {
-    // Handle dev versions like 0.0.7-dev.abc123
-    const parseVersion = (v) => {
-      const match = v.match(/^(\d+)\.(\d+)\.(\d+)(?:-dev\.(.+))?$/);
-      if (!match) return { major: 0, minor: 0, patch: 0, dev: null };
-      return {
-        major: parseInt(match[1], 10),
-        minor: parseInt(match[2], 10),
-        patch: parseInt(match[3], 10),
-        dev: match[4] || null
-      };
-    };
-
-    const r = parseVersion(remote);
-    const l = parseVersion(local);
-
-    if (r.major !== l.major) return r.major > l.major;
-    if (r.minor !== l.minor) return r.minor > l.minor;
-    if (r.patch !== l.patch) return r.patch > l.patch;
-    
-    // If same version, non-dev is newer than dev
-    if (r.dev === null && l.dev !== null) return true;
-    
-    return false;
-  }
-
   // Check for updates
   async function check(silent = false) {
     if (checking) return null;
@@ -135,7 +109,7 @@ function createUpdateManager({ store, mainWindow }) {
       } else {
         // Stable channel - compare version tags
         release = await getLatestRelease(REPO_OWNER, REPO_NAME);
-        if (release && isNewerVersion(release.version, currentVersion)) {
+        if (release && isNewer(release.version, currentVersion)) {
           availableUpdate = {
             version: release.version,
             downloadUrl: release.downloadUrl,
@@ -277,32 +251,8 @@ del "%TEMP%\\oddsmoni-start.vbs" >nul 2>&1
 
   // Broadcast to renderer (windows and views)
   function broadcast(channel, data) {
-    const eventName = `updater-${channel}`;
-    try {
-      // Send to main window
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(eventName, data);
-        // Also send to all BrowserViews attached to main window (settings overlay etc)
-        try {
-          const views = mainWindow.getBrowserViews ? mainWindow.getBrowserViews() : [];
-          views.forEach(view => {
-            try {
-              if (view.webContents && !view.webContents.isDestroyed()) {
-                view.webContents.send(eventName, data);
-              }
-            } catch (_) {}
-          });
-        } catch (_) {}
-      }
-      // Also send to all BrowserWindows
-      BrowserWindow.getAllWindows().forEach(win => {
-        try {
-          if (!win.isDestroyed()) {
-            win.webContents.send(eventName, data);
-          }
-        } catch (_) {}
-      });
-    } catch (_) {}
+    const { broadcastGlobal } = require('../utils/broadcast');
+    broadcastGlobal(`updater-${channel}`, data);
   }
 
   // Get status

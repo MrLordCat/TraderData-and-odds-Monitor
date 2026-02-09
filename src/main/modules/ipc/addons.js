@@ -6,85 +6,39 @@ const { ipcMain, shell } = require('electron');
 const { clearCache } = require('../updater/githubApi');
 
 function registerAddonIpc({ addonManager }) {
-  // Get all addons info (installed + available)
-  ipcMain.handle('addons-get-info', async () => {
-    return addonManager.getAddonsInfo();
+  // Simple passthrough handlers
+  const HANDLERS = {
+    'addons-get-info':          () => addonManager.getAddonsInfo(),
+    'addons-install':           p  => addonManager.installAddon(p.addonId, p.downloadUrl),
+    'addons-uninstall':         p  => addonManager.uninstallAddon(p.addonId),
+    'addons-set-enabled':       p  => addonManager.setAddonEnabled(p.addonId, p.enabled),
+    'addons-get-enabled-paths': () => addonManager.getEnabledAddonPaths(),
+    'addons-get-dir':           () => addonManager.getAddonsDir(),
+    'addons-update':            p  => addonManager.updateAddon(p.addonId),
+    'addons-get-channel':       () => addonManager.getAddonChannel(),
+    'addons-set-channel':       p  => addonManager.setAddonChannel(p.channel),
+  };
+  Object.entries(HANDLERS).forEach(([ch, fn]) => {
+    ipcMain.handle(ch, async (_e, p) => fn(p || {}));
   });
-  
-  // Fetch available addons from registry (with optional force refresh)
-  ipcMain.handle('addons-fetch-available', async (event, { forceRefresh } = {}) => {
-    if (forceRefresh) {
-      clearCache();
-    }
+
+  // Handlers with extra logic
+  ipcMain.handle('addons-fetch-available', async (_e, { forceRefresh } = {}) => {
+    if (forceRefresh) clearCache();
     return addonManager.fetchAvailableAddons();
   });
-  
-  // Install addon
-  ipcMain.handle('addons-install', async (event, { addonId, downloadUrl }) => {
-    return addonManager.installAddon(addonId, downloadUrl);
-  });
-  
-  // Uninstall addon
-  ipcMain.handle('addons-uninstall', async (event, { addonId }) => {
-    return addonManager.uninstallAddon(addonId);
-  });
-  
-  // Enable/disable addon
-  ipcMain.handle('addons-set-enabled', async (event, { addonId, enabled }) => {
-    return addonManager.setAddonEnabled(addonId, enabled);
-  });
-  
-  // Get enabled addon paths (for sidebar loading)
-  ipcMain.handle('addons-get-enabled-paths', async () => {
-    return addonManager.getEnabledAddonPaths();
-  });
-  
-  // Get addons directory path
-  ipcMain.handle('addons-get-dir', async () => {
-    return addonManager.getAddonsDir();
-  });
-  
-  // Check for addon updates (with optional force refresh)
-  ipcMain.handle('addons-check-updates', async (event, { forceRefresh } = {}) => {
-    if (forceRefresh) {
-      clearCache();
-    }
+  ipcMain.handle('addons-check-updates', async (_e, { forceRefresh } = {}) => {
+    if (forceRefresh) clearCache();
     return addonManager.checkForUpdates();
   });
   
-  // Update addon to latest version
-  ipcMain.handle('addons-update', async (event, { addonId }) => {
-    return addonManager.updateAddon(addonId);
-  });
-  
-  // Get addon update channel (dev/release)
-  ipcMain.handle('addons-get-channel', async () => {
-    return addonManager.getAddonChannel();
-  });
-  
-  // Set addon update channel (dev/release)
-  ipcMain.handle('addons-set-channel', async (event, { channel }) => {
-    return addonManager.setAddonChannel(channel);
-  });
-  
   // Open path in file explorer
-  ipcMain.on('shell-open-path', (event, dirPath) => {
-    try {
-      shell.openPath(dirPath);
-    } catch (e) {
-      console.error('[addons] shell.openPath failed:', e);
-    }
+  ipcMain.on('shell-open-path', (_e, dirPath) => {
+    try { shell.openPath(dirPath); } catch (e) { console.error('[addons] shell.openPath failed:', e); }
   });
-  
-  // Open path in file explorer (handle version for invoke)
-  ipcMain.handle('shell-open-path', async (event, dirPath) => {
-    try {
-      await shell.openPath(dirPath);
-      return { success: true };
-    } catch (e) {
-      console.error('[addons] shell.openPath failed:', e);
-      return { success: false, error: e.message };
-    }
+  ipcMain.handle('shell-open-path', async (_e, dirPath) => {
+    try { await shell.openPath(dirPath); return { success: true }; }
+    catch (e) { console.error('[addons] shell.openPath failed:', e); return { success: false, error: e.message }; }
   });
 }
 

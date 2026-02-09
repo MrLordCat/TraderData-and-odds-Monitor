@@ -5,9 +5,10 @@
 
 const WebSocket = require('ws');
 const path = require('path');
-const https = require('https');
 const fs = require('fs');
 const { app } = require('electron');
+const { isNewer } = require('../utils/version');
+const { fetchJSON, fetchText } = require('../utils/fetch');
 
 // Version of bundled extension (update when shipping new version)
 const BUNDLED_EXTENSION_VERSION = '1.4.0';
@@ -92,7 +93,7 @@ function createExtensionBridge(opts = {}) {
         extensionVersion = msg.version || '1.0.0';
         
         // Check if update available
-        const updateAvailable = isVersionNewer(BUNDLED_EXTENSION_VERSION, extensionVersion);
+        const updateAvailable = isNewer(BUNDLED_EXTENSION_VERSION, extensionVersion);
         
         // Send initial state to extension
         ws.send(JSON.stringify({
@@ -145,12 +146,12 @@ function createExtensionBridge(opts = {}) {
       // Fetch manifest.json from GitHub main branch
       const manifestUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${EXTENSION_PATH}/manifest.json`;
       
-      const manifest = await fetchJson(manifestUrl);
+      const manifest = await fetchJSON(manifestUrl);
       const latestVersion = manifest.version;
       
       console.log(`[extensionBridge] GitHub version: ${latestVersion}, current: ${currentVersion}`);
       
-      if (!isVersionNewer(latestVersion, currentVersion)) {
+      if (!isNewer(latestVersion, currentVersion)) {
         ws.send(JSON.stringify({ 
           type: 'update-result', 
           upToDate: true, 
@@ -221,46 +222,6 @@ function createExtensionBridge(opts = {}) {
     }
   }
 
-  // Fetch JSON from URL
-  function fetchJson(url) {
-    return new Promise((resolve, reject) => {
-      https.get(url, { headers: { 'User-Agent': 'OddsMoni' } }, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          return fetchJson(res.headers.location).then(resolve).catch(reject);
-        }
-        if (res.statusCode !== 200) {
-          return reject(new Error(`HTTP ${res.statusCode}`));
-        }
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }).on('error', reject);
-    });
-  }
-
-  // Fetch text from URL
-  function fetchText(url) {
-    return new Promise((resolve, reject) => {
-      https.get(url, { headers: { 'User-Agent': 'OddsMoni' } }, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          return fetchText(res.headers.location).then(resolve).catch(reject);
-        }
-        if (res.statusCode !== 200) {
-          return reject(new Error(`HTTP ${res.statusCode}`));
-        }
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => resolve(data));
-      }).on('error', reject);
-    });
-  }
-
   // Send current map to extension
   function sendCurrentMap(map, lastFlag) {
     currentMap = map;
@@ -314,17 +275,6 @@ function createExtensionBridge(opts = {}) {
       connectedClient = null;
       extensionVersion = null;
     }
-  }
-
-  // Version comparison helper (returns true if v1 > v2)
-  function isVersionNewer(v1, v2) {
-    const parts1 = v1.split('.').map(Number);
-    const parts2 = v2.split('.').map(Number);
-    for (let i = 0; i < 3; i++) {
-      if ((parts1[i] || 0) > (parts2[i] || 0)) return true;
-      if ((parts1[i] || 0) < (parts2[i] || 0)) return false;
-    }
-    return false;
   }
 
   /**

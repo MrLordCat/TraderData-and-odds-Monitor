@@ -413,6 +413,17 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   function attachContextMenu(view,label){ if(!view || view.__statsCtxMenuAttached) return; view.__statsCtxMenuAttached=true; view.webContents.on('context-menu',(e,params)=>{ try { const template=[]; const nav=view.webContents.navigationHistory; const canBack= nav? nav.canGoBack(): (view.webContents.canGoBack && view.webContents.canGoBack()); const canFwd= nav? nav.canGoForward(): (view.webContents.canGoForward && view.webContents.canGoForward()); if(canBack) template.push({ label:'Back', click:()=>{ try { nav? nav.goBack(): view.webContents.goBack(); } catch(_){ } } }); if(canFwd) template.push({ label:'Forward', click:()=>{ try { nav? nav.goForward(): view.webContents.goForward(); } catch(_){ } } }); template.push({ label:'Reload', click:()=>{ try { view.webContents.reload(); } catch(_){ } } }); try { const curUrl=view.webContents.getURL(); if(curUrl) template.push({ label:'Copy Page URL', click:()=>{ try { clipboard.writeText(curUrl); } catch(_){ } } }); } catch(_){ } if(params.linkURL) template.push({ label:'Copy Link URL', click:()=>{ try { clipboard.writeText(params.linkURL); } catch(_){ } } }); template.push({ type:'separator' }); if(params.isEditable) template.push({ role:'cut' }); template.push({ role:'copy' }); if(params.isEditable) template.push({ role:'paste' }); template.push({ role:'selectAll' }); template.push({ type:'separator' }); template.push({ label:'Open DevTools', click:()=>{ try { view.webContents.openDevTools({ mode:'detach' }); } catch(_){ } } }); if(typeof params.x==='number' && typeof params.y==='number') template.push({ label:'Inspect Element', click:()=>{ try { view.webContents.inspectElement(params.x, params.y); } catch(_){ } } }); template.push({ type:'separator' }); template.push({ label:'Stats Slot: '+(label||'?'), enabled:false }); const menu=Menu.buildFromTemplate(template); menu.popup({ window: mainWindow }); } catch(err){ try { console.warn('[stats][ctxmenu] build fail', err.message); } catch(_){ } } }); }
 
 
+  function deferEnsureTopmost() { [0,80,200].forEach(d=> setTimeout(()=>{ try { ensureTopmost(); } catch(_){ } }, d)); }
+
+  /** Common BrowserView setup: add to window, context menu, throttling, hotkeys */
+  function setupView(view, label) {
+    try { mainWindow.addBrowserView(view); } catch(_){ }
+    attachContextMenu(view, label);
+    try { view.webContents.setBackgroundThrottling(false); } catch(_){ }
+    try { view.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
+    try { if(hotkeysRef?.attachToWebContents) hotkeysRef.attachToWebContents(view.webContents); } catch(_){ }
+  }
+
   // --- Panel lifecycle (always docked) ---------------------------------------------------
   function createPanel(offsetY){
     if(panelActive) return;
@@ -427,13 +438,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
           backgroundThrottling:false 
         } 
       });
-      try { views.panel.webContents.setBackgroundThrottling(false); } catch(_){ }
-      try { views.panel.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
-      try { mainWindow.addBrowserView(views.panel); } catch(_){ }
-      attachContextMenu(views.panel,'Panel');
-      
-      // Unified window-active hotkeys (TAB/F1/F2/F3)
-      try { if(hotkeysRef && hotkeysRef.attachToWebContents) hotkeysRef.attachToWebContents(views.panel.webContents); } catch(_){ }
+      setupView(views.panel, 'Panel');
       
       try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','..','renderer','pages','stats_panel.html')); } catch(_){ }
       views.panel.webContents.on('did-finish-load', ()=>{ 
@@ -482,9 +487,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     layout();
     setTimeout(layout, 60);
     
-    // Assert panel topmost
     try { if(views.panel) mainWindow.setTopBrowserView(views.panel); } catch(_){ }
-    [0,80,200].forEach(d=> setTimeout(()=>{ try { ensureTopmost(); } catch(_){ } }, d));
+    deferEnsureTopmost();
   }
   
   // Update module-level ref with createPanel function now that it's defined
@@ -504,47 +508,19 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     const freshViews = !(views.A && views.B);
     
     if(freshViews){
-      views.A = new BrowserView({ 
-        webPreferences:{ 
-          partition:'persist:statsA', 
-          contextIsolation:true, 
-          sandbox:false, 
-          preload:path.join(__dirname,'..','..','preloads','statsContent.js'), 
-          backgroundThrottling:false 
-        } 
+      ['A','B'].forEach(slot=>{
+        views[slot] = new BrowserView({
+          webPreferences:{
+            partition:'persist:stats'+slot,
+            contextIsolation:true, sandbox:false,
+            preload:path.join(__dirname,'..','..','preloads','statsContent.js'),
+            backgroundThrottling:false
+          }
+        });
+        setupView(views[slot], slot);
+        resolveAndLoad(views[slot], urls[slot]);
+        attachNavTracking(slot, views[slot]);
       });
-      views.B = new BrowserView({ 
-        webPreferences:{ 
-          partition:'persist:statsB', 
-          contextIsolation:true, 
-          sandbox:false, 
-          preload:path.join(__dirname,'..','..','preloads','statsContent.js'), 
-          backgroundThrottling:false 
-        } 
-      });
-      
-      try { mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ }
-      attachContextMenu(views.A,'A');
-      attachContextMenu(views.B,'B');
-      
-      // Disable background throttling
-      try { views.A.webContents.setBackgroundThrottling(false); } catch(_){ }
-      try { views.B.webContents.setBackgroundThrottling(false); } catch(_){ }
-      try { views.A.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
-      try { views.B.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
-      
-      // Unified window-active hotkeys
-      try { 
-        if(hotkeysRef && hotkeysRef.attachToWebContents){ 
-          hotkeysRef.attachToWebContents(views.A.webContents); 
-          hotkeysRef.attachToWebContents(views.B.webContents); 
-        } 
-      } catch(_){ }
-      
-      resolveAndLoad(views.A, urls.A);
-      resolveAndLoad(views.B, urls.B);
-      attachNavTracking('A', views.A);
-      attachNavTracking('B', views.B);
     }
     
     statsActive = true;
@@ -554,7 +530,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     
     // Assert topmost ordering
     try { ['panel','A','B'].forEach(k=>{ const v=views[k]; if(v) try { mainWindow.setTopBrowserView(v); } catch(_){ } }); } catch(_){ }
-    [0,80,200].forEach(d=> setTimeout(()=>{ try { ensureTopmost(); } catch(_){ } }, d));
+    deferEnsureTopmost();
     
     // Notify panel that stats mode is active
     try { if(views.panel) views.panel.webContents.send('stats-mode-changed', { active: true }); } catch(_){ }
@@ -613,27 +589,30 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   }
 
   // --- IPC command dispatcher -------------------------------------------------------------
+  const IPC_SIMPLE = {
+    'stats-set-url': p=> setUrl(p.slot, p.url),
+    'stats-layout': p=> setMode(p.mode),
+    'stats-toggle-side': ()=> toggleSide(),
+    'stats-set-side': p=> setSide(p?.side),
+    'stats-single-window': p=> applySingleWindow(p?.enabled),
+    'board-set-side': p=> setSide(p?.side),
+    'board-set-width': p=> setWidth(p?.width),
+  };
   function handleIpc(ch,payload){
+    if(IPC_SIMPLE[ch]){ IPC_SIMPLE[ch](payload); return; }
     switch(ch){
-      case 'stats-set-url': setUrl(payload.slot,payload.url); break;
-      case 'stats-layout': setMode(payload.mode); break;
       case 'stats-open-devtools':
         try {
           if(payload && payload.target==='panel' && views.panel){ views.panel.webContents.openDevTools({ mode:'detach' }); break; }
           const slot = payload && payload.slot; if(['A','B'].includes(slot)){ const v=views[slot]; if(v) v.webContents.openDevTools({ mode:'detach' }); }
         } catch(_){}
         break;
-      case 'stats-toggle-side': toggleSide(); break;
-      case 'stats-set-side': setSide(payload && payload.side); break;
-  case 'stats-single-window': applySingleWindow(payload && payload.enabled); break;
       case 'stats-reload-slot':
         try { const slot=payload && payload.slot; if(['A','B'].includes(slot)){ const v=views[slot]; if(v) try { v.webContents.reloadIgnoringCache(); } catch(_){ try { v.webContents.reload(); } catch(_2){} } } } catch(_){}
         break;
       case 'stats-save-credentials':
         try { const { slot, username, password } = payload||{}; if(slot && username){ const v=views[slot]; if(v){ const host=new URL(v.webContents.getURL()).hostname; const all=store.get('siteCredentials')||{}; all[host]={ username,password }; store.set('siteCredentials',all); v.webContents.send('apply-credentials',{ hostname:host, username, password }); if(views.panel) views.panel.webContents.send('stats-credentials-status',{ slot, hostname:host, has:true, username }); } } } catch(_){}
         break;
-      case 'board-set-side': setSide(payload && payload.side); break;
-      case 'board-set-width': setWidth(payload && payload.width); break;
       case 'lol-stats-settings':
         if(payload){
           if(typeof payload.manualMode==='boolean') lolManualMode=payload.manualMode;

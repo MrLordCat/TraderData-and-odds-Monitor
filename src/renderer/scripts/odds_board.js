@@ -17,53 +17,28 @@ function updateEmbeddedMapTag(){
     else el.textContent='Map '+currentMap;
   } catch(_){ }
 }
+function applyMapValue(m){ currentMap=m; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); }
+function applyIsLast(cfg){ const b=document.getElementById('embeddedIsLast'); if(b && typeof cfg?.isLast!=='undefined') b.classList.toggle('active', !!cfg.isLast); }
 function initEmbeddedMapSync(){
   try {
     // Listen for atomic map config (preferred)
     if(window.desktopAPI && window.desktopAPI.onMapConfig){
       window.desktopAPI.onMapConfig(cfg=>{ 
         try { 
-          if(cfg && typeof cfg.map !== 'undefined'){
-            currentMap = cfg.map; 
-            window.__embeddedCurrentMap = currentMap; 
-            updateEmbeddedMapTag(); 
-            syncEmbeddedMapSelect(); 
-            forceMapSelectValue();
-          }
-          // Update isLast button state
-          const lastBtn = document.getElementById('embeddedIsLast');
-          if(lastBtn && typeof cfg?.isLast !== 'undefined'){
-            lastBtn.classList.toggle('active', !!cfg.isLast);
-          }
+          if(cfg && typeof cfg.map !== 'undefined') applyMapValue(cfg.map);
+          applyIsLast(cfg);
         } catch(_){} 
       });
     } else if(window.desktopAPI && window.desktopAPI.onMap){
-      window.desktopAPI.onMap(mapVal=>{ 
-        try { 
-          currentMap = mapVal; 
-          window.__embeddedCurrentMap = currentMap; 
-          updateEmbeddedMapTag(); 
-          syncEmbeddedMapSelect(); 
-          forceMapSelectValue(); 
-        } catch(_){} 
-      });
+      window.desktopAPI.onMap(mapVal=>{ try { applyMapValue(mapVal); } catch(_){} });
     } else {
       // Fallback: direct IPC listener
       try {
         const { ipcRenderer } = require('electron');
         ipcRenderer.on('set-map-config', (_e, cfg)=>{ 
           try { 
-            if(cfg && typeof cfg.map !== 'undefined'){
-              currentMap = cfg.map; 
-              window.__embeddedCurrentMap = currentMap; 
-              updateEmbeddedMapTag(); 
-              syncEmbeddedMapSelect(); 
-              forceMapSelectValue();
-            }
-            const lastBtn = document.getElementById('embeddedIsLast');
-            if(lastBtn && typeof cfg?.isLast !== 'undefined'){
-              lastBtn.classList.toggle('active', !!cfg.isLast);
-            }
+            if(cfg && typeof cfg.map !== 'undefined') applyMapValue(cfg.map);
+            applyIsLast(cfg);
           } catch(_){} 
         });
       } catch(_){}
@@ -72,28 +47,11 @@ function initEmbeddedMapSync(){
     // Initial fetch
     if(window.desktopAPI && window.desktopAPI.getMapConfig){
       window.desktopAPI.getMapConfig().then(cfg=>{ 
-        if(cfg && typeof cfg.map!=='undefined'){ 
-          currentMap=cfg.map; 
-          window.__embeddedCurrentMap=currentMap; 
-          updateEmbeddedMapTag(); 
-          syncEmbeddedMapSelect(); 
-          forceMapSelectValue();
-        }
-        const lastBtn = document.getElementById('embeddedIsLast');
-        if(lastBtn && typeof cfg?.isLast !== 'undefined'){
-          lastBtn.classList.toggle('active', !!cfg.isLast);
-        }
+        if(cfg && typeof cfg.map!=='undefined') applyMapValue(cfg.map);
+        applyIsLast(cfg);
       }).catch(()=>{});
     } else if(window.desktopAPI && window.desktopAPI.getLastMap){
-      window.desktopAPI.getLastMap().then(v=>{ 
-        if(typeof v!=='undefined'){ 
-          currentMap=v; 
-          window.__embeddedCurrentMap=currentMap; 
-          updateEmbeddedMapTag(); 
-          syncEmbeddedMapSelect(); 
-          forceMapSelectValue(); 
-        } 
-      }).catch(()=>{});
+      window.desktopAPI.getLastMap().then(v=>{ if(typeof v!=='undefined') applyMapValue(v); }).catch(()=>{});
     }
     
     bindEmbeddedMapSelect();
@@ -129,16 +87,17 @@ function syncEmbeddedMapSelect(){
   } catch(_){ }
 }
 function forceMapSelectValue(){
-  // Multi-attempt retry if race with late DOM or late persisted load
-  const attempts = [0,60,150,320,650];
   const desired = (currentMap==null?'' : String(currentMap));
-  if(desired==='') return; // nothing to force
-  attempts.forEach(ms=> setTimeout(()=>{
-    try {
-      const sel=document.getElementById('embeddedMapSelect');
-      if(!sel) return; if(sel.value!==desired){ sel.value=desired; /* console.debug('[embeddedOdds] force map select', desired, 'at', ms);*/ }
-    } catch(_){ }
+  if(desired==='') return;
+  [0,60,150,320,650].forEach(ms=> setTimeout(()=>{
+    try { const sel=document.getElementById('embeddedMapSelect'); if(sel && sel.value!==desired) sel.value=desired; } catch(_){ }
   }, ms));
+}
+/** Compare two odds records numerically. Returns true if both valid and equal. */
+function oddsMatch(a, b){
+  if(!a || !b || !Array.isArray(a.odds) || !Array.isArray(b.odds)) return false;
+  if(a.odds[0]==='-' || b.odds[0]==='-') return false;
+  return parseFloat(a.odds[0])===parseFloat(b.odds[0]) && parseFloat(a.odds[1])===parseFloat(b.odds[1]);
 }
 function bindEmbeddedMapSelect(){
   try {
@@ -267,15 +226,8 @@ function renderEmbeddedOdds(){
       embeddedDsMismatchTimer = setTimeout(()=>{
         try {
           const dsRow = document.getElementById('embeddedDsRow');
-          const dsRec = embeddedOddsData['ds'];
-          const excelRec = embeddedOddsData['excel'];
-          if(!dsRow || !dsRec || !excelRec) return;
-          if(!Array.isArray(dsRec.odds) || !Array.isArray(excelRec.odds)) return;
-          if(dsRec.odds[0] === '-' || excelRec.odds[0] === '-') return;
-          // Compare as numbers
-          const dsN1 = parseFloat(dsRec.odds[0]), dsN2 = parseFloat(dsRec.odds[1]);
-          const exN1 = parseFloat(excelRec.odds[0]), exN2 = parseFloat(excelRec.odds[1]);
-          if(dsN1 !== exN1 || dsN2 !== exN2){
+          if(!dsRow) return;
+          if(!oddsMatch(embeddedOddsData['ds'], embeddedOddsData['excel'])){
             dsRow.classList.add('ds-mismatch');
           }
         } catch(_){ }
@@ -298,14 +250,9 @@ function renderEmbeddedOdds(){
         dsRow.classList.remove('no-data');
         
         // If DS odds now match Excel, clear mismatch highlight and cancel timer
-        if(excelRec && Array.isArray(excelRec.odds) && excelRec.odds[0] !== '-'){
-          // Compare as numbers
-          const dsN1 = parseFloat(dsRec.odds[0]), dsN2 = parseFloat(dsRec.odds[1]);
-          const exN1 = parseFloat(excelRec.odds[0]), exN2 = parseFloat(excelRec.odds[1]);
-          if(dsN1 === exN1 && dsN2 === exN2){
+        if(oddsMatch(dsRec, excelRec)){
             dsRow.classList.remove('ds-mismatch');
             if(embeddedDsMismatchTimer){ clearTimeout(embeddedDsMismatchTimer); embeddedDsMismatchTimer = null; }
-          }
         }
       } else {
         // Show placeholder when no DS data
