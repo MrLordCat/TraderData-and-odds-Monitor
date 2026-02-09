@@ -81,12 +81,85 @@ h1 {
 
 /* Content */
 .content {
-	padding: var(--md-sys-spacing-md) var(--md-sys-spacing-xl);
+	padding: 0 var(--md-sys-spacing-xl);
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
 	flex: 1 1 auto;
 	scrollbar-gutter: stable;
+}
+
+/* ===== Tab System ===== */
+.tab-bar {
+	display: flex;
+	gap: 0;
+	padding: 0 var(--md-sys-spacing-xl);
+	border-bottom: 2px solid var(--md-sys-color-outline-variant);
+	background: var(--md-sys-color-surface-container-high);
+	flex: 0 0 auto;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+.tab-bar .tab {
+	position: relative;
+	padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-lg);
+	border: none;
+	background: transparent;
+	color: var(--md-sys-color-on-surface-variant);
+	font: 500 var(--md-sys-typescale-label-large-size)/var(--md-sys-typescale-label-large-line-height) var(--md-sys-typescale-font-family);
+	letter-spacing: 0.02em;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+	            background var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+	border-radius: var(--md-sys-shape-corner-small) var(--md-sys-shape-corner-small) 0 0;
+}
+
+.tab-bar .tab::after {
+	content: '';
+	position: absolute;
+	bottom: -2px;
+	left: 0;
+	right: 0;
+	height: 3px;
+	background: transparent;
+	border-radius: 3px 3px 0 0;
+	transition: background var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+
+.tab-bar .tab:hover {
+	color: var(--md-sys-color-on-surface);
+	background: var(--md-sys-color-surface-container-highest);
+}
+
+.tab-bar .tab.active {
+	color: var(--md-sys-color-primary);
+}
+
+.tab-bar .tab.active::after {
+	background: var(--md-sys-color-primary);
+}
+
+/* Tab content panels */
+.tab-content {
+	display: none;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+	padding-top: var(--md-sys-spacing-md);
+}
+
+.tab-content.active {
+	display: flex;
+	flex-direction: column;
+	animation: tabFadeIn 250ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+
+@keyframes tabFadeIn {
+	0%   { opacity: 0; transform: translateY(6px); }
+	100% { opacity: 1; transform: translateY(0); }
 }
 
 /* Scrollable segments - uses m3-scrollbar */
@@ -98,28 +171,10 @@ h1 {
 	padding-right: var(--md-sys-spacing-xs);
 }
 
-/* Apply m3-scrollbar styles */
-.segmentsScroll::-webkit-scrollbar { width: 8px; }
-.segmentsScroll::-webkit-scrollbar-track {
-	background: var(--md-sys-color-surface-container-low);
-	border-radius: var(--md-sys-shape-corner-full);
-}
-.segmentsScroll::-webkit-scrollbar-thumb {
-	background: var(--md-sys-color-outline-variant);
-	border-radius: var(--md-sys-shape-corner-full);
-	border: 2px solid transparent;
-	background-clip: padding-box;
-}
-.segmentsScroll::-webkit-scrollbar-thumb:hover {
-	background: var(--md-sys-color-outline);
-	background-clip: padding-box;
-}
-
-/* Two-column layout */
+/* Single-column in tabs (no more 2-column masonry) */
 .segments {
-	column-count: 2;
-	column-gap: var(--md-sys-spacing-md);
-	column-fill: balance;
+	display: flex;
+	flex-direction: column;
 }
 
 /* Section cards - extend m3-card */
@@ -214,9 +269,47 @@ h1 {
 /* Responsive */
 @media (max-width: 720px) {
 	.panel { width: calc(100% - 40px); height: calc(100% - 80px); }
-	.segments { column-count: 1; }
 	.formGrid { grid-template-columns: 1fr; }
+	.tab-bar { padding: 0 var(--md-sys-spacing-md); }
+	.tab-bar .tab { padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-md); font-size: var(--md-sys-typescale-label-medium-size); }
 }
+
+/* Scrollbar for segmentsScroll */
+.segmentsScroll::-webkit-scrollbar { width: 8px; }
+.segmentsScroll::-webkit-scrollbar-track {
+	background: var(--md-sys-color-surface-container-low);
+	border-radius: var(--md-sys-shape-corner-full);
+}
+.segmentsScroll::-webkit-scrollbar-thumb {
+	background: var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-full);
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+.segmentsScroll::-webkit-scrollbar-thumb:hover {
+	background: var(--md-sys-color-outline);
+	background-clip: padding-box;
+}
+
+/* Help tab */
+.helpList { margin: var(--md-sys-spacing-xs) 0; padding-left: var(--md-sys-spacing-lg); line-height: 1.8; }
+.helpList li { margin: var(--md-sys-spacing-xs) 0; font-size: var(--md-sys-typescale-body-small-size); color: var(--md-sys-color-on-surface-variant); }
+.helpBlock { line-height: 1.6; }
+.helpBlock p { margin: var(--md-sys-spacing-sm) 0; font-size: var(--md-sys-typescale-body-small-size); color: var(--md-sys-color-on-surface-variant); }
+
+.helpTable { width: 100%; border-collapse: collapse; font-size: var(--md-sys-typescale-body-small-size); }
+.helpTable td { padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-sm); border-bottom: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); vertical-align: top; }
+.helpTable td:first-child { white-space: nowrap; padding-right: var(--md-sys-spacing-lg); }
+
+/* About tab */
+.aboutCenter { text-align: center; padding: var(--md-sys-spacing-xl); }
+.aboutLogo { font-size: 3em; margin-bottom: var(--md-sys-spacing-md); }
+.aboutTitle { margin: 0 0 var(--md-sys-spacing-xs); font-size: var(--md-sys-typescale-headline-small-size); color: var(--md-sys-color-primary); border: none; padding: 0; }
+.aboutVersion { margin: 0 0 var(--md-sys-spacing-md); font-size: var(--md-sys-typescale-body-medium-size); color: var(--md-sys-color-on-surface-variant); }
+.aboutDesc { margin: 0; font-size: var(--md-sys-typescale-body-small-size); color: var(--md-sys-color-on-surface-variant); line-height: 1.6; max-width: 480px; margin-inline: auto; }
+.aboutFeatures { margin: 0; padding-left: var(--md-sys-spacing-lg); line-height: 1.8; }
+.aboutFeatures li { margin: var(--md-sys-spacing-xs) 0; font-size: var(--md-sys-typescale-body-small-size); color: var(--md-sys-color-on-surface-variant); }
+.aboutLink { cursor: pointer; color: var(--md-sys-color-primary); text-decoration: underline; }
 
 .sepLine { margin: var(--md-sys-spacing-lg) 0; border: none; border-top: 1px solid var(--md-sys-color-outline-variant); }
 

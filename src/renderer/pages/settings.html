@@ -16,9 +16,22 @@
 			<h1 id="title">Settings <small id="version-label" style="opacity:0.5;font-weight:normal"></small></h1>
 			<button id="close" class="x">✕</button>
 		</div>
+
+		<!-- Tab bar -->
+		<nav class="tab-bar" role="tablist" aria-label="Settings tabs">
+			<button class="tab active" role="tab" aria-selected="true" data-tab="main">Main</button>
+			<button class="tab" role="tab" aria-selected="false" data-tab="ui">UI & Sounds</button>
+			<button class="tab" role="tab" aria-selected="false" data-tab="auto">Auto Odds</button>
+			<button class="tab" role="tab" aria-selected="false" data-tab="control">Control</button>
+			<button class="tab" role="tab" aria-selected="false" data-tab="updates">Updates</button>
+			<button class="tab" role="tab" aria-selected="false" data-tab="help">Help</button>
+			<button class="tab" role="tab" aria-selected="false" data-tab="about">About</button>
+		</nav>
+
 		<div class="content">
-			<div class="segmentsScroll">
-				<div class="segments" role="group" aria-label="Settings sections">
+			<!-- ============ MAIN TAB ============ -->
+			<div class="tab-content active" data-tab="main" role="tabpanel">
+				<div class="segmentsScroll">
 					<section class="seg">
 					<h2 class="sectionTitle">Game</h2>
 					<div class="grid formGrid">
@@ -67,106 +80,12 @@
 					<div class="hint">Map reselect periodically re-clicks map tabs (useful for SPAs). Auto reload refreshes broker pages when odds go stale or missing. These features work when the ⟳ button is active.</div>
 					</section>
 
-					<section class="seg">
-					<h2 class="sectionTitle">Hotkeys</h2>
-					<ul class="hotkeyList">
-						<li><span class="hk">Tab</span> — switch between Brokers and Stats</li>
-						<li><span class="hk">F1</span> — toggle Auto (works while the app window is active)</li>
-						<li><span class="hk">F2</span> — Auto Resume after Suspend (toggle)</li>
-						<li><span class="hk">F3</span> — start/stop Excel/Python script</li>
-						<li><span class="hk">Num5</span> — global (even outside the app) toggle Auto</li>
-					</ul>
-					<div class="hint">Tab/F1/F2/F3 are handled only when the app is active. Num5 is a global hotkey (if registered with the OS).</div>
-					</section>
-
-				<section class="seg">
-				<h2 class="sectionTitle">Sound Notifications</h2>
-				<div class="grid formGrid">
-					<label for="sounds-enabled">Enable sounds
-						<small class="labelHint">Play sounds for match events (first blood, towers, etc.)</small>
-					</label>
-					<input id="sounds-enabled" type="checkbox" checked />
-					<label for="sounds-volume">Volume</label>
-					<div class="rangeWrap">
-						<input id="sounds-volume" type="range" min="0" max="100" step="5" value="70" />
-						<span id="sounds-volume-val" class="rangeVal">70%</span>
-					</div>
 				</div>
-				<div class="hint">Sounds play for game start (based on ban phase), first blood, first tower, quadra and penta kills. Volume adjusts all notification sounds.</div>
-				</section>
+			</div>
 
-				<section class="seg">
-				<h2 class="sectionTitle">Auto Odds</h2>
-				<div class="grid formGrid">
-					<!-- Core Settings -->
-					<h3 class="subsectionTitle">⚙️ Core</h3>
-					<label for="auto-tolerance">Tolerance (%)</label>
-					<div class="rangeWrap">
-						<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />
-						<span id="auto-tolerance-val" class="rangeVal"></span>
-					</div>
-					<label for="auto-interval">Step interval (ms)
-						<small class="labelHint">How often Auto checks alignment</small>
-					</label>
-					<div class="rangeWrap">
-						<input id="auto-interval" type="range" min="120" max="2000" step="10" />
-						<span id="auto-interval-val" class="rangeVal"></span>
-					</div>
-					<label for="auto-pulse-step">Pulse step (%)
-						<small class="labelHint">Diff % per burst pulse (8-15); capped at 3 pulses</small>
-					</label>
-					<div class="rangeWrap">
-						<input id="auto-pulse-step" type="range" min="8" max="15" step="1" />
-						<span id="auto-pulse-step-val" class="rangeVal"></span>
-					</div>
-
-					<!-- Protection / Thresholds -->
-					<h3 class="subsectionTitle">🛡️ Protection</h3>
-					<label for="auto-suspend-threshold">Auto Suspend threshold (%)
-						<small class="labelHint">Pauses auto when diff ≥ this; resumes at half</small>
-					</label>
-					<div class="rangeWrap">
-						<input id="auto-suspend-threshold" type="range" min="15" max="80" step="1" />
-						<span id="auto-suspend-threshold-val" class="rangeVal"></span>
-					</div>
-					<label for="auto-shock-threshold">Shock threshold (%)
-						<small class="labelHint">Large odds shift detection (ARB protection)</small>
-					</label>
-					<div class="rangeWrap">
-						<input id="auto-shock-threshold" type="range" min="40" max="120" step="1" />
-						<span id="auto-shock-threshold-val" class="rangeVal"></span>
-					</div>
-					<label for="auto-stop-no-mid">Stop on no MID
-						<small class="labelHint">Disable Auto when MID data unavailable</small>
-					</label>
-					<input id="auto-stop-no-mid" type="checkbox" checked />
-					<label for="auto-resume-on-mid">Resume on MID
-						<small class="labelHint">Auto-resume when MID becomes available</small>
-					</label>
-					<input id="auto-resume-on-mid" type="checkbox" checked />
-
-					<!-- Timing Settings -->
-					<h3 class="subsectionTitle">⏱️ Timing</h3>
-					<label for="auto-fire-cooldown">Fire cooldown (ms)
-						<small class="labelHint">Min delay between keypresses</small>
-					</label>
-					<div class="rangeWrap">
-						<input id="auto-fire-cooldown" type="range" min="100" max="3000" step="50" />
-						<span id="auto-fire-cooldown-val" class="rangeVal"></span>
-					</div>
-					<label for="auto-pulse-gap">Pulse gap (ms)
-						<small class="labelHint">Delay between burst pulses</small>
-					</label>
-					<div class="rangeWrap">
-						<input id="auto-pulse-gap" type="range" min="100" max="1000" step="50" />
-						<span id="auto-pulse-gap-val" class="rangeVal"></span>
-					</div>
-				</div>
-				<div class="hint">Tolerance: diff% below this considered aligned. Step interval: polling rate. Pulse step: each step adds one pulse (max 3). Suspend: pauses on large diff. Shock: ARB detection.</div>
-				<div class="hint"><strong>Note:</strong> Excel/DS mode selection is on the Odds Board (Excel and DS buttons).</div>
-				</section>
-
-				<!-- Game Stats Theme section removed (LoL table theme controls deprecated) -->
+			<!-- ============ UI TAB ============ -->
+			<div class="tab-content" data-tab="ui" role="tabpanel" hidden>
+				<div class="segmentsScroll">
 					<section class="seg">
 					<h2 class="sectionTitle">Stats Table</h2>
 					<div class="grid formGrid">
@@ -184,7 +103,7 @@
 						<label for="anim-color1">Primary color</label><input id="anim-color1" type="color" />
 						<label for="anim-color2">Secondary color</label><input id="anim-color2" type="color" />
 					</div>
-						<div class="hint">Animations are currently minimal (the framework is in place). Settings are saved for future effects.</div>
+					<div class="hint">Animations are currently minimal (the framework is in place). Settings are saved for future effects.</div>
 					</section>
 
 					<section class="seg">
@@ -209,49 +128,119 @@
 					</section>
 
 					<section class="seg">
-					<h2 class="sectionTitle">Addons</h2>
-					<div class="addons-container">
-						<div class="addons-actions">
-							<button id="addons-refresh" type="button" class="btn-secondary">
-								<span class="btn-icon">🔄</span> Refresh
-							</button>
-							<button id="addons-open-folder" type="button" class="btn-secondary">
-								<span class="btn-icon">📁</span> Open Folder
-							</button>
-							<div class="addon-channel-selector">
-								<label for="addon-channel">Channel:</label>
-								<select id="addon-channel">
-									<option value="dev">Dev (latest)</option>
-									<option value="release">Release (stable)</option>
-								</select>
-							</div>
-						</div>
-						
-						<div id="addons-list" class="addons-list">
-							<div class="addons-loading">Loading addons...</div>
-						</div>
-						
-						<div id="addons-available" class="addons-available">
-							<h3 class="addons-subtitle">Available to Install</h3>
-							<div id="addons-available-list"></div>
-						</div>
-					</div>
-					<div class="hint">Addons extend app functionality. After installing or enabling/disabling, restart the app to apply changes.</div>
-					</section>
-
-					<section class="seg">
-					<h2 class="sectionTitle">Dev</h2>
+					<h2 class="sectionTitle">Sound Notifications</h2>
 					<div class="grid formGrid">
-						<label>DevTools</label>
-						<button id="open-devtools" type="button">Open DevTools</button>
-						<label>Main Window</label>
-						<button id="open-main-devtools" type="button">Main Window DevTools</button>
-						<label>User Data</label>
-						<button id="open-userdata" type="button">Open Folder</button>
+						<label for="sounds-enabled">Enable sounds
+							<small class="labelHint">Play sounds for match events (first blood, towers, etc.)</small>
+						</label>
+						<input id="sounds-enabled" type="checkbox" checked />
+						<label for="sounds-volume">Volume</label>
+						<div class="rangeWrap">
+							<input id="sounds-volume" type="range" min="0" max="100" step="5" value="70" />
+							<span id="sounds-volume-val" class="rangeVal">70%</span>
+						</div>
 					</div>
-					<div class="hint">DevTools opens board console. Main Window opens renderer console. User Data folder contains logs and settings.</div>
+					<div class="hint">Sounds play for game start (based on ban phase), first blood, first tower, quadra and penta kills. Volume adjusts all notification sounds.</div>
 					</section>
+				</div>
+			</div>
 
+			<!-- ============ AUTO ODDS TAB ============ -->
+			<div class="tab-content" data-tab="auto" role="tabpanel" hidden>
+				<div class="segmentsScroll">
+					<section class="seg">
+					<h2 class="sectionTitle">Auto Odds</h2>
+					<div class="grid formGrid">
+						<!-- Core Settings -->
+						<h3 class="subsectionTitle">⚙️ Core</h3>
+						<label for="auto-tolerance">Tolerance (%)</label>
+						<div class="rangeWrap">
+							<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />
+							<span id="auto-tolerance-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-interval">Step interval (ms)
+							<small class="labelHint">How often Auto checks alignment</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-interval" type="range" min="120" max="2000" step="10" />
+							<span id="auto-interval-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-pulse-step">Pulse step (%)
+							<small class="labelHint">Diff % per burst pulse (8-15); capped at 3 pulses</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-pulse-step" type="range" min="8" max="15" step="1" />
+							<span id="auto-pulse-step-val" class="rangeVal"></span>
+						</div>
+
+						<!-- Protection / Thresholds -->
+						<h3 class="subsectionTitle">🛡️ Protection</h3>
+						<label for="auto-suspend-threshold">Auto Suspend threshold (%)
+							<small class="labelHint">Pauses auto when diff ≥ this; resumes at half</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-suspend-threshold" type="range" min="15" max="80" step="1" />
+							<span id="auto-suspend-threshold-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-shock-threshold">Shock threshold (%)
+							<small class="labelHint">Large odds shift detection (ARB protection)</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-shock-threshold" type="range" min="40" max="120" step="1" />
+							<span id="auto-shock-threshold-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-stop-no-mid">Stop on no MID
+							<small class="labelHint">Disable Auto when MID data unavailable</small>
+						</label>
+						<input id="auto-stop-no-mid" type="checkbox" checked />
+						<label for="auto-resume-on-mid">Resume on MID
+							<small class="labelHint">Auto-resume when MID becomes available</small>
+						</label>
+						<input id="auto-resume-on-mid" type="checkbox" checked />
+
+						<!-- Timing Settings -->
+						<h3 class="subsectionTitle">⏱️ Timing</h3>
+						<label for="auto-fire-cooldown">Fire cooldown (ms)
+							<small class="labelHint">Min delay between keypresses</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-fire-cooldown" type="range" min="100" max="3000" step="50" />
+							<span id="auto-fire-cooldown-val" class="rangeVal"></span>
+						</div>
+						<label for="auto-pulse-gap">Pulse gap (ms)
+							<small class="labelHint">Delay between burst pulses</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-pulse-gap" type="range" min="100" max="1000" step="50" />
+							<span id="auto-pulse-gap-val" class="rangeVal"></span>
+						</div>
+					</div>
+					<div class="hint">Tolerance: diff% below this considered aligned. Step interval: polling rate. Pulse step: each step adds one pulse (max 3). Suspend: pauses on large diff. Shock: ARB detection.</div>
+					<div class="hint"><strong>Note:</strong> Excel/DS mode selection is on the Odds Board (Excel and DS buttons).</div>
+					</section>
+				</div>
+			</div>
+
+			<!-- ============ CONTROL TAB ============ -->
+			<div class="tab-content" data-tab="control" role="tabpanel" hidden>
+				<div class="segmentsScroll">
+					<section class="seg">
+					<h2 class="sectionTitle">Hotkeys</h2>
+					<ul class="hotkeyList">
+						<li><span class="hk">Tab</span> — switch between Brokers and Stats</li>
+						<li><span class="hk">F1</span> — toggle Auto (works while the app window is active)</li>
+						<li><span class="hk">F2</span> — Auto Resume after Suspend (toggle)</li>
+						<li><span class="hk">F3</span> — start/stop Excel/Python script</li>
+						<li><span class="hk">Num5</span> — global (even outside the app) toggle Auto</li>
+					</ul>
+					<div class="hint">Tab/F1/F2/F3 are handled only when the app is active. Num5 is a global hotkey (if registered with the OS).</div>
+					</section>
+				</div>
+			</div>
+
+			<!-- ============ UPDATES TAB ============ -->
+			<div class="tab-content" data-tab="updates" role="tabpanel" hidden>
+				<div class="segmentsScroll">
 					<section class="seg">
 					<h2 class="sectionTitle">Updates</h2>
 					<div class="grid formGrid">
@@ -278,6 +267,19 @@
 					</section>
 
 					<section class="seg">
+					<h2 class="sectionTitle">Dev</h2>
+					<div class="grid formGrid">
+						<label>DevTools</label>
+						<button id="open-devtools" type="button">Open DevTools</button>
+						<label>Main Window</label>
+						<button id="open-main-devtools" type="button">Main Window DevTools</button>
+						<label>User Data</label>
+						<button id="open-userdata" type="button">Open Folder</button>
+					</div>
+					<div class="hint">DevTools opens board console. Main Window opens renderer console. User Data folder contains logs and settings.</div>
+					</section>
+
+					<section class="seg">
 					<h2 class="sectionTitle">Edge Extension</h2>
 					<div class="grid formGrid">
 						<label>Status</label>
@@ -290,8 +292,145 @@
 					</div>
 					<div class="hint">To install: Open Edge → edge://extensions/ → Enable Developer mode → Load unpacked → Select the folder above.</div>
 					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Addons</h2>
+					<div class="addons-container">
+						<div class="addons-actions">
+							<button id="addons-refresh" type="button" class="btn-secondary">
+								<span class="btn-icon">🔄</span> Refresh
+							</button>
+							<button id="addons-open-folder" type="button" class="btn-secondary">
+								<span class="btn-icon">📁</span> Open Folder
+							</button>
+							<div class="addon-channel-selector">
+								<label for="addon-channel">Channel:</label>
+								<select id="addon-channel">
+									<option value="dev">Dev (latest)</option>
+									<option value="release">Release (stable)</option>
+								</select>
+							</div>
+						</div>
+						<div id="addons-list" class="addons-list">
+							<div class="addons-loading">Loading addons...</div>
+						</div>
+						<div id="addons-available" class="addons-available">
+							<h3 class="addons-subtitle">Available to Install</h3>
+							<div id="addons-available-list"></div>
+						</div>
+					</div>
+					<div class="hint">Addons extend app functionality. After installing or enabling/disabling, restart the app to apply changes.</div>
+					</section>
 				</div>
 			</div>
+
+			<!-- ============ HELP TAB ============ -->
+			<div class="tab-content" data-tab="help" role="tabpanel" hidden>
+				<div class="segmentsScroll">
+					<section class="seg">
+					<h2 class="sectionTitle">Overview</h2>
+					<div class="helpBlock">
+						<p>OddsMoni opens multiple bookmaker sites as embedded panels, automatically extracts live odds, and aggregates them on the Odds Board. The board shows <strong>Best</strong>, <strong>MID</strong> (average), and <strong>ARB</strong> (arbitrage) values across all active brokers.</p>
+					</div>
+					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">View Switching</h2>
+					<div class="helpBlock">
+						<p>The app has two main views:</p>
+						<p><strong>Brokers view</strong> — bookmaker sites with live odds extraction.</p>
+						<p><strong>Stats view</strong> — two slots (A/B) for streams (e.g. Twitch) and live game stats from Grid. If Grid is available, match statistics (gold diff, kills, towers, dragons, barons) are displayed in real time.</p>
+						<p>Press <span class="hk">Tab</span> to switch between these views. The Odds Board sidebar remains visible in both.</p>
+					</div>
+					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Auto Mode</h2>
+					<div class="helpBlock">
+						<p>Auto Mode continuously compares MID odds (from brokers) with target odds and sends virtual keystrokes to adjust the target.</p>
+						<p><strong>Requirements to work:</strong></p>
+						<ul class="helpList">
+							<li>Live odds from at least 2 brokers (to compute MID)</li>
+							<li>A target source — either <strong>Excel</strong> (via Python script) or <strong>DS Extension</strong></li>
+						</ul>
+						<p>Toggle: <span class="hk">F1</span> (app focused) or <span class="hk">Num5</span> (global, works even when app is in background). Configure tolerance, thresholds, and timing in the <strong>Auto Odds</strong> tab.</p>
+						<p><strong>Guards</strong> automatically block or pause Auto when conditions aren't met: Excel off, no MID data, DS disconnected, map mismatch, or ARB spike. Auto resumes automatically when the condition clears.</p>
+					</div>
+					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Excel &amp; DS Integration</h2>
+					<div class="helpBlock">
+						<p><strong>Excel mode:</strong> Press <span class="hk">F3</span> to start the Python script that reads odds and team names from an open Excel workbook. Status indicator shows the script state (Off / Starting / Active / Frozen).</p>
+						<p><strong>DS mode:</strong> Works without Excel. Requires the Edge Extension connected via WebSocket. The extension reads odds from the DS page and sends them to OddsMoni. Commands (adjust up/down, commit) are sent back to the extension which clicks buttons on the DS page.</p>
+						<p>Excel and DS are mutually exclusive — select the active mode on the Odds Board (Excel / DS buttons).</p>
+					</div>
+					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Sounds &amp; Notifications</h2>
+					<div class="helpBlock">
+						<p>Audio alerts for LoL match events: game start (detected via ban phase), first blood, first tower, first baron, quadra/penta kills. Configure in the <strong>UI &amp; Sounds</strong> tab.</p>
+					</div>
+					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Hotkeys</h2>
+					<table class="helpTable">
+						<tr><td><span class="hk">Tab</span></td><td>Switch between Brokers and Stats views</td></tr>
+						<tr><td><span class="hk">F1</span></td><td>Toggle Auto Mode (app focused)</td></tr>
+						<tr><td><span class="hk">Num5</span></td><td>Toggle Auto Mode (global)</td></tr>
+						<tr><td><span class="hk">F2</span></td><td>Resume Auto after suspend</td></tr>
+						<tr><td><span class="hk">F3</span></td><td>Start / stop Excel Python script</td></tr>
+						<tr><td><span class="hk">F12</span></td><td>DevTools for active broker</td></tr>
+
+					</table>
+					<div class="hint">Tab/F1/F2/F3 require app focus. Num5 works globally if registered with the OS.</div>
+					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Troubleshooting</h2>
+					<div class="helpBlock">
+						<p><strong>Odds not appearing:</strong> Wait for the broker page to fully load. Use ⟳ reselect or increase the missing odds timeout in <strong>Main → Broker Refresh</strong>.</p>
+						<p><strong>Auto won't start:</strong> Check that at least 2 brokers provide odds (MID available) and that Excel or DS is active. Guard indicators on the board show the blocking reason.</p>
+						<p><strong>DS Extension not connecting:</strong> Verify the extension is loaded in Edge (edge://extensions/, Developer mode) and OddsMoni's WebSocket bridge is running (port 9876).</p>
+						<p><strong>Stale odds / wrong map:</strong> Enable Map Reselect in <strong>Main → Broker Refresh</strong>. For BetBoom, a 3-second grace period after reload suppresses stale data automatically.</p>
+					</div>
+					</section>
+				</div>
+			</div>
+
+			<!-- ============ ABOUT TAB ============ -->
+			<div class="tab-content" data-tab="about" role="tabpanel" hidden>
+				<div class="segmentsScroll">
+					<section class="seg aboutCenter">
+					<div class="aboutLogo">📊</div>
+					<h2 class="aboutTitle">OddsMoni</h2>
+					<p class="aboutVersion" id="about-version">Version —</p>
+					<p class="aboutDesc">Electron-based desktop application for real-time odds monitoring, aggregation, and automated trading across multiple bookmaker platforms.</p>
+					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Features</h2>
+					<ul class="aboutFeatures">
+						<li>Multi-broker odds extraction and normalization</li>
+						<li>Automated trading with Excel and DS integration</li>
+						<li>Live LoL game stats with sound notifications</li>
+						<li>Addon/plugin system for extensions</li>
+						<li>Auto-update system (dev/stable channels)</li>
+					</ul>
+					</section>
+
+					<section class="seg">
+					<h2 class="sectionTitle">Links</h2>
+					<div class="grid formGrid">
+						<label>GitHub</label>
+						<span class="staticVal aboutLink" data-url="https://github.com/MrLordCat/TraderData-and-odds-Monitor">Repository ↗</span>
+					</div>
+					</section>
+				</div>
+			</div>
+
 		</div>
 		<div class="foot">
 			<button id="reset">Reset</button>

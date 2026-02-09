@@ -612,6 +612,14 @@ function initEmbeddedToolbar(){
             btn.title = b.id;
             btn.addEventListener('click', ()=>{
               try { window.desktopAPI?.addBroker(b.id); } catch(_){ }
+              // Switch from stats to brokers view so user sees the new broker
+              try {
+                if(window.desktopAPI?.getStatsState){
+                  window.desktopAPI.getStatsState().then(st => {
+                    if(st && st.mode === 'embedded') window.desktopAPI.statsToggle();
+                  }).catch(()=>{});
+                }
+              } catch(_){ }
               closePicker();
             });
             list.appendChild(btn);

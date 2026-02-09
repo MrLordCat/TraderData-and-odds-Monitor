@@ -310,10 +310,10 @@ Team names flow: Excel K4/N4 → Python → JSON → excelWatcher.js → IPC `ex
 ## 10. Hotkeys
 - **F1**: Toggle Auto mode (handled by `modules/hotkeys/index.js`)
 - **F3**: Toggle Excel script (Python controller)
-- **Tab/Space**: Toggle stats panel
+- **Tab**: Toggle stats panel
 - **Numpad5**: Global toggle Auto (via `globalShortcut.register`)
 - **F12**: DevTools for active broker
-- **Ctrl+F12**: DevTools for board
+
 
 Hotkeys managed in `modules/hotkeys/index.js` via `before-input-event`. Avoid duplicate handlers!
 

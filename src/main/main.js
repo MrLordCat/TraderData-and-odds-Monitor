@@ -751,7 +751,6 @@ app.whenReady().then(()=>{
 app.on('will-quit', ()=>{ try { globalShortcut.unregisterAll(); } catch(_){} });
 // Hotkey throttle state (prevents duplicate triggers)
 let __lastHotkeyTs = { tab:0, f1:0, f2:0, f3:0 };
-// Global space hotkey (throttled) to toggle stats embedded view
 app.on('browser-window-created', (_e, win)=>{
   try {
     win.webContents.on('before-input-event', (_event, input)=>{
@@ -775,17 +774,8 @@ app.on('browser-window-created', (_e, win)=>{
           try { if(excelExtractorController && excelExtractorController.toggle) excelExtractorController.toggle(); } catch(_){ }
           return;
         }
-        // Space hotkey REMOVED - now handled by addons (e.g. Power Towers game)
         // Numpad5 handled by globalShortcut.register - no fallback needed (causes double toggle)
-        // Ctrl+F12 -> open Board (odds) BrowserView DevTools
-        if(input.key==='F12' && input.control){
-          try {
-            const bwc = getBoardWebContents(getBroadcastCtx());
-            if(bwc) bwc.openDevTools({ mode:'detach' });
-          } catch(e){ console.warn('[hotkey][Ctrl+F12][board] failed', e); }
-          return;
-        }
-        // F12 (no Ctrl) -> open devtools (active broker if possible else main window)
+        // F12 -> open devtools (active broker if possible else main window)
         if(input.key==='F12'){
           try {
             // Prefer first in activeBrokerIds order; fallback to any view; then main window.

@@ -105,9 +105,7 @@ Installation:
 
 | Key | Action |
 |-----|--------|
-| Space | Toggle Stats embedded view |
 | F12 | DevTools for active broker |
-| Ctrl+F12 | DevTools for board view |
 | Numpad5 | Toggle Auto mode |
 | Alt+C | Disable Auto |
 

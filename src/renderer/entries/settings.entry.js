@@ -21,6 +21,70 @@ import { initSounds, gatherSettings as gatherSoundsSettings, resetToDefaults as 
 let pendingConfig = null;
 let domReady = false;
 
+/**
+ * Tab switching logic
+ */
+function initTabs() {
+  const tabBar = document.querySelector('.tab-bar');
+  if (!tabBar) return;
+
+  tabBar.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab');
+    if (!btn || btn.classList.contains('active')) return;
+
+    const tabId = btn.dataset.tab;
+
+    // Deactivate all tab buttons
+    tabBar.querySelectorAll('.tab').forEach(t => {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
+    });
+
+    // Activate clicked tab button
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+
+    // Switch content panels
+    document.querySelectorAll('.tab-content').forEach(panel => {
+      if (panel.dataset.tab === tabId) {
+        panel.classList.add('active');
+        panel.hidden = false;
+      } else {
+        panel.classList.remove('active');
+        panel.hidden = true;
+      }
+    });
+  });
+}
+
+/**
+ * Initialize About tab version info
+ */
+function initAboutVersion() {
+  try {
+    const aboutVer = document.getElementById('about-version');
+    if (!aboutVer) return;
+    ipcRenderer.invoke('updater-get-version').then(info => {
+      if (info && info.version) {
+        let text = 'Version ' + info.version;
+        if (info.buildInfo && info.buildInfo.channel === 'dev') text += ' (dev)';
+        aboutVer.textContent = text;
+      }
+    }).catch(() => {});
+  } catch (_) {}
+
+  // GitHub link handler
+  try {
+    const link = document.querySelector('.aboutLink[data-url]');
+    if (link) {
+      link.addEventListener('click', () => {
+        const url = link.dataset.url;
+        if (url) require('electron').shell.openExternal(url);
+      });
+    }
+  } catch (_) {}
+}
+
 function applyConfig(cfg) {
   // Apply heat bar / stats config
   applyHeatbarConfig(cfg);
@@ -41,6 +105,9 @@ function initAll() {
   if (domReady) return; // prevent double init
   domReady = true;
 
+  // ===== Tab switching =====
+  initTabs();
+
   // Initialize all modules (wrapped in try-catch to prevent one failure breaking everything)
   try { initModule(); } catch (e) { console.error('[settings] init module failed:', e); }
   try { initAutoSettings(); } catch (e) { console.error('[settings] autoSettings init failed:', e); }
@@ -51,6 +118,7 @@ function initAll() {
   try { initGameSelector(); } catch (e) { console.error('[settings] gameSelector init failed:', e); }
   try { initAddons(); } catch (e) { console.error('[settings] addons init failed:', e); }
   try { initSounds(); } catch (e) { console.error('[settings] sounds init failed:', e); }
+  try { initAboutVersion(); } catch (e) { console.error('[settings] about init failed:', e); }
 
   // ===== Main buttons =====
   const resetBtn = document.getElementById('reset');
