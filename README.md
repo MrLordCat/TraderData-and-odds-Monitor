@@ -44,6 +44,7 @@ Download the portable `.zip`, extract anywhere, and run `OddsMoni.exe`. No insta
 ## Quick Start (Development)
 
 Prerequisites:
+
 - Node.js 18+
 - Windows 10/11
 
@@ -53,6 +54,7 @@ npm run dev
 ```
 
 Build portable:
+
 ```powershell
 npm run pack:zip
 ```
@@ -66,17 +68,20 @@ Later I built another extension to scrape odds from multiple bookmakers and disp
 ## Using the App
 
 **Top toolbar groups:**
+
 - Brokers: add broker, apply layout presets, refresh all
 - Board: toggle dock side and resize with the vertical splitter
 - Stats: toggle Stats embedded view, Hide/Unhide panel button
 - Dev/Settings: open DevTools for diagnostics; open UI settings
 
 **Stats panel:**
+
 - Two slots (A/B) for portal.grid.gg, Twitch, or embedded LoL Stats
 - Layout modes: split, vertical, focus A, focus B
 - Side panel on left or right with layout/source controls
 
 **Board (odds):**
+
 - Docked to the side of the stage; move between left/right; resize with splitter
 - Receives odds from brokers and from the optional Excel watcher
 - DS odds highlight: pulses red when different from Excel for >5 seconds
@@ -84,11 +89,13 @@ Later I built another extension to scrape odds from multiple bookmakers and disp
 ## Edge Extension (DS Uptime Tracker)
 
 Optional browser extension for DS page integration:
+
 - **Uptime tracking**: Monitors Active/Suspended states, calculates uptime percentage
 - **Odds sync**: Sends DS odds to OddsMoni via WebSocket
 - **Auto-update**: Check for updates directly from GitHub
 
 Installation:
+
 1. Open Edge → Extensions → Manage Extensions
 2. Enable "Developer mode"
 3. Click "Load unpacked" → select `resources/extensions/uptime/`
@@ -129,4 +136,3 @@ brokers/extractors   → DOM parsers per bookmaker
 ## License
 
 MIT
-

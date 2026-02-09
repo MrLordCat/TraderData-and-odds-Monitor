@@ -5,12 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [0.3.1] - 2026-02-09
 
 ### 🐛 Bug Fixes
+
 - **BetBoom: match-level odds leak after reload** — removed fallback to "Исход матча" when a specific map is requested; now returns `emptyResult()` instead of leaking match-level odds into the board
 - **BetBoom: active tab verification** — extractor checks that the correct map tab is actually selected (`aria-checked`, `data-state`, CSS class) before extracting; returns empty if tab not yet switched
 - **BetBoom: 3s reload grace period** — broker preload suppresses odds for 3 seconds after page reload/SPA navigation (`RELOAD_GRACE_MS`), giving time for `triggerMapChange` to switch to the correct tab
 - **Map select labels** — shortened "Set N" → "N" in stats panel map selector for cleaner UI
 
-### 📖 Documentation
+### 📚 Documentation
+
 - **copilot-instructions.md** — comprehensive update:
   - Added missing files to directory tree: `credentials.js`, `statsContent.js`, `extensionBridge/`, `dev/`, `entries/` (4 files), `error.html`, `module_detach.html`, `slot.html`, `broker-refresh.js`
   - Removed non-existent entries: `settings/index.js`, `ipc/statsDebug.js`
@@ -23,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - **docs/AUTO_MODE.md** — fixed architecture section: "single ~1200-line file" → 6 ES modules with file listing and line counts
 
 ### 🧹 Codebase Cleanup
+
 - **Dead code removal**: Removed `api_helpers.js`, `board.css`, `extractors.js` wrapper, dead exports from `odds_board_shared.js`, dead IPC channels/handlers, stale comments and `if(false)` blocks (-563 lines)
 - **Backward-compat shims removed**: `statsPanelToggle`, `statsPanelSetHidden` preload APIs; `setPanelHidden`/`togglePanelHidden`/`getPanelHidden` from stats manager; dead `stats-panel-set-hidden`/`stats-panel-toggle` IPC channels
 - **Duplicates eliminated**: Triple `require('electron')` → single; duplicate `auto-mode-changed` IPC handlers merged; double `lolManualMode` change listener unified (was a bug — logic ran twice)
@@ -31,12 +34,14 @@ All notable changes to this project will be documented in this file.
 - **AutoCore removed**: Unused compatibility shim (only referenced in docs)
 
 ### 🔧 Improvements
+
 - **Python executable auto-detection**: `resolvePythonExe()` tries `python` first, falls back to `py` (Windows Launcher), caches result
 
 ## [0.3.0] - 2026-02-05
 
 ### ✨ New Features
-- **Global Light/Dark Theme Toggle** 
+
+- **Global Light/Dark Theme Toggle**
   - New theme toggle button in Stats Panel topbar (sun ☀️ / moon 🌙 icons)
   - Smooth theme transition animation (375ms)
   - Persisted in electron-store (`appTheme` key)
@@ -57,6 +62,7 @@ All notable changes to this project will be documented in this file.
   - 8-second safety timeout ensures app always starts
 
 ### 🔧 Improvements
+
 - **Heat Bar Ease-Out Decay**: Bar fades slower as it approaches zero
   - Quadratic curve: at full level 100% speed, at 50% → 36% speed, near zero → 15% speed
   - Makes small activity bumps significantly more visible and easier to track
@@ -89,6 +95,7 @@ All notable changes to this project will be documented in this file.
 - **Settings Overlay**: Simplified architecture, backdrop handles dimming
 
 ### 🐛 Bug Fixes
+
 - **Theme persistence**: Theme now saved and restored on app restart
 - **Settings theme sync**: Settings overlay receives correct theme when opened
 - **Slot views theme**: Empty slot placeholders adapt to light/dark theme
@@ -99,6 +106,7 @@ All notable changes to this project will be documented in this file.
 - **Heat bar instant fade**: Migrated incorrectly stored decayPerSec values
 
 ### 🔧 Technical Details
+
 - `src/main/modules/splash/index.js`: Splash screen manager with task-based loading
 - `src/renderer/pages/splash.html`: Splash screen UI with progress bar
 - `src/renderer/scripts/warmup.js`: Animation warm-up module for stats panel
@@ -115,6 +123,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.5] - 2026-01-31
 
 ### 🏗️ Major Refactor
+
 - **Auto Mode completely rewritten**: Unified architecture in single `loader.js` (~1300 lines)
   - **OddsStore**: Centralized odds state management with OddsCore integration
   - **GuardSystem**: Unified guard logic with priority-based blocking (Excel > Market > Frozen > NoMID > ARB)
@@ -122,6 +131,7 @@ All notable changes to this project will be documented in this file.
   - **AutoCoordinator**: State machine (idle → aligning → trading) with suspend/resume logic
 
 ### ✨ New Features
+
 - **NO_MID Recovery**: Auto mode now properly recovers when MID returns after being suspended
   - Alignment continues while Excel is still suspended (frozen)
   - Resume signal sent only after alignment completes
@@ -132,6 +142,7 @@ All notable changes to this project will be documented in this file.
   - 3-second timeout fallback if Excel doesn't respond
 
 ### 🐛 Bug Fixes
+
 - **Double-pulse oscillation**: Fixed issue where Auto sent multiple pulses without waiting for Excel to react
   - Root cause: step() was called every ~500ms without checking if Excel processed previous pulse
   - Solution: New pulse-wait mechanism tracks Excel odds changes before allowing next pulse
@@ -146,6 +157,7 @@ All notable changes to this project will be documented in this file.
 - **Alignment interval respects cooldown**: Uses `max(alignmentCheckIntervalMs, fireCooldownMs + 100)` to prevent spam
 
 ### ⚡ Improvements
+
 - **User vs Auto suspend distinction**: Clear separation between user-initiated and auto-initiated suspends
   - User suspend (ESC in Excel): Auto waits for user to resume
   - Auto suspend (NO_MID, ARB spike): Auto self-resumes when condition clears
@@ -154,6 +166,7 @@ All notable changes to this project will be documented in this file.
 - **Re-entrant notify guard**: Prevents recursive notification loops
 
 ### 🧹 Cleanup
+
 - Removed legacy `auto_core.js`, `auto_hub.js`, `align_engine.js` modules
 - Backward-compatible shims (AutoCore, AutoHub) for existing code
 - Cleaner state management with single source of truth
@@ -163,6 +176,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.4] - 2026-01-21
 
 ### ✨ New Features
+
 - **DS Auto Mode**: Auto trading without Excel — uses DS extension as odds reference
   - Sends `adjust-up`/`adjust-down`/`commit` commands to extension
   - Enable via Settings → Auto Odds → "DS Auto Mode" checkbox
@@ -174,6 +188,7 @@ All notable changes to this project will be documented in this file.
 - **Broker refresh settings**: New Settings section to configure broker auto-refresh behavior
 
 ### ⚡ Improvements
+
 - **Settings UI refactored**: Split into modular structure (8 files) for better maintainability
 - **Auto Odds settings reorganized**: Split into subsections for clarity
 - **Map synchronization improved**: Atomic map config handling prevents race conditions
@@ -181,6 +196,7 @@ All notable changes to this project will be documented in this file.
 - **Yellow waiting state**: Now only shows for system suspends (not manual toggle)
 
 ### 🐛 Bug Fixes
+
 - **Auto mode pause toggle**: Clicking Auto button when paused now properly disables it (was trying to enable instead)
 - **Excel team names priority**: Excel K4/N4 team names now have priority over grid-detected names
 - **Blocking states reset**: Fixed "stuck" Auto mode by resetting wait states on enable
@@ -188,6 +204,7 @@ All notable changes to this project will be documented in this file.
 - **Heat bars visibility**: Fixed CSS and module loading for stats activity bars
 
 ### 🧹 Cleanup
+
 - Removed deprecated code (openStatsLogWindow, contrast stubs, theme stubs, openAddBrokerDialog)
 - Removed debug logs from broker.js, mapNav.js, stats_activity.js, stats_panel.js
 - Removed automatic extension update dialog (manual updates from Settings only)
@@ -198,6 +215,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.3] - 2026-01-14
 
 ### ✨ New Features
+
 - **DS/Excel Odds Mismatch Alert**: DS odds row pulses red when different from Excel for >5 seconds
   - Numeric comparison (1.4 == 1.40) to avoid false positives
   - Auto-clears when odds match again
@@ -211,15 +229,18 @@ All notable changes to this project will be documented in this file.
   - "Open Extension Folder" button for easy installation
 
 ### 🐛 Bug Fixes
+
 - **Extension context invalidated**: Wrapped chrome.storage calls in try-catch with `safeStorageSet()` helper
 - **Popup duplicate variable**: Fixed `updateStatus` element vs function naming conflict
 - **Connection errors**: Better error handling showing "Refresh DS page" message
 
 ### 🧹 Cleanup
+
 - **Removed legacy files**: Deleted unused `renderer/board.js` and `renderer/stats_embedded.js`
 - **Removed empty folder**: Deleted legacy `renderer/` directory
 
 ### 🔧 Technical
+
 - **WebSocket bridge**: Extension connects to OddsMoni on port 9876
 - **Uptime calculation**: Tracks Active/Suspended states, calculates percentage excluding last suspend
 - **stats_embedded.js**: DS mismatch logic with setTimeout-based detection
@@ -229,6 +250,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.2]
 
 ### 🐛 Bug Fixes
+
 - Minor stability improvements
 
 ---
@@ -236,6 +258,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.1]
 
 ### 🐛 Bug Fixes
+
 - **Numpad hotkeys**: Fixed scan code detection to distinguish numpad from regular keys
   - Numpad0/1/-/+ no longer interfere with other applications (YouTube, etc.)
   - Regular number keys and -/= now work correctly everywhere
@@ -250,6 +273,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.0]
 
 ### 🏗️ Project Restructure
+
 - **React-like folder structure**: Reorganized entire codebase into `src/` directory
   - `src/main/` — Main process (main.js, modules, preloads)
   - `src/renderer/` — Renderer (pages, scripts, styles, core, ui, sidebar)
@@ -259,6 +283,7 @@ All notable changes to this project will be documented in this file.
 - **Better separation**: Clear distinction between main/renderer code
 
 ### ✨ New Auto Settings
+
 - **Shock threshold**: Configurable ARB protection (40-120%, default 80%)
   - Replaces hardcoded 5% constant — now user-adjustable
 - **Stop on no MID**: Toggle to disable Auto when MID data unavailable
@@ -269,16 +294,19 @@ All notable changes to this project will be documented in this file.
 - **All settings connected**: Settings now properly sync to Auto engine in real-time
 
 ### 🐛 Bug Fixes
+
 - **Double F21 fix**: Increased debounce from 250ms to 800ms, removed retry logic
 - **ARB suspend threshold**: Now uses user setting instead of hardcoded 5%
 - **Stop on no MID**: Now respects the toggle setting (was always stopping before)
 - **Settings sync**: All Auto settings now properly initialize and update the engine
 
 ### ⚡ Improvements
+
 - **Python exit hotkey**: Changed from ESC to Ctrl+Esc (blocks Windows Start menu)
 - **Workflow changelog**: Release notes now automatically extracted from CHANGELOG.md
 
 ### 🔧 Technical
+
 - **auto_core.js**: Added burst3Enabled, pulseGapMs to engine state
 - **auto_hub.js**: Added setShockThreshold(), setStopOnNoMid() functions
 - **IPC handlers**: New channels for all Auto settings (shock-threshold, burst3-enabled, stop-no-mid, fire-cooldown, max-excel-wait, pulse-gap)
@@ -288,10 +316,12 @@ All notable changes to this project will be documented in this file.
 ## [0.1.7]
 
 ### ✨ New Features
+
 - **Update badge notification**: Settings button now shows a red pulsing badge when update is available (replaces popup overlay)
 - **Always-on stale broker refresh**: Brokers without odds updates for 3+ minutes are automatically refreshed
 
 ### ⚡ Improvements
+
 - **Faster Excel sync**: Reduced polling interval from 2s to 200ms for near-instant odds display
 - **Python script optimization**: Removed manual map cycling (Numpad*) — map now follows Odds Board selection only
 - **Settings UI**: Added visual card styling to settings sections for better readability
@@ -299,15 +329,18 @@ All notable changes to this project will be documented in this file.
 - **IPC synchronization**: Fixed channel naming between preload.js and desktop_api_shim.js
 
 ### 🐛 Bug Fixes
+
 - **Updater detection**: Fixed manual check not finding available updates
 - **ZIP extraction**: Replaced PowerShell with adm-zip for reliable update extraction
 - **Settings overlay z-index**: Fixed overlay not appearing over sidebar/stats panel
 
 ### 🧹 Removed
+
 - **Auto refresh checkbox**: Removed from toolbar — stale refresh is now always enabled
 - **Update popup overlay**: Replaced with badge notification system
 
 ### 🔧 Technical
+
 - **STALE_MS**: Changed from 5 to 3 minutes
 - **adm-zip**: Added as dependency for pure JavaScript ZIP extraction
 
@@ -316,18 +349,22 @@ All notable changes to this project will be documented in this file.
 ## [0.1.2]
 
 ### ✨ New Features
+
 - **Excel team names**: Team names now automatically read from Excel cells K4/N4 via Python watcher
 - **Silent auto-updater**: Update window no longer flashes during background updates
 
 ### 🐛 Bug Fixes  
+
 - **Settings panel order**: Fixed sections randomly reordering on each open (removed JS masonry, pure CSS columns now)
 - **Team names broadcast**: Fixed team names not reaching stats panel BrowserView
 - **Excel watcher logging**: Added verbose mode and rebroadcast on stats panel load
 
 ### 🌐 Localization
+
 - **Python scripts**: Translated all Russian text to English in excel_watcher.py
 
 ### 🔧 Build
+
 - **Release workflow**: Dev build no longer triggers when creating release tags
 
 ---
@@ -335,21 +372,25 @@ All notable changes to this project will be documented in this file.
 ## [0.0.7]
 
 ### 🚀 New Features
+
 - **Script Map indicator**: Badge near S button shows Python controller's current map; red border warns when script map differs from board map
 - **Auto Suspend by diff%**: New intelligent suspension — pauses Auto when Excel vs Mid diff exceeds threshold; auto-resumes at half threshold
 - **Auto Suspend threshold setting**: Configurable in Settings with description
 
 ### ⚡ Improvements
+
 - **Unified Excel status module**: Shared `excel_status.js` handles both board and embedded stats panels — eliminates code duplication
 - **Locked odds fallback**: When bookmaker shows '-' on one side but valid odds on the other (e.g. 1 vs 14.5), '-' is replaced with '1'
 - **Auto status display fix**: No longer shows "BLOCKED" when Auto is already active
 
 ### 🧹 Removed
+
 - **R button (Auto Resume)**: Removed entirely — Auto Suspend by diff% now handles resume automatically
 - **F2 hotkey**: No longer toggles auto-resume (feature removed)
 - **autoResume logic**: Cleaned from auto_core.js, auto_hub.js, auto_trader.js, preload.js, desktop_api_shim.js
 
 ### 📝 Documentation
+
 - Updated hotkeys README (removed F2)
 - Updated CODE_REVIEW_OVERVIEW.md with new Auto Suspend description
 
@@ -358,12 +399,14 @@ All notable changes to this project will be documented in this file.
 ## [0.0.6]
 
 ### 🏗️ Architecture
+
 - **Single shared AutoCore engine**: Consolidated dual engines (board + embedded stats) into one shared instance
   - Eliminates duplicate key presses at the source
   - All views now share single engine state
   - `notifyAllUIs()` broadcasts state changes to all registered UI callbacks
 
 ### 🐛 Bug Fixes
+
 - **Fixed burst pulses being blocked**: Reduced IPC deduplication window from 100ms to 25ms
   - Burst pulses (~55ms apart) now pass through correctly
   - Only true duplicates (<25ms) are suppressed
@@ -374,6 +417,7 @@ All notable changes to this project will be documented in this file.
 ## [0.0.5]
 
 ### ⚡ Improvements
+
 - **Pulse cooldown system**: After sending N pulses, system now waits for N odds changes (or min 300ms) before sending new pulses — prevents over-correction
 - **Updated burst threshold ranges**:
   - L1: 7% – 15% (was 2% – 10%)
@@ -381,6 +425,7 @@ All notable changes to this project will be documented in this file.
   - L3: 20% – 40% (was 10% – 30%)
 
 ### 🐛 Bug Fixes
+
 - **ESC exit handling**: When hotkey controller exits (ESC), watcher now properly stops and Auto mode disables correctly in Odds Board
 
 ---
@@ -388,6 +433,7 @@ All notable changes to this project will be documented in this file.
 ## [0.0.4]
 
 ### 🚀 New Features
+
 - **Python-only hotkey controller**: Replaced AHK with pure Python using `keyboard` library
   - F21-F24 virtual key support via `keyboard.hook()` for auto mode
   - Numpad0/1 key suppression to prevent digit typing
@@ -396,17 +442,20 @@ All notable changes to this project will be documented in this file.
 - **Broker wake-up loop**: Periodic `collect-now` signal every 2s to prevent Chromium throttling
 
 ### ⚡ Improvements
+
 - **Background throttling disabled**: Added `backgroundThrottling: false` to board and stats views for instant odds updates
 - **Shared Excel status module**: New `renderer/ui/excel_status.js` eliminates code duplication
 - **Tooltip behavior**: Shows only on hover, hides immediately on mouseleave
 - **Removed AHK from status display**: UI now shows Python-only status
 
 ### 🐛 Bug Fixes
+
 - Fixed duplicate tooltips (removed native HTML `title` attribute from Auto buttons)
 - Fixed slow odds appearing in stats board when switching views
 - Fixed broker views "sleeping" when main window loses focus
 
 ### 🧹 Code Quality
+
 - Removed AHK status tracking (no longer needed)
 - Centralized Excel status button logic into shared module
 - Added keyboard package to requirements.txt
@@ -416,15 +465,17 @@ All notable changes to this project will be documented in this file.
 ## [0.0.3] - 2024-12-18
 
 ### 🚀 New Features
+
 - **Per-broker swap**: Swap odds sides (Team 1 ↔ Team 2) individually for any broker with cross-view sync
 - **Unified hotkey manager**: Consistent keyboard shortcuts across all views (board, stats, main)
-- **Excel Extractor improvements**: 
+- **Excel Extractor improvements**:
   - Failure protection with auto-suspend on stale data
   - AHK process monitoring without PID coupling
   - Mini-toast notifications for status changes
 - **Stats panel cover**: Loading overlay during initialization for cleaner UX
 
 ### ⚡ Improvements
+
 - **Auto Trader refactored**: Unified logic for board and embedded panels (single script)
 - **Auto Resume disabled by default**: Better user control on app launch
 - **Broadcast utilities**: Shared IPC helpers reduce code duplication
@@ -434,6 +485,7 @@ All notable changes to this project will be documented in this file.
 - **desktopAPI shim**: Unified polyfill for views without preload.js
 
 ### 🐛 Bug Fixes
+
 - Fixed false "AHK exited" alerts
 - Fixed Auto blocking when Excel Extractor status missing
 - Fixed Auto config not applying from Settings
@@ -441,6 +493,7 @@ All notable changes to this project will be documented in this file.
 - Fixed hotkeys not responding after load
 
 ### 🧹 Code Quality
+
 - Removed deprecated auto_press debug files
 - Removed legacy auto_trader_board.js and auto_trader_embedded.js (unified into auto_trader.js)
 - Russian hints translated to English
@@ -451,6 +504,7 @@ All notable changes to this project will be documented in this file.
 ## [0.0.2] - 2024-12-XX
 
 Initial tracked release with core functionality:
+
 - Multi-broker BrowserView grid with layout presets
 - Docked board panel with odds aggregation
 - Stats panel with LoL live data integration
