@@ -1,4 +1,4 @@
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -74,6 +74,46 @@ function createExcelExtractorController({
     //   .join(' ');
     // try { console.log('[excel-extractor][log]', msg); } catch (_) { }
     // broadcast('excel-extractor-log', { ts: Date.now(), msg });
+  }
+
+  // -------- Python executable auto-detection --------
+  // Tries 'python', then 'py' (Windows Launcher), caches result.
+  let _resolvedPythonExe = null;
+
+  function resolvePythonExe() {
+    // User override takes priority
+    try {
+      const pyOverride = store.get('excelPythonPath');
+      if (pyOverride) return pyOverride;
+    } catch (_) { }
+
+    // Return cached result
+    if (_resolvedPythonExe) return _resolvedPythonExe;
+
+    // Try 'python' first
+    try {
+      const result = spawnSync('python', ['--version'], { stdio: 'pipe', windowsHide: true, timeout: 5000 });
+      if (result.status === 0 && !result.error) {
+        _resolvedPythonExe = 'python';
+        excelLog('Resolved Python executable: python');
+        return 'python';
+      }
+    } catch (_) { }
+
+    // Try 'py' (Windows Python Launcher)
+    try {
+      const result = spawnSync('py', ['--version'], { stdio: 'pipe', windowsHide: true, timeout: 5000 });
+      if (result.status === 0 && !result.error) {
+        _resolvedPythonExe = 'py';
+        excelLog('Resolved Python executable: py (Windows Launcher)');
+        return 'py';
+      }
+    } catch (_) { }
+
+    // Nothing found, default to 'python' (will fail with descriptive error)
+    _resolvedPythonExe = 'python';
+    excelLog('Neither python nor py found, defaulting to python');
+    return 'python';
   }
 
   function getAppRoot() {
@@ -335,8 +375,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
         return;
       }
 
-      let py = 'python';
-      try { const pyOverride = store.get('excelPythonPath'); if (pyOverride) py = pyOverride; } catch (_) { }
+      const py = resolvePythonExe();
 
       // Сначала проверяем и устанавливаем зависимости
       checkAndInstallDeps(py, (depsErr) => {
@@ -510,8 +549,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       return;
     }
 
-    let py = 'python';
-    try { const pyOverride = store.get('excelPythonPath'); if (pyOverride) py = pyOverride; } catch (_) { }
+    const py = resolvePythonExe();
 
     const cwd = path.dirname(scriptPath);
     const args = ['-u', scriptPath];
@@ -640,8 +678,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
   function installDeps() {
     if (state.excelDepsInstalling) return;
 
-    let py = 'python';
-    try { const pyOverride = store.get('excelPythonPath'); if (pyOverride) py = pyOverride; } catch (_) { }
+    const py = resolvePythonExe();
 
     state.excelDepsInstalling = true;
     state.excelProcError = null;
