@@ -2,7 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.1] - 2026-02-06
+## [0.3.1] - 2026-02-09
+
+### 🐛 Bug Fixes
+- **BetBoom: match-level odds leak after reload** — removed fallback to "Исход матча" when a specific map is requested; now returns `emptyResult()` instead of leaking match-level odds into the board
+- **BetBoom: active tab verification** — extractor checks that the correct map tab is actually selected (`aria-checked`, `data-state`, CSS class) before extracting; returns empty if tab not yet switched
+- **BetBoom: 3s reload grace period** — broker preload suppresses odds for 3 seconds after page reload/SPA navigation (`RELOAD_GRACE_MS`), giving time for `triggerMapChange` to switch to the correct tab
+- **Map select labels** — shortened "Set N" → "N" in stats panel map selector for cleaner UI
+
+### 📖 Documentation
+- **copilot-instructions.md** — comprehensive update:
+  - Added missing files to directory tree: `credentials.js`, `statsContent.js`, `extensionBridge/`, `dev/`, `entries/` (4 files), `error.html`, `module_detach.html`, `slot.html`, `broker-refresh.js`
+  - Removed non-existent entries: `settings/index.js`, `ipc/statsDebug.js`
+  - Added missing IPC modules: `board.js`, `brokerRefresh.js`, `early.js`, `extensionBridge.js`, `moduleDetach.js`
+  - Added BetBoom reload protection section (tab verification, grace period, no match-level fallback)
+  - Fixed rebroadcast timings: 400/1400ms → 400/1200ms
+  - Added `brokerRefreshSettings`, `mapAutoRefreshEnabled` to persistence keys
+  - Updated pitfalls: `emptyResult()` format, BetBoom-specific warnings
+- **brokers/README.md** — replaced outdated reference to deleted `extractors.js` with modular `extractors/` architecture
+- **docs/AUTO_MODE.md** — fixed architecture section: "single ~1200-line file" → 6 ES modules with file listing and line counts
 
 ### 🧹 Codebase Cleanup
 - **Dead code removal**: Removed `api_helpers.js`, `board.css`, `extractors.js` wrapper, dead exports from `odds_board_shared.js`, dead IPC channels/handlers, stale comments and `if(false)` blocks (-563 lines)

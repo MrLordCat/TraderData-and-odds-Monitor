@@ -90,6 +90,8 @@ ipcRenderer.on('set-map-config', (_e, config)=>{
 // Periodic odds loop with deduplication (only send if changed)
 function sendOddsIfChanged(){
   try {
+    // During reload grace period, don't send odds (prevents stale match-level odds)
+    if(isInReloadGrace()) return;
     const odds = getCurrentOdds();
     // Create signature from odds array only (skip broker/map metadata)
     const sig = odds?.odds ? JSON.stringify(odds.odds) : '';
@@ -101,11 +103,23 @@ function sendOddsIfChanged(){
 }
 setInterval(sendOddsIfChanged, 1500);
 
+// Grace period after page load/navigation to suppress stale odds
+// Betboom loads on "Матч" tab by default, needs time to switch to correct map
+let __reloadGraceUntil = 0;
+const RELOAD_GRACE_MS = 3000; // suppress odds for 3s after reload for betboom
+function isInReloadGrace(){
+  if(BROKER_ID !== 'betboom') return false;
+  return Date.now() < __reloadGraceUntil;
+}
+function startReloadGrace(){
+  if(BROKER_ID === 'betboom') __reloadGraceUntil = Date.now() + RELOAD_GRACE_MS;
+}
+
 // SPA URL watcher -> reassert map
 let lastHref=location.href;
 try {
   new MutationObserver(()=>{
-    const href=location.href; if(href!==lastHref){ lastHref=href; [400,1200].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap, { isLast })), d)); }
+    const href=location.href; if(href!==lastHref){ lastHref=href; startReloadGrace(); [400,1200].forEach(d=> setTimeout(()=> safe(()=> triggerMapChange(HOST, desiredMap, { isLast })), d)); }
   }).observe(document, { subtree:true, childList:true });
 } catch(_){ }
 
@@ -128,7 +142,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 
 // Light ping so main can replay last map/placeholder odds promptly
-window.addEventListener('DOMContentLoaded', ()=>{ try { ipcRenderer.send('bv-odds-update', { broker:'_ping' }); } catch(_){} });
+// Also start reload grace period for betboom to prevent stale odds after reload
+window.addEventListener('DOMContentLoaded', ()=>{
+  try {
+    startReloadGrace();
+    ipcRenderer.send('bv-odds-update', { broker:'_ping' });
+  } catch(_){}
+});
 
 // ================= Credential Auto-Fill & Capture =================
 const { createCredentialFiller, hookCredentialCapture } = require('./credentials');

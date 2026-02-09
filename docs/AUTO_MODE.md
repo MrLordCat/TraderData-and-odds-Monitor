@@ -10,17 +10,18 @@ Auto Mode is an **odds alignment loop**: it continuously compares a *reference p
 
 ## 0) Architecture Overview (Implemented)
 
-The Auto Mode has been completely rewritten into a **unified module** located at `src/renderer/auto/loader.js`. This single file (~1200 lines) contains all Auto Mode logic and replaces the previous scattered implementation across `auto_core.js`, `auto_hub.js`, and `auto_trader.js`.
+The Auto Mode has been split into **ES modules** under `src/renderer/auto/`. This modular structure replaces the previous scattered implementation across `auto_core.js`, `auto_hub.js`, and `auto_trader.js`.
 
-### 0.1 Key Components (all in loader.js)
+### 0.1 Key Components
 
-| Component | Responsibility |
-|-----------|----------------|
-| `OddsStore` | Subscribes to OddsCore, tracks all broker odds, derives MID/ARB |
-| `GuardSystem` | Unified guard logic with priority: Excel > Market > Frozen > NoMID > ARB |
-| `createAlignEngine()` | Pure function: computes action based on MID vs target |
-| `AutoCoordinator` | Main coordinator: state machine, step loop, suspend/resume logic |
-| `AutoCore/AutoHub` | Backward-compatibility shims that delegate to AutoCoordinator |
+| Component | File | Responsibility |
+|-----------|------|----------------|
+| `OddsStore` | `odds-store.js` (~130 lines) | Subscribes to OddsCore, tracks all broker odds, derives MID/ARB |
+| `GuardSystem` | `guard-system.js` (~100 lines) | Unified guard logic with priority: Excel > Market > Frozen > NoMID > ARB |
+| `AlignEngine` | `align-engine.js` (~85 lines) | Pure function: computes action based on MID vs target, manages cooldowns |
+| `AutoCoordinator` | `auto-coordinator.js` (~610 lines) | Main coordinator: state machine, step loop, suspend/resume logic |
+| `Constants` | `constants.js` (~90 lines) | REASON, STATE, MODE, DEFAULTS, KEYS, REASON_LABELS |
+| `Loader` | `loader.js` (~175 lines) | Entry point: imports modules, wires them, registers globals, compat shims (AutoHub), UI init |
 
 ### 0.2 State Machine
 
@@ -104,7 +105,12 @@ let lastResumeTs = 0;
 ```
 src/renderer/
 ├── auto/
-│   └── loader.js             # Unified Auto Mode module (~1200 lines)
+│   ├── loader.js             # Entry point, wiring, compat shims (~175 lines)
+│   ├── constants.js          # REASON, STATE, MODE, DEFAULTS, KEYS (~90 lines)
+│   ├── odds-store.js         # OddsStore — reactive odds aggregator (~130 lines)
+│   ├── guard-system.js       # GuardSystem — guard logic (~100 lines)
+│   ├── align-engine.js       # AlignEngine — alignment actions & cooldowns (~85 lines)
+│   └── auto-coordinator.js   # AutoCoordinator — state machine (~610 lines)
 └── core/
     └── odds_core.js          # OddsCore (unchanged)
 

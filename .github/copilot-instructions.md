@@ -25,13 +25,17 @@ src/
 │   ├── main.js                # Bootstrap, window creation, IPC init, global state, hotkeys
 │   ├── preloads/              # Preload scripts
 │   │   ├── main.js            # Main window preload (desktopAPI)
-│   │   ├── broker.js          # Broker view preload (odds extraction)
+│   │   ├── broker.js          # Broker view preload (odds extraction, reload grace)
+│   │   ├── credentials.js     # Credential auto-fill & capture helpers
+│   │   ├── statsContent.js    # Stats panel preload (IPC forwarding)
 │   │   └── slot.js            # Empty slot placeholder preload
 │   └── modules/               # Feature managers and IPC submodules
 │       ├── addonManager/      # Addon/plugin system (install, enable, load)
 │       ├── board/             # Board panel manager
 │       ├── brokerManager/     # Broker view lifecycle
 │       ├── hotkeys/           # Unified hotkey manager (TAB/F1/F3)
+│       ├── extensionBridge/    # WebSocket bridge for Edge extension (DS Uptime)
+│       ├── dev/               # Dev tools (CSS watcher)
 │       ├── ipc/               # IPC handlers (see section 4)
 │       │   ├── autoPress.js   # Auto-press virtual key injection (F21-F24)
 │       ├── layout/            # Layout preset system
@@ -49,12 +53,20 @@ src/
 │   │   ├── index.html         # Main window
 │   │   ├── settings.html      # Settings overlay (incl. Addons section)
 │   │   ├── splash.html        # Splash screen with progress bar
-│   │   └── stats_panel.html   # Stats panel (Odds Board + Game Stats embedded)
+│   │   ├── stats_panel.html   # Stats panel (Odds Board + Game Stats embedded)
+│   │   ├── error.html         # Broker error/fallback page
+│   │   ├── module_detach.html # Detached addon module window
+│   │   └── slot.html          # Empty slot placeholder
+│   ├── entries/               # Bundle entry points
+│   │   ├── index.entry.js     # Main window entry
+│   │   ├── settings.entry.js  # Settings overlay entry
+│   │   ├── stats-panel.entry.js # Stats panel entry
+│   │   └── error.entry.js     # Error page entry
 │   ├── scripts/               # Page-specific JS
 │   │   └── settings/          # Settings modules (modular structure)
-│   │       ├── index.js       # Main entry, orchestrates all modules
 │   │       ├── init.js        # Version display, DevTools buttons
 │   │       ├── auto-settings.js # Auto trading settings
+│   │       ├── broker-refresh.js # Broker refresh/stale settings
 │   │       ├── heatbar.js     # Heat bar & animations config
 │   │       ├── sounds.js      # Sound notification settings
 │   │       ├── updater.js     # Updates section
@@ -123,11 +135,16 @@ IPC is modular under `src/main/modules/ipc/*.js`:
 - `autoRefresh.js` - Auto-refresh toggle
 - `mapAutoRefresh.js` - Periodic map rebroadcast
 - `settings.js` - Settings overlay
-- `stats.js`, `statsDebug.js` - Stats panel
+- `stats.js` - Stats panel
 - `swap.js` - Broker swap positions
 - `excelExtractor.js` - Python script control
 - `updater.js` - Auto-update system
 - `theme.js` - Theme toggle (light/dark)
+- `board.js` - Board panel IPC
+- `brokerRefresh.js` - Broker refresh settings
+- `early.js` - Early-init IPC handlers
+- `extensionBridge.js` - DS extension bridge IPC
+- `moduleDetach.js` - Addon module detach/attach
 
 **Conventions:**
 - Mutable shared objects passed as `{ value: ... }` refs (e.g. `stageBoundsRef`, `activeBrokerIdsRef`).
@@ -162,6 +179,11 @@ To add a bookmaker:
 **Bo1 handling (BetBoom, Thunderpick):**
 - При `mapNum === 1 && opts.isLast === true` экстрактор возвращает матчевые коэффициенты ("Исход матча"/"Match Winner").
 - mapNav.js при тех же условиях кликает вкладку "Матч"/"Main" вместо "Карта 1"/"Map 1".
+
+**BetBoom reload protection:**
+- Если запрашивается конкретная карта (mapNum ≥ 2 или mapNum=1 без isLast), фолбэк на матчевые коэффициенты **отключён** — возвращается `emptyResult()` вместо "Исход матча".
+- Перед извлечением проверяется, что нужный таб карты **реально активен** (`aria-checked`, `data-state`, CSS-класс). Если таб ещё не выбран — `emptyResult()`.
+- В broker.js preload: 3-секундная grace period после перезагрузки страницы (только для BetBoom), во время которой odds не отправляются — даёт время на переключение таба.
 
 ## 7. Stats / Board
 - Stats modes: `hidden|embedded|window` in `statsState.mode`.
@@ -312,6 +334,8 @@ electron-store keys:
 - `appTheme` - Theme preference ('dark' | 'light')
 - Updater: `lastUpdateCheck`, `updateChannel`
 - Addons: `enabledAddons` (array of addon IDs)
+- Broker refresh: `brokerRefreshSettings` (staleReloadEnabled, staleMissingTimeoutMin, staleUnchangedTimeoutMin)
+- Map auto refresh: `mapAutoRefreshEnabled`
 
 Always wrap fragile calls in `try/catch`.
 
@@ -464,8 +488,10 @@ power-towers/
 - Don't remove `views[id]` without destroying `webContents` & updating `activeBrokerIdsRef`.
 - Respect IPC initialization order (some depend on managers existing).
 - Don't duplicate hotkey handlers (causes double toggle).
-- Extraction functions must fail soft (return `['-','-']`).
-- Keep delayed rebroadcasts (400/1400ms) for SPA transitions.
+- Extraction functions must fail soft (return `emptyResult()` → `{ odds: ['-','-'], frozen: false }`).
+- Keep delayed rebroadcasts (400/1200ms) for SPA transitions.
+- BetBoom has a 3s reload grace period (`RELOAD_GRACE_MS`) to suppress stale match-level odds after page reload. Don't remove it.
+- BetBoom extractor verifies active tab before extracting — do NOT add fallback to match-level odds for specific map requests.
 - Dev build won't trigger on release tags (tags-ignore in workflow).
 - Addons install to userData, not project directory.
 - Addon updates require force-refresh to get latest downloadUrl (handled automatically).

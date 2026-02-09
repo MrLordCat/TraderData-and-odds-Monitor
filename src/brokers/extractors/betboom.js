@@ -25,12 +25,26 @@ function extractBetboom(mapNum = 1, game = 'lol', opts = {}) {
     target = sections.find(s => /Исход\s+матча/i.test(s.textContent));
   } else {
     const num = parseInt(mapNum, 10) || 1;
+    
+    // Verify the correct map tab is actually selected before extracting
+    const tabs = [...document.querySelectorAll('button[role="radio"]')];
+    const expectedTab = tabs.find(b => b.textContent.trim() === 'Карта ' + num);
+    if (expectedTab) {
+      // Check if this tab is active (aria-checked or data-state attribute)
+      const isActive = expectedTab.getAttribute('aria-checked') === 'true'
+        || expectedTab.getAttribute('data-state') === 'checked'
+        || expectedTab.classList.contains('active')
+        || expectedTab.hasAttribute('data-checked');
+      if (!isActive) {
+        // Correct tab exists but is not selected yet — don't extract stale odds
+        return emptyResult();
+      }
+    }
+    
     const mapRe = new RegExp(`Карта\\s*${num}`, 'i');
     target = sections.find(s => /Исход/i.test(s.textContent) && mapRe.test(s.textContent));
-    if (!target) {
-      // Fallback to match-level if specific map collapsed or missing
-      target = sections.find(s => /Исход\s+матча/i.test(s.textContent));
-    }
+    // No fallback to match-level: if specific map not found, return empty
+    // This prevents leaking match-level odds after page reload
   }
   
   if (!target) return emptyResult();
