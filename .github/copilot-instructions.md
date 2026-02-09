@@ -33,6 +33,7 @@ src/
 │       ├── brokerManager/     # Broker view lifecycle
 │       ├── hotkeys/           # Unified hotkey manager (TAB/F1/F3)
 │       ├── ipc/               # IPC handlers (see section 4)
+│       │   ├── autoPress.js   # Auto-press virtual key injection (F21-F24)
 │       ├── layout/            # Layout preset system
 │       ├── settingsOverlay/   # Settings modal (with warmup)
 │       ├── splash/            # Splash screen with progress-based loading
@@ -61,11 +62,17 @@ src/
 │   │       ├── game-selector.js # Game selector
 │   │       └── addons.js      # Addons management
 │   ├── styles/                # CSS files
-│   ├── core/                  # Shared logic (auto_core, auto_hub, odds_core)
-│   ├── ui/                    # UI components (toast, excel_status, api_helpers)
+│   ├── auto/                   # Auto trading system (modular)
+│   │   ├── loader.js          # Entry point, wiring, compat shims, UI init
+│   │   ├── constants.js       # REASON, STATE, MODE, DEFAULTS, KEYS
+│   │   ├── odds-store.js      # OddsStore — reactive odds aggregator
+│   │   ├── guard-system.js    # GuardSystem — guard logic
+│   │   ├── align-engine.js    # AlignEngine — alignment actions & cooldowns
+│   │   └── auto-coordinator.js # AutoCoordinator — state machine
+│   ├── core/                  # Shared logic (odds_core)
+│   ├── ui/                    # UI components (toast, excel_status)
 │   └── lolstats/              # LoL stats embeds
 ├── brokers/
-│   ├── extractors.js          # Backward-compat re-export wrapper
 │   ├── extractors/            # Modular extractor architecture
 │   │   ├── base.js            # Shared utilities (deepQuery, normalizeGame, etc.)
 │   │   ├── index.js           # Router/registry with EXTRACTOR_TABLE
@@ -213,15 +220,20 @@ Eliminates "cold start" lag by pre-warming animations before showing main window
 
 **Safety:** 8-second timeout forces main window show if warmup hangs.
 
-## 8. Auto Trading System (Refactored)
-Auto Mode has been completely rewritten into a **unified module** at `src/renderer/auto/loader.js`.
+## 8. Auto Trading System (Modular)
+Auto Mode is split into ES modules under `src/renderer/auto/`.
 
 ### Architecture
-- **loader.js** (~1200 lines): Single unified module containing OddsStore, GuardSystem, AlignEngine, AutoCoordinator
-- **OddsStore**: Subscribes to OddsCore, tracks all broker odds, derives MID/ARB
-- **GuardSystem**: Unified guard logic with priority: Excel > Market > Frozen > NoMID > ARB
-- **AutoCoordinator**: State machine (idle → aligning → trading), step loop, suspend/resume logic
-- **AutoCore/AutoHub**: Backward-compatibility shims that delegate to AutoCoordinator
+- **constants.js** (~90 lines): REASON, STATE, MODE, DEFAULTS, KEYS, REASON_LABELS
+- **odds-store.js** (~130 lines): `createOddsStore()` — subscribes to OddsCore, tracks all broker odds, derives MID/ARB
+- **guard-system.js** (~100 lines): `createGuardSystem()` — guard logic with priority: Excel > Market > Frozen > NoMID > ARB
+- **align-engine.js** (~85 lines): `createAlignEngine()` — computes alignment actions and manages cooldowns
+- **auto-coordinator.js** (~610 lines): `createAutoCoordinator()` — state machine (idle → aligning → trading), step loop, suspend/resume
+- **loader.js** (~175 lines): Entry point — imports modules, wires them, registers globals, compat shims (AutoHub), UI init
+- **AutoHub shim**: `setScriptMap` / `setBoardMap` used by `excel_status.js` (kept for compatibility)
+
+### IPC (main process)
+- **ipc/autoPress.js**: Virtual key injection (F21-F24) via SendInput PowerShell script, dedup logic, auto-confirm
 
 ### Signal Sender Architecture
 **Critical**: Only stats_panel window sends signals to prevent duplicates:

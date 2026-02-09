@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-02-06
+
+### 🧹 Codebase Cleanup
+- **Dead code removal**: Removed `api_helpers.js`, `board.css`, `extractors.js` wrapper, dead exports from `odds_board_shared.js`, dead IPC channels/handlers, stale comments and `if(false)` blocks (-563 lines)
+- **Backward-compat shims removed**: `statsPanelToggle`, `statsPanelSetHidden` preload APIs; `setPanelHidden`/`togglePanelHidden`/`getPanelHidden` from stats manager; dead `stats-panel-set-hidden`/`stats-panel-toggle` IPC channels
+- **Duplicates eliminated**: Triple `require('electron')` → single; duplicate `auto-mode-changed` IPC handlers merged; double `lolManualMode` change listener unified (was a bug — logic ran twice)
+- **Auto-press IPC extracted**: `src/main/modules/ipc/autoPress.js` — virtual key injection logic moved out of `main.js` (main.js: 979 → 846 lines)
+- **Auto Mode split into 6 ES modules**: `loader.js` (1401 lines) → `constants.js`, `odds-store.js`, `guard-system.js`, `align-engine.js`, `auto-coordinator.js`, `loader.js` (max 609 lines)
+- **AutoCore removed**: Unused compatibility shim (only referenced in docs)
+
+### 🔧 Improvements
+- **Python executable auto-detection**: `resolvePythonExe()` tries `python` first, falls back to `py` (Windows Launcher), caches result
+
 ## [0.3.0] - 2026-02-05
 
 ### ✨ New Features
