@@ -641,5 +641,3 @@ function initEmbeddedToolbar(){
 window.addEventListener('DOMContentLoaded', ()=>{
   try { initEmbeddedToolbar(); } catch(_){ }
 });
-
-// (Legacy embedded auto code removed – unified Auto Core is used via auto_trader.js)

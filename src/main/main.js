@@ -21,6 +21,7 @@ const path = require('path');
 const Store = require('electron-store');
 const store = new Store({ name: 'prefs' });
 const fs = require('fs');
+const { exec } = require('child_process');
 // Centralized shared constants (direct import to avoid circular barrel dependency)
 const constants = require('./modules/utils/constants');
 // Broadcast helper (eliminates repeated board/main/stats iteration)
@@ -357,17 +358,6 @@ ipcMain.on('set-disabled-brokers', (e, list) => {
 // (refresh-broker / refresh-all moved to brokers IPC module)
 // (layout IPC moved to modules/ipc/layout.js)
 
-// (settings + heatbar + contrast + layout preset IPC moved to modules/ipc/settings.js & modules/ipc/layout.js)
-
-// --- Close broker handler from renderer drag bar ---
-// (close-broker moved to brokers IPC module)
-
-// --- Add broker via slot placeholder ---
-// (slot-request-add moved to brokers IPC module)
-// Data request from addBroker dialog preload
-// (add-broker-selected & request-add-broker-data moved to brokers IPC module)
-// Map IPC moved to modules/ipc/map.js
-
 const { createStaleMonitor } = require('./modules/staleMonitor/');
 let staleMonitor;
 // IPC modularized handlers
@@ -395,8 +385,6 @@ function bootstrap() {
       try { store.set('disabledBrokers', BROKERS.map(b => b.id)); } catch(_) {}
       try { store.set('hasLaunched', true); } catch(_) {}
     }
-    // Cleanup deprecated keys from older builds (dataservices overlay remnants)
-    try { if(store.get('lastDataservicesUrl')!==undefined) store.delete('lastDataservicesUrl'); } catch(_) {}
   } catch(_) {}
   
   // Update splash progress
@@ -816,7 +804,6 @@ app.whenReady().then(()=>{
   try { fs.writeFileSync(path.join(__dirname,'auto_press_signal.json'), JSON.stringify({ side, key:keyLabel, direction, ts })); } catch(_){ }
         // Only SendInput via helper script using F22/F23/F24 virtual keys (0x85/0x86/0x87) so AHK v2 can hook them.
         try {
-          const { exec } = require('child_process');
             const injVk = vk; // already resolved mapping
             if(typeof __sendInputScriptPath !== 'undefined' && __sendInputScriptPath && injVk!=null){
               const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${__sendInputScriptPath}" ${injVk}`;
@@ -851,9 +838,8 @@ app.whenReady().then(()=>{
         return true;
       });
       // Additional passive logging channels from renderer
-      ipcMain.on('auto-mode-changed', (_e, payload)=>{ try { console.log('[autoSim][mode]', payload); } catch(_){ } });
-      // Relay auto mode ON/OFF across views so board and embedded stay in sync
       ipcMain.on('auto-mode-changed', (_e, payload)=>{
+        try { console.log('[autoSim][mode]', payload); } catch(_){ }
         try { broadcastToAll(getBroadcastCtx(), 'auto-set-all', { on: !!(payload && payload.active) }); } catch(_){ }
       });
       ipcMain.on('auto-fire-attempt', (_e, payload)=>{ try { console.log('[autoSim][fireAttempt]', payload); } catch(_){ } });
@@ -893,12 +879,7 @@ app.whenReady().then(()=>{
       if(!registeredWith) console.warn('[shortcut][Num5] registration returned false (tried: '+candidates.join(', ')+')');
     } catch(e){ console.warn('[shortcut][Num5] registration error', e); }
 });
-// Hotkey strategy:
-//  - Global 'Space' accelerator was REMOVED to prevent capturing space keystrokes when user focus is outside the app.
-//  - We now rely only on window-level before-input-event handlers (see browser-window-created listener below).
-//  - Broker BrowserViews also have their own before-input-event logic (in brokerManager) with editable element guard.
-// Optional future fallback (example):
-//  if(false){ /* re-enable guarded global shortcut */ /* globalShortcut.register('Space', () => { ... guarded toggle ... }); */ }
+
 app.on('will-quit', ()=>{ try { globalShortcut.unregisterAll(); } catch(_){} });
 // Hotkey throttle state (prevents duplicate triggers)
 let __lastHotkeyTs = { tab:0, f1:0, f2:0, f3:0 };
@@ -970,7 +951,6 @@ app.on('browser-window-created', (_e, win)=>{
             let sent=false;
             // Send only F23/F24 (do not resend bracket)
             try {
-              const { exec } = require('child_process');
               const injVk = side===1 ? 0x87 : 0x86;
               if(typeof __sendInputScriptPath !== 'undefined' && __sendInputScriptPath){
                 const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File \"${__sendInputScriptPath}\" ${injVk}`;

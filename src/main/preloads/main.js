@@ -23,9 +23,6 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // statsDetach/statsAttach removed (no separate stats window)
   getStatsState: () => ipcRenderer.invoke('get-stats-state'),
   onStatsState: (cb) => withUnsub('stats-state-updated', cb),
-    // Stats panel visibility
-    statsPanelToggle: () => ipcRenderer.send('stats-panel-toggle'),
-    statsPanelSetHidden: (hidden) => ipcRenderer.send('stats-panel-set-hidden', { hidden: !!hidden }),
   refreshAll: () => ipcRenderer.send('refresh-all'),
   setMap: (id, map) => ipcRenderer.send('set-map', { id, map }),
   // resetBrokerUrls & reflowAll removed (legacy maintenance controls)

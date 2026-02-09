@@ -93,10 +93,6 @@ try {
   });
 } catch(_){ }
 
-// (Removed) Capture Data prototype wiring – feature deprecated.
-
-// (Theme logic moved to stats_theme.js)
-
 // ================= Runtime State =================
 let metricVisibility = {}; // runtime copy controlling row visibility
 const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'];
@@ -652,7 +648,6 @@ function updateGameSelect(){
   }
   if(!any){ placeholder.selected=true; gameSelect.appendChild(placeholder); }
 }
-// startInlineRename removed - team names are read-only from Excel K4/N4
 function renderLol(payload, manual=false){
   try {
     ensureRows();
@@ -776,8 +771,7 @@ function renderLol(payload, manual=false){
   };
   document.getElementById('swapTeamsBtn').title='Swap display order of teams';
   // Team names are read-only (from Excel K4/N4) - no dblclick editing
-  // Manual toggle logic extension
-  document.getElementById('lolManualMode').addEventListener('change', ()=>{ const on=document.getElementById('lolManualMode').checked; if(on){ if(cachedLive){ manualData.team1Name=cachedLive.team1Name||manualData.team1Name; manualData.team2Name=cachedLive.team2Name||manualData.team2Name; manualData.gameStats = JSON.parse(JSON.stringify(cachedLive.gameStats||manualData.gameStats)); } ensureRows(); attachManualHandlers(); updateGameSelect(); renderManual(); } else { updateGameSelect(); if(liveDataset) renderLol(liveDataset); } try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ } });
+  // Manual toggle logic
   document.getElementById('lolManualMode').addEventListener('change', ()=>{
     const on = document.getElementById('lolManualMode').checked;
     if(on){

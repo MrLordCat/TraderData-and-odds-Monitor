@@ -255,9 +255,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   }
 
   function toggleSide(){ setSide(side==='left'?'right':'left'); }
-  // Panel hidden is deprecated - panel is always visible
-  function setPanelHidden(hidden){ /* noop - panel always visible */ }
-  function togglePanelHidden(){ /* noop */ }
 
   function applySingleWindow(enabled){
     singleWindow = !!enabled; persist();
@@ -581,7 +578,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   
   // Backward compatibility aliases
   function createEmbedded(offsetY){ createStatsViews(offsetY); }
-  function destroyEmbedded(force){ 
+  function destroyEmbedded(force){
     hideStatsViews();
     if(force){
       ['A','B'].forEach(k=>{ 
@@ -628,8 +625,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
         break;
       case 'stats-toggle-side': toggleSide(); break;
       case 'stats-set-side': setSide(payload && payload.side); break;
-    case 'stats-panel-set-hidden': setPanelHidden(payload && payload.hidden); break;
-    case 'stats-panel-toggle': togglePanelHidden(); break;
   case 'stats-single-window': applySingleWindow(payload && payload.enabled); break;
       case 'stats-reload-slot':
         try { const slot=payload && payload.slot; if(['A','B'].includes(slot)){ const v=views[slot]; if(v) try { v.webContents.reloadIgnoringCache(); } catch(_){ try { v.webContents.reload(); } catch(_2){} } } } catch(_){}
@@ -669,8 +664,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   function isPanelActive(){ return panelActive; }
 
   return { 
-    // Backward compatibility
-    open: ()=>{}, 
     handleIpc, 
     views, 
     createEmbedded, 
@@ -679,8 +672,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     ensureTopmost, 
     setUrl, 
     getMode: ()=>mode, 
-    getSide: ()=>side, 
-    getPanelHidden: ()=>panelHidden, 
+    getSide: ()=>side,
     setSide, 
     setWidth,
     setHotkeys,

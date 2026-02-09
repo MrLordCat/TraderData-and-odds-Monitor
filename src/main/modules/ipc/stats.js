@@ -9,7 +9,7 @@ function initStatsIpc(ctx){
   ipcMain.handle('get-stats-state', ()=> statsState);
   ipcMain.on('stats-toggle', ()=> toggleStatsEmbedded());
   // Forward common stats panel control channels + config/persistence updates to statsManager
-  ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings','stats-config-set','stats-single-window','stats-panel-set-hidden','stats-panel-toggle','stats-set-side'].forEach(ch=>{
+  ['stats-set-url','stats-layout','stats-open-devtools','stats-toggle-side','stats-reload-slot','lol-stats-settings','stats-config-set','stats-single-window','stats-set-side'].forEach(ch=>{
     ipcMain.on(ch, (e,p)=>{
       try {
         // Unify side switching between board + stats.
@@ -28,11 +28,6 @@ function initStatsIpc(ctx){
         }
 
         statsManager.handleIpc(ch, p);
-        // After any panel visibility change, sync statsState.panelHidden and broadcast
-        if((ch==='stats-panel-set-hidden' || ch==='stats-panel-toggle') && mainWindow && !mainWindow.isDestroyed()){
-          try { statsState.panelHidden = !!statsManager.getPanelHidden?.(); } catch(_){ }
-          try { mainWindow.webContents.send('stats-state-updated', statsState); } catch(_){ }
-        }
       } catch(_){ }
     });
   });

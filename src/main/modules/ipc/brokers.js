@@ -103,8 +103,6 @@ function initBrokerIpc(ctx){
       try { console.log('[broker][close] cleaned', brokerId); } catch(_){ }
     } catch(err){ try { console.warn('close-broker handling failed', err.message); } catch(_){ } }
   });
-  // Deprecated popup path: ignore slot-request-add (inline picker handles UI)
-  ipcMain.on('slot-request-add', ()=> { /* intentionally no-op */ });
   ipcMain.on('request-add-broker-data', (e, { slotIndex, includeActive }) => {
     try {
       const activeBrokerIds = Object.keys(views).filter(i=>!i.startsWith('slot-'));

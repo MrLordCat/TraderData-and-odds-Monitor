@@ -24,7 +24,6 @@ const moduleEntries = {
   'odds-board-shared': 'src/renderer/ui/odds_board_shared.js',
   'toast': 'src/renderer/ui/toast.js',
   'excel-status': 'src/renderer/ui/excel_status.js',
-  'api-helpers': 'src/renderer/ui/api_helpers.js',
 };
 
 const outdir = path.join(__dirname, '..', 'src', 'renderer', 'dist');

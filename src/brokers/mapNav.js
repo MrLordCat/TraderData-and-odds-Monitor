@@ -1,7 +1,7 @@
 // Map navigation helpers for broker pages
 // Exports: triggerMapChange(host, map)
 // Universal logic: always click target tab to ensure correct selection
-const { deepQuery } = require('./extractors');
+const { deepQuery } = require('./extractors/index');
 
 function triggerMapChange(host, map, opts={}){
   const isLast = opts.isLast === true;
