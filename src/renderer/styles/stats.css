@@ -368,6 +368,19 @@ h1.statsHeader { text-shadow:none; }
 	color: var(--md-sys-color-on-secondary-container);
 	border: none;
 	border-radius: var(--md-sys-shape-corner-full);
+	cursor: pointer;
+	transition: background 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.btn-sm:hover {
+	background: var(--md-sys-color-surface-container-highest);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.btn-sm:active {
+	background: var(--md-sys-color-surface-container-high);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+	transform: translateY(1px);
 }
 
 /* Controls strip visual container - M3 Surface */

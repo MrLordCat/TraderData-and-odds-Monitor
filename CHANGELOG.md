@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-02-09
+
+### 🐛 Bug Fixes
+- **Python executable auto-detection**: Fixed Python script startup on systems without `python` command
+  - Added `resolvePythonExe()` with automatic fallback: tries `python` first, falls back to `py` (Windows Launcher)
+  - Result cached after first successful probe for better performance
+  - User override via `excelPythonPath` store key still takes priority
+  - All pip install calls already use `py -m pip` pattern, compatible with both executables
+
+### ⚡ Improvements
+- **Swap Teams button styling**: Enhanced interactive states for better user feedback
+  - Added hover state with subtle elevation and background change
+  - Added active/pressed state with translateY animation
+  - Enhanced active toggle state hover with brightness filter and stronger shadow
+  - All states properly adapt to both light and dark themes using M3 Design tokens
+
+---
+
 ## [0.3.0] - 2026-02-05
 
 ### ✨ New Features

@@ -201,6 +201,17 @@ tr.drop-target { outline: 2px dashed var(--md-sys-color-primary); }
   box-shadow: 0 0 0 1px var(--md-sys-color-primary) inset;
 }
 
+#swapTeamsBtn.active:hover {
+  background: var(--md-sys-color-primary-container);
+  filter: brightness(1.1);
+  box-shadow: 0 0 0 2px var(--md-sys-color-primary) inset, 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+#swapTeamsBtn.active:active {
+  filter: brightness(0.95);
+  transform: translateY(1px);
+}
+
 /* Scroll container */
 .lolTableWrap {
   position: relative; /* Required for activity heat bars layer */
