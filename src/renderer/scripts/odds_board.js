@@ -68,7 +68,6 @@ function bindEmbeddedMapSelect(){
   if(!sel || sel.dataset.bound) return; sel.dataset.bound='1';
   sel.addEventListener('change', e=>{
     const v=e.target.value;
-    console.debug('[embeddedOdds] map change via stats select ->', v);
     window.desktopAPI.setMap('*', v);
     currentMap = v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag();
   });
@@ -79,7 +78,6 @@ function bindEmbeddedMapSelect(){
     btn.addEventListener('click', ()=>{
       const v = sel.value;
       window.desktopAPI.setMap('*', v);
-      console.debug('[embeddedOdds] manual map refresh ->', v);
     });
     // Right-click toggles shared auto mode
     btn.addEventListener('contextmenu', (e)=>{
@@ -233,20 +231,12 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   try {
     if(OddsCore && !window.__embeddedOddsHub){
       const hub = OddsCore.createOddsHub(); window.__embeddedOddsHub = hub;
-      console.log('[embeddedOdds][init] Using shared OddsCore hub');
-      let firstLogged=false;
       hub.subscribe(st=>{ try {
-        if(!firstLogged){
-          firstLogged=true;
-          const cnt = Object.keys(st.records||{}).length;
-          console.log('[embeddedOdds][hub][first] records:', cnt, 'derived.hasMid:', !!(st && st.derived && st.derived.hasMid));
-        }
         Object.assign(embeddedOddsData, st.records||{}); renderEmbeddedOdds();
       } catch(_){ } });
       hub.start();
     } else {
-      console.log('[embeddedOdds][init] Fallback odds wiring (desktopAPI)');
-      if(window.desktopAPI?.onOdds) window.desktopAPI.onOdds(p=>{ console.debug('[embeddedOdds] odds-update', p && p.broker); handleEmbeddedOdds(p); });
+      if(window.desktopAPI?.onOdds) window.desktopAPI.onOdds(p=>{ handleEmbeddedOdds(p); });
     }
   } catch(_){ }
   window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds());
@@ -259,7 +249,7 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   // One-time attempt to fetch last Excel odds (if loaded after they were emitted) so user doesn't need to re-select map
   try {
     const ipc = (window.require? window.require('electron').ipcRenderer: null);
-    if(ipc && ipc.invoke){ ipc.invoke('excel-last-odds').then(p=>{ console.log('[embeddedOdds][excel-last-odds]', p? 'received':'none'); if(p && p.broker==='excel'){ handleEmbeddedOdds(p); } }).catch(()=>{}); }
+    if(ipc && ipc.invoke){ ipc.invoke('excel-last-odds').then(p=>{ if(p && p.broker==='excel'){ handleEmbeddedOdds(p); } }).catch(()=>{}); }
   } catch(_){ }
   // Excel extractor toggle + status (embedded panel)
   try {
@@ -459,3 +449,24 @@ function initEmbeddedToolbar(){
 }
 
 window.addEventListener('DOMContentLoaded', initEmbeddedToolbar);
+
+// ======= Auto Debug Log =======
+const AUTO_LOG_MAX = 60;
+function initAutoDebugLog() {
+  try {
+    const ipc = window.require ? window.require('electron').ipcRenderer : null;
+    if (!ipc) return;
+    const logEl = document.getElementById('autoDebugLog');
+    if (!logEl) return;
+    ipc.on('auto-debug-log', (_e, payload) => {
+      if (!payload || !payload.msg) return;
+      const line = document.createElement('div');
+      line.className = 'dl';
+      line.textContent = payload.msg;
+      logEl.appendChild(line);
+      while (logEl.children.length > AUTO_LOG_MAX) logEl.removeChild(logEl.firstChild);
+      logEl.scrollTop = logEl.scrollHeight;
+    });
+  } catch (_) { }
+}
+try { initAutoDebugLog(); } catch (_) { }

@@ -197,6 +197,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     alignmentAttempts = 0;
 
     engine.resetCooldown();
+    autoLog('⚙ ALIGNING' + (afterNoMid ? ' (after NO_MID)' : '') + (skipResumeSignal ? ' (skip resume signal)' : ''));
     updateStatus('Aligning...');
     notify();
     checkAlignmentProgress();
@@ -250,6 +251,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       state.phase = STATE.TRADING;
       state.reason = null;
       updateStatus('Trading');
+      autoLog('✓ ALIGNED → TRADING (' + reason + ')');
       if (!pendingSkipResumeSignal) {
         lastResumeSentTs = Date.now();
         sendSignal('market:resume');
@@ -262,6 +264,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     } else {
       state.phase = STATE.IDLE;
       state.reason = REASON.ALIGN_FAILED;
+      autoLog('✗ ALIGN FAILED (' + reason + ')');
       updateStatus('Align failed: ' + reason);
     }
 
@@ -297,6 +300,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       updateStatus('Waiting...');
     }
 
+    autoLog('▶ ENABLE mode=' + state.mode + ' phase=' + state.phase);
     notify();
     broadcastState(true);
 
@@ -318,6 +322,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     state.reason = REASON.MANUAL;
     userSuspended = false;
 
+    autoLog('■ DISABLE manual');
     notify();
     broadcastState(false);
   }
@@ -351,8 +356,10 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
     if (isUserInitiated) {
       userSuspended = true;
+      autoLog('⏸ SUSPEND user reason=' + reason);
     } else {
       if (!canResumeFlag) state.userWanted = false;
+      autoLog('⏸ SUSPEND auto reason=' + reason);
       sendSignal(reason);
       // Backup: retry suspend signal once if Excel didn't react
       scheduleSuspendRetry('suspend', reason);
@@ -397,6 +404,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
   function sendSignal(reason, isRetry = false) {
     if (!isSignalSender) return;
+    autoLog('⌨ F21 signal=' + reason + (isRetry ? ' (RETRY)' : ''));
     sendKeyPress({ key: KEYS.SIGNAL, direction: reason, noConfirm: true, retry: isRetry });
   }
 
@@ -413,12 +421,24 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         const snap = OddsStore.getSnapshot();
         const frozen = !!snap?.excel?.frozen;
         if (type === 'suspend' && !frozen) {
+          autoLog('⚠ backup retry: Excel NOT frozen → resend suspend');
           sendSignal(signalReason, true);
         } else if (type === 'resume' && frozen) {
+          autoLog('⚠ backup retry: Excel STILL frozen → resend resume');
           sendSignal(signalReason, true);
         }
       } catch (_) { }
     }, delay);
+  }
+
+  /** Emit debug log visible in Board panel */
+  function autoLog(msg) {
+    try {
+      const ts = new Date();
+      const hms = String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0') + ':' + String(ts.getSeconds()).padStart(2,'0');
+      const entry = hms + ' ' + msg;
+      ipcSend(global, 'auto-debug-log', { msg: entry });
+    } catch (_) { }
   }
 
   function broadcastState(active) {
@@ -531,6 +551,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
           const timeSinceSuspend = Date.now() - lastSuspendTs;
           if (timeSinceSuspend < SUSPEND_RESUME_COOLDOWN_MS) return;
           if (!GuardSystem.canResume(odds, state.mode, state.reason)) return;
+          autoLog('▷ RESUME attempt (NO_MID recovered, MID available)');
           lastResumeTs = Date.now();
           startAlignment(false, true);
           return;
@@ -549,6 +570,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
           const canResumeNow = GuardSystem.canResume(odds, state.mode, state.reason);
           if (canResumeNow) {
+            autoLog('▷ RESUME attempt reason=' + (state.reason || 'none') + (skipResumeSignal ? ' (skip F21)' : ''));
             lastResumeTs = Date.now();
             startAlignment(skipResumeSignal);
           }

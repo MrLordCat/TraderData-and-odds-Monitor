@@ -153,13 +153,9 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
 
   ipcMain.handle('auto-state-get', () => ({ active: __autoLast.active }));
 
-  // Forwarded renderer console lines (selective)
-  ipcMain.on('renderer-log-forward', (_e, payload) => {
-    try {
-      if (!payload || !payload.level) return;
-      const line = '[renderer][fwd][' + payload.level + '] ' + (payload.args ? payload.args.join(' ') : '');
-      console[payload.level] ? console[payload.level](line) : console.log(line);
-    } catch (err) { console.warn('[renderer-log-forward] fail', err.message); }
+  // Auto debug log — broadcast to all views (displayed in Board panel)
+  ipcMain.on('auto-debug-log', (_e, payload) => {
+    try { broadcastToAll(getBroadcastCtx(), 'auto-debug-log', payload); } catch (_) { }
   });
 }
 

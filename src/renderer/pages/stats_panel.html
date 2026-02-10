@@ -65,8 +65,7 @@
       <div class="modeButtons"><button id="modeSplit" title="Horizontal split">Split</button><button id="modeVertical" title="Vertical split">Vert</button><button id="modeA" title="A full height">A</button><button id="modeB" title="B full height">B</button></div>
       <button id="toggleSide" class="panelSideBtn" title="Toggle panel side">Panel Side</button>
       <div class="divider"></div>
-      <!-- Removed: FrameGen / upscaler controls -->
-      <div class="note">Layout: <span id="dbgLayout"></span><br/>Side: <span id="dbgSide"></span></div>
+      <!-- Removed: debug layout/side spans -->
     </div>
   </div>
 
@@ -183,6 +182,10 @@
           <tr id="embeddedArbRow"><th>Arb</th><td colspan="3" id="embeddedArbCell">-</td></tr>
         </tfoot>
       </table>
+      <!-- Auto Debug Log -->
+      <div id="autoDebugLogWrap" class="autoDebugLogWrap">
+        <div id="autoDebugLog" class="autoDebugLog"></div>
+      </div>
     </div>
   </div>
 
