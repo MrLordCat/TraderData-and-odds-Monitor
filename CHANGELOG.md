@@ -2,7 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.1] - 2026-02-09
+## [0.4.1] - 2026-02-10
+
+### ✨ New Features
+
+- **Splash screen redesign** — canvas particle system (28 floating blue/purple dots drifting upward), glow + shimmer sweep on progress bar, logo float animation, fade transition on status text
+- **Template presets (All / Mini)** — template dropdown in Game Stats controls row; Mini hides firstKill, firstTower, firstBaron, firstInhibitor, race5–20, towerCount, dragonOrders
+- **Always-active smart reselect** — map reselect always active; switches to 3-second fast mode when odds are missing (`ca1a703`)
+- **Backup suspend/resume retry signal** — configurable retry delay (100–700ms, default 800ms) for more reliable auto-press delivery (`a72d4fa`)
+- **Auto debug logs in Board panel** — real-time auto-mode debug log viewer in board panel; old scattered debug logs removed (`166e0a5`)
+
+### 🐛 Bug Fixes
+
+- **Pari.ru Bo1 (isLast) support** — match-level odds extraction when map=1 and isLast=true (`c08822c`)
+- **Template persistence** — selected template (All/Mini) now saved in electron-store and restored on restart
+- **Auto logs moved to dev console** — throttled download progress logging + retry logic fix (`6852aee`)
+- **Suspend retry delay limits** — changed from default range to 700–1500ms (`eea1029`)
+
+### 🎨 UI Improvements
+
+- **LoL table cleanup** — removed netWorth, Atakhan, and Winner rows; winner coloring moved to team name headers via game data (`e344dc7`)
+- **Game Stats button unification** — Manual mode changed from checkbox to toggle button; new compact row layout with Swap (⇄ icon), Manual, +Game, Template dropdown; removed lolStatus text element (`67d417b`, `c39e36c`)
+- **Stats panel widened** — default width 360 → 385 px (+7%) with auto-migration for stored value (`9e8cf4a`)
+- **Animation suppression on Grid load** — 5-second suppression on page load/refresh + 2-second extension from first data arrival; covers both heat bar bumps and cell pop animations (`d20b93f`)
+
+### 🧹 Cleanup
+
+- **Console.log cleanup** — removed all debug console.log/debug from stats panel sources (`a356cc0`)
+
+## [0.4.0] - 2026-02-09
 
 ### 🐛 Bug Fixes
 
