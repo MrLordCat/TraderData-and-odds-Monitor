@@ -527,6 +527,53 @@ small {
 /* Stats Controls */
 /* (Merged definition above; keep layout behavior separated for clarity) */
 .statsControls { display:flex; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+.gsControlsGrid { display:flex; flex-direction:column; gap:6px; }
+.gsControlsRow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+/* Section header right group */
+.sectionHeader__right { margin-left:auto; display:flex; gap:6px; align-items:center; }
+
+/* Game select styled as btn-sm */
+.gsSelect {
+  appearance: auto;
+  cursor: pointer;
+}
+
+/* Reset icon button */
+.btn-icon-sm {
+  min-width: 28px;
+  padding: 3px 6px;
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
+}
+
+/* Active toggle state for buttons (Manual, Swap) */
+.btn-sm.active {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+/* Template dropdown */
+.gsTemplateWrap { position:relative; display:inline-block; }
+.gsTemplateMenu {
+  position:absolute; top:100%; left:0; margin-top:4px; z-index:20;
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--md-sys-shape-corner-medium, 8px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  min-width: 90px;
+  overflow:hidden;
+}
+.gsTemplateItem {
+  display:block; width:100%; text-align:left;
+  padding: 6px 12px; font-size:11px;
+  background:none; border:none; color: var(--md-sys-color-on-surface);
+  cursor:pointer;
+}
+.gsTemplateItem:hover {
+  background: var(--md-sys-color-surface-container-highest, rgba(255,255,255,.08));
+}
 
 /* == RESET: LoL Stats Table styles removed intentionally for redesign == */
 #lolTable {
@@ -554,8 +601,6 @@ small {
 .metricSummary { cursor: pointer; font-size: 11px; opacity: .8; }
 
 /* Removed: metric rows, drag handles, editable states, toggle animations, reorder effects */
-/* Keep status width container for now */
-.lolStatusWrap { display:inline-block; min-width:120px; white-space:nowrap; padding-left:6px; }
 
 /* ================= Odds Board Header Controls - M3 ================= */
 .oddsHeaderControls {

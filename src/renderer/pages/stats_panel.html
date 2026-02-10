@@ -88,16 +88,26 @@
   <div class="sectionHeader">
     <button class="dragHandleSec" title="Drag to reorder" tabindex="-1">≡</button>
     <span class="accent">Game Stats</span>
-    <select id="lolGameSelect" class="font-11" style="padding:2px 6px;min-width:78px;vertical-align:middle;"><option value="" disabled selected>Game -</option></select>
+    <span class="sectionHeader__right">
+      <select id="lolGameSelect" class="btn-sm font-11 gsSelect" style="min-width:78px;"><option value="" disabled selected>Game -</option></select>
+      <button id="lolReset" class="btn-sm btn-icon-sm font-11" title="Reset LoL Stats">↺</button>
+    </span>
+  </div>
+  <div class="statsBody sectionBody"><div class="statsControls gsControlsGrid">
+  <div class="gsControlsRow">
+    <button id="swapTeamsBtn" class="btn-sm font-11">Swap</button>
+    <button id="lolManualMode" class="btn-sm font-11" data-active="false">Manual</button>
     <button id="lolAddGameBtn" class="btn-sm font-11 addGameBtn" title="Add manual game" aria-disabled="true">+ Game</button>
   </div>
-  <div class="statsBody sectionBody"><div class="statsControls">
-  <button id="lolReset" class="btn-sm font-11">Reset LoL Stats</button>
-  <label class="authRow font-11" style="cursor:pointer;">
-        <input id="lolManualMode" type="checkbox" style="margin:0;"> Manual
-      </label>
-  <button id="swapTeamsBtn" class="btn-sm font-11">Swap Teams</button>
-  <span class="lolStatusWrap"><span id="lolStatus" class="statusSmall">Waiting...</span></span>
+  <div class="gsControlsRow">
+    <div class="gsTemplateWrap">
+      <button id="gsTemplateBtn" class="btn-sm font-11" title="Row visibility template">☰ Template</button>
+      <div id="gsTemplateMenu" class="gsTemplateMenu" style="display:none;">
+        <button class="gsTemplateItem" data-template="all">All</button>
+        <button class="gsTemplateItem" data-template="mini">Mini</button>
+      </div>
+    </div>
+  </div>
       <!-- Metrics toggles removed for full visual reset -->
     </div>
   <div class="lolTableWrap">

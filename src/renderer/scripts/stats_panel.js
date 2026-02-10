@@ -175,7 +175,26 @@ function syncDragonCounts(g){ const t1=manualData.team1Name, t2=manualData.team2
 // ================= Helpers =================
 function isLolMatchUrl(u){ try { const url=new URL(u); if(!/portal\.grid\.gg/.test(url.hostname)) return false; return /lol/.test(url.pathname); } catch(_){ return false; } }
 function cell(id, side){ return document.getElementById(`${id}-${side}`); }
-function sendPersist(){ send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, metricVisibility, metricOrder: metricsOrderMutable }); }
+// Helper: Manual mode is now a toggle button with data-active attribute
+function isManualOn(){ const el=document.getElementById('lolManualMode'); return el && el.getAttribute('data-active')==='true'; }
+function setManualOn(v){ const el=document.getElementById('lolManualMode'); if(el){ el.setAttribute('data-active', v?'true':'false'); el.classList.toggle('active', !!v); } document.body.classList.toggle('manual-mode', !!v); }
+function sendPersist(){ send('lol-stats-settings',{ manualMode: isManualOn(), metricVisibility, metricOrder: metricsOrderMutable }); }
+
+// ================= Template Presets =================
+const TEMPLATE_MINI_HIDE = ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','towerCount','dragonOrders'];
+let currentTemplate = 'all';
+function applyTemplate(name){
+  currentTemplate = name;
+  if(name === 'mini'){
+    metricsOrder.forEach(id=>{ metricVisibility[id] = !TEMPLATE_MINI_HIDE.includes(id); });
+  } else {
+    metricsOrder.forEach(id=>{ metricVisibility[id] = true; });
+  }
+  applyVisibility();
+  sendPersist();
+  // Update button label
+  const btn=document.getElementById('gsTemplateBtn'); if(btn) btn.textContent='☰ '+name.charAt(0).toUpperCase()+name.slice(1);
+}
 
 // ================= Metrics UI =================
 function buildMetricToggles(){ const wrap=document.getElementById('metricToggles'); if(!wrap) return; wrap.innerHTML=''; metricsOrder.forEach(id=>{ const label=document.createElement('label'); label.className='metricToggle'; const cb=document.createElement('input'); cb.type='checkbox'; cb.checked = metricVisibility[id] !== false; cb.onchange=()=>{ metricVisibility[id]=cb.checked; sendPersist(); applyVisibility(); }; label.appendChild(cb); label.appendChild(document.createTextNode(metricLabels[id]||id)); wrap.appendChild(label); }); }
@@ -185,7 +204,7 @@ function applyVisibility(){
     const row = document.querySelector(`tr[data-metric="${id}"]`);
     if(!row) return; total++; const off = (metricVisibility[id] === false); if(off) hidden++; row.style.display = off?'none':'';
   });
-  // Ensure any newly introduced metrics default to visible (e.g., 'winner')
+  // Ensure any newly introduced metrics default to visible
   metricsOrder.forEach(id=>{ if(!(id in metricVisibility)) metricVisibility[id] = true; });
   if(total && hidden === total){
   // all hidden — restore defaults
@@ -279,7 +298,7 @@ function setText(id, side, val){
 }
 
 // ================= LoL Update Handling =================
-ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(document.getElementById('lolManualMode').checked) return; try {
+ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(isManualOn()) return; try {
   const firstRender = (lastGameRendered == null);
   if(firstRender){ window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; }
   liveDataset = payload; cachedLive = payload; const games=Object.keys(payload.gameStats||{}).map(Number).sort((a,b)=>a-b); const sig = games.join(','); if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; if(sig !== lastLiveGamesSig){ lastLiveGamesSig = sig; if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; }
@@ -308,14 +327,14 @@ function clearLol(){
   });
 }
 
-ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); const st=document.getElementById('lolStatus'); if(st) st.textContent='Waiting...'; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
+ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
 
 // ================= Credentials =================
 
 function ensureOption(select, value){ if(![...select.options].some(o=>o.value===value)){ const opt=document.createElement('option'); opt.value=value; opt.textContent=value.replace(/^https?:\/\/(www\.)?/,'').slice(0,40); select.appendChild(opt); } }
 
 // ================= Init From Main (stats-init) =================
-ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; document.getElementById('lolManualMode').checked = !!cfg.lolManualMode; const sw=!!cfg.singleWindow; const swEl=document.getElementById('singleWindowMode'); if(swEl){ swEl.checked=sw; if(typeof window.__applySingleWindowUi==='function') window.__applySingleWindowUi(sw); } metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
+ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); ensureOption(sa, cfg.urls.A); ensureOption(sb, cfg.urls.B); sa.value = cfg.urls.A; sb.value = cfg.urls.B; document.getElementById('dbgLayout').textContent = cfg.mode; document.getElementById('dbgSide').textContent = cfg.side; setManualOn(!!cfg.lolManualMode); const sw=!!cfg.singleWindow; const swEl=document.getElementById('singleWindowMode'); if(swEl){ swEl.checked=sw; if(typeof window.__applySingleWindowUi==='function') window.__applySingleWindowUi(sw); } metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
   if(cfg.lolManualData && typeof cfg.lolManualData==='object'){
     try { manualData = JSON.parse(JSON.stringify(cfg.lolManualData)); } catch(_){ }
   }
@@ -323,8 +342,8 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
     window.__LOL_CHECK_STATE = JSON.parse(JSON.stringify(cfg.lolMetricMarks));
   }
   buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); }
-  if(document.getElementById('lolManualMode').checked){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
-  ipcRenderer.send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE });
+  if(isManualOn()){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
+  ipcRenderer.send('lol-stats-settings',{ manualMode: isManualOn(), manualData, metricMarks: window.__LOL_CHECK_STATE });
   __setPanelSideUi(cfg && cfg.side);
  } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); });
@@ -439,7 +458,7 @@ function bindReset(){
       teamNamesSource = 'grid'; // reset source priority
       setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false);
       // Additional manual dataset reset if in manual mode
-      if(document.getElementById('lolManualMode').checked){
+      if(isManualOn()){
         manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats:{ '1': makeEmptyGame() } };
         currentGame='1';
         updateGameSelect();
@@ -456,19 +475,23 @@ function bindReset(){
       // Re‑signal injected scripts (in case they are already present) after a short delay
       setTimeout(()=>{
         try { window.postMessage({ type:'restart_data_collection', reason:'manual-reset' }, '*'); } catch(_){ }
-        const st=document.getElementById('lolStatus'); if(st) st.textContent='Manual reset...';
       }, 150);
     } catch(e){ console.warn('lolReset failed', e); }
   };
 }
 
 function bindSettings(){
-  const manualCb = document.getElementById('lolManualMode');
-  function applyManualClass(){
-    document.body.classList.toggle('manual-mode', !!manualCb.checked);
+  // Manual mode is now a button — click handler is in init()
+  // Template dropdown
+  const tplBtn = document.getElementById('gsTemplateBtn');
+  const tplMenu = document.getElementById('gsTemplateMenu');
+  if(tplBtn && tplMenu){
+    tplBtn.addEventListener('click', (e)=>{ e.stopPropagation(); tplMenu.style.display = tplMenu.style.display==='none'?'block':'none'; });
+    tplMenu.querySelectorAll('.gsTemplateItem').forEach(item=>{
+      item.addEventListener('click', (e)=>{ e.stopPropagation(); applyTemplate(item.dataset.template); tplMenu.style.display='none'; });
+    });
+    document.addEventListener('click', ()=>{ tplMenu.style.display='none'; });
   }
-  manualCb.addEventListener('change', ()=>{ sendPersist(); applyManualClass(); });
-  applyManualClass(); // initial
 }
 
 // Placeholder functions for features referenced later (map & manual editing) to avoid ReferenceErrors before extraction completes.
@@ -478,15 +501,15 @@ function attachManualHandlers(){
       const el = cell(id, side);
       if(!el || el.dataset.bound) return;
       el.dataset.bound='1';
-      el.addEventListener('click', ()=>{ if(!document.getElementById('lolManualMode').checked) return; handleManualClick(id, side); });
-      el.addEventListener('contextmenu', e=>{ if(!document.getElementById('lolManualMode').checked) return; e.preventDefault(); handleManualRightClick(id, side); return false; });
+      el.addEventListener('click', ()=>{ if(!isManualOn()) return; handleManualClick(id, side); });
+      el.addEventListener('contextmenu', e=>{ if(!isManualOn()) return; e.preventDefault(); handleManualRightClick(id, side); return false; });
       el.title='LMB: + / set, RMB: - / clear';
     });
   });
 }
 function initDragAndDrop(){ const body=document.getElementById('lt-body'); if(!body) return; body.querySelectorAll('tr').forEach(tr=>{ tr.addEventListener('dragstart', ev=>{ tr.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; }); tr.addEventListener('dragend', ()=>{ tr.classList.remove('dragging'); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); }); }); body.addEventListener('dragover', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); if(after) after.classList.add('drop-target'); }); body.addEventListener('drop', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); const dragging=body.querySelector('tr.dragging'); if(!dragging) return; if(after) body.insertBefore(dragging, after); else body.appendChild(dragging); metricsOrderMutable=[...body.querySelectorAll('tr')].map(r=>r.dataset.metric); metricsOrder=[...metricsOrderMutable]; lastOrderSig = null; // Suppress animations briefly while DOM reshuffles
   window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
-  ensureRows(); if(document.getElementById('lolManualMode').checked) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
+  ensureRows(); if(isManualOn()) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
 function getAfterRow(body,y){ const rows=[...body.querySelectorAll('tr:not(.dragging)')]; return rows.find(r=> y <= r.getBoundingClientRect().top + r.getBoundingClientRect().height/2); }
 let addBtn; let gameSelect; let headerH1;
 /** Convert dragonTimes to ordered indices per team */
@@ -496,7 +519,7 @@ function dragonTimesToOrders(dragonTimes, t1, t2){
 }
 function updateGameSelect(){
   if(!gameSelect) return;
-  const manualOn=document.getElementById('lolManualMode').checked;
+  const manualOn=isManualOn();
   gameSelect.innerHTML='';
   const placeholder=document.createElement('option');
   placeholder.value=''; placeholder.disabled=true; placeholder.textContent='Game -';
@@ -553,7 +576,6 @@ function renderLol(payload, manual=false){
     (function(){ let orders1=[], orders2=[]; if(s.dragonOrders){ orders1 = s.dragonOrders[dispTeam1]||[]; orders2 = s.dragonOrders[dispTeam2]||[]; } else if(s.dragonTimes){ const map = dragonTimesToOrders(s.dragonTimes, team1Name, team2Name); orders1 = map[dispTeam1]||[]; orders2 = map[dispTeam2]||[]; } setText('dragonOrders','t1', orders1.join(' ')); setText('dragonOrders','t2', orders2.join(' ')); })();
     if(s.quadra) setBinary('quadra', filledBinary); if(s.penta) setBinary('penta', filledBinary);
   ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta'].forEach(m=>{ if(!filledBinary.has(m)){ setText(m,'t1','✗'); setText(m,'t2','✗'); } });
-    const statusEl=document.getElementById('lolStatus'); if(statusEl) statusEl.textContent = `Games: ${games.join(', ')}`;
     // Store winner info from game data for header coloring
     window.__CURRENT_GAME_WINNER = s.winner || null;
     window.__CURRENT_GAME_TEAMS = { t1: dispTeam1, t2: dispTeam2 };
@@ -599,7 +621,7 @@ function renderLol(payload, manual=false){
   } catch(err){ }
   };
   if(gameSelect){
-    gameSelect.onchange=()=>{ const manualOn=document.getElementById('lolManualMode').checked; const val=gameSelect.value; if(!val) return; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
+    gameSelect.onchange=()=>{ const manualOn=isManualOn(); const val=gameSelect.value; if(!val) return; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
       if(manualOn){ currentGame=val; renderManual(); } else { currentLiveGame=Number(val); const games=Object.keys(liveDataset?.gameStats||{}).map(Number).sort((a,b)=>a-b); const last=games[games.length-1]; followLatestLiveGame = (currentLiveGame===last); if(liveDataset) renderLol(liveDataset); }
       if(activityModule && activityModule.recalc) activityModule.recalc(); };
   }
@@ -612,7 +634,7 @@ function renderLol(payload, manual=false){
     document.getElementById('swapTeamsBtn').classList.toggle('active', swapTeams); 
     // Suppress heatbar/cell bump animations briefly while values visually reshuffle
     window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
-    if(document.getElementById('lolManualMode').checked) { 
+    if(isManualOn()) { 
       renderManual(); 
     } else { 
       const snap = liveDataset || cachedLive; 
@@ -627,9 +649,11 @@ function renderLol(payload, manual=false){
   };
   document.getElementById('swapTeamsBtn').title='Swap display order of teams';
   // Team names are read-only (from Excel K4/N4) - no dblclick editing
-  // Manual toggle logic
-  document.getElementById('lolManualMode').addEventListener('change', ()=>{
-    const on = document.getElementById('lolManualMode').checked;
+  // Manual toggle logic (button, not checkbox)
+  document.getElementById('lolManualMode').addEventListener('click', ()=>{
+    const on = !isManualOn();
+    setManualOn(on);
+    sendPersist();
     if(on){
       if(cachedLive){
         manualData.team1Name = cachedLive.team1Name || manualData.team1Name;
@@ -662,7 +686,7 @@ function renderLol(payload, manual=false){
   window.__LOL_CHECK_STATE = window.__LOL_CHECK_STATE || {}; // { gameId: { metricId: true } }
   function currentGameId(){
     try {
-      if(document.getElementById('lolManualMode').checked){
+      if(isManualOn()){
         return String(currentGame||'1');
       }
       // live mode: use lastGameRendered or detected live game

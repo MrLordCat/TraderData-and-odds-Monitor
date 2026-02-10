@@ -47,7 +47,6 @@
 
 #stats.collapsible.collapsed .statsControls,
 #stats.collapsible.collapsed .lolTableWrap,
-#stats.collapsible.collapsed #lolStatus,
 #stats.collapsible.collapsed details { display: none !important; }
 
 #stats.collapsible.collapsed { padding-bottom: 4px; }
@@ -215,12 +214,6 @@ tr.drop-target { outline: 2px dashed var(--md-sys-color-primary); }
 /* Game select & add button sizing */
 #stats select,
 #stats button { font-size: 11px; }
-
-/* Status text */
-#lolStatus {
-  font-size: 11px;
-  opacity: .65;
-}
 
 /* Responsive tweaks placeholder */
 @media (max-width: 1200px) { }
