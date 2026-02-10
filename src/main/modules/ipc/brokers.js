@@ -100,8 +100,8 @@ function initBrokerIpc(ctx){
       try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('odds-update', removalPayload); } catch(_){ }
       // Direct broker-closed for stats panel (in case odds removal races with initial render)
       try { if(statsManager && statsManager.views && statsManager.views.panel) statsManager.views.panel.webContents.send('broker-closed', { id: brokerId }); } catch(_){ }
-      try { console.log('[broker][close] cleaned', brokerId); } catch(_){ }
-    } catch(err){ try { console.warn('close-broker handling failed', err.message); } catch(_){ } }
+      console.log('[broker][close] cleaned', brokerId);
+    } catch(err){ console.warn('close-broker handling failed', err.message); }
   });
   ipcMain.on('request-add-broker-data', (e, { slotIndex, includeActive }) => {
     try {

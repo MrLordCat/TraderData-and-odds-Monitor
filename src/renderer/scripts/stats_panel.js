@@ -1,11 +1,9 @@
 // Core stats logic (theme & embedded odds handled in separate modules)
-// Guard against double execution (e.g., accidental multiple script tags or hot reload) causing 'ipcRenderer already declared'
-if(!window.__statsPanelBootstrapped){ window.__statsPanelBootstrapped = true; }
 let ipcRenderer = window.ipcRenderer; // reuse if already present
 if(!ipcRenderer){
   try { ipcRenderer = require('electron').ipcRenderer; window.ipcRenderer = ipcRenderer; } catch(e){ /* fallback placeholder */ }
 }
-try { console.log('[stats_panel] script start (boot=' + (window.__statsPanelBootstrapped) + ')'); } catch(_){ }
+console.log('[stats_panel] script start');
 if(!ipcRenderer){
   // If preload/nodeIntegration unexpectedly off, attach minimal shim so later code won't crash
   window.ipcRenderer = ipcRenderer = { send: ()=>{}, on: ()=>{}, invoke: async()=>{} };
@@ -26,81 +24,60 @@ function __setPanelSideUi(side){
 function bindStatsTopbar(){
   const byId = (id)=> document.getElementById(id);
 
-  try {
-    const sideBtn = byId('spPanelSide');
-    if(sideBtn){
-      sideBtn.addEventListener('click', ()=>{
-        try {
-          ipcRenderer.send('stats-toggle-side');
-          __setPanelSideUi(__statsPanelSide === 'left' ? 'right' : 'left');
-        } catch(_){ }
-      });
-    }
-  } catch(_){ }
+  const sideBtn = byId('spPanelSide');
+  if(sideBtn){
+    sideBtn.addEventListener('click', ()=>{
+      ipcRenderer.send('stats-toggle-side');
+      __setPanelSideUi(__statsPanelSide === 'left' ? 'right' : 'left');
+    });
+  }
 
-  try {
-    byId('spBack')?.addEventListener('click', ()=>{ try { ipcRenderer.send('stats-toggle'); } catch(_){ } });
-  } catch(_){ }
-
-  try {
-    byId('spSettings')?.addEventListener('click', ()=>{ try { ipcRenderer.send('open-settings'); } catch(_){ } });
-  } catch(_){ }
+  byId('spBack')?.addEventListener('click', ()=> ipcRenderer.send('stats-toggle'));
+  byId('spSettings')?.addEventListener('click', ()=> ipcRenderer.send('open-settings'));
 
   // Update badge: show when update available
-  try {
-    const updateBadge = byId('spUpdateBadge');
-    const showBadge = () => { if(updateBadge) updateBadge.hidden = false; };
-    const hideBadge = () => { if(updateBadge) updateBadge.hidden = true; };
-    
-    // Check initial state
+  const updateBadge = byId('spUpdateBadge');
+  if(updateBadge){
+    const showBadge = () => { updateBadge.hidden = false; };
+    const hideBadge = () => { updateBadge.hidden = true; };
     ipcRenderer.invoke('updater-get-status').then(st => {
       if(st && st.availableUpdate) showBadge();
     }).catch(()=>{});
-    
-    // Listen for update events
     ipcRenderer.on('updater-update-available', showBadge);
     ipcRenderer.on('updater-update-not-available', hideBadge);
-  } catch(_){ }
+  }
 }
 
-try {
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindStatsTopbar);
-  else bindStatsTopbar();
-} catch(_){ }
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindStatsTopbar);
+else bindStatsTopbar();
 
 // (Stats mode: broker controls are intentionally hidden in topbar)
 
 // Sync side changes coming from main (e.g., toggled in board view)
-try {
-  ipcRenderer.on('stats-side-updated', (_e, p)=>{
-    try {
-      const side = p && p.side;
-      __setPanelSideUi(side);
-      const dbg = document.getElementById('dbgSide');
-      if(dbg) dbg.textContent = __statsPanelSide;
-    } catch(_){ }
-  });
-} catch(_){ }
+ipcRenderer.on('stats-side-updated', (_e, p)=>{
+  const side = p && p.side;
+  __setPanelSideUi(side);
+  const dbg = document.getElementById('dbgSide');
+  if(dbg) dbg.textContent = __statsPanelSide;
+});
 
 // Listen for settings updates to reload sound preferences
-try {
-  ipcRenderer.on('settings-updated', ()=>{
-    try {
-      if(window.__STATS_SOUNDS__ && typeof window.__STATS_SOUNDS__.loadSettings === 'function'){
-        window.__STATS_SOUNDS__.loadSettings();
-      }
-    } catch(e){ console.warn('[stats_panel] Failed to reload sound settings:', e); }
-  });
-} catch(_){ }
+ipcRenderer.on('settings-updated', ()=>{
+  try {
+    if(window.__STATS_SOUNDS__ && typeof window.__STATS_SOUNDS__.loadSettings === 'function'){
+      window.__STATS_SOUNDS__.loadSettings();
+    }
+  } catch(e){ console.warn('[stats_panel] Failed to reload sound settings:', e); }
+});
 
 // ================= Runtime State =================
 let metricVisibility = {}; // runtime copy controlling row visibility
 const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'];
 const COUNT_METRICS = ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
+function parseTs(raw){ if(raw==null) return Infinity; if(typeof raw==='number'&&!isNaN(raw)) return raw>36000?Math.floor(raw/1000):raw; if(typeof raw==='string'){ const v=raw.trim(); if(/^\d+$/.test(v)){ const n=Number(v); return n>36000?Math.floor(n/1000):n; } if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(v)){ const p=v.split(':').map(n=>Number(n)||0); if(p.length===2) return p[0]*60+p[1]; if(p.length===3) return p[0]*3600+p[1]*60+p[2]; } } return Infinity; }
 let prevMatchUrls = { A: null, B: null };
 let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
-const customTeamNames = { 1:null, 2:null }; // custom display names (live)
 let teamNamesSource = 'grid'; // 'grid' or 'excel' - Excel has priority
 let metricsOrder = ['netWorth','atakhan','firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta','winner'];
 let metricsOrderMutable = [...metricsOrder];
@@ -108,8 +85,7 @@ const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5
 let lastOrderSig = null;
 let __prevValues = {}; // cell previous values
 let lastGameRendered = null;
-const firstEventFlags = {}; // legacy safety (used for initial value flags)
-const animTimers = { delete: ()=>{}, get: ()=>null, set: ()=>{} }; // inert placeholder
+
 let liveDataset = null, cachedLive = null, currentLiveGame = null, currentGame = null; // game selection
 let swapTeams = false; // manual mode swap
 // Manual mode data
@@ -175,69 +151,34 @@ function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: m
 
 function applyRaceFromKills(gs){ const bucket = gs.killCount||{}; [ ['race5',5], ['race10',10], ['race15',15], ['race20',20] ].forEach(([key,n])=>{ if(!gs[key]){ const t1=bucket[manualData.team1Name]||0; const t2=bucket[manualData.team2Name]||0; if(t1===n || t2===n) gs[key]= t1===n? manualData.team1Name: manualData.team2Name; } }); }
 
-function handleManualClick(metric, side){
+function handleManualAction(metric, side, isRemove){
   const g = manualData.gameStats[currentGame]; if(!g) return;
   const team = side==='t1'? manualData.team1Name: manualData.team2Name;
-  // Order matters: dragonCount must be handled BEFORE generic COUNT_METRICS branch
   if(BINARY_METRICS.includes(metric)){
-    if(!g[metric]) g[metric]=team; else if(g[metric]!==team) g[metric]=team;
-  }
-  else if(metric==='dragonCount'){
-    const bucket=g.dragonCount ||= {};
-    bucket[team]=(bucket[team]||0)+1;
-    (g.dragonOrderSequence ||= []).push(team);
-    syncDragonCounts(g);
-  }
-  else if(COUNT_METRICS.includes(metric)){
+    if(isRemove){ if(g[metric]===team) g[metric]=null; } else { g[metric]=team; }
+  } else if(metric==='dragonCount'){
+    const bucket=g.dragonCount ||= {}; const seq = g.dragonOrderSequence ||= [];
+    if(isRemove){ if(bucket[team]>0){ bucket[team]--; for(let i=seq.length-1;i>=0;i--){ if(seq[i]===team){ seq.splice(i,1); break; } } syncDragonCounts(g); } }
+    else { bucket[team]=(bucket[team]||0)+1; seq.push(team); syncDragonCounts(g); }
+  } else if(COUNT_METRICS.includes(metric)){
     const bucket=g[metric] ||= {};
-    bucket[team]=(bucket[team]||0)+1;
-    if(metric==='killCount') applyRaceFromKills(g);
-  }
-  else if(metric==='netWorth'){
+    if(isRemove){ if(bucket[team]>0) bucket[team]--; }
+    else { bucket[team]=(bucket[team]||0)+1; if(metric==='killCount') applyRaceFromKills(g); }
+  } else if(metric==='netWorth'){
     const bucket=g.netWorth ||= {};
-    const val=prompt('Net Worth for '+team, bucket[team]||0);
-    if(val!=null) bucket[team]=Number(val)||0;
+    if(isRemove) bucket[team]=0;
+    else { const val=prompt('Net Worth for '+team, bucket[team]||0); if(val!=null) bucket[team]=Number(val)||0; }
   }
   renderManual();
 }
-
-function handleManualRightClick(metric, side){
-  const g=manualData.gameStats[currentGame]; if(!g) return;
-  const team = side==='t1'? manualData.team1Name: manualData.team2Name;
-  if(BINARY_METRICS.includes(metric)){
-    if(g[metric]===team) g[metric]=null;
-  }
-  else if(metric==='dragonCount'){
-    const bucket=g.dragonCount ||= {};
-    if(bucket[team]>0){
-      bucket[team]--;
-      const seq = (g.dragonOrderSequence ||= []);
-      for(let i=seq.length-1;i>=0;i--){ if(seq[i]===team){ seq.splice(i,1); break; } }
-      syncDragonCounts(g);
-    }
-  }
-  else if(COUNT_METRICS.includes(metric)){
-    const bucket=g[metric]||{};
-    if(bucket[team]>0) bucket[team]--;
-  }
-  else if(metric==='netWorth'){
-    const bucket=g.netWorth||{}; bucket[team]=0;
-  }
-  renderManual();
-}
+function handleManualClick(metric, side){ handleManualAction(metric, side, false); }
+function handleManualRightClick(metric, side){ handleManualAction(metric, side, true); }
 
 function syncDragonCounts(g){ const t1=manualData.team1Name, t2=manualData.team2Name; g.dragonCount[t1]=g.dragonOrderSequence.filter(t=>t===t1).length; g.dragonCount[t2]=g.dragonOrderSequence.filter(t=>t===t2).length; }
 
 
 // ================= Helpers =================
 function isLolMatchUrl(u){ try { const url=new URL(u); if(!/portal\.grid\.gg/.test(url.hostname)) return false; return /lol/.test(url.pathname); } catch(_){ return false; } }
-// Animations disabled (can be reintroduced later if needed)
-function animationsAllowed(){
-  try {
-    const cfg = window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get();
-    return !!(cfg && cfg.animationsEnabled);
-  } catch(_){ return false; }
-}
 function cell(id, side){ return document.getElementById(`${id}-${side}`); }
 function sendPersist(){ send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, metricVisibility, metricOrder: metricsOrderMutable }); }
 
@@ -268,8 +209,8 @@ function ensureRows(){
   metricsOrderMutable.forEach(id=>{
     const tr=document.createElement('tr');
     tr.dataset.metric=id;
-  if(BINARY_METRICS.includes(id) || ['dragonOrders','netWorth','quadra','penta','atakhan','winner'].includes(id)) tr.dataset.type='binary';
-    else if(COUNT_METRICS.includes(id) || ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].includes(id)) tr.dataset.type='count';
+  if(BINARY_METRICS.includes(id) || id==='dragonOrders' || id==='netWorth') tr.dataset.type='binary';
+    else if(COUNT_METRICS.includes(id)) tr.dataset.type='count';
     tr.draggable=true;
     // IMPORTANT: no escaped quotes here – previous refactor inserted backslashes so query selectors failed
   // Per‑game checkbox (default unchecked). State stored in window.__LOL_CHECK_STATE[game][metric]
@@ -282,10 +223,9 @@ function ensureRows(){
   });
   lastOrderSig = sig;
   __prevValues = {};
-  for(const k in firstEventFlags) delete firstEventFlags[k];
   attachManualHandlers();
   initDragAndDrop();
-  try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ }
+  if(activityModule && activityModule.recalc) activityModule.recalc();
 }
 
 // ================= Animations & Cell Updates =================
@@ -337,7 +277,7 @@ function setText(id, side, val){
         }
         c.classList.add('gs-animating');
         const dur = (cfg.animationDurationMs||450);
-        setTimeout(()=>{ try { c.classList.remove('gs-animating'); } catch(_){ } }, dur+80);
+        setTimeout(()=>{ c.classList.remove('gs-animating'); }, dur+80);
       }
     }
   } catch(_){ }
@@ -346,7 +286,7 @@ function setText(id, side, val){
 // ================= LoL Update Handling =================
 ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(document.getElementById('lolManualMode').checked) return; try {
   const firstRender = (lastGameRendered == null);
-  if(firstRender){ try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ } }
+  if(firstRender){ window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; }
   liveDataset = payload; cachedLive = payload; const games=Object.keys(payload.gameStats||{}).map(Number).sort((a,b)=>a-b); const sig = games.join(','); if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; if(sig !== lastLiveGamesSig){ lastLiveGamesSig = sig; if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; }
   updateGameSelect(); renderLol(payload); } catch(e){} });
 
@@ -354,7 +294,7 @@ ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(document.getElementById('l
 function clearLol(){
   metricsOrder.forEach(id=>{
     const isCount = COUNT_METRICS.includes(id);
-    const isBinary = BINARY_METRICS.includes(id) || ['quadra','penta','atakhan','dragonOrders','firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20'].includes(id);
+    const isBinary = BINARY_METRICS.includes(id) || id==='dragonOrders';
     ['t1','t2'].forEach(side=>{
       const c=document.getElementById(`${id}-${side}`);
       if(!c) return;
@@ -367,7 +307,6 @@ function clearLol(){
       c.classList.remove('wl-win','wl-lose');
       const key=id+':'+side;
       delete __prevValues[key];
-      delete firstEventFlags['fe:'+key];
       const row = c.parentElement;
       if(row && row.dataset) delete row.dataset.win;
     });
@@ -390,10 +329,10 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
   }
   buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); }
   if(document.getElementById('lolManualMode').checked){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
-  try { ipcRenderer.send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE }); } catch(_){ }
-  try { __setPanelSideUi(cfg && cfg.side); } catch(_){ }
+  ipcRenderer.send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE });
+  __setPanelSideUi(cfg && cfg.side);
  } catch(e) {} });
-ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
+ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); });
 
 // Team names from Excel K4/N4 (read-only, updates headers)
 ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
@@ -415,61 +354,49 @@ ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
 });
 
 function applyWinLose(){
-  try {
-    // Reset header classes
-    try {
-      const th1 = document.getElementById('lt-team1');
-      const th2 = document.getElementById('lt-team2');
-      if(th1) th1.classList.remove('wl-win','wl-lose');
-      if(th2) th2.classList.remove('wl-win','wl-lose');
-    } catch(_){ }
-    let win1 = 0, win2 = 0;
-    metricsOrder.forEach(id=>{
-      const row = document.querySelector(`tr[data-metric="${id}"]`);
-      if(!row) return;
-      const c1 = document.getElementById(`${id}-t1`);
-      const c2 = document.getElementById(`${id}-t2`);
-      if(!c1 || !c2) return;
-      c1.classList.remove('wl-win','wl-lose');
-      c2.classList.remove('wl-win','wl-lose');
-      row.removeAttribute('data-win');
-      const t1 = (c1.textContent||'').trim();
-      const t2 = (c2.textContent||'').trim();
-      let n1=0, n2=0;
-      if(BINARY_METRICS.includes(id) || ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','quadra','penta','atakhan'].includes(id)){
-        n1 = t1==='✓'?1:0; n2 = t2==='✓'?1:0;
-      } else if(COUNT_METRICS.includes(id) || ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].includes(id)){
-        n1 = parseInt(t1,10); n2 = parseInt(t2,10); if(isNaN(n1)) n1=0; if(isNaN(n2)) n2=0;
-      } else if(id==='netWorth'){
-        n1 = parseFloat(t1)||0; n2 = parseFloat(t2)||0;
-      } else if(id==='dragonOrders'){
-        n1 = t1? t1.split(/\s+/).filter(Boolean).length:0; n2 = t2? t2.split(/\s+/).filter(Boolean).length:0;
-      } else {
-        n1 = parseFloat(t1)||0; n2 = parseFloat(t2)||0;
-      }
-      if(window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get().winLoseEnabled===false){ return; }
-      if(n1===0 && n2===0) return; // nothing to highlight
-      if(n1>n2){ c1.classList.add('wl-win'); if(n2>0) c2.classList.add('wl-lose'); row.dataset.win='1'; win1++; }
-      else if(n2>n1){ c2.classList.add('wl-win'); if(n1>0) c1.classList.add('wl-lose'); row.dataset.win='2'; win2++; }
-      else { row.dataset.win='tie'; }
-    });
-    // Apply header highlight ONLY if an explicit Winner row has ✓; otherwise, don't mark header at all.
-    if(!(window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get().winLoseEnabled===false)){
-      try {
-        const th1 = document.getElementById('lt-team1');
-        const th2 = document.getElementById('lt-team2');
-        const w1 = document.getElementById('winner-t1');
-        const w2 = document.getElementById('winner-t2');
-        const hasWinner = !!(w1 && w2 && ((w1.textContent||'').trim()==='✓' || (w2.textContent||'').trim()==='✓'));
-        if(th1 && th2 && hasWinner){
-          const t1won = (w1.textContent||'').trim()==='✓';
-          const t2won = (w2.textContent||'').trim()==='✓';
-          if(t1won){ th1.classList.add('wl-win'); th2.classList.add('wl-lose'); }
-          else if(t2won){ th2.classList.add('wl-win'); th1.classList.add('wl-lose'); }
-        }
-      } catch(_){ }
+  const wlCfg = window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get();
+  const wlDisabled = wlCfg && wlCfg.winLoseEnabled === false;
+  // Reset header classes
+  const th1 = document.getElementById('lt-team1');
+  const th2 = document.getElementById('lt-team2');
+  if(th1) th1.classList.remove('wl-win','wl-lose');
+  if(th2) th2.classList.remove('wl-win','wl-lose');
+  metricsOrder.forEach(id=>{
+    const row = document.querySelector(`tr[data-metric="${id}"]`);
+    if(!row) return;
+    const c1 = document.getElementById(`${id}-t1`);
+    const c2 = document.getElementById(`${id}-t2`);
+    if(!c1 || !c2) return;
+    c1.classList.remove('wl-win','wl-lose');
+    c2.classList.remove('wl-win','wl-lose');
+    row.removeAttribute('data-win');
+    if(wlDisabled) return;
+    const t1 = (c1.textContent||'').trim();
+    const t2 = (c2.textContent||'').trim();
+    let n1=0, n2=0;
+    if(BINARY_METRICS.includes(id)){
+      n1 = t1==='✓'?1:0; n2 = t2==='✓'?1:0;
+    } else if(COUNT_METRICS.includes(id)){
+      n1 = parseInt(t1,10); n2 = parseInt(t2,10); if(isNaN(n1)) n1=0; if(isNaN(n2)) n2=0;
+    } else if(id==='dragonOrders'){
+      n1 = t1? t1.split(/\s+/).filter(Boolean).length:0; n2 = t2? t2.split(/\s+/).filter(Boolean).length:0;
+    } else {
+      n1 = parseFloat(t1)||0; n2 = parseFloat(t2)||0;
     }
-  } catch(_){ }
+    if(n1===0 && n2===0) return;
+    if(n1>n2){ c1.classList.add('wl-win'); if(n2>0) c2.classList.add('wl-lose'); row.dataset.win='1'; }
+    else if(n2>n1){ c2.classList.add('wl-win'); if(n1>0) c1.classList.add('wl-lose'); row.dataset.win='2'; }
+    else { row.dataset.win='tie'; }
+  });
+  // Apply header highlight ONLY if an explicit Winner row has ✓
+  if(!wlDisabled && th1 && th2){
+    const w1 = document.getElementById('winner-t1');
+    const w2 = document.getElementById('winner-t2');
+    const t1won = w1 && (w1.textContent||'').trim()==='✓';
+    const t2won = w2 && (w2.textContent||'').trim()==='✓';
+    if(t1won){ th1.classList.add('wl-win'); th2.classList.add('wl-lose'); }
+    else if(t2won){ th2.classList.add('wl-win'); th1.classList.add('wl-lose'); }
+  }
 }
 // (Heat bar listener lives in stats_theme.js)
 
@@ -485,16 +412,13 @@ function bindBasic(){
     const btnSplit = byId('modeSplit'); const btnVert = byId('modeVertical'); const btnA = byId('modeA'); const btnB = byId('modeB');
     const selA = byId('srcA'); const selB = byId('srcB');
     function applyUi(disable){
-      try {
-        if(btnSplit) btnSplit.disabled = !!disable;
-        if(btnVert) btnVert.disabled = !!disable;
-        if(btnA) btnA.disabled = !!disable;
-        if(btnB) btnB.disabled = !!disable;
-        // Optional: disable source selector of background slot in single-window, informative only
-        const layout = byId('dbgLayout')?.textContent;
-        if(selB) selB.disabled = !!disable && (layout==='focusA');
-        if(selA) selA.disabled = !!disable && (layout==='focusB');
-      } catch(_){ }
+      if(btnSplit) btnSplit.disabled = !!disable;
+      if(btnVert) btnVert.disabled = !!disable;
+      if(btnA) btnA.disabled = !!disable;
+      if(btnB) btnB.disabled = !!disable;
+      const layout = byId('dbgLayout')?.textContent;
+      if(selB) selB.disabled = !!disable && (layout==='focusA');
+      if(selA) selA.disabled = !!disable && (layout==='focusB');
     }
     chk.addEventListener('change', ()=>{
       const enabled = !!chk.checked;
@@ -504,17 +428,10 @@ function bindBasic(){
     // Expose for initial apply from stats-init
     window.__applySingleWindowUi = applyUi;
   })();
-  safe('modeSplit', el=> el.onclick = ()=>{ send('stats-layout',{mode:'split'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='split'; });
-  safe('modeVertical', el=> el.onclick = ()=>{ send('stats-layout',{mode:'vertical'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='vertical'; });
-  safe('modeA', el=> el.onclick = ()=>{ send('stats-layout',{mode:'focusA'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='focusA'; });
-  safe('modeB', el=> el.onclick = ()=>{ send('stats-layout',{mode:'focusB'}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent='focusB'; });
+  [['modeSplit','split'],['modeVertical','vertical'],['modeA','focusA'],['modeB','focusB']].forEach(([id,mode])=>{
+    safe(id, el=> el.onclick = ()=>{ send('stats-layout',{mode}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent=mode; });
+  });
   safe('toggleSide', el=> el.onclick = ()=>{ send('stats-toggle-side'); const d=byId('dbgSide'); if(d) d.textContent = d.textContent==='left'?'right':'left'; });
-
-  // Observe global game changes (placeholder: console + optional badge later)
-  try {
-    ipcRenderer.invoke('game-get').then(g=>{ try { console.log('[stats_panel] game initial', g); } catch(_){ } }).catch(()=>{});
-    ipcRenderer.on('game-changed', (_e, g)=>{ try { console.log('[stats_panel] game changed ->', g); } catch(_){ } });
-  } catch(_){ }
 }
 
 function bindReset(){
@@ -527,7 +444,6 @@ function bindReset(){
       liveDataset = null; cachedLive=null; currentLiveGame=null; lastLiveGamesSig='';
       followLatestLiveGame = true;
       // Clear custom display overrides for live mode (reset requirement)
-      customTeamNames[1]=null; customTeamNames[2]=null;
       teamNamesSource = 'grid'; // reset source priority
       setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false);
       // Additional manual dataset reset if in manual mode
@@ -539,8 +455,8 @@ function bindReset(){
       }
       // Clear checkbox marks & persist
       window.__LOL_CHECK_STATE = {};
-      try { ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE); } catch(_){ }
-      try { ipcRenderer.send('lol-manual-data-set', manualData); } catch(_){ }
+      ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE);
+      ipcRenderer.send('lol-manual-data-set', manualData);
       // Reset aggregator in main (does not navigate)
       ipcRenderer.send('lol-stats-reset');
       // Request a reload of slot A ONLY (keep exact same URL; no cache-bust param added)
@@ -557,7 +473,7 @@ function bindReset(){
 function bindSettings(){
   const manualCb = document.getElementById('lolManualMode');
   function applyManualClass(){
-    try { document.body.classList.toggle('manual-mode', !!manualCb.checked); } catch(_){ }
+    document.body.classList.toggle('manual-mode', !!manualCb.checked);
   }
   manualCb.addEventListener('change', ()=>{ sendPersist(); applyManualClass(); });
   applyManualClass(); // initial
@@ -577,35 +493,14 @@ function attachManualHandlers(){
   });
 }
 function initDragAndDrop(){ const body=document.getElementById('lt-body'); if(!body) return; body.querySelectorAll('tr').forEach(tr=>{ tr.addEventListener('dragstart', ev=>{ tr.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; }); tr.addEventListener('dragend', ()=>{ tr.classList.remove('dragging'); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); }); }); body.addEventListener('dragover', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); if(after) after.classList.add('drop-target'); }); body.addEventListener('drop', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); const dragging=body.querySelector('tr.dragging'); if(!dragging) return; if(after) body.insertBefore(dragging, after); else body.appendChild(dragging); metricsOrderMutable=[...body.querySelectorAll('tr')].map(r=>r.dataset.metric); metricsOrder=[...metricsOrderMutable]; lastOrderSig = null; // Suppress animations briefly while DOM reshuffles
-  try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+  window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
   ensureRows(); if(document.getElementById('lolManualMode').checked) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
 function getAfterRow(body,y){ const rows=[...body.querySelectorAll('tr:not(.dragging)')]; return rows.find(r=> y <= r.getBoundingClientRect().top + r.getBoundingClientRect().height/2); }
 let addBtn; let gameSelect; let headerH1;
-// Compute a simple winner for a given game's stats snapshot, mirroring applyWinLose comparisons
-function computeGameWinnerSimple(snapshot, team1Name, team2Name){
-  if(!snapshot) return null;
-  let score1=0, score2=0;
-  function cmpBinary(field){ const v=snapshot[field]; if(!v) return; if(v===team1Name) score1++; else if(v===team2Name) score2++; }
-  function cmpCount(field){ const b=snapshot[field]||{}; const v1=b[team1Name]||0; const v2=b[team2Name]||0; if(v1>v2) score1++; else if(v2>v1) score2++; }
-  // Binary metrics
-  ['firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20','quadra','penta','atakhan'].forEach(cmpBinary);
-  // Counts
-  ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'].forEach(cmpCount);
-  // Dragon orders / times
-  try {
-    let o1=[], o2=[];
-    if(snapshot.dragonOrders){ o1 = snapshot.dragonOrders[team1Name]||[]; o2 = snapshot.dragonOrders[team2Name]||[]; }
-    else if(snapshot.dragonTimes){
-      const parseTs=(raw)=>{ if(raw==null) return Infinity; if(typeof raw==='number'&&!isNaN(raw)) return raw>36000?Math.floor(raw/1000):raw; if(typeof raw==='string'){ const v=raw.trim(); if(/^\d+$/.test(v)) return Number(v); if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(v)){ const parts=v.split(':').map(n=>Number(n)||0); if(parts.length===2){ const [m,s]=parts; return m*60+s; } if(parts.length===3){ const [h,m,s]=parts; return h*3600+m*60+s; } } } return Infinity; };
-      const arr=[]; (snapshot.dragonTimes[team1Name]||[]).forEach(ts=> arr.push({ team: team1Name, ts: parseTs(ts) })); (snapshot.dragonTimes[team2Name]||[]).forEach(ts=> arr.push({ team: team2Name, ts: parseTs(ts) }));
-      arr.sort((a,b)=> a.ts-b.ts); let idx=1; const map={}; arr.forEach(e=>{ if(!isFinite(e.ts)) return; (map[e.team]=map[e.team]||[]).push(idx++); }); o1 = map[team1Name]||[]; o2 = map[team2Name]||[];
-    }
-    if(o1.length>o2.length) score1++; else if(o2.length>o1.length) score2++;
-  } catch(_){ }
-  // Net worth
-  try { const nw=snapshot.netWorth||{}; const n1 = Number(nw[team1Name]||0); const n2 = Number(nw[team2Name]||0); if(n1>n2) score1++; else if(n2>n1) score2++; } catch(_){ }
-  if(score1===0 && score2===0) return null; // insufficient data
-  if(score1>score2) return 1; if(score2>score1) return 2; return 'tie';
+/** Convert dragonTimes to ordered indices per team */
+function dragonTimesToOrders(dragonTimes, t1, t2){
+  const arr=[]; (dragonTimes[t1]||[]).forEach(ts=> arr.push({ team: t1, ts: parseTs(ts) })); (dragonTimes[t2]||[]).forEach(ts=> arr.push({ team: t2, ts: parseTs(ts) }));
+  arr.sort((a,b)=> a.ts-b.ts); let idx=1; const map={}; arr.forEach(e=>{ if(!isFinite(e.ts)) return; (map[e.team]=map[e.team]||[]).push(idx++); }); return map;
 }
 function updateGameSelect(){
   if(!gameSelect) return;
@@ -614,26 +509,6 @@ function updateGameSelect(){
   const placeholder=document.createElement('option');
   placeholder.value=''; placeholder.disabled=true; placeholder.textContent='Game -';
   let any=false;
-  // Helper: detect if a snapshot has any meaningful signals beyond empty defaults
-  function hasAnySignal(snapshot, team1Name, team2Name){
-    try {
-      if(!snapshot || typeof snapshot!== 'object') return false;
-      // Any binary set
-      const binaries=['firstKill','firstTower','firstInhibitor','firstBaron','race5','race10','race15','race20','quadra','penta','atakhan'];
-      if(binaries.some(k=> snapshot[k]===team1Name || snapshot[k]===team2Name)) return true;
-      // Any counts > 0
-      const counts=['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
-      for(const k of counts){ const b=snapshot[k]||{}; if((b[team1Name]||0)>0 || (b[team2Name]||0)>0) return true; }
-      // Dragon orders / times
-      try {
-        if(snapshot.dragonOrders){ const o1=snapshot.dragonOrders[team1Name]||[]; const o2=snapshot.dragonOrders[team2Name]||[]; if((o1.length||0)>0 || (o2.length||0)>0) return true; }
-        if(snapshot.dragonTimes){ const t1=snapshot.dragonTimes[team1Name]||[]; const t2=snapshot.dragonTimes[team2Name]||[]; if((t1.length||0)>0 || (t2.length||0)>0) return true; }
-      } catch(_){ }
-      // Net worth present and non-zero
-      try { const nw=snapshot.netWorth||{}; const n1=Number(nw[team1Name]||0); const n2=Number(nw[team2Name]||0); if(n1!==0 || n2!==0) return true; } catch(_){ }
-    } catch(_){ }
-    return false;
-  }
   if(manualOn){
     const games=Object.keys(manualData.gameStats||{}).filter(k=>/^[0-9]+$/.test(k)).map(Number).sort((a,b)=>a-b);
     games.forEach(g=>{ const o=document.createElement('option'); o.value=String(g); const label='Game '+g; o.textContent=label; if(String(g)===String(currentGame||'1')) o.selected=true; gameSelect.appendChild(o); any=true; });
@@ -671,29 +546,21 @@ function renderLol(payload, manual=false){
     const t1Key = dispTeam1;
     const t2Key = dispTeam2;
     const th1=document.getElementById('lt-team1'); const th2=document.getElementById('lt-team2');
-    const headerDisp1 = (customTeamNames[1] && !manual) ? customTeamNames[1] : (dispTeam1||'Team 1');
-    const headerDisp2 = (customTeamNames[2] && !manual) ? customTeamNames[2] : (dispTeam2||'Team 2');
+    const headerDisp1 = dispTeam1 || 'Team 1';
+    const headerDisp2 = dispTeam2 || 'Team 2';
   setTeamHeader(1, headerDisp1, true);
   setTeamHeader(2, headerDisp2, true);
   function setBinary(field, filledSet){ const v=s[field]; if(!v) return; filledSet.add(field); const idx = v===t1Key?1:(v===t2Key?2:0); if(!idx) return; setText(field,'t1', idx===1 ? '✓' : '✗'); setText(field,'t2', idx===2 ? '✓' : '✗'); }
     const DEFAULT_ZERO_COUNT_FIELDS = ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
-    function setCount(field){ const bucket = s[field] || {}; const has1 = Object.prototype.hasOwnProperty.call(bucket, dispTeam1); const has2 = Object.prototype.hasOwnProperty.call(bucket, dispTeam2); if(!has1 && !has2){ if(DEFAULT_ZERO_COUNT_FIELDS.includes(field)){ ['t1','t2'].forEach(side=>{ const key=field+':'+side; if(!__prevValues[key]) __prevValues[key]='0'; firstEventFlags['fe:'+key]=true; setText(field, side, '0'); }); } else { setText(field,'t1',''); setText(field,'t2',''); } return; } let v1 = has1 ? bucket[dispTeam1] : 0; let v2 = has2 ? bucket[dispTeam2] : 0; if(v1 === undefined || v1 === null || isNaN(v1)) v1 = 0; if(v2 === undefined || v2 === null || isNaN(v2)) v2 = 0; setText(field,'t1', v1 === 0 ? '0' : v1); setText(field,'t2', v2 === 0 ? '0' : v2); }
+    function setCount(field){ const bucket = s[field] || {}; const has1 = Object.prototype.hasOwnProperty.call(bucket, dispTeam1); const has2 = Object.prototype.hasOwnProperty.call(bucket, dispTeam2); if(!has1 && !has2){ if(DEFAULT_ZERO_COUNT_FIELDS.includes(field)){ ['t1','t2'].forEach(side=>{ const key=field+':'+side; if(!__prevValues[key]) __prevValues[key]='0'; setText(field, side, '0'); }); } else { setText(field,'t1',''); setText(field,'t2',''); } return; } let v1 = has1 ? bucket[dispTeam1] : 0; let v2 = has2 ? bucket[dispTeam2] : 0; if(v1 === undefined || v1 === null || isNaN(v1)) v1 = 0; if(v2 === undefined || v2 === null || isNaN(v2)) v2 = 0; setText(field,'t1', v1 === 0 ? '0' : v1); setText(field,'t2', v2 === 0 ? '0' : v2); }
   // winner header highlight omitted
     const filledBinary = new Set();
-    setBinary('firstKill', filledBinary);
-    setCount('killCount');
-    ['race5','race10','race15','race20'].forEach(r=> setBinary(r, filledBinary));
-    setBinary('firstTower', filledBinary);
-    setBinary('firstInhibitor', filledBinary);
-    setBinary('firstBaron', filledBinary);
-    setCount('towerCount');
-    setCount('inhibitorCount');
-    setCount('baronCount');
-  setCount('dragonCount');
+    ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron'].forEach(f=> setBinary(f, filledBinary));
+    COUNT_METRICS.forEach(setCount);
   // Winner (live only). Manual mode can also toggle if user wants.
   if(s.winner){ setBinary('winner', filledBinary); }
     // Dragon orders
-    (function(){ function parseTs(raw){ if(raw==null) return Infinity; if(typeof raw==='number' && !isNaN(raw)) return raw; if(typeof raw==='string'){ const val=raw.trim(); if(/^\d+$/.test(val)){ const num=Number(val); if(num>3600*10) return Math.floor(num/1000); return num; } if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(val)){ const parts=val.split(':').map(n=>Number(n)||0); if(parts.length===2){ const [m,s]=parts; return m*60+s; } if(parts.length===3){ const [h,m,s]=parts; return h*3600+m*60+s; } } } return Infinity; } let orders1=[], orders2=[]; if(s.dragonOrders){ orders1 = s.dragonOrders[dispTeam1]||[]; orders2 = s.dragonOrders[dispTeam2]||[]; } else if(s.dragonTimes){ const arr=[]; (s.dragonTimes[team1Name]||[]).forEach(ts=> arr.push({ team: team1Name, ts: parseTs(ts) })); (s.dragonTimes[team2Name]||[]).forEach(ts=> arr.push({ team: team2Name, ts: parseTs(ts) })); arr.sort((a,b)=> a.ts-b.ts); let idx=1; const map={}; arr.forEach(e=>{ if(!isFinite(e.ts)) return; (map[e.team]=map[e.team]||[]).push(idx++); }); orders1 = map[dispTeam1]||[]; orders2 = map[dispTeam2]||[]; } setText('dragonOrders','t1', orders1.join(' ')); setText('dragonOrders','t2', orders2.join(' ')); })();
+    (function(){ let orders1=[], orders2=[]; if(s.dragonOrders){ orders1 = s.dragonOrders[dispTeam1]||[]; orders2 = s.dragonOrders[dispTeam2]||[]; } else if(s.dragonTimes){ const map = dragonTimesToOrders(s.dragonTimes, team1Name, team2Name); orders1 = map[dispTeam1]||[]; orders2 = map[dispTeam2]||[]; } setText('dragonOrders','t1', orders1.join(' ')); setText('dragonOrders','t2', orders2.join(' ')); })();
     // Net worth
   const nw = s.netWorth || {}; const hasNw1 = Object.prototype.hasOwnProperty.call(nw, t1Key); const hasNw2 = Object.prototype.hasOwnProperty.call(nw, t2Key); const nw1 = hasNw1 ? nw[t1Key] : ''; const nw2 = hasNw2 ? nw[t2Key] : ''; setText('netWorth','t1', nw1); setText('netWorth','t2', nw2);
     if(s.quadra) setBinary('quadra', filledBinary); if(s.penta) setBinary('penta', filledBinary); if(s.atakhan) setBinary('atakhan', filledBinary);
@@ -706,16 +573,16 @@ function renderLol(payload, manual=false){
 
 // ================= Startup =================
 (function init(){
-  try { console.log('[stats_panel] init()'); } catch(_){}
+  console.log('[stats_panel] init()');
   bindBasic();
   bindReset();
   bindSettings();
   buildMetricToggles();
   ensureRows();
-  try { console.log('[stats_panel] after ensureRows count=', document.querySelectorAll('#lt-body tr').length); } catch(_){}
-  try { activityModule && activityModule.init && activityModule.init(); } catch(_){ }
+  console.log('[stats_panel] after ensureRows count=', document.querySelectorAll('#lt-body tr').length);
+  if(activityModule && activityModule.init) activityModule.init();
   // Apply any pending heat bar config that arrived before DOM was ready
-  try { if(window.__applyPendingHeatBar) window.__applyPendingHeatBar(); } catch(_){ }
+  if(window.__applyPendingHeatBar) window.__applyPendingHeatBar();
   applyVisibility();
   // Setup game controls
   headerH1 = document.querySelector('#stats h1');
@@ -729,7 +596,7 @@ function renderLol(payload, manual=false){
   addBtn.onclick=()=>{
     if(addBtn.getAttribute('aria-disabled')==='true') return;
     try {
-      try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+      window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
       const rawKeys = Object.keys(manualData.gameStats||{});
       const keys = rawKeys.filter(k=>/^\d+$/.test(k));
       let maxN = 0; keys.forEach(k=>{ const n=Number(k); if(Number.isFinite(n) && n>maxN) maxN=n; });
@@ -739,13 +606,13 @@ function renderLol(payload, manual=false){
       currentGame = next;
       updateGameSelect();
       renderManual();
-      try { ipcRenderer.send('lol-manual-data-set', manualData); } catch(_){ }
+      ipcRenderer.send('lol-manual-data-set', manualData);
   } catch(err){ }
   };
   if(gameSelect){
-    gameSelect.onchange=()=>{ const manualOn=document.getElementById('lolManualMode').checked; const val=gameSelect.value; if(!val) return; try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+    gameSelect.onchange=()=>{ const manualOn=document.getElementById('lolManualMode').checked; const val=gameSelect.value; if(!val) return; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
       if(manualOn){ currentGame=val; renderManual(); } else { currentLiveGame=Number(val); const games=Object.keys(liveDataset?.gameStats||{}).map(Number).sort((a,b)=>a-b); const last=games[games.length-1]; followLatestLiveGame = (currentLiveGame===last); if(liveDataset) renderLol(liveDataset); }
-      try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ } };
+      if(activityModule && activityModule.recalc) activityModule.recalc(); };
   }
   document.addEventListener('mousedown', e=>{ const td=e.target.closest && e.target.closest('td.editable'); if(td) td.classList.add('pressing'); });
   document.addEventListener('mouseup', ()=>{ document.querySelectorAll('td.pressing').forEach(td=> td.classList.remove('pressing')); });
@@ -755,7 +622,7 @@ function renderLol(payload, manual=false){
     swapTeams=!swapTeams; 
     document.getElementById('swapTeamsBtn').classList.toggle('active', swapTeams); 
     // Suppress heatbar/cell bump animations briefly while values visually reshuffle
-    try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+    window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
     if(document.getElementById('lolManualMode').checked) { 
       renderManual(); 
     } else { 
@@ -788,13 +655,13 @@ function renderLol(payload, manual=false){
     } else {
       updateGameSelect(); if(liveDataset) renderLol(liveDataset);
     }
-    try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ }
+    if(activityModule && activityModule.recalc) activityModule.recalc();
   });
   updateGameSelect(); if(addBtn){ addBtn.setAttribute('aria-disabled','true'); addBtn.disabled=true; }
   // Lightweight self-test sample (only if no data after short delay)
   // Removed mock Alpha/Beta injection sample.
   // Ensure headers initialized & dblclick bound immediately (before first data payload)
-  try { setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false); } catch(_){ }
+  setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false);
   // (embedded odds + reordering initialized by stats_boot.js)
 })();
 // (embedded odds board & section reordering in stats_embedded.js)
@@ -833,7 +700,7 @@ function renderLol(payload, manual=false){
     if(!cb) return;
     const metric = cb.getAttribute('data-metric');
     persistMetric(metric, cb.checked);
-    try { ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE); } catch(_){ }
+    ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE);
   });
   // Hook into game select changes & manual/live toggle to refresh checkbox states
   const obs = new MutationObserver(()=> syncFromState());

@@ -108,7 +108,7 @@ function bump(teamIdx){
   if(!state.enabled) return;
   const i = teamIdx-1; if(i<0||i>1) return;
   ensureDom();
-  if(!state.layer){ try { console.warn('[activity] bump before layer; retry soon'); } catch(_){ } setTimeout(()=>{ ensureDom(); if(state.layer) bump(teamIdx); }, 80); return; }
+  if(!state.layer){ console.warn('[activity] bump before layer; retry soon'); setTimeout(()=>{ ensureDom(); if(state.layer) bump(teamIdx); }, 80); return; }
   state.levels[i] = Math.min(1, state.levels[i] + state.bumpAmount);
   const el = state.els[i];
   if(el){

@@ -80,7 +80,7 @@ window.addEventListener('DOMContentLoaded', () => {
             ipcRenderer.send('stats-save-credentials', { slot: __slot, username, password });
           }
           if(username){
-            try { console.log('[cred][statsContent] submit slot=' + __slot, 'host=' + location.hostname, 'user=' + username); } catch(_){ }
+            console.log('[cred][statsContent] submit slot=' + __slot, 'host=' + location.hostname, 'user=' + username);
           }
         } catch(_){ }
       }, { capture: true });

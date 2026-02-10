@@ -206,11 +206,7 @@ function extractRivalry(mapNum = 0, game = 'lol', opts = {}) {
     
     const frozen = heuristicAllInactive || legacyFrozen || textCueFrozen;
     
-    if (debug) {
-      try {
-        console.log('[RIVALRY][debug]', { mapNum, odds, plateStates, heuristicAllInactive, legacyFrozen, textCueFrozen, frozen });
-      } catch (_) { }
-    }
+    if (debug) console.log('[RIVALRY][debug]', { mapNum, odds, plateStates, heuristicAllInactive, legacyFrozen, textCueFrozen, frozen });
     
     return { odds: odds.length === 2 ? odds : ['-', '-'], frozen };
   } catch (_) { return emptyResult(); }

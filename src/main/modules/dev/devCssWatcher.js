@@ -36,7 +36,7 @@ function initDevCssWatcher(ctx){
       } catch(_){ }
     }
     watchDir(watchRoot);
-  } catch(e){ try { console.warn('initDevCssWatcher failed', e); } catch(_){ } }
+  } catch(e){ console.warn('initDevCssWatcher failed', e); }
 }
 
 module.exports = { initDevCssWatcher };

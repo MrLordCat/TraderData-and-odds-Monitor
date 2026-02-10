@@ -10,6 +10,25 @@ const { emptyResult } = require('./base');
  * @param {object} opts - Additional options
  * @returns {{odds: [string, string], frozen: boolean}}
  */
+const ODDS_SEL = '.srb-ParticipantStackedBorderless_Odds, .sip-MergedHandicapParticipant_Odds, .gl-Participant_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds';
+
+function checkFrozen(parts, target) {
+  const disabledFrozen = parts.some(p => {
+    const o = p.querySelector(ODDS_SEL);
+    if (!o) return false;
+    const cs = getComputedStyle(o);
+    return cs.pointerEvents === 'none' || parseFloat(cs.opacity || '1') < 1;
+  });
+  let groupSuspended = false, partSusp = false;
+  try { const topRow = target.querySelector('.sip-MarketGroupButton_TopRowContainer'); if (topRow && /suspended/i.test(topRow.className)) groupSuspended = true; if (target.querySelector('.sip-MarketGroupButton_SuspendedText')) groupSuspended = true; } catch (_) {}
+  try { partSusp = parts.some(p => /gl-Participant_Suspended/.test(p.className || '')); } catch (_) {}
+  return groupSuspended || partSusp || disabledFrozen;
+}
+
+function extractOdds(parts) {
+  return parts.map(p => p.querySelector(ODDS_SEL)?.textContent.trim() || '-');
+}
+
 function extractBet365(mapNum = 0, game = 'lol', opts = {}) {
   try {
     const pods = Array.from(document.querySelectorAll('div.gl-MarketGroupPod'));
@@ -45,30 +64,9 @@ function extractBet365(mapNum = 0, game = 'lol', opts = {}) {
         if (centered.length >= 2) parts = centered.slice(0, 2);
       }
       
-      const odds = parts.slice(0, 2).map(p => {
-        const o = p.querySelector('.srb-ParticipantStackedBorderless_Odds, .sip-MergedHandicapParticipant_Odds, .gl-Participant_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds');
-        return o ? o.textContent.trim() : '-';
-      });
-      
-      const disabledFrozen = parts.slice(0, 2).some(p => {
-        const o = p.querySelector('.srb-ParticipantStackedBorderless_Odds, .sip-MergedHandicapParticipant_Odds, .gl-Participant_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds');
-        if (!o) return false;
-        const cs = getComputedStyle(o);
-        return cs.pointerEvents === 'none' || parseFloat(cs.opacity || '1') < 1;
-      });
-      
-      let groupSuspended = false;
-      let partSusp = false;
-      try {
-        const topRow = target.querySelector('.sip-MarketGroupButton_TopRowContainer');
-        if (topRow && /suspended/i.test(topRow.className)) groupSuspended = true;
-        if (target.querySelector('.sip-MarketGroupButton_SuspendedText')) groupSuspended = true;
-      } catch (_) { }
-      try {
-        partSusp = parts.slice(0, 2).some(p => /gl-Participant_Suspended/.test(p.className || ''));
-      } catch (_) { }
-      
-      const frozen = groupSuspended || partSusp || disabledFrozen;
+      const p2 = parts.slice(0, 2);
+      const odds = extractOdds(p2);
+      const frozen = checkFrozen(p2, target);
       return { odds: odds.length === 2 ? odds : ['-', '-'], frozen };
       
     } else {
@@ -104,29 +102,9 @@ function extractBet365(mapNum = 0, game = 'lol', opts = {}) {
         } catch (_) { }
       }
       
-      const odds = parts.slice(0, 2).map(p =>
-        p.querySelector('.sip-MergedHandicapParticipant_Odds, .srb-ParticipantStackedBorderless_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds, .gl-Participant_Odds')?.textContent.trim() || '-'
-      );
-      
-      const disabledFrozen = parts.slice(0, 2).some(p => {
-        const o = p.querySelector('.sip-MergedHandicapParticipant_Odds, .srb-ParticipantStackedBorderless_Odds, .srb-ParticipantCenteredStackedMarketRow_Odds, .gl-Participant_Odds');
-        if (!o) return false;
-        const cs = getComputedStyle(o);
-        return cs.pointerEvents === 'none' || parseFloat(cs.opacity || '1') < 1;
-      });
-      
-      let groupSuspended = false;
-      let partSusp = false;
-      try {
-        const topRow = target.querySelector('.sip-MarketGroupButton_TopRowContainer');
-        if (topRow && /suspended/i.test(topRow.className)) groupSuspended = true;
-        if (target.querySelector('.sip-MarketGroupButton_SuspendedText')) groupSuspended = true;
-      } catch (_) { }
-      try {
-        partSusp = parts.slice(0, 2).some(p => /gl-Participant_Suspended/.test(p.className || ''));
-      } catch (_) { }
-      
-      const frozen = groupSuspended || partSusp || disabledFrozen;
+      const p2 = parts.slice(0, 2);
+      const odds = extractOdds(p2);
+      const frozen = checkFrozen(p2, target);
       return { odds: odds.length === 2 ? odds : ['-', '-'], frozen };
     }
   } catch (_) { return emptyResult(); }

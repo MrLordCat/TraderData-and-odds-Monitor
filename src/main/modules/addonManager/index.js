@@ -18,6 +18,8 @@ const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const AdmZip = require('adm-zip');
+const { compareVersions } = require('../utils/version');
+const { fetchJSON: fetchJSONUtil } = require('../utils/fetch');
 
 const REPO_OWNER = 'MrLordCat';
 const REPO_NAME = 'TraderData-and-odds-Monitor';
@@ -199,42 +201,6 @@ function createAddonManager({ store, mainWindow }) {
   }
   
   /**
-   * Fetch JSON from URL
-   */
-  function fetchJSON(url) {
-    return new Promise((resolve, reject) => {
-      const options = {
-        headers: {
-          'User-Agent': 'OddsMoni-AddonManager',
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      };
-      
-      https.get(url, options, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          fetchJSON(res.headers.location).then(resolve).catch(reject);
-          return;
-        }
-        
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode}`));
-          return;
-        }
-        
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }).on('error', reject);
-    });
-  }
-  
-  /**
    * Fetch available addons from GitHub releases based on channel
    */
   async function fetchAvailableAddons(forceRefresh = false) {
@@ -247,7 +213,7 @@ function createAddonManager({ store, mainWindow }) {
       const channel = addonChannel;
       
       // Fetch releases from GitHub API
-      const releases = await fetchJSON(`${GITHUB_API_BASE}/releases`);
+      const releases = await fetchJSONUtil(`${GITHUB_API_BASE}/releases`);
       
       // Filter addon releases (tag starts with 'addon-')
       const addonReleases = releases.filter(r => r.tag_name.startsWith('addon-'));
@@ -528,56 +494,6 @@ function createAddonManager({ store, mainWindow }) {
     broadcast('addon-enabled-changed', { addonId, enabled });
     
     return { success: true, requiresRestart: true };
-  }
-  
-  /**
-   * Compare semver versions (basic)
-   * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
-   * Handles dev versions like 'dev.abc1234' or '0.1.0-dev.abc1234'
-   */
-  function compareVersions(v1, v2) {
-    if (!v1 || !v2) return 0;
-    if (v1 === v2) return 0;
-    
-    // Extract dev hash if present
-    // Format: "dev.abc1234" or "0.1.0-dev.abc1234"
-    const extractDevHash = (v) => {
-      const match = v.match(/(?:^dev\.|.*-dev\.)([a-f0-9]+)$/i);
-      return match ? match[1] : null;
-    };
-    
-    const hash1 = extractDevHash(v1);
-    const hash2 = extractDevHash(v2);
-    const isDev1 = hash1 !== null || v1.startsWith('dev');
-    const isDev2 = hash2 !== null || v2.startsWith('dev');
-    
-    // If both are dev versions
-    if (isDev1 && isDev2) {
-      // Different hash = update available (remote is newer)
-      if (hash1 && hash2 && hash1 !== hash2) return 1;
-      // Same hash or can't compare
-      return 0;
-    }
-    
-    // Dev is always considered newer than release
-    if (isDev1 && !isDev2) return 1;
-    if (!isDev1 && isDev2) return -1;
-    
-    // Standard semver comparison
-    const parse = (v) => {
-      const parts = v.replace(/^v/, '').split('.').map(p => parseInt(p, 10) || 0);
-      while (parts.length < 3) parts.push(0);
-      return parts;
-    };
-    
-    const p1 = parse(v1);
-    const p2 = parse(v2);
-    
-    for (let i = 0; i < 3; i++) {
-      if (p1[i] > p2[i]) return 1;
-      if (p1[i] < p2[i]) return -1;
-    }
-    return 0;
   }
   
   /**

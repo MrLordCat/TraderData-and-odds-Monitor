@@ -42,26 +42,17 @@
   function schedulePublish(){ if(__publishTimer) return; __publishTimer = setTimeout(()=>{ __publishTimer=null; try { publish(); } catch(_){ } }, PUBLISH_DEBOUNCE_MS); }
   // Note: multi-line/block-based winner inference removed to prevent false positives.
 
-  // Sound suppression: don't play sounds during initial backlog processing (historical data)
-  let soundsEnabled = false; // Will be enabled after backlog processing completes
-  const SOUND_ENABLE_DELAY_MS = 2000; // Wait 2 seconds after backlog before enabling sounds
-  
-  // Backlog burst detection: if many events arrive in quick succession, it's backlog not real-time
-  // Track recent event arrivals to detect burst loading
-  const BURST_WINDOW_MS = 500; // Window to count events
-  const BURST_THRESHOLD = 5; // If more than N events in window, it's a backlog burst
-  let recentEventTimestamps = []; // timestamps of recent event arrivals
-  
-  // Deferred gameStart sound - wait to see if burst follows
+  // Sound suppression: don't play sounds during initial backlog processing
+  let soundsEnabled = false;
+  const SOUND_ENABLE_DELAY_MS = 2000;
+  // Burst detection: suppress if many events in quick succession (backlog replay)
+  const BURST_WINDOW_MS = 500, BURST_THRESHOLD = 5;
+  let recentEventTimestamps = [];
   let pendingGameStartSound = null; // { timeout, gameNum }
-  const GAME_START_DEFER_MS = 400; // Wait this long before playing gameStart
-  
-  // Track when events are received (real-time) vs processed from backlog
-  // Events are fresh only if: 1) sounds enabled AND 2) not in a burst of events
-  const FRESH_EVENT_WINDOW_MS = 3000; // 3 seconds
+  const GAME_START_DEFER_MS = 400;
+  const FRESH_EVENT_WINDOW_MS = 3000;
   const eventReceiveTimestamps = new Map(); // entryKey -> receiveTimestamp
   
-  // Check if we're currently in a burst of events (backlog loading)
   function isInEventBurst() {
     const now = Date.now();
     // Clean old timestamps
@@ -72,94 +63,38 @@
   // Record event arrival for burst detection
   function recordEventArrival() {
     recentEventTimestamps.push(Date.now());
-    // If burst detected, disable sounds and cancel pending gameStart
-    if (isInEventBurst()) {
-      if (soundsEnabled) {
-        console.log(`[inject-stats] 🔇 Burst detected - disabling sounds (backlog loading)`);
-        soundsEnabled = false;
-        // Re-enable after delay when burst ends
-        setTimeout(() => {
-          if (!isInEventBurst()) {
-            soundsEnabled = true;
-            console.log('[inject-stats] 🔊 Sounds re-enabled (burst ended)');
-          }
-        }, SOUND_ENABLE_DELAY_MS);
-      }
-      if (pendingGameStartSound) {
-        console.log(`[inject-stats] 🔇 Cancelling pending gameStart (burst detected)`);
-        clearTimeout(pendingGameStartSound.timeout);
-        pendingGameStartSound = null;
-      }
+    // Cancel pending gameStart on burst
+    if (isInEventBurst() && pendingGameStartSound) {
+      clearTimeout(pendingGameStartSound.timeout);
+      pendingGameStartSound = null;
     }
   }
   
   // Schedule gameStart sound with delay (to detect if burst follows)
   function scheduleGameStartSound(gameNum, entryKey) {
-    // Cancel any existing pending sound
-    if (pendingGameStartSound) {
-      clearTimeout(pendingGameStartSound.timeout);
-    }
-    
+    if (pendingGameStartSound) clearTimeout(pendingGameStartSound.timeout);
     const timeout = setTimeout(() => {
-      // Check again if we're in burst (events may have arrived during delay)
-      if (isInEventBurst()) {
-        console.log(`[inject-stats] 🔇 gameStart cancelled after delay (burst): Game ${gameNum}`);
-        pendingGameStartSound = null;
-        return;
-      }
-      console.log(`[inject-stats] 🔊 Playing deferred gameStart: Game ${gameNum}`);
-      actuallyPlaySound('gameStart', entryKey);
       pendingGameStartSound = null;
+      if (!isInEventBurst()) actuallyPlaySound('gameStart');
     }, GAME_START_DEFER_MS);
-    
     pendingGameStartSound = { timeout, gameNum };
-    console.log(`[inject-stats] ⏳ Scheduled gameStart sound for Game ${gameNum} (${GAME_START_DEFER_MS}ms delay)`);
   }
   
-  // Actually send sound event to preload
-  function actuallyPlaySound(soundType, entryKey = null) {
-    try {
-      const eventTs = Date.now();
-      console.log(`[inject-stats] 🔊 playSound: ${soundType} (ts=${eventTs})`);
-      window.postMessage({
-        source: 'lol-sound-event',
-        type: soundType,
-        timestamp: eventTs
-      }, '*');
-    } catch(e) {
-      console.warn('[inject-stats] Sound trigger failed:', e);
-    }
+  function actuallyPlaySound(soundType) {
+    try { window.postMessage({ source: 'lol-sound-event', type: soundType, timestamp: Date.now() }, '*'); } catch(_){ }
   }
 
   // Sound notification helper - sends message to be picked up by preload/main
   // Always use Date.now() for timestamp - game timestamps are relative and unusable for freshness checks
   function playSound(soundType, entryKey = null) {
-    // ALWAYS check for burst - even if soundsEnabled (user may load new game after previous finished)
-    const inBurst = isInEventBurst();
-    
-    if (inBurst) {
-      console.log(`[inject-stats] 🔇 Sound suppressed (burst detected): ${soundType}`);
-      return;
-    }
-    
-    // If sounds not enabled yet, check freshness
+    if (isInEventBurst()) return;
     if (!soundsEnabled) {
       const receivedRecently = entryKey && eventReceiveTimestamps.has(entryKey) && 
         (Date.now() - eventReceiveTimestamps.get(entryKey)) < FRESH_EVENT_WINDOW_MS;
-      
-      if (!receivedRecently) {
-        console.log(`[inject-stats] 🔇 Sound suppressed (not recent): ${soundType}`);
-        return;
-      }
-      
-      // For gameStart, use deferred playback to detect burst that follows ban phase
-      if (soundType === 'gameStart') {
-        scheduleGameStartSound(lastCompletedGame + 1, entryKey);
-        return;
-      }
+      if (!receivedRecently) return;
+      if (soundType === 'gameStart') { scheduleGameStartSound(lastCompletedGame + 1, entryKey); return; }
     }
-    
-    actuallyPlaySound(soundType, entryKey);
+    actuallyPlaySound(soundType);
   }
 
   const gameStats = {};
@@ -330,11 +265,10 @@
       return;
     }
     
-    // Series ended - notify parent
+    // Series ended
     if (RX_SERIES_END.test(head)) {
       console.log('[inject-stats] Series ended');
       seriesActive = false;
-      playSound('seriesEnd', entryKey);
       return;
     }
     
@@ -409,8 +343,8 @@
           if (!target.winner) {
             target.winner = candTeam;
             target.winAt = ts;
-            try { target.winnerSource = 'live-log-single-line'; } catch(_){ }
-            try { console.log('[lol][winner][inject]', candTeam, 'won Game', gNum, 'at', ts); } catch(_){ }
+            target.winnerSource = 'live-log-single-line';
+            console.log('[lol][winner][inject]', candTeam, 'won Game', gNum, 'at', ts);
           }
         }
       }
@@ -482,42 +416,19 @@
       }
     }
 
-    // Tower
-  if (RX_TOWER.test(t)) {
-      if (!stats.firstTower) {
-        stats.firstTower   = team;
-        stats.firstTowerAt = ts;
-        playSound('firstTower');
+    // Tower, Inhibitor, Baron — same pattern: first + count
+    [[RX_TOWER,'firstTower','towerCount','firstTower'],
+     [RX_INHIB,'firstInhibitor','inhibitorCount','firstInhibitor'],
+     [RX_BARON,'firstBaron','baronCount','firstBaron']].forEach(([rx,firstKey,countKey,sound])=>{
+      if(rx.test(t)){
+        if(!stats[firstKey]){ stats[firstKey]=team; stats[firstKey+'At']=ts; playSound(sound); }
+        stats[countKey][team]=(stats[countKey][team]||0)+1;
       }
-      stats.towerCount[team] = (stats.towerCount[team]||0) + 1;
-    }
-
-    // Inhibitor
-  if (RX_INHIB.test(t)) {
-      if (!stats.firstInhibitor) {
-        stats.firstInhibitor   = team;
-        stats.firstInhibitorAt = ts;
-        playSound('firstInhibitor');
-      }
-      stats.inhibitorCount[team] = (stats.inhibitorCount[team]||0) + 1;
-    }
-
-    // Baron
-    if (RX_BARON.test(t)) {
-      if (!stats.firstBaron) { 
-        stats.firstBaron   = team; 
-        stats.firstBaronAt = ts; 
-        playSound('firstBaron');
-      }
-      stats.baronCount[team] = (stats.baronCount[team]||0) + 1;
-    }
+    });
 
     // Atakhan
     if (RX_ATAKHAN.test(t)) {
-      if (!stats.atakhan) {
-        stats.atakhan = team;
-        stats.atakhanAt = ts;
-      }
+      if (!stats.atakhan) { stats.atakhan = team; stats.atakhanAt = ts; }
     }
 
     // Dragon - check for both slaydragon and slay[Name]drake events
@@ -554,11 +465,6 @@
   window.addEventListener('message', (event) => {
     if (event.source !== window || !event.data) return;
     if (event.data.type === 'restart_data_collection') {
-      // Store current game stats before clearing (in case we want to preserve some data)
-      const existingGames = Object.keys(gameStats);
-      
-      // Reset collection state but preserve game stats temporarily
-      const preservedStats = { ...gameStats };
       mappingReady = false;
       backlog = [];
       // Don't clear processedEntries immediately - clear after a delay to prevent duplicate processing

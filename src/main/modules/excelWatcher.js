@@ -4,8 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-let electronApp = null;
-try { ({ app: electronApp } = require('electron')); } catch(_){ }
+const { broadcastGlobal } = require('./utils/broadcast');
+const { app: electronApp } = require('electron');
 
 function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, extensionBridgeRef, verbose=false }) {
   if(!win || win.isDestroyed()) return { dispose(){} };
@@ -24,24 +24,20 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
 
   function log(){
     if(!verbose) return;
-    try { console.log('[excel][watcher]', ...arguments); } catch(_){ }
+    console.log('[excel][watcher]', ...arguments);
   }
 
   function candidatePaths(){
     // Only support new extractor file current_state.json (plus optional custom override path)
     const out = [];
-    try {
-  const custom = store.get('excelDumpPath'); if(custom && typeof custom === 'string'){ out.push(custom); if(verbose) log('stored excelDumpPath', custom); }
-    } catch(_){ }
+    const custom = store.get('excelDumpPath'); if(custom && typeof custom === 'string'){ out.push(custom); if(verbose) log('stored excelDumpPath', custom); }
     const FILE = 'current_state.json';
     // Packaged app note: __dirname here is <appRoot>/src/main/modules. The Python script cwd is <appRoot>/Excel Extractor.
     // We resolve three levels up to get appRoot.
-    try {
-      const appRoot = path.resolve(__dirname, '..', '..', '..');
-      out.push(path.join(appRoot, FILE));
-      out.push(path.join(appRoot, 'Excel Extractor', FILE));
-    } catch(_){ }
-    try { if(electronApp){ const doc = electronApp.getPath('documents'); out.push(path.join(doc, FILE)); } } catch(_){ }
+    const appRoot = path.resolve(__dirname, '..', '..', '..');
+    out.push(path.join(appRoot, FILE));
+    out.push(path.join(appRoot, 'Excel Extractor', FILE));
+    try { const doc = electronApp.getPath('documents'); out.push(path.join(doc, FILE)); } catch(_){ }
     const up = process.env.USERPROFILE || process.env.HOME || '';
     if(up) out.push(path.join(up, 'Documents', FILE));
     out.push(path.join(process.cwd(), FILE));
@@ -132,24 +128,7 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
         if(team1 !== lastTeamNames.team1 || team2 !== lastTeamNames.team2){
           lastTeamNames.team1 = team1;
           lastTeamNames.team2 = team2;
-          // Broadcast to main window
-          if(win && !win.isDestroyed()){
-            try { win.webContents.send('excel-team-names', { team1, team2 }); } catch(_){ }
-          }
-          // Broadcast to stats panel (separate BrowserView)
-          try {
-            if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
-              statsManager.views.panel.webContents.send('excel-team-names', { team1, team2 });
-              log('sent excel-team-names to stats panel');
-            }
-          } catch(e){ log('stats panel send failed:', e.message); }
-          // Broadcast to board
-          try {
-            if(boardManager && boardManager.getWebContents){
-              const bwc = boardManager.getWebContents();
-              if(bwc && !bwc.isDestroyed()) bwc.send('excel-team-names', { team1, team2 });
-            }
-          } catch(_){ }
+          broadcastGlobal('excel-team-names', { team1, team2 });
           log('team names from Excel:', team1, '/', team2);
         }
       } catch(_){ }
@@ -261,7 +240,7 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
         try { win.webContents.send('excel-template-sync', payload); } catch(_){ }
       }
       // Optional: also forward via sendOdds callback path if provided and expects generic channel
-      try { if(typeof sendOdds === 'function' && sendOdds.__acceptsTemplateSync) sendOdds(payload); } catch(_){ }
+      if(typeof sendOdds === 'function') sendOdds(payload);
       // Write sync file next to current_state.json so external AHK can read
       if(activePath){
         const dir = path.dirname(activePath);
@@ -279,11 +258,7 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
       const team1 = lastTeamNames.team1 || 'Team 1';
       const team2 = lastTeamNames.team2 || 'Team 2';
       log('rebroadcast team names:', team1, '/', team2);
-      try {
-        if(statsManager && statsManager.views && statsManager.views.panel && statsManager.views.panel.webContents && !statsManager.views.panel.webContents.isDestroyed()){
-          statsManager.views.panel.webContents.send('excel-team-names', { team1, team2 });
-        }
-      } catch(_){ }
+      broadcastGlobal('excel-team-names', { team1, team2 });
     }
   }
 

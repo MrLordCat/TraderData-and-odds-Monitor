@@ -80,7 +80,7 @@
       const gm = RX_GAME_START.exec(low);
       if(gm && gm[1]) currentGame = gm[1];
       streaks.clear();
-      try { console.log('[lol-multi] game-start', currentGame, 'backlogRemaining='+backlog.length); } catch(_){ }
+      console.log('[lol-multi] game-start', currentGame, 'backlogRemaining='+backlog.length);
       return;
     }
 
@@ -120,7 +120,7 @@
 
     // quadra / penta
     if (cnt === 4) {
-      try { console.log('[lol-multi] QUADRA detected', { game: currentGame, killer: killerRaw, team, ts, cnt }); } catch(_){ }
+      console.log('[lol-multi] QUADRA detected', { game: currentGame, killer: killerRaw, team, ts, cnt });
       window.postMessage({
         source: 'lol-multikill',
         game: currentGame || null,
@@ -128,7 +128,7 @@
       }, '*');
     }
     else if (cnt === 5) {
-      try { console.log('[lol-multi] PENTA detected', { game: currentGame, killer: killerRaw, team, ts, cnt }); } catch(_){ }
+      console.log('[lol-multi] PENTA detected', { game: currentGame, killer: killerRaw, team, ts, cnt });
       window.postMessage({
         source: 'lol-multikill',
         game: currentGame || null,
@@ -139,7 +139,7 @@
     }
     else {
       // regular kill step logging (only for counts >=2 to reduce noise)
-      if(cnt>=2){ try { console.log('[lol-multi] streak-progress', { game: currentGame, killer: killerRaw, team, cnt, delta }); } catch(_){ } }
+      if(cnt>=2){ console.log('[lol-multi] streak-progress', { game: currentGame, killer: killerRaw, team, cnt, delta }); }
     }
   }
 

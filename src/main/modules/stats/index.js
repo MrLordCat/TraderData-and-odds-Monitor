@@ -2,9 +2,9 @@
 // Panel is now the primary side panel containing odds board + stats sections.
 // Stats mode (A/B views) toggled separately. Panel docked by default.
 
-const { BrowserView, Menu, clipboard } = require('electron');
+const { BrowserView } = require('electron');
+const { attachContextMenu: attachCtxMenu } = require('../utils/contextMenu');
 const path = require('path');
-const fs = require('fs');
 
 // Module-level flag to prevent duplicate IPC registration
 let soundIpcRegistered = false;
@@ -22,7 +22,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   // Side is unified with docked board side to avoid mismatches between modes.
   let side = store.get('boardSide') || store.get('statsPanelSide', 'right'); // left|right
   let panelWidth = store.get('boardWidth') || DEFAULT_PANEL_WIDTH; // unified panel width
-  let panelHidden = false; // Panel is always visible (no longer hideable)
   let embedOffsetY = 0;                                           // toolbar offset
   let singleWindow = !!store.get('statsSingleWindow', false);     // when true, only one slot is active
 
@@ -100,8 +99,10 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   // Store flushPendingSoundEvents in ref for IPC handler
   currentStatsManagerRef.flushPendingSoundEvents = flushPendingSoundEvents;
 
-  // Temporary cover for stats mode
-  const COVER_BG = '#0d0f17';
+  // Temporary cover for stats mode (theme-aware)
+  const COVER_DARK = '#0d0f17';
+  const COVER_LIGHT = '#f9f9ff';
+  function coverBg(){ return (store.get('appTheme') === 'light') ? COVER_LIGHT : COVER_DARK; }
   let coverView = null;
   let coverShown = false;
 
@@ -121,30 +122,25 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
       if(!mainWindow || mainWindow.isDestroyed()) return;
       const b = getCoverBounds();
       if(!b) return;
+      const bg = coverBg();
       if(!coverView){
         coverView = new BrowserView({ webPreferences:{ contextIsolation:true, sandbox:true } });
-        try { coverView.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
+        try { coverView.webContents.setBackgroundColor(bg); } catch(_){ }
         try {
-          const html = `<!doctype html><html><head><meta charset="utf-8"/></head><body style="margin:0;background:${COVER_BG};"></body></html>`;
+          const html = `<!doctype html><html><head><meta charset="utf-8"/></head><body style="margin:0;background:${bg};"></body></html>`;
           coverView.webContents.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
         } catch(_){ }
       }
-      // Attach only once; re-attaching every toggle can make Electron accumulate internal listeners.
-      try {
-        const attached = typeof mainWindow.getBrowserViews==='function' && mainWindow.getBrowserViews().includes(coverView);
-        if(!attached) mainWindow.addBrowserView(coverView);
-      } catch(_){ }
+      const attached = typeof mainWindow.getBrowserViews==='function' && mainWindow.getBrowserViews().includes(coverView);
+      if(!attached) try { mainWindow.addBrowserView(coverView); } catch(_){ }
       try { coverView.setBounds(b); } catch(_){ }
       coverShown = true;
     } catch(_){ }
   }
   function hideCover(){
-    try {
-      if(!coverView) return;
-      // Keep attached; just hide.
-      try { coverView.setBounds({ x:0, y:0, width:0, height:0 }); } catch(_){ }
-      coverShown = false;
-    } catch(_){ }
+    if(!coverView) return;
+    try { coverView.setBounds({ x:0, y:0, width:0, height:0 }); } catch(_){ }
+    coverShown = false;
   }
 
   // --- Persistence ------------------------------------------------------------------------
@@ -153,7 +149,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     store.set('statsLayoutMode', mode);
     store.set('statsPanelSide', side);
     // Keep canonical side in sync (used by board manager).
-    try { store.set('boardSide', side); } catch(_){ }
+    store.set('boardSide', side);
     store.set('boardWidth', panelWidth);
     store.set('statsSingleWindow', singleWindow);
     store.set('lolMetricVisibility', lolMetricVisibility);
@@ -166,13 +162,11 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
 
   // --- Helpers ---------------------------------------------------------------------------
   function canonicalHost(h){
-    try {
-      if(!h) return h;
-      if(/(^|\.)grid\.gg$/i.test(h)) return 'grid.gg';
-      const p = h.split('.');
-      if(p.length>2) return p.slice(-2).join('.');
-      return h;
-    } catch(_) { return h; }
+    if(!h) return h;
+    if(/(^|\.)grid\.gg$/i.test(h)) return 'grid.gg';
+    const p = h.split('.');
+    if(p.length>2) return p.slice(-2).join('.');
+    return h;
   }
 
   // Layout panel (always docked) + optional A/B stats views
@@ -297,12 +291,12 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
       const all = store.get('siteCookies')||{}; const saved = all[host]||all[canon];
       if(Array.isArray(saved)) saved.forEach(c=>{ try { sess.cookies.set({ url:`${u.protocol}//${host}${c.path||'/'}`, name:c.name, value:c.value, domain:c.domain, path:c.path, secure:c.secure, httpOnly:c.httpOnly, expirationDate:c.expirationDate, sameSite:c.sameSite }).catch(()=>{}); } catch(_){ } });
       view.webContents.loadURL(raw);
-    } catch(e){ try { console.warn('[stats] load fail', raw, e.message); } catch(_){ } }
+    } catch(e){ console.warn('[stats] load fail', raw, e.message); }
   }
   function setUrl(slot,u){ if(['A','B'].includes(slot) && u){ urls[slot]=u; persist(); resolveAndLoad(views[slot],u); } }
 
   // --- LoL stats integration --------------------------------------------------------------
-  let lolStats = null; const lastPortal = { A:null,B:null }; const portalInjectedOnce=new WeakSet(); const slotInit={ A:false,B:false }; let ipcLolRegistered=false;
+  let lolStats = null; const lastPortal = { A:null,B:null }; const slotInit={ A:false,B:false }; let ipcLolRegistered=false;
   function ensureLolStats(){
     if(lolStats) return;
     const { createLolStatsModule } = require('../../lolstats');
@@ -379,7 +373,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
         const host = new URL(cur).hostname;
         const canon = canonicalHost(host);
         const creds = credsAll[host] || credsAll[canon];
-        try { maybeInstallUblock(view, canon); } catch(_){ }
         if(creds){
           view.webContents.send('apply-credentials',{ hostname:host, username:creds.username, password:creds.password });
           if(views.panel) views.panel.webContents.send('stats-credentials-status',{ slot, hostname:host, has:true, username:creds.username });
@@ -397,9 +390,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
           // Note: main injection happens on dom-ready now for earlier WebSocket interception
           // Here we just mark as initialized and broadcast current state
           try { view.webContents.send('identify-slot', slot); } catch(_){ }
-          if(!portalInjectedOnce.has(view)){
-            portalInjectedOnce.add(view);
-          }
           maybeAutoReset(slot, cur);
           broadcast(lolStats.snapshot());
         }
@@ -409,9 +399,20 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     view.webContents.on('did-navigate-in-page', (_e,u)=> maybeAutoReset(slot,u));
   }
 
-  // --- Context menu ----------------------------------------------------------------------
-  function attachContextMenu(view,label){ if(!view || view.__statsCtxMenuAttached) return; view.__statsCtxMenuAttached=true; view.webContents.on('context-menu',(e,params)=>{ try { const template=[]; const nav=view.webContents.navigationHistory; const canBack= nav? nav.canGoBack(): (view.webContents.canGoBack && view.webContents.canGoBack()); const canFwd= nav? nav.canGoForward(): (view.webContents.canGoForward && view.webContents.canGoForward()); if(canBack) template.push({ label:'Back', click:()=>{ try { nav? nav.goBack(): view.webContents.goBack(); } catch(_){ } } }); if(canFwd) template.push({ label:'Forward', click:()=>{ try { nav? nav.goForward(): view.webContents.goForward(); } catch(_){ } } }); template.push({ label:'Reload', click:()=>{ try { view.webContents.reload(); } catch(_){ } } }); try { const curUrl=view.webContents.getURL(); if(curUrl) template.push({ label:'Copy Page URL', click:()=>{ try { clipboard.writeText(curUrl); } catch(_){ } } }); } catch(_){ } if(params.linkURL) template.push({ label:'Copy Link URL', click:()=>{ try { clipboard.writeText(params.linkURL); } catch(_){ } } }); template.push({ type:'separator' }); if(params.isEditable) template.push({ role:'cut' }); template.push({ role:'copy' }); if(params.isEditable) template.push({ role:'paste' }); template.push({ role:'selectAll' }); template.push({ type:'separator' }); template.push({ label:'Open DevTools', click:()=>{ try { view.webContents.openDevTools({ mode:'detach' }); } catch(_){ } } }); if(typeof params.x==='number' && typeof params.y==='number') template.push({ label:'Inspect Element', click:()=>{ try { view.webContents.inspectElement(params.x, params.y); } catch(_){ } } }); template.push({ type:'separator' }); template.push({ label:'Stats Slot: '+(label||'?'), enabled:false }); const menu=Menu.buildFromTemplate(template); menu.popup({ window: mainWindow }); } catch(err){ try { console.warn('[stats][ctxmenu] build fail', err.message); } catch(_){ } } }); }
+  // --- Context menu (shared utility) -----------------------------------------------------
+  function attachContextMenu(view, label) { attachCtxMenu(view, mainWindow, 'Stats Slot: ' + (label || '?')); }
 
+
+  function deferEnsureTopmost() { [0,80,200].forEach(d=> setTimeout(()=>{ try { ensureTopmost(); } catch(_){ } }, d)); }
+
+  /** Common BrowserView setup: add to window, context menu, throttling, hotkeys */
+  function setupView(view, label) {
+    try { mainWindow.addBrowserView(view); } catch(_){ }
+    attachContextMenu(view, label);
+    try { view.webContents.setBackgroundThrottling(false); } catch(_){ }
+    try { view.webContents.setBackgroundColor(coverBg()); } catch(_){ }
+    try { if(hotkeysRef?.attachToWebContents) hotkeysRef.attachToWebContents(view.webContents); } catch(_){ }
+  }
 
   // --- Panel lifecycle (always docked) ---------------------------------------------------
   function createPanel(offsetY){
@@ -427,25 +428,12 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
           backgroundThrottling:false 
         } 
       });
-      try { views.panel.webContents.setBackgroundThrottling(false); } catch(_){ }
-      try { views.panel.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
-      try { mainWindow.addBrowserView(views.panel); } catch(_){ }
-      attachContextMenu(views.panel,'Panel');
-      
-      // Unified window-active hotkeys (TAB/F1/F2/F3)
-      try { if(hotkeysRef && hotkeysRef.attachToWebContents) hotkeysRef.attachToWebContents(views.panel.webContents); } catch(_){ }
+      setupView(views.panel, 'Panel');
       
       try { views.panel.webContents.loadFile(path.join(__dirname,'..','..','..','renderer','pages','stats_panel.html')); } catch(_){ }
       views.panel.webContents.on('did-finish-load', ()=>{ 
         try { 
-          let hb = store.get('gsHeatBar'); 
-          // Migration: if decayPerSec > 1, user likely entered "seconds" in old UI
-          // Convert: old value was "2" meaning "2 seconds", so decayPerSec should be 1/2 = 0.5
-          if(hb && typeof hb.decayPerSec === 'number' && hb.decayPerSec > 1) {
-            console.log('[stats] Migrating gsHeatBar.decayPerSec from', hb.decayPerSec, 'to', 1/hb.decayPerSec);
-            hb = { ...hb, decayPerSec: 1 / hb.decayPerSec };
-            store.set('gsHeatBar', hb);
-          }
+          const hb = store.get('gsHeatBar'); 
           views.panel.webContents.send('stats-init', { 
             urls, mode, side, panelWidth, 
             lolManualMode, lolMetricVisibility, lolMetricOrder, 
@@ -482,9 +470,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     layout();
     setTimeout(layout, 60);
     
-    // Assert panel topmost
     try { if(views.panel) mainWindow.setTopBrowserView(views.panel); } catch(_){ }
-    [0,80,200].forEach(d=> setTimeout(()=>{ try { ensureTopmost(); } catch(_){ } }, d));
+    deferEnsureTopmost();
   }
   
   // Update module-level ref with createPanel function now that it's defined
@@ -499,52 +486,24 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     if(!panelActive) createPanel(offsetY);
     
     // Show cover while loading stats views
-    showCover();
+    try { showCover(); } catch(_){ }
     
     const freshViews = !(views.A && views.B);
     
     if(freshViews){
-      views.A = new BrowserView({ 
-        webPreferences:{ 
-          partition:'persist:statsA', 
-          contextIsolation:true, 
-          sandbox:false, 
-          preload:path.join(__dirname,'..','..','preloads','statsContent.js'), 
-          backgroundThrottling:false 
-        } 
+      ['A','B'].forEach(slot=>{
+        views[slot] = new BrowserView({
+          webPreferences:{
+            partition:'persist:stats'+slot,
+            contextIsolation:true, sandbox:false,
+            preload:path.join(__dirname,'..','..','preloads','statsContent.js'),
+            backgroundThrottling:false
+          }
+        });
+        setupView(views[slot], slot);
+        resolveAndLoad(views[slot], urls[slot]);
+        attachNavTracking(slot, views[slot]);
       });
-      views.B = new BrowserView({ 
-        webPreferences:{ 
-          partition:'persist:statsB', 
-          contextIsolation:true, 
-          sandbox:false, 
-          preload:path.join(__dirname,'..','..','preloads','statsContent.js'), 
-          backgroundThrottling:false 
-        } 
-      });
-      
-      try { mainWindow.addBrowserView(views.A); mainWindow.addBrowserView(views.B); } catch(_){ }
-      attachContextMenu(views.A,'A');
-      attachContextMenu(views.B,'B');
-      
-      // Disable background throttling
-      try { views.A.webContents.setBackgroundThrottling(false); } catch(_){ }
-      try { views.B.webContents.setBackgroundThrottling(false); } catch(_){ }
-      try { views.A.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
-      try { views.B.webContents.setBackgroundColor(COVER_BG); } catch(_){ }
-      
-      // Unified window-active hotkeys
-      try { 
-        if(hotkeysRef && hotkeysRef.attachToWebContents){ 
-          hotkeysRef.attachToWebContents(views.A.webContents); 
-          hotkeysRef.attachToWebContents(views.B.webContents); 
-        } 
-      } catch(_){ }
-      
-      resolveAndLoad(views.A, urls.A);
-      resolveAndLoad(views.B, urls.B);
-      attachNavTracking('A', views.A);
-      attachNavTracking('B', views.B);
     }
     
     statsActive = true;
@@ -554,7 +513,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     
     // Assert topmost ordering
     try { ['panel','A','B'].forEach(k=>{ const v=views[k]; if(v) try { mainWindow.setTopBrowserView(v); } catch(_){ } }); } catch(_){ }
-    [0,80,200].forEach(d=> setTimeout(()=>{ try { ensureTopmost(); } catch(_){ } }, d));
+    deferEnsureTopmost();
     
     // Notify panel that stats mode is active
     try { if(views.panel) views.panel.webContents.send('stats-mode-changed', { active: true }); } catch(_){ }
@@ -576,19 +535,6 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     try { if(views.panel) views.panel.webContents.send('stats-mode-changed', { active: false }); } catch(_){ }
   }
   
-  // Backward compatibility aliases
-  function createEmbedded(offsetY){ createStatsViews(offsetY); }
-  function destroyEmbedded(force){
-    hideStatsViews();
-    if(force){
-      ['A','B'].forEach(k=>{ 
-        const v=views[k]; 
-        if(v) try { v.webContents.destroy(); } catch(_){ } 
-        views[k] = null;
-      });
-    }
-  }
-
   function handleStageResized(){
     try { 
       const sy = stageBoundsRef && stageBoundsRef.value ? Number(stageBoundsRef.value.y) : embedOffsetY; 
@@ -613,27 +559,30 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   }
 
   // --- IPC command dispatcher -------------------------------------------------------------
+  const IPC_SIMPLE = {
+    'stats-set-url': p=> setUrl(p.slot, p.url),
+    'stats-layout': p=> setMode(p.mode),
+    'stats-toggle-side': ()=> toggleSide(),
+    'stats-set-side': p=> setSide(p?.side),
+    'stats-single-window': p=> applySingleWindow(p?.enabled),
+    'board-set-side': p=> setSide(p?.side),
+    'board-set-width': p=> setWidth(p?.width),
+  };
   function handleIpc(ch,payload){
+    if(IPC_SIMPLE[ch]){ IPC_SIMPLE[ch](payload); return; }
     switch(ch){
-      case 'stats-set-url': setUrl(payload.slot,payload.url); break;
-      case 'stats-layout': setMode(payload.mode); break;
       case 'stats-open-devtools':
         try {
           if(payload && payload.target==='panel' && views.panel){ views.panel.webContents.openDevTools({ mode:'detach' }); break; }
           const slot = payload && payload.slot; if(['A','B'].includes(slot)){ const v=views[slot]; if(v) v.webContents.openDevTools({ mode:'detach' }); }
         } catch(_){}
         break;
-      case 'stats-toggle-side': toggleSide(); break;
-      case 'stats-set-side': setSide(payload && payload.side); break;
-  case 'stats-single-window': applySingleWindow(payload && payload.enabled); break;
       case 'stats-reload-slot':
         try { const slot=payload && payload.slot; if(['A','B'].includes(slot)){ const v=views[slot]; if(v) try { v.webContents.reloadIgnoringCache(); } catch(_){ try { v.webContents.reload(); } catch(_2){} } } } catch(_){}
         break;
       case 'stats-save-credentials':
         try { const { slot, username, password } = payload||{}; if(slot && username){ const v=views[slot]; if(v){ const host=new URL(v.webContents.getURL()).hostname; const all=store.get('siteCredentials')||{}; all[host]={ username,password }; store.set('siteCredentials',all); v.webContents.send('apply-credentials',{ hostname:host, username, password }); if(views.panel) views.panel.webContents.send('stats-credentials-status',{ slot, hostname:host, has:true, username }); } } } catch(_){}
         break;
-      case 'board-set-side': setSide(payload && payload.side); break;
-      case 'board-set-width': setWidth(payload && payload.width); break;
       case 'lol-stats-settings':
         if(payload){
           if(typeof payload.manualMode==='boolean') lolManualMode=payload.manualMode;
@@ -663,13 +612,43 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   function isStatsActive(){ return statsActive; }
   function isPanelActive(){ return panelActive; }
 
+  /** Re-apply background color on theme change */
+  function refreshCoverTheme(){
+    const bg = coverBg();
+    if(coverView) try { coverView.webContents.setBackgroundColor(bg); } catch(_){ }
+    ['A','B'].forEach(k=>{ if(views[k]) try { views[k].webContents.setBackgroundColor(bg); } catch(_){ } });
+  }
+
+  /** Pre-create A/B views during splash so Tab opens instantly */
+  function warmupViews(){
+    if(views.A && views.B) return; // already created
+    if(!mainWindow || mainWindow.isDestroyed()) return;
+    if(!panelActive) return; // panel must exist first
+    ['A','B'].forEach(slot=>{
+      if(views[slot]) return;
+      views[slot] = new BrowserView({
+        webPreferences:{
+          partition:'persist:stats'+slot,
+          contextIsolation:true, sandbox:false,
+          preload:path.join(__dirname,'..','..','preloads','statsContent.js'),
+          backgroundThrottling:false
+        }
+      });
+      setupView(views[slot], slot);
+      // Hide at zero bounds (not shown until Tab is pressed)
+      try { views[slot].setBounds({ x:0, y:0, width:0, height:0 }); } catch(_){ }
+      resolveAndLoad(views[slot], urls[slot]);
+      attachNavTracking(slot, views[slot]);
+    });
+    console.log('[stats] warmupViews complete — A/B pre-created');
+  }
+
   return { 
     handleIpc, 
     views, 
-    createEmbedded, 
-    destroyEmbedded, 
     handleStageResized, 
-    ensureTopmost, 
+    ensureTopmost,
+    deferEnsureTopmost, 
     setUrl, 
     getMode: ()=>mode, 
     getSide: ()=>side,
@@ -684,6 +663,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     getPanelView,
     isStatsActive,
     isPanelActive,
+    refreshCoverTheme,
+    warmupViews,
     getPanelWidth: ()=>panelWidth
   };
 }

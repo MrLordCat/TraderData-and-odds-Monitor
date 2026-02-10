@@ -6,6 +6,20 @@
 import { REASON, STATE, MODE, DEFAULTS, KEYS } from './constants.js';
 import { createAlignEngine } from './align-engine.js';
 
+/** Dual-path IPC: desktopAPI → fallback to require('electron') */
+function ipcInvoke(g, ch, payload) {
+  try {
+    if (g.desktopAPI?.invoke) return g.desktopAPI.invoke(ch, payload);
+    if (g.require) { const { ipcRenderer } = g.require('electron'); if (ipcRenderer?.invoke) return ipcRenderer.invoke(ch, payload); }
+  } catch (_) {}
+}
+function ipcSend(g, ch, payload) {
+  try {
+    if (g.desktopAPI?.send) g.desktopAPI.send(ch, payload);
+    else if (g.require) { const { ipcRenderer } = g.require('electron'); if (ipcRenderer?.send) ipcRenderer.send(ch, payload); }
+  } catch (_) {}
+}
+
 export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, global }) {
   const state = { active: false, phase: STATE.IDLE, mode: MODE.EXCEL, reason: null, userWanted: false };
   const config = {
@@ -69,6 +83,23 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   let pendingSkipResumeSignal = false;
   let aligningAfterNoMid = false;
 
+  /** Shared guard check. Returns 'ok' | 'suspended' | 'grace' */
+  function runGuardCheck(odds, opts) {
+    if (aligningAfterNoMid && !odds.derived.hasMid) {
+      aligningAfterNoMid = false;
+      suspend(REASON.NO_MID, true, false);
+      return 'suspended';
+    }
+    if (aligningAfterNoMid) return 'ok';
+    const g = GuardSystem.checkGuards(odds, state.mode);
+    if (!g.canTrade) {
+      if (opts?.graceCheck && g.reason === REASON.EXCEL_SUSPENDED && (Date.now() - lastResumeSentTs) < RESUME_GRACE_PERIOD_MS) return 'grace';
+      suspend(g.reason, !!g.isSoftSuspend, g.isUserSuspend === true);
+      return 'suspended';
+    }
+    return 'ok';
+  }
+
   function step() {
     if (!state.active) return;
     if (!isSignalSender) return;
@@ -78,25 +109,9 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     try {
       const odds = OddsStore.getSnapshot();
 
-      if (aligningAfterNoMid) {
-        if (!odds.derived.hasMid) {
-          aligningAfterNoMid = false;
-          suspend(REASON.NO_MID, true, false);
-          return;
-        }
-      } else {
-        const guardResult = GuardSystem.checkGuards(odds, state.mode);
-        if (!guardResult.canTrade) {
-          const timeSinceResumeSent = Date.now() - lastResumeSentTs;
-          if (guardResult.reason === REASON.EXCEL_SUSPENDED && timeSinceResumeSent < RESUME_GRACE_PERIOD_MS) {
-            scheduleStep();
-            return;
-          }
-          const isUserSuspend = guardResult.isUserSuspend === true;
-          suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
-          return;
-        }
-      }
+      const gr = runGuardCheck(odds, { graceCheck: true });
+      if (gr === 'suspended') return;
+      if (gr === 'grace') { scheduleStep(); return; }
 
       if (state.phase === STATE.IDLE && state.reason) {
         startAlignment();
@@ -190,21 +205,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     if (!state.active) return;
 
     const odds = OddsStore.getSnapshot();
-    const guardResult = GuardSystem.checkGuards(odds, state.mode);
-
-    if (aligningAfterNoMid) {
-      if (!odds.derived.hasMid) {
-        aligningAfterNoMid = false;
-        suspend(REASON.NO_MID, true, false);
-        return;
-      }
-    } else {
-      if (!guardResult.canTrade) {
-        const isUserSuspend = guardResult.isUserSuspend === true;
-        suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
-        return;
-      }
-    }
+    if (runGuardCheck(odds) === 'suspended') return;
 
     alignmentAttempts++;
 
@@ -383,15 +384,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
   function sendKeyPress(payload) {
     if (!isSignalSender) return;
-    try {
-      if (global.desktopAPI && global.desktopAPI.invoke) {
-        return global.desktopAPI.invoke('send-auto-press', payload);
-      }
-      if (global.require) {
-        const { ipcRenderer } = global.require('electron');
-        if (ipcRenderer && ipcRenderer.invoke) return ipcRenderer.invoke('send-auto-press', payload);
-      }
-    } catch (_) {}
+    return ipcInvoke(global, 'send-auto-press', payload);
   }
 
   function sendSignal(reason) {
@@ -400,15 +393,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   }
 
   function broadcastState(active) {
-    try {
-      const payload = { on: active };
-      if (global.desktopAPI && global.desktopAPI.send) {
-        global.desktopAPI.send('auto-active-set', payload);
-      } else if (global.require) {
-        const { ipcRenderer } = global.require('electron');
-        if (ipcRenderer && ipcRenderer.send) ipcRenderer.send('auto-active-set', payload);
-      }
-    } catch (_) {}
+    ipcSend(global, 'auto-active-set', { on: active });
   }
 
   function updateStatus(msg) { lastStatus = msg; }
@@ -455,42 +440,27 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   // === External Listeners ===
 
   function attachExternalListeners() {
-    // Excel extractor status
+    const handleActiveSet = (p) => {
+      const want = !!(p && p.on);
+      if (want && !state.active) enable();
+      else if (!want && state.active) suspend(REASON.MANUAL, false, true);
+    };
+
     if (global.desktopAPI) {
       if (global.desktopAPI.onExcelExtractorStatus) global.desktopAPI.onExcelExtractorStatus(GuardSystem.setExcelStatus);
       if (global.desktopAPI.getExcelExtractorStatus) global.desktopAPI.getExcelExtractorStatus().then(GuardSystem.setExcelStatus).catch(() => {});
+      if (global.desktopAPI.onAutoStateSet) global.desktopAPI.onAutoStateSet(handleStateSet);
+      if (global.desktopAPI.onAutoToggleAll) global.desktopAPI.onAutoToggleAll(() => toggle());
+      if (global.desktopAPI.onAutoActiveSet) global.desktopAPI.onAutoActiveSet(handleActiveSet);
     } else if (global.require) {
       try {
         const { ipcRenderer } = global.require('electron');
         if (ipcRenderer) {
           ipcRenderer.on('excel-extractor-status', (_e, s) => GuardSystem.setExcelStatus(s));
           ipcRenderer.invoke('excel-extractor-status-get').then(GuardSystem.setExcelStatus).catch(() => {});
-        }
-      } catch (_) {}
-    }
-
-    // Main process state commands
-    if (global.desktopAPI) {
-      if (global.desktopAPI.onAutoStateSet) global.desktopAPI.onAutoStateSet(handleStateSet);
-      if (global.desktopAPI.onAutoToggleAll) global.desktopAPI.onAutoToggleAll(() => toggle());
-      if (global.desktopAPI.onAutoActiveSet) {
-        global.desktopAPI.onAutoActiveSet((p) => {
-          const want = !!(p && p.on);
-          if (want && !state.active) enable();
-          else if (!want && state.active) suspend(REASON.MANUAL, false, true);
-        });
-      }
-    } else if (global.require) {
-      try {
-        const { ipcRenderer } = global.require('electron');
-        if (ipcRenderer) {
           ipcRenderer.on('auto-state-set', (_e, p) => handleStateSet(p));
           ipcRenderer.on('auto-toggle-all', () => toggle());
-          ipcRenderer.on('auto-active-set', (_e, p) => {
-            const want = !!(p && p.on);
-            if (want && !state.active) enable();
-            else if (!want && state.active) suspend(REASON.MANUAL, false, true);
-          });
+          ipcRenderer.on('auto-active-set', (_e, p) => handleActiveSet(p));
         }
       } catch (_) {}
     }
@@ -564,25 +534,22 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       const { ipcRenderer } = global.require('electron');
       if (!ipcRenderer) return;
 
-      ipcRenderer.on('auto-tolerance-updated', (_e, v) => { if (typeof v === 'number') setConfig({ tolerancePct: v }); });
-      ipcRenderer.on('auto-interval-updated', (_e, v) => { if (typeof v === 'number') setConfig({ intervalMs: v }); });
-      ipcRenderer.on('auto-fire-cooldown-updated', (_e, v) => { if (typeof v === 'number') setConfig({ fireCooldownMs: v }); });
-      ipcRenderer.on('auto-pulse-gap-updated', (_e, v) => { if (typeof v === 'number') setConfig({ pulseGapMs: v }); });
-      ipcRenderer.on('auto-pulse-step-updated', (_e, v) => { if (typeof v === 'number') setConfig({ pulseStepPct: v }); });
-      ipcRenderer.on('auto-stop-no-mid-updated', (_e, v) => { if (typeof v === 'boolean') GuardSystem.setSettings({ stopOnNoMid: v }); });
-      ipcRenderer.on('auto-resume-on-mid-updated', (_e, v) => { if (typeof v === 'boolean') GuardSystem.setSettings({ resumeOnMid: v }); });
-      ipcRenderer.on('auto-shock-threshold-updated', (_e, v) => { if (typeof v === 'number') GuardSystem.setSettings({ shockThresholdPct: v }); });
-      ipcRenderer.on('auto-suspend-threshold-updated', (_e, v) => { if (typeof v === 'number') GuardSystem.setSettings({ suspendThresholdPct: v }); });
-
-      ipcRenderer.invoke('auto-tolerance-get').then(v => { if (typeof v === 'number') setConfig({ tolerancePct: v }); }).catch(() => {});
-      ipcRenderer.invoke('auto-interval-get').then(v => { if (typeof v === 'number') setConfig({ intervalMs: v }); }).catch(() => {});
-      ipcRenderer.invoke('auto-fire-cooldown-get').then(v => { if (typeof v === 'number') setConfig({ fireCooldownMs: v }); }).catch(() => {});
-      ipcRenderer.invoke('auto-pulse-gap-get').then(v => { if (typeof v === 'number') setConfig({ pulseGapMs: v }); }).catch(() => {});
-      ipcRenderer.invoke('auto-pulse-step-get').then(v => { if (typeof v === 'number') setConfig({ pulseStepPct: v }); }).catch(() => {});
-      ipcRenderer.invoke('auto-stop-no-mid-get').then(v => { if (typeof v === 'boolean') GuardSystem.setSettings({ stopOnNoMid: v }); }).catch(() => {});
-      ipcRenderer.invoke('auto-resume-on-mid-get').then(v => { if (typeof v === 'boolean') GuardSystem.setSettings({ resumeOnMid: v }); }).catch(() => {});
-      ipcRenderer.invoke('auto-shock-threshold-get').then(v => { if (typeof v === 'number') GuardSystem.setSettings({ shockThresholdPct: v }); }).catch(() => {});
-      ipcRenderer.invoke('auto-suspend-threshold-get').then(v => { if (typeof v === 'number') GuardSystem.setSettings({ suspendThresholdPct: v }); }).catch(() => {});
+      // Config settings: [updatedChannel, getChannel, type, handler]
+      const configSettings = [
+        ['auto-tolerance-updated',        'auto-tolerance-get',        'number',  v => setConfig({ tolerancePct: v })],
+        ['auto-interval-updated',         'auto-interval-get',         'number',  v => setConfig({ intervalMs: v })],
+        ['auto-fire-cooldown-updated',    'auto-fire-cooldown-get',    'number',  v => setConfig({ fireCooldownMs: v })],
+        ['auto-pulse-gap-updated',        'auto-pulse-gap-get',        'number',  v => setConfig({ pulseGapMs: v })],
+        ['auto-pulse-step-updated',       'auto-pulse-step-get',       'number',  v => setConfig({ pulseStepPct: v })],
+        ['auto-stop-no-mid-updated',      'auto-stop-no-mid-get',      'boolean', v => GuardSystem.setSettings({ stopOnNoMid: v })],
+        ['auto-resume-on-mid-updated',    'auto-resume-on-mid-get',    'boolean', v => GuardSystem.setSettings({ resumeOnMid: v })],
+        ['auto-shock-threshold-updated',  'auto-shock-threshold-get',  'number',  v => GuardSystem.setSettings({ shockThresholdPct: v })],
+        ['auto-suspend-threshold-updated','auto-suspend-threshold-get','number',  v => GuardSystem.setSettings({ suspendThresholdPct: v })],
+      ];
+      configSettings.forEach(([updCh, getCh, type, handler]) => {
+        ipcRenderer.on(updCh, (_e, v) => { if (typeof v === type) handler(v); });
+        ipcRenderer.invoke(getCh).then(v => { if (typeof v === type) handler(v); }).catch(() => {});
+      });
     } catch (_) {}
   }
 

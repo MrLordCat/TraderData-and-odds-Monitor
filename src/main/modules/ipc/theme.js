@@ -51,7 +51,7 @@ function broadcastTheme(theme) {
  * @param {Object} ctx - Context object with store
  * @param {Store} ctx.store - electron-store instance
  */
-function initThemeIpc({ store }) {
+function initThemeIpc({ store, statsManager }) {
   // Get current theme
   ipcMain.handle('theme-get', () => {
     try {
@@ -68,6 +68,7 @@ function initThemeIpc({ store }) {
       store.set('appTheme', sanitized);
       console.log('[theme] Theme set to:', sanitized);
       broadcastTheme(sanitized);
+      try { statsManager?.refreshCoverTheme?.(); } catch(_){ }
     } catch (e) {
       console.error('[theme] Failed to set theme:', e);
     }
@@ -82,6 +83,7 @@ function initThemeIpc({ store }) {
       store.set('appTheme', next);
       console.log('[theme] Theme toggled to:', next);
       broadcastTheme(next);
+      try { statsManager?.refreshCoverTheme?.(); } catch(_){ }
       return next;
     } catch (e) {
       console.error('[theme] Failed to toggle theme:', e);

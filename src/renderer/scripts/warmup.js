@@ -21,43 +21,10 @@
     warmupTabs();
     root.classList.remove('warmup-no-transition');
     
-    // 3. Theme transition warm-up - actually run the transition WITH animation
-    // This compiles CSS transitions and creates GPU layers for color changes
-    warmupThemeWithTransition();
+    // 3. Theme transition warm-up is handled centrally by splash manager
+    //    (toggles theme across ALL views simultaneously for full CSS compilation)
     
     console.log(`[warmup] Complete in ${(performance.now() - startTime).toFixed(1)}ms`);
-  }
-  
-  function warmupThemeWithTransition() {
-    const root = document.documentElement;
-    const currentTheme = root.getAttribute('data-theme') || 'dark';
-    const oppositeTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    
-    // Make window invisible during theme warmup to hide the flash
-    const body = document.body;
-    const originalOpacity = body.style.opacity;
-    body.style.opacity = '0';
-    body.style.pointerEvents = 'none';
-    
-    // Switch to opposite theme WITH transitions enabled
-    root.setAttribute('data-theme', oppositeTheme);
-    
-    // Force style recalculation - this compiles the transition
-    void root.offsetHeight;
-    
-    // Wait for transition to start (just a few ms is enough)
-    setTimeout(() => {
-      // Switch back
-      root.setAttribute('data-theme', currentTheme);
-      void root.offsetHeight;
-      
-      // Wait for return transition then restore visibility
-      setTimeout(() => {
-        body.style.opacity = originalOpacity || '';
-        body.style.pointerEvents = '';
-        console.log('[warmup] Theme transition warmed up');
-      }, 50);
-    }, 50);
   }
   
   function warmupTabs() {
