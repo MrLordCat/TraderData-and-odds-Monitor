@@ -39,13 +39,7 @@
     let changed=false;
     try {
       for(const item of pending.splice(0)){ // process all
-        if(item.type==='networth'){
-          const inner = inflateBase64ToJSON(item.seg.data); if(!inner) continue;
-          const sg = (inner.stateGroups||[]).find(g=>g.name==='Game'); const state = sg?.states?.[0]; if(!state) continue;
-          const teamGroup = (state.entityGroups||[]).find(g=>g.name==='Team'); if(!teamGroup) continue;
-          const values = {}; (teamGroup.entitySubGroups?.[0]?.entities||[]).forEach(ent=>{ const teamName=ent.name; const np=ent.dataPoints||[]; const netWorth=np[0]?.value ?? null; if(teamName && netWorth!=null) values[teamName]=netWorth; });
-          window.postMessage({ source:'lol-netWorth', netWorth: values }, '*');
-        } else if(item.type==='score'){
+        if(item.type==='score'){
           const inner = inflateBase64ToJSON(item.seg.data); if(!inner) continue; if(tryExtract(inner)) changed = true;
         }
       }
@@ -115,19 +109,6 @@
       if(service && !seenServices.has(service) && seenServices.size < MAX_DEBUG_SERVICES){
         seenServices.add(service);
         window.postMessage({ source:'lol-debug', stage:'service', service }, '*');
-      }
-      // Net worth extraction
-      if(/series_comparison/i.test(service)){
-        for(const seg of env.data || []){
-          if(!seg?.data) continue;
-          if(!(typeof pako !== 'undefined' && pako.inflate)) { pending.push({ type:'networth', seg }); continue; }
-          const inner = inflateBase64ToJSON(seg.data); if(!inner) continue;
-          const sg = (inner.stateGroups||[]).find(g=>g.name==='Game'); const state = sg?.states?.[0]; if(!state) continue;
-          const teamGroup = (state.entityGroups||[]).find(g=>g.name==='Team'); if(!teamGroup) continue;
-          const values = {}; (teamGroup.entitySubGroups?.[0]?.entities||[]).forEach(ent=>{ const teamName=ent.name; const np=ent.dataPoints||[]; const netWorth=np[0]?.value ?? null; if(teamName && netWorth!=null) values[teamName]=netWorth; });
-          window.postMessage({ source:'lol-netWorth', netWorth: values }, '*');
-        }
-        return; // don't attempt mapping in this branch
       }
       // Scoreboard / roster style services
     if(/scoreboard|team|roster|color/i.test(service)){

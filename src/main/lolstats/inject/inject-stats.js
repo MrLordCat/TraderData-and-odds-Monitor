@@ -17,7 +17,6 @@
   const RX_BARON      = /slaybaron/i;
   const RX_DRAGON     = /slaydragon/i;
   const RX_DRAKE      = /slay\w*drake/i;
-  const RX_ATAKHAN    = /slaythornboundatakhan/i; // Atakhan objective
   const RX_BANNED     = /\bbanned\b/i; // Ban detection
   const RX_GAME_END   = /^Game\s+(\d+)\s+ended$/i; // Game end detection for ban phase logic
   // Strict single-line winner detection: "<Team Name> won Game <N>"
@@ -122,9 +121,6 @@
 
   dragonCount: {}, dragonTimes: {},
 
-  // Atakhan (single objective kill; binary which team secured)
-  atakhan: null, atakhanAt: ''
-,
   // Multi-kills (injected via separate multikill parser then merged in main process)
   quadra: null, quadraAt: '',
   penta: null, pentaAt: '',
@@ -425,11 +421,6 @@
         stats[countKey][team]=(stats[countKey][team]||0)+1;
       }
     });
-
-    // Atakhan
-    if (RX_ATAKHAN.test(t)) {
-      if (!stats.atakhan) { stats.atakhan = team; stats.atakhanAt = ts; }
-    }
 
     // Dragon - check for both slaydragon and slay[Name]drake events
     if (RX_DRAGON.test(t) || RX_DRAKE.test(t)) {

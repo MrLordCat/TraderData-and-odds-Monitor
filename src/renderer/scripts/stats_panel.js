@@ -71,16 +71,16 @@ ipcRenderer.on('settings-updated', ()=>{
 
 // ================= Runtime State =================
 let metricVisibility = {}; // runtime copy controlling row visibility
-const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'];
+const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta'];
 const COUNT_METRICS = ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
 function parseTs(raw){ if(raw==null) return Infinity; if(typeof raw==='number'&&!isNaN(raw)) return raw>36000?Math.floor(raw/1000):raw; if(typeof raw==='string'){ const v=raw.trim(); if(/^\d+$/.test(v)){ const n=Number(v); return n>36000?Math.floor(n/1000):n; } if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(v)){ const p=v.split(':').map(n=>Number(n)||0); if(p.length===2) return p[0]*60+p[1]; if(p.length===3) return p[0]*3600+p[1]*60+p[2]; } } return Infinity; }
 let prevMatchUrls = { A: null, B: null };
 let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
 let teamNamesSource = 'grid'; // 'grid' or 'excel' - Excel has priority
-let metricsOrder = ['netWorth','atakhan','firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta','winner'];
+let metricsOrder = ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta'];
 let metricsOrderMutable = [...metricsOrder];
-const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', netWorth:'Net Worth', quadra:'Quadra', penta:'Penta', atakhan:'Atakhan', winner:'Winner' };
+const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', quadra:'Quadra', penta:'Penta' };
 let lastOrderSig = null;
 let __prevValues = {}; // cell previous values
 let lastGameRendered = null;
@@ -127,7 +127,7 @@ function setTeamHeader(idx, rawText, opts = {}){
 }
 
 function makeEmptyGame(){
-  return { firstKill:null, firstKillAt:'', killCount:{}, race5:null,race5At:'', race10:null,race10At:'', race15:null,race15At:'', race20:null,race20At:'', firstTower:null, firstTowerAt:'', firstInhibitor:null, firstInhibitorAt:'', firstBaron:null, firstBaronAt:'', towerCount:{}, inhibitorCount:{}, baronCount:{}, dragonCount:{}, dragonOrders:{}, dragonOrderSequence:[], netWorth:{}, quadra:null, quadraAt:'', penta:null, pentaAt:'', atakhan:null, atakhanAt:'' };
+  return { firstKill:null, firstKillAt:'', killCount:{}, race5:null,race5At:'', race10:null,race10At:'', race15:null,race15At:'', race20:null,race20At:'', firstTower:null, firstTowerAt:'', firstInhibitor:null, firstInhibitorAt:'', firstBaron:null, firstBaronAt:'', towerCount:{}, inhibitorCount:{}, baronCount:{}, dragonCount:{}, dragonOrders:{}, dragonOrderSequence:[], quadra:null, quadraAt:'', penta:null, pentaAt:'' };
 }
 
 function manualSnapshotCurrent(){
@@ -146,7 +146,7 @@ function renderManual(){ renderLol(manualSnapshotCurrent(), true); applyWinLose(
 
 // Team names are now read-only from Excel (K4/N4)
 // Manual mode team renaming functions preserved for internal bucket renaming only
-function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const old=cur; if(idx===1) manualData.team1Name=v; else manualData.team2Name=v; Object.values(manualData.gameStats).forEach(gs=>{ ['killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonTimes','netWorth'].forEach(f=>{ const bucket=gs[f]; if(!bucket) return; if(bucket[old]!=null){ bucket[v]=bucket[old]; delete bucket[old]; } }); if(gs.firstKill===old) gs.firstKill=v; ['race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','atakhan','quadra','penta','winner'].forEach(b=>{ if(gs[b]===old) gs[b]=v; }); }); renderManual(); }
+function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const old=cur; if(idx===1) manualData.team1Name=v; else manualData.team2Name=v; Object.values(manualData.gameStats).forEach(gs=>{ ['killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonTimes'].forEach(f=>{ const bucket=gs[f]; if(!bucket) return; if(bucket[old]!=null){ bucket[v]=bucket[old]; delete bucket[old]; } }); if(gs.firstKill===old) gs.firstKill=v; ['race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','winner'].forEach(b=>{ if(gs[b]===old) gs[b]=v; }); }); renderManual(); }
 
 function applyRaceFromKills(gs){ const bucket = gs.killCount||{}; [ ['race5',5], ['race10',10], ['race15',15], ['race20',20] ].forEach(([key,n])=>{ if(!gs[key]){ const t1=bucket[manualData.team1Name]||0; const t2=bucket[manualData.team2Name]||0; if(t1===n || t2===n) gs[key]= t1===n? manualData.team1Name: manualData.team2Name; } }); }
 
@@ -163,10 +163,6 @@ function handleManualAction(metric, side, isRemove){
     const bucket=g[metric] ||= {};
     if(isRemove){ if(bucket[team]>0) bucket[team]--; }
     else { bucket[team]=(bucket[team]||0)+1; if(metric==='killCount') applyRaceFromKills(g); }
-  } else if(metric==='netWorth'){
-    const bucket=g.netWorth ||= {};
-    if(isRemove) bucket[team]=0;
-    else { const val=prompt('Net Worth for '+team, bucket[team]||0); if(val!=null) bucket[team]=Number(val)||0; }
   }
   renderManual();
 }
@@ -208,7 +204,7 @@ function ensureRows(){
   metricsOrderMutable.forEach(id=>{
     const tr=document.createElement('tr');
     tr.dataset.metric=id;
-  if(BINARY_METRICS.includes(id) || id==='dragonOrders' || id==='netWorth') tr.dataset.type='binary';
+  if(BINARY_METRICS.includes(id) || id==='dragonOrders') tr.dataset.type='binary';
     else if(COUNT_METRICS.includes(id)) tr.dataset.type='count';
     tr.draggable=true;
     // IMPORTANT: no escaped quotes here – previous refactor inserted backslashes so query selectors failed
@@ -246,10 +242,10 @@ function setText(id, side, val){
   }
   // Update value
   wrap.textContent = newVal;
-  // Activity heat bar bump logic (exclude netWorth to reduce noise)
+  // Activity heat bar bump logic
   // Suppress during reorder / team swap transitional updates
   const suppress = (window.__SUPPRESS_STATS_ANIM_UNTIL && performance.now() < window.__SUPPRESS_STATS_ANIM_UNTIL);
-  if(!suppress && id !== 'netWorth' && activityModule && activityModule.onMetricUpdate){
+  if(!suppress && activityModule && activityModule.onMetricUpdate){
     try {
       let shouldBump = false;
   if(newVal === '✓' && prevVal !== '✓') shouldBump = true; // binary acquisition (was 1/0 previously)
@@ -257,7 +253,7 @@ function setText(id, side, val){
         const nNew = parseInt(newVal,10);
         const nPrev = /^[0-9]+$/.test(prevVal||'') ? parseInt(prevVal,10) : -Infinity;
         if(nNew > nPrev) shouldBump = true;
-      } else if(id==='quadra' || id==='penta' || id==='atakhan'){
+      } else if(id==='quadra' || id==='penta'){
         if(newVal && newVal !== prevVal) shouldBump = true;
       }
       if(shouldBump){ activityModule.onMetricUpdate(side==='t1'?1:2); }
@@ -300,7 +296,7 @@ function clearLol(){
       let val='';
       if(isCount) val='0';
       else if(isBinary){
-        if(id==='dragonOrders' || id==='netWorth') val=''; else val='✗';
+        if(id==='dragonOrders') val=''; else val='✗';
       }
       c.textContent = val;
       c.classList.remove('wl-win','wl-lose');
@@ -384,14 +380,14 @@ function applyWinLose(){
     else if(n2>n1){ c2.classList.add('wl-win'); if(n1>0) c1.classList.add('wl-lose'); row.dataset.win='2'; }
     else { row.dataset.win='tie'; }
   });
-  // Apply header highlight ONLY if an explicit Winner row has ✓
+  // Apply header highlight based on game data winner
   if(!wlDisabled && th1 && th2){
-    const w1 = document.getElementById('winner-t1');
-    const w2 = document.getElementById('winner-t2');
-    const t1won = w1 && (w1.textContent||'').trim()==='✓';
-    const t2won = w2 && (w2.textContent||'').trim()==='✓';
-    if(t1won){ th1.classList.add('wl-win'); th2.classList.add('wl-lose'); }
-    else if(t2won){ th2.classList.add('wl-win'); th1.classList.add('wl-lose'); }
+    const winner = window.__CURRENT_GAME_WINNER;
+    const teams = window.__CURRENT_GAME_TEAMS;
+    if(winner && teams){
+      if(winner === teams.t1){ th1.classList.add('wl-win'); th2.classList.add('wl-lose'); }
+      else if(winner === teams.t2){ th2.classList.add('wl-win'); th1.classList.add('wl-lose'); }
+    }
   }
 }
 // (Heat bar listener lives in stats_theme.js)
@@ -553,15 +549,14 @@ function renderLol(payload, manual=false){
     const filledBinary = new Set();
     ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron'].forEach(f=> setBinary(f, filledBinary));
     COUNT_METRICS.forEach(setCount);
-  // Winner (live only). Manual mode can also toggle if user wants.
-  if(s.winner){ setBinary('winner', filledBinary); }
     // Dragon orders
     (function(){ let orders1=[], orders2=[]; if(s.dragonOrders){ orders1 = s.dragonOrders[dispTeam1]||[]; orders2 = s.dragonOrders[dispTeam2]||[]; } else if(s.dragonTimes){ const map = dragonTimesToOrders(s.dragonTimes, team1Name, team2Name); orders1 = map[dispTeam1]||[]; orders2 = map[dispTeam2]||[]; } setText('dragonOrders','t1', orders1.join(' ')); setText('dragonOrders','t2', orders2.join(' ')); })();
-    // Net worth
-  const nw = s.netWorth || {}; const hasNw1 = Object.prototype.hasOwnProperty.call(nw, t1Key); const hasNw2 = Object.prototype.hasOwnProperty.call(nw, t2Key); const nw1 = hasNw1 ? nw[t1Key] : ''; const nw2 = hasNw2 ? nw[t2Key] : ''; setText('netWorth','t1', nw1); setText('netWorth','t2', nw2);
-    if(s.quadra) setBinary('quadra', filledBinary); if(s.penta) setBinary('penta', filledBinary); if(s.atakhan) setBinary('atakhan', filledBinary);
-  ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','atakhan','winner'].forEach(m=>{ if(!filledBinary.has(m)){ setText(m,'t1','✗'); setText(m,'t2','✗'); } });
+    if(s.quadra) setBinary('quadra', filledBinary); if(s.penta) setBinary('penta', filledBinary);
+  ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta'].forEach(m=>{ if(!filledBinary.has(m)){ setText(m,'t1','✗'); setText(m,'t2','✗'); } });
     const statusEl=document.getElementById('lolStatus'); if(statusEl) statusEl.textContent = `Games: ${games.join(', ')}`;
+    // Store winner info from game data for header coloring
+    window.__CURRENT_GAME_WINNER = s.winner || null;
+    window.__CURRENT_GAME_TEAMS = { t1: dispTeam1, t2: dispTeam2 };
     // After all cell values are updated compute win/lose highlighting
     applyWinLose();
   } catch(e) { /* swallow */ }

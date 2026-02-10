@@ -47,7 +47,7 @@ window.addEventListener('message', (e) => {
   if(!__slot) return;
   const d = e.data;
   if(!d || typeof d !== 'object') return;
-  if(d.source === 'lol-live-stats' || d.source === 'lol-multikill' || d.source==='lol-netWorth' || d.source==='lol-debug' || d.source==='lol-reset-trigger') {
+  if(d.source === 'lol-live-stats' || d.source === 'lol-multikill' || d.source==='lol-debug' || d.source==='lol-reset-trigger') {
     ipcRenderer.send('lol-stats-raw', { slot: __slot, data: d });
   }
   // Forward sound events to main process for stats_panel
