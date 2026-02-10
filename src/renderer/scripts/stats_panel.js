@@ -179,7 +179,7 @@ function cell(id, side){ return document.getElementById(`${id}-${side}`); }
 // Helper: Manual mode is now a toggle button with data-active attribute
 function isManualOn(){ const el=document.getElementById('lolManualMode'); return el && el.getAttribute('data-active')==='true'; }
 function setManualOn(v){ const el=document.getElementById('lolManualMode'); if(el){ el.setAttribute('data-active', v?'true':'false'); el.classList.toggle('active', !!v); } document.body.classList.toggle('manual-mode', !!v); }
-function sendPersist(){ send('lol-stats-settings',{ manualMode: isManualOn(), metricVisibility, metricOrder: metricsOrderMutable }); }
+function sendPersist(){ send('lol-stats-settings',{ manualMode: isManualOn(), metricVisibility, metricOrder: metricsOrderMutable, template: currentTemplate }); }
 
 // ================= Template Presets =================
 const TEMPLATE_MINI_HIDE = ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','towerCount','dragonOrders'];
@@ -344,6 +344,7 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
   if(cfg.lolMetricMarks && typeof cfg.lolMetricMarks==='object'){
     window.__LOL_CHECK_STATE = JSON.parse(JSON.stringify(cfg.lolMetricMarks));
   }
+  if(cfg.lolTemplate && cfg.lolTemplate !== currentTemplate){ applyTemplate(cfg.lolTemplate); }
   buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); }
   if(isManualOn()){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
   ipcRenderer.send('lol-stats-settings',{ manualMode: isManualOn(), manualData, metricMarks: window.__LOL_CHECK_STATE });

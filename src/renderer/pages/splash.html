@@ -5,12 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OddsMoni Loading</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
       background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
@@ -23,8 +19,29 @@
       overflow: hidden;
       -webkit-app-region: drag;
       user-select: none;
+      position: relative;
     }
-    
+
+    /* ── Particle canvas ── */
+    #particleCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Content layer ── */
+    .content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Logo ── */
     .logo {
       font-size: 42px;
       font-weight: 700;
@@ -34,77 +51,157 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      animation: logoFloat 3s ease-in-out infinite;
     }
-    
+    @keyframes logoFloat {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-3px); }
+    }
+
     .version {
       font-size: 13px;
       color: #8b949e;
       margin-bottom: 32px;
     }
-    
+
+    /* ── Progress bar ── */
     .progress-container {
       width: 280px;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 2px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
       overflow: hidden;
       margin-bottom: 16px;
+      position: relative;
     }
-    
+
     .progress-bar {
       height: 100%;
       width: 0%;
       background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 100%);
-      border-radius: 2px;
-      transition: width 150ms ease-out;
+      border-radius: 3px;
+      transition: width 200ms ease-out;
+      position: relative;
+      box-shadow: 0 0 8px rgba(96, 165, 250, 0.5),
+                  0 0 20px rgba(167, 139, 250, 0.25);
     }
-    
+    /* Shimmer sweep across filled portion */
+    .progress-bar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255,255,255,0.35) 50%,
+        transparent 100%
+      );
+      width: 60%;
+      animation: shimmer 1.8s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(260%); }
+    }
+
+    /* ── Status text with fade ── */
     .status {
       font-size: 12px;
       color: #8b949e;
       min-height: 18px;
+      transition: opacity 150ms ease;
     }
-    
-    /* Subtle pulse animation on logo */
-    .logo {
-      animation: pulse 2s ease-in-out infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.8; }
-    }
+    .status.fade { opacity: 0; }
   </style>
 </head>
 <body>
-  <div class="logo">OddsMoni</div>
-  <div class="version" id="version">v0.3.0</div>
-  <div class="progress-container">
-    <div class="progress-bar" id="progressBar"></div>
+  <canvas id="particleCanvas"></canvas>
+  <div class="content">
+    <div class="logo">OddsMoni</div>
+    <div class="version" id="version">v0.4.0</div>
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="status" id="status">Initializing...</div>
   </div>
-  <div class="status" id="status">Initializing...</div>
-  
+
   <script>
     const { ipcRenderer } = require('electron');
-    
+
+    /* ── Particle system (canvas) ── */
+    (function initParticles() {
+      const canvas = document.getElementById('particleCanvas');
+      const ctx = canvas.getContext('2d');
+      let W, H;
+      const PARTICLE_COUNT = 28;
+      const particles = [];
+
+      function resize() {
+        W = canvas.width = canvas.offsetWidth;
+        H = canvas.height = canvas.offsetHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      // Particle: small circle drifting upward with slight horizontal sway
+      function spawn(y) {
+        return {
+          x: Math.random() * W,
+          y: y !== undefined ? y : Math.random() * H,
+          r: 1.2 + Math.random() * 2,          // radius 1.2–3.2
+          vx: (Math.random() - 0.5) * 0.2,     // gentle horizontal drift
+          vy: -(0.15 + Math.random() * 0.35),   // upward speed
+          alpha: 0.08 + Math.random() * 0.18,   // subtle opacity
+          color: Math.random() > 0.5 ? '96,165,250' : '167,139,250' // blue or purple
+        };
+      }
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(spawn());
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        for (const p of particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          // Recycle when off-screen top
+          if (p.y + p.r < 0) {
+            Object.assign(p, spawn(H + p.r));
+          }
+          // Wrap horizontal
+          if (p.x < -p.r) p.x = W + p.r;
+          if (p.x > W + p.r) p.x = -p.r;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+          ctx.fill();
+        }
+        requestAnimationFrame(draw);
+      }
+      draw();
+    })();
+
+    /* ── Progress / status IPC ── */
     const progressBar = document.getElementById('progressBar');
     const statusEl = document.getElementById('status');
     const versionEl = document.getElementById('version');
-    
-    // Receive progress updates from main process
+
     ipcRenderer.on('splash-progress', (event, { progress, status, version }) => {
       if (progress !== undefined) {
         progressBar.style.width = `${Math.min(100, progress)}%`;
       }
-      if (status) {
-        statusEl.textContent = status;
+      if (status && status !== statusEl.textContent) {
+        // Fade out → swap text → fade in
+        statusEl.classList.add('fade');
+        setTimeout(() => {
+          statusEl.textContent = status;
+          statusEl.classList.remove('fade');
+        }, 150);
       }
       if (version) {
         versionEl.textContent = `v${version}`;
       }
     });
-    
-    // Signal that splash is ready
+
     ipcRenderer.send('splash-ready');
   </script>
 </body>

@@ -33,6 +33,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   let lolMetricMarks = store.get('lolMetricMarks', {});
   let lolMetricVisibility = store.get('lolMetricVisibility', {});
   let lolMetricOrder = store.get('lolMetricOrder', null);
+  let lolTemplate = store.get('lolTemplate', 'all');
   const DEFAULT_STATS_CONFIG = { animationsEnabled:true, animationDurationMs:450, animationScale:1, animationPrimaryColor:'#3b82f6', animationSecondaryColor:'#f59e0b', heatBarOpacity:0.55, winLoseEnabled:true };
   let statsConfig = Object.assign({}, DEFAULT_STATS_CONFIG, store.get('statsConfig', {}));
 
@@ -156,6 +157,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     store.set('statsSingleWindow', singleWindow);
     store.set('lolMetricVisibility', lolMetricVisibility);
     if(lolMetricOrder) store.set('lolMetricOrder', lolMetricOrder);
+    store.set('lolTemplate', lolTemplate);
     store.set('statsConfig', statsConfig);
     store.set('lolManualMode', lolManualMode);
     if(lolManualData) store.set('lolManualData', lolManualData);
@@ -438,7 +440,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
           const hb = store.get('gsHeatBar'); 
           views.panel.webContents.send('stats-init', { 
             urls, mode, side, panelWidth, 
-            lolManualMode, lolMetricVisibility, lolMetricOrder, 
+            lolManualMode, lolMetricVisibility, lolMetricOrder, lolTemplate,
             gsHeatBar: hb, statsConfig, lolManualData, lolMetricMarks, singleWindow,
             panelOnly: !statsActive  // Indicate if only panel is active (no A/B views)
           }); 
@@ -590,6 +592,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
           if(typeof payload.manualMode==='boolean') lolManualMode=payload.manualMode;
             if(payload.metricVisibility) lolMetricVisibility={ ...lolMetricVisibility, ...payload.metricVisibility };
             if(Array.isArray(payload.metricOrder)) lolMetricOrder=payload.metricOrder.slice();
+            if(typeof payload.template==='string') lolTemplate=payload.template;
             if(payload.manualData) lolManualData = payload.manualData;
             if(payload.metricMarks) lolMetricMarks = payload.metricMarks;
             persist();
