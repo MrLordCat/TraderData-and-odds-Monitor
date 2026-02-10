@@ -78,6 +78,7 @@ let prevMatchUrls = { A: null, B: null };
 let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
 let teamNamesSource = 'grid'; // 'grid' or 'excel' - Excel has priority
+let _animSuppressFirstData = true; // extend suppression +2s on first data after reset/load
 let metricsOrder = ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta'];
 let metricsOrderMutable = [...metricsOrder];
 const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', quadra:'Quadra', penta:'Penta' };
@@ -300,7 +301,9 @@ function setText(id, side, val){
 // ================= LoL Update Handling =================
 ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(isManualOn()) return; try {
   const firstRender = (lastGameRendered == null);
-  if(firstRender){ window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; }
+  if(firstRender){ window.__SUPPRESS_STATS_ANIM_UNTIL = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, performance.now() + 5000); }
+  // Extend suppression +2s on first data arriving after grid load/reset
+  if(_animSuppressFirstData){ _animSuppressFirstData = false; window.__SUPPRESS_STATS_ANIM_UNTIL = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, performance.now() + 2000); }
   liveDataset = payload; cachedLive = payload; const games=Object.keys(payload.gameStats||{}).map(Number).sort((a,b)=>a-b); const sig = games.join(','); if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; if(sig !== lastLiveGamesSig){ lastLiveGamesSig = sig; if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; }
   updateGameSelect(); renderLol(payload); } catch(e){} });
 
@@ -327,7 +330,7 @@ function clearLol(){
   });
 }
 
-ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
+ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); _animSuppressFirstData = true; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
 
 // ================= Credentials =================
 
@@ -586,6 +589,8 @@ function renderLol(payload, manual=false){
 
 // ================= Startup =================
 (function init(){
+  // Suppress animations for 5s on panel startup (protects against backlog replay)
+  window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000;
   bindBasic();
   bindReset();
   bindSettings();
