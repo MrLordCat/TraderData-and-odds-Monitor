@@ -152,11 +152,6 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
   });
 
   ipcMain.handle('auto-state-get', () => ({ active: __autoLast.active }));
-
-  // Auto debug log — broadcast to all views (displayed in Board panel)
-  ipcMain.on('auto-debug-log', (_e, payload) => {
-    try { broadcastToAll(getBroadcastCtx(), 'auto-debug-log', payload); } catch (_) { }
-  });
 }
 
 module.exports = { initAutoPressIpc };

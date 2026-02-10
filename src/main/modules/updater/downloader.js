@@ -8,10 +8,20 @@ const path = require('path');
 const { pipeline } = require('stream/promises');
 const { createWriteStream, createReadStream } = require('fs');
 
-// Download file with progress callback
-function downloadUpdate(url, destPath, onProgress) {
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+const PROGRESS_THROTTLE_MS = 500; // Max 2 progress broadcasts per second
+const DOWNLOAD_TIMEOUT_MS = 300000; // 5 min inactivity timeout
+
+// Download file with progress callback (throttled + retry)
+function downloadUpdate(url, destPath, onProgress, retryCount = 0) {
   return new Promise((resolve, reject) => {
-    const makeRequest = (reqUrl) => {
+    let lastProgressTime = 0;
+    let lastReportedPercent = -1;
+
+    const makeRequest = (reqUrl, redirectCount = 0) => {
+      if (redirectCount > 5) { reject(new Error('Too many redirects')); return; }
+
       const urlObj = new URL(reqUrl);
       const protocol = urlObj.protocol === 'https:' ? https : http;
 
@@ -20,15 +30,16 @@ function downloadUpdate(url, destPath, onProgress) {
         path: urlObj.pathname + urlObj.search,
         method: 'GET',
         headers: {
-          'User-Agent': 'OddsMoni-Updater/1.0'
+          'User-Agent': 'OddsMoni-Updater/1.0',
+          'Accept': '*/*'
         }
       };
 
       const req = protocol.request(opts, (res) => {
         // Handle redirects (GitHub uses them for release assets)
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          console.log(`[downloader] Redirect to: ${res.headers.location}`);
-          makeRequest(res.headers.location);
+          console.log(`[downloader] Redirect ${res.statusCode} -> ${res.headers.location.substring(0, 80)}...`);
+          makeRequest(res.headers.location, redirectCount + 1);
           return;
         }
 
@@ -46,7 +57,13 @@ function downloadUpdate(url, destPath, onProgress) {
           downloadedSize += chunk.length;
           if (totalSize > 0 && onProgress) {
             const progress = Math.round((downloadedSize / totalSize) * 100);
-            onProgress(progress);
+            const now = Date.now();
+            // Throttle: report only every PROGRESS_THROTTLE_MS or on 100%
+            if (progress !== lastReportedPercent && (progress === 100 || now - lastProgressTime >= PROGRESS_THROTTLE_MS)) {
+              lastProgressTime = now;
+              lastReportedPercent = progress;
+              onProgress(progress);
+            }
           }
         });
 
@@ -54,7 +71,9 @@ function downloadUpdate(url, destPath, onProgress) {
 
         fileStream.on('finish', () => {
           fileStream.close();
-          console.log(`[downloader] Download complete: ${destPath}`);
+          // Final 100% report
+          if (onProgress && lastReportedPercent !== 100) onProgress(100);
+          console.log(`[downloader] Download complete: ${(totalSize / 1048576).toFixed(1)} MB -> ${destPath}`);
           resolve(destPath);
         });
 
@@ -62,17 +81,32 @@ function downloadUpdate(url, destPath, onProgress) {
           fs.unlink(destPath, () => {});
           reject(err);
         });
+
+        res.on('error', (err) => {
+          fileStream.destroy();
+          fs.unlink(destPath, () => {});
+          reject(err);
+        });
       });
 
       req.on('error', reject);
-      req.setTimeout(300000, () => { // 5 min timeout for large files
+      req.setTimeout(DOWNLOAD_TIMEOUT_MS, () => {
         req.destroy();
-        reject(new Error('Download timeout'));
+        reject(new Error('Download timeout (no data for 5 min)'));
       });
       req.end();
     };
 
     makeRequest(url);
+  }).catch((err) => {
+    // Retry logic
+    if (retryCount < MAX_RETRIES) {
+      const attempt = retryCount + 1;
+      console.warn(`[downloader] Attempt ${attempt}/${MAX_RETRIES} failed: ${err.message}. Retrying in ${RETRY_DELAY_MS}ms...`);
+      return new Promise(r => setTimeout(r, RETRY_DELAY_MS * attempt))
+        .then(() => downloadUpdate(url, destPath, onProgress, attempt));
+    }
+    throw err;
   });
 }
 

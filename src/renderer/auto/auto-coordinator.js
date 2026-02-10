@@ -431,13 +431,11 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     }, delay);
   }
 
-  /** Emit debug log visible in Board panel */
   function autoLog(msg) {
     try {
       const ts = new Date();
       const hms = String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0') + ':' + String(ts.getSeconds()).padStart(2,'0');
-      const entry = hms + ' ' + msg;
-      ipcSend(global, 'auto-debug-log', { msg: entry });
+      console.log('[Auto] ' + hms + ' ' + msg);
     } catch (_) { }
   }
 

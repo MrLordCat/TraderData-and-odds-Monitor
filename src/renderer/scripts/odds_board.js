@@ -450,23 +450,4 @@ function initEmbeddedToolbar(){
 
 window.addEventListener('DOMContentLoaded', initEmbeddedToolbar);
 
-// ======= Auto Debug Log =======
-const AUTO_LOG_MAX = 60;
-function initAutoDebugLog() {
-  try {
-    const ipc = window.require ? window.require('electron').ipcRenderer : null;
-    if (!ipc) return;
-    const logEl = document.getElementById('autoDebugLog');
-    if (!logEl) return;
-    ipc.on('auto-debug-log', (_e, payload) => {
-      if (!payload || !payload.msg) return;
-      const line = document.createElement('div');
-      line.className = 'dl';
-      line.textContent = payload.msg;
-      logEl.appendChild(line);
-      while (logEl.children.length > AUTO_LOG_MAX) logEl.removeChild(logEl.firstChild);
-      logEl.scrollTop = logEl.scrollHeight;
-    });
-  } catch (_) { }
-}
-try { initAutoDebugLog(); } catch (_) { }
+
