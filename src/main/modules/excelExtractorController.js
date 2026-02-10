@@ -39,21 +39,6 @@ function createExcelExtractorController({
 
   function broadcast(channel, payload) { broadcastGlobal(channel, payload); }
 
-  function excelLog() {
-    // Debug logging disabled
-    // const msg = Array.from(arguments)
-    //   .map(a => {
-    //     if (a instanceof Error) return a.stack || a.message;
-    //     if (typeof a === 'object') {
-    //       try { return JSON.stringify(a); } catch (_) { return String(a); }
-    //     }
-    //     return String(a);
-    //   })
-    //   .join(' ');
-    // try { console.log('[excel-extractor][log]', msg); } catch (_) { }
-    // broadcast('excel-extractor-log', { ts: Date.now(), msg });
-  }
-
   // -------- Python executable auto-detection --------
   // Tries 'python', then 'py' (Windows Launcher), caches result.
   let _resolvedPythonExe = null;
@@ -68,29 +53,16 @@ function createExcelExtractorController({
     // Return cached result
     if (_resolvedPythonExe) return _resolvedPythonExe;
 
-    // Try 'python' first
-    try {
-      const result = spawnSync('python', ['--version'], { stdio: 'pipe', windowsHide: true, timeout: 5000 });
-      if (result.status === 0 && !result.error) {
-        _resolvedPythonExe = 'python';
-        excelLog('Resolved Python executable: python');
-        return 'python';
-      }
-    } catch (_) { }
-
-    // Try 'py' (Windows Python Launcher)
-    try {
-      const result = spawnSync('py', ['--version'], { stdio: 'pipe', windowsHide: true, timeout: 5000 });
-      if (result.status === 0 && !result.error) {
-        _resolvedPythonExe = 'py';
-        excelLog('Resolved Python executable: py (Windows Launcher)');
-        return 'py';
-      }
-    } catch (_) { }
+    for (const candidate of ['python', 'py']) {
+      try {
+        const result = spawnSync(candidate, ['--version'], { stdio: 'pipe', windowsHide: true, timeout: 5000 });
+        if (result.status === 0 && !result.error) { _resolvedPythonExe = candidate; return candidate; }
+      } catch (_) { }
+    }
 
     // Nothing found, default to 'python' (will fail with descriptive error)
     _resolvedPythonExe = 'python';
-    excelLog('Neither python nor py found, defaulting to python');
+    console.warn('[excel-extractor] Neither python nor py found, defaulting to python');
     return 'python';
   }
 
@@ -137,7 +109,6 @@ function createExcelExtractorController({
 
     state.excelDepsInstalling = true;
     broadcastExcelStatus();
-    excelLog('Checking Python dependencies...');
 
     // Проверяем какие пакеты отсутствуют
     const checkScript = `
@@ -173,7 +144,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       const output = stdout.trim();
       
       if (output === 'OK') {
-        excelLog('All Python dependencies are installed');
         depsChecked = true;
         state.excelDepsInstalling = false;
         broadcastExcelStatus();
@@ -185,7 +155,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       const match = output.match(/MISSING:(.+)/);
       if (!match) {
         // Python не найден или ошибка
-        excelLog('Failed to check dependencies:', stderr || output || 'unknown error');
+        console.warn('[excel-extractor] Failed to check dependencies:', stderr || output || 'unknown error');
         state.excelDepsInstalling = false;
         broadcastExcelStatus();
         callback(new Error('Failed to check Python dependencies'));
@@ -201,7 +171,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
         return;
       }
 
-      excelLog('Installing missing packages:', missing.join(', '));
+      console.log('[excel-extractor] Installing missing packages:', missing.join(', '));
 
       // Устанавливаем отсутствующие пакеты
       const installArgs = ['-m', 'pip', 'install', '--upgrade', ...missing];
@@ -211,7 +181,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       let installErr = '';
       installProc.stdout.on('data', d => { 
         installOut += d.toString();
-        excelLog('[pip]', d.toString().trim());
       });
       installProc.stderr.on('data', d => { 
         installErr += d.toString();
@@ -222,12 +191,12 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
         broadcastExcelStatus();
 
         if (installCode === 0) {
-          excelLog('Successfully installed:', missing.join(', '));
+          console.log('[excel-extractor] Successfully installed:', missing.join(', '));
           depsChecked = true;
           callback(null);
         } else {
           const errMsg = installErr || installOut || 'pip install failed';
-          excelLog('Failed to install packages:', errMsg);
+          console.warn('[excel-extractor] Failed to install packages:', errMsg);
           callback(new Error('pip install failed: ' + errMsg.slice(0, 200)));
         }
       });
@@ -235,7 +204,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       installProc.on('error', (err) => {
         state.excelDepsInstalling = false;
         broadcastExcelStatus();
-        excelLog('pip spawn error:', err.message);
+        console.warn('[excel-extractor] pip spawn error:', err.message);
         callback(err);
       });
     });
@@ -243,7 +212,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     checkProc.on('error', (err) => {
       state.excelDepsInstalling = false;
       broadcastExcelStatus();
-      excelLog('Python check spawn error:', err.message);
+      console.warn('[excel-extractor] Python check spawn error:', err.message);
       callback(err);
     });
   }
@@ -254,10 +223,9 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
 
   function readAhkFromCurrentState() {
     try {
-      const file = (() => {
-        try { const custom = store.get('excelDumpPath'); if (custom && typeof custom === 'string') return custom; } catch (_) { }
-        return path.join(getExcelExtractorDir(), 'current_state.json');
-      })();
+      let file;
+      try { const custom = store.get('excelDumpPath'); file = (custom && typeof custom === 'string') ? custom : null; } catch (_) { }
+      if (!file) file = path.join(getExcelExtractorDir(), 'current_state.json');
       const data = readJsonSafe(file);
       if (!data) return;
       const ahk = data.ahk;
@@ -374,7 +342,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
           }
 
           store.set('excelWorkbookPath', workbookPath);
-          excelLog('excelWorkbookPath set', workbookPath);
         }
       } catch (err) {
         abortStart('File picker failed: ' + (err && err.message ? err.message : String(err)));
@@ -384,12 +351,10 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       const args = ['-u', scriptPath, '--file', workbookPath];
       const cwd = path.dirname(scriptPath);
 
-      excelLog('spawn attempt', JSON.stringify({ python: py, args, cwd, scriptPath }));
-
       const spawnEnv = pySpawnEnv();
 
       state.excelProc = spawn(py, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: spawnEnv });
-      excelLog('spawned pid', state.excelProc.pid, 'script', scriptPath);
+      console.log('[excel-extractor] spawned pid', state.excelProc.pid);
 
       state.excelProc.on('spawn', () => {
         state.excelProcStarting = false;
@@ -403,7 +368,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
         const needReset = !existingDump || path.normalize(existingDump) !== path.normalize(dumpCandidate);
         if (needReset) {
           store.set('excelDumpPath', dumpCandidate);
-          excelLog('excelDumpPath synced to', dumpCandidate);
         }
       } catch (_) { }
 
@@ -411,7 +375,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       let gotAnyOutput = false;
       const firstOutputTimer = setTimeout(() => {
         if (!gotAnyOutput && state.excelProc) {
-          excelLog('no-output-first-4s: возможно скрипт ждёт Excel или не установлен pywin32. Убедитесь что: Excel открыт с нужной книгой и выполнен pip install pywin32');
+          console.warn('[excel-extractor] no-output-first-4s: возможно скрипт ждёт Excel или не установлен pywin32');
         }
       }, 4000);
 
@@ -425,23 +389,19 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       state.excelProc.stdout.on('data', d => {
         try {
           markOutput();
-          const s = d.toString();
-          excelLog('[stdout]', String(s || '').trim());
         } catch (_) { }
       });
 
       state.excelProc.stderr.on('data', d => {
         try {
           markOutput();
-          const t = d.toString();
-          stderrBuf += t;
-          excelLog('[stderr]', String(t || '').trim());
+          stderrBuf += d.toString();
         } catch (_) { }
       });
 
       state.excelProc.on('exit', (code, sig) => {
         try { clearTimeout(firstOutputTimer); } catch (_) { }
-        excelLog('exit code', code, 'sig', sig || '');
+        console.log('[excel-extractor] exit code', code, 'sig', sig || '');
 
         if (code && code !== 0) {
           if (/pywin32/i.test(stderrBuf)) state.excelProcError = 'pywin32 не установлен (pip install pywin32)';
@@ -467,7 +427,7 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       state.excelProcError = (err && err.message) ? err.message : String(err);
       state.excelProcStarting = false;
       state.excelProc = null;
-      excelLog('spawn failed', state.excelProcError);
+      console.error('[excel-extractor] spawn failed', state.excelProcError);
       broadcastExcelStatus();
     }
   }
@@ -477,7 +437,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
 
     const scriptPath = resolveHotkeyControllerPath();
     if (!scriptPath) {
-      excelLog('[hotkey] excel_hotkey_controller.py not found');
       state.hotkeyProcError = 'excel_hotkey_controller.py not found';
       return;
     }
@@ -487,19 +446,15 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     const cwd = path.dirname(scriptPath);
     const args = ['-u', scriptPath];
 
-    excelLog('[hotkey] starting', scriptPath);
-
     try {
       state.hotkeyProc = spawn(py, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: pySpawnEnv(), windowsHide: true });
       state.hotkeyProcError = null;
 
-      excelLog('[hotkey] spawned pid', state.hotkeyProc.pid);
-
-      state.hotkeyProc.stdout.on('data', d => { try { excelLog('[hotkey][stdout]', d.toString().trim()); } catch (_) { } });
-      state.hotkeyProc.stderr.on('data', d => { try { excelLog('[hotkey][stderr]', d.toString().trim()); } catch (_) { } });
+      state.hotkeyProc.stdout.on('data', () => {});
+      state.hotkeyProc.stderr.on('data', () => {});
 
       state.hotkeyProc.on('exit', (code, sig) => {
-        excelLog('[hotkey] exit code', code, 'sig', sig || '');
+        console.log('[excel-extractor][hotkey] exit code', code, 'sig', sig || '');
         state.hotkeyProc = null;
         if (code && code !== 0) {
           state.hotkeyProcError = 'Hotkey controller exit code ' + code;
@@ -507,14 +462,14 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
         // When hotkey controller exits (e.g., ESC pressed), also stop the watcher
         // This ensures proper cleanup and status update in the board
         if (state.excelProc) {
-          excelLog('[hotkey] stopping watcher due to hotkey controller exit');
+          console.log('[excel-extractor][hotkey] stopping watcher due to hotkey controller exit');
           stopExcelExtractor();
         }
         broadcastExcelStatus();
       });
 
     } catch (err) {
-      excelLog('[hotkey] spawn failed', err && err.message ? err.message : String(err));
+      console.error('[excel-extractor][hotkey] spawn failed', err && err.message ? err.message : String(err));
       state.hotkeyProcError = err && err.message ? err.message : String(err);
       state.hotkeyProc = null;
     }
@@ -523,7 +478,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
   function stopHotkeyController() {
     try {
       if (state.hotkeyProc) {
-        excelLog('[hotkey] stopping pid', state.hotkeyProc.pid);
         state.hotkeyProc.kill();
         state.hotkeyProc = null;
       }
@@ -534,21 +488,12 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     // Stop hotkey controller first
     stopHotkeyController();
 
-    const ahkPid = (() => {
-      try {
-        const v = state.ahkStatus && state.ahkStatus.pid;
-        if (v != null && !isNaN(Number(v))) return Number(v);
-      } catch (_) { }
-      return null;
-    })();
-
-    const ahkManaged = (() => {
-      try { return !!(state.ahkStatus && state.ahkStatus.managed); } catch (_) { return false; }
-    })();
+    const rawPid = state.ahkStatus?.pid;
+    const ahkPid = (rawPid != null && !isNaN(Number(rawPid))) ? Number(rawPid) : null;
+    const ahkManaged = !!state.ahkStatus?.managed;
 
     try {
       if (state.excelProc) {
-        excelLog('[python] stopping pid', state.excelProc.pid);
         state.excelProc.kill();
       }
     } catch (_) { }
@@ -556,7 +501,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     // On Windows, process termination may bypass Python atexit; best-effort stop AHK by PID.
     try {
       if (ahkPid) {
-        excelLog('[ahk] stopping pid (from python status)', ahkPid);
         spawn('taskkill', ['/PID', String(ahkPid), '/T', '/F'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       }
     } catch (_) { }
@@ -564,7 +508,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     // Fallback: if Python indicates it launched AHK but PID is unreliable, best-effort stop AutoHotkey by image name.
     try {
       if (!ahkPid && ahkManaged) {
-        excelLog('[ahk] stopping by image name (managed by python)');
         spawn('taskkill', ['/IM', 'AutoHotkey*.exe', '/T', '/F'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       }
     } catch (_) { }
@@ -590,42 +533,10 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
       if (!trimmed) return;
       if (!fs.existsSync(trimmed)) return;
       store.set('excelScriptPath', trimmed);
-      excelLog('[excel-extractor] custom script path set', trimmed);
       if (!state.excelProc) startExcelExtractor();
       else broadcastExcelStatus();
     } catch (err) {
-      excelLog('[excel-extractor] set-path error', err && err.message ? err.message : String(err));
-    }
-  }
-
-  function installDeps() {
-    if (state.excelDepsInstalling) return;
-
-    const py = resolvePythonExe();
-
-    state.excelDepsInstalling = true;
-    state.excelProcError = null;
-    broadcastExcelStatus();
-
-    try {
-      const inst = spawn(py, ['-m', 'pip', 'install', 'pywin32'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-      let errBuf = '';
-      inst.stdout.on('data', d => { try { excelLog('[install][stdout]', d.toString().trim()); } catch (_) { } });
-      inst.stderr.on('data', d => { try { const s = d.toString(); errBuf += s; excelLog('[install][stderr]', s.trim()); } catch (_) { } });
-      inst.on('exit', (code) => {
-        state.excelDepsInstalling = false;
-        if (code === 0) {
-          state.excelProcError = null;
-          setTimeout(() => { if (!state.excelProc) startExcelExtractor(); }, 400);
-        } else {
-          state.excelProcError = 'Install failed (code ' + code + ')' + (errBuf ? (': ' + short(errBuf, 140)) : '');
-        }
-        broadcastExcelStatus();
-      });
-    } catch (err) {
-      state.excelDepsInstalling = false;
-      state.excelProcError = 'Install spawn err: ' + (err && err.message ? err.message : String(err));
-      broadcastExcelStatus();
+      console.warn('[excel-extractor] set-path error', err && err.message ? err.message : String(err));
     }
   }
 
@@ -656,7 +567,6 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
     toggle,
     getStatus,
     setExcelScriptPath,
-    installDeps,
     broadcastExcelStatus,
     dispose,
   };

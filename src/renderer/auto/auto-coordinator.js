@@ -83,6 +83,23 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   let pendingSkipResumeSignal = false;
   let aligningAfterNoMid = false;
 
+  /** Shared guard check. Returns 'ok' | 'suspended' | 'grace' */
+  function runGuardCheck(odds, opts) {
+    if (aligningAfterNoMid && !odds.derived.hasMid) {
+      aligningAfterNoMid = false;
+      suspend(REASON.NO_MID, true, false);
+      return 'suspended';
+    }
+    if (aligningAfterNoMid) return 'ok';
+    const g = GuardSystem.checkGuards(odds, state.mode);
+    if (!g.canTrade) {
+      if (opts?.graceCheck && g.reason === REASON.EXCEL_SUSPENDED && (Date.now() - lastResumeSentTs) < RESUME_GRACE_PERIOD_MS) return 'grace';
+      suspend(g.reason, !!g.isSoftSuspend, g.isUserSuspend === true);
+      return 'suspended';
+    }
+    return 'ok';
+  }
+
   function step() {
     if (!state.active) return;
     if (!isSignalSender) return;
@@ -92,25 +109,9 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     try {
       const odds = OddsStore.getSnapshot();
 
-      if (aligningAfterNoMid) {
-        if (!odds.derived.hasMid) {
-          aligningAfterNoMid = false;
-          suspend(REASON.NO_MID, true, false);
-          return;
-        }
-      } else {
-        const guardResult = GuardSystem.checkGuards(odds, state.mode);
-        if (!guardResult.canTrade) {
-          const timeSinceResumeSent = Date.now() - lastResumeSentTs;
-          if (guardResult.reason === REASON.EXCEL_SUSPENDED && timeSinceResumeSent < RESUME_GRACE_PERIOD_MS) {
-            scheduleStep();
-            return;
-          }
-          const isUserSuspend = guardResult.isUserSuspend === true;
-          suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
-          return;
-        }
-      }
+      const gr = runGuardCheck(odds, { graceCheck: true });
+      if (gr === 'suspended') return;
+      if (gr === 'grace') { scheduleStep(); return; }
 
       if (state.phase === STATE.IDLE && state.reason) {
         startAlignment();
@@ -204,21 +205,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     if (!state.active) return;
 
     const odds = OddsStore.getSnapshot();
-    const guardResult = GuardSystem.checkGuards(odds, state.mode);
-
-    if (aligningAfterNoMid) {
-      if (!odds.derived.hasMid) {
-        aligningAfterNoMid = false;
-        suspend(REASON.NO_MID, true, false);
-        return;
-      }
-    } else {
-      if (!guardResult.canTrade) {
-        const isUserSuspend = guardResult.isUserSuspend === true;
-        suspend(guardResult.reason, !!guardResult.isSoftSuspend, isUserSuspend);
-        return;
-      }
-    }
+    if (runGuardCheck(odds) === 'suspended') return;
 
     alignmentAttempts++;
 

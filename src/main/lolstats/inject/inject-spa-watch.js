@@ -14,7 +14,7 @@
     const cur = location.pathname + location.search + location.hash;
     if(cur !== last){
       last = cur;
-      try { console.log('[lol-spa-watch] URL changed -> restart data collection'); } catch(_){ }
+      console.log('[lol-spa-watch] URL changed -> restart data collection');
       // Notify injected collectors to reset internal state
       window.postMessage({ type:'restart_data_collection' }, '*');
       // Also emit a distinct marker for Electron main aggregator to reset its aggregate state

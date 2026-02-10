@@ -12,10 +12,6 @@ function initExcelExtractorIpc({ ipcMain, controller }) {
   ipcMain.on('excel-extractor-set-path', (_e, p) => {
     try { controller.setExcelScriptPath(p); } catch (_) { }
   });
-
-  ipcMain.on('excel-extractor-install-deps', () => {
-    try { controller.installDeps(); } catch (_) { }
-  });
 }
 
 module.exports = { initExcelExtractorIpc };

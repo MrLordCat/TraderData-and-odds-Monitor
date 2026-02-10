@@ -76,7 +76,7 @@ function createCredentialFiller(opts){
         if(user && lastCreds.username){ applyValue(user, lastCreds.username); ok = true; }
         if(pass && lastCreds.password){ applyValue(pass, lastCreds.password); ok = true; }
         if(ok){
-          try { console.log(logPrefix, 'filled attempt', attempts, 'host=', location.hostname); } catch(_){ }
+          console.log(logPrefix, 'filled attempt', attempts, 'host=', location.hostname);
           return;
         }
       } catch(_){ }

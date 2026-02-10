@@ -1,11 +1,9 @@
 // Core stats logic (theme & embedded odds handled in separate modules)
-// Guard against double execution (e.g., accidental multiple script tags or hot reload) causing 'ipcRenderer already declared'
-if(!window.__statsPanelBootstrapped){ window.__statsPanelBootstrapped = true; }
 let ipcRenderer = window.ipcRenderer; // reuse if already present
 if(!ipcRenderer){
   try { ipcRenderer = require('electron').ipcRenderer; window.ipcRenderer = ipcRenderer; } catch(e){ /* fallback placeholder */ }
 }
-try { console.log('[stats_panel] script start (boot=' + (window.__statsPanelBootstrapped) + ')'); } catch(_){ }
+console.log('[stats_panel] script start');
 if(!ipcRenderer){
   // If preload/nodeIntegration unexpectedly off, attach minimal shim so later code won't crash
   window.ipcRenderer = ipcRenderer = { send: ()=>{}, on: ()=>{}, invoke: async()=>{} };
@@ -26,72 +24,51 @@ function __setPanelSideUi(side){
 function bindStatsTopbar(){
   const byId = (id)=> document.getElementById(id);
 
-  try {
-    const sideBtn = byId('spPanelSide');
-    if(sideBtn){
-      sideBtn.addEventListener('click', ()=>{
-        try {
-          ipcRenderer.send('stats-toggle-side');
-          __setPanelSideUi(__statsPanelSide === 'left' ? 'right' : 'left');
-        } catch(_){ }
-      });
-    }
-  } catch(_){ }
+  const sideBtn = byId('spPanelSide');
+  if(sideBtn){
+    sideBtn.addEventListener('click', ()=>{
+      ipcRenderer.send('stats-toggle-side');
+      __setPanelSideUi(__statsPanelSide === 'left' ? 'right' : 'left');
+    });
+  }
 
-  try {
-    byId('spBack')?.addEventListener('click', ()=>{ try { ipcRenderer.send('stats-toggle'); } catch(_){ } });
-  } catch(_){ }
-
-  try {
-    byId('spSettings')?.addEventListener('click', ()=>{ try { ipcRenderer.send('open-settings'); } catch(_){ } });
-  } catch(_){ }
+  byId('spBack')?.addEventListener('click', ()=> ipcRenderer.send('stats-toggle'));
+  byId('spSettings')?.addEventListener('click', ()=> ipcRenderer.send('open-settings'));
 
   // Update badge: show when update available
-  try {
-    const updateBadge = byId('spUpdateBadge');
-    const showBadge = () => { if(updateBadge) updateBadge.hidden = false; };
-    const hideBadge = () => { if(updateBadge) updateBadge.hidden = true; };
-    
-    // Check initial state
+  const updateBadge = byId('spUpdateBadge');
+  if(updateBadge){
+    const showBadge = () => { updateBadge.hidden = false; };
+    const hideBadge = () => { updateBadge.hidden = true; };
     ipcRenderer.invoke('updater-get-status').then(st => {
       if(st && st.availableUpdate) showBadge();
     }).catch(()=>{});
-    
-    // Listen for update events
     ipcRenderer.on('updater-update-available', showBadge);
     ipcRenderer.on('updater-update-not-available', hideBadge);
-  } catch(_){ }
+  }
 }
 
-try {
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindStatsTopbar);
-  else bindStatsTopbar();
-} catch(_){ }
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindStatsTopbar);
+else bindStatsTopbar();
 
 // (Stats mode: broker controls are intentionally hidden in topbar)
 
 // Sync side changes coming from main (e.g., toggled in board view)
-try {
-  ipcRenderer.on('stats-side-updated', (_e, p)=>{
-    try {
-      const side = p && p.side;
-      __setPanelSideUi(side);
-      const dbg = document.getElementById('dbgSide');
-      if(dbg) dbg.textContent = __statsPanelSide;
-    } catch(_){ }
-  });
-} catch(_){ }
+ipcRenderer.on('stats-side-updated', (_e, p)=>{
+  const side = p && p.side;
+  __setPanelSideUi(side);
+  const dbg = document.getElementById('dbgSide');
+  if(dbg) dbg.textContent = __statsPanelSide;
+});
 
 // Listen for settings updates to reload sound preferences
-try {
-  ipcRenderer.on('settings-updated', ()=>{
-    try {
-      if(window.__STATS_SOUNDS__ && typeof window.__STATS_SOUNDS__.loadSettings === 'function'){
-        window.__STATS_SOUNDS__.loadSettings();
-      }
-    } catch(e){ console.warn('[stats_panel] Failed to reload sound settings:', e); }
-  });
-} catch(_){ }
+ipcRenderer.on('settings-updated', ()=>{
+  try {
+    if(window.__STATS_SOUNDS__ && typeof window.__STATS_SOUNDS__.loadSettings === 'function'){
+      window.__STATS_SOUNDS__.loadSettings();
+    }
+  } catch(e){ console.warn('[stats_panel] Failed to reload sound settings:', e); }
+});
 
 // ================= Runtime State =================
 let metricVisibility = {}; // runtime copy controlling row visibility
@@ -101,7 +78,6 @@ function parseTs(raw){ if(raw==null) return Infinity; if(typeof raw==='number'&&
 let prevMatchUrls = { A: null, B: null };
 let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
-const customTeamNames = { 1:null, 2:null }; // custom display names (live)
 let teamNamesSource = 'grid'; // 'grid' or 'excel' - Excel has priority
 let metricsOrder = ['netWorth','atakhan','firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta','winner'];
 let metricsOrderMutable = [...metricsOrder];
@@ -109,8 +85,7 @@ const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5
 let lastOrderSig = null;
 let __prevValues = {}; // cell previous values
 let lastGameRendered = null;
-const firstEventFlags = {}; // legacy safety (used for initial value flags)
-const animTimers = { delete: ()=>{}, get: ()=>null, set: ()=>{} }; // inert placeholder
+
 let liveDataset = null, cachedLive = null, currentLiveGame = null, currentGame = null; // game selection
 let swapTeams = false; // manual mode swap
 // Manual mode data
@@ -204,13 +179,6 @@ function syncDragonCounts(g){ const t1=manualData.team1Name, t2=manualData.team2
 
 // ================= Helpers =================
 function isLolMatchUrl(u){ try { const url=new URL(u); if(!/portal\.grid\.gg/.test(url.hostname)) return false; return /lol/.test(url.pathname); } catch(_){ return false; } }
-// Animations disabled (can be reintroduced later if needed)
-function animationsAllowed(){
-  try {
-    const cfg = window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get();
-    return !!(cfg && cfg.animationsEnabled);
-  } catch(_){ return false; }
-}
 function cell(id, side){ return document.getElementById(`${id}-${side}`); }
 function sendPersist(){ send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, metricVisibility, metricOrder: metricsOrderMutable }); }
 
@@ -255,10 +223,9 @@ function ensureRows(){
   });
   lastOrderSig = sig;
   __prevValues = {};
-  for(const k in firstEventFlags) delete firstEventFlags[k];
   attachManualHandlers();
   initDragAndDrop();
-  try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ }
+  if(activityModule && activityModule.recalc) activityModule.recalc();
 }
 
 // ================= Animations & Cell Updates =================
@@ -310,7 +277,7 @@ function setText(id, side, val){
         }
         c.classList.add('gs-animating');
         const dur = (cfg.animationDurationMs||450);
-        setTimeout(()=>{ try { c.classList.remove('gs-animating'); } catch(_){ } }, dur+80);
+        setTimeout(()=>{ c.classList.remove('gs-animating'); }, dur+80);
       }
     }
   } catch(_){ }
@@ -319,7 +286,7 @@ function setText(id, side, val){
 // ================= LoL Update Handling =================
 ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(document.getElementById('lolManualMode').checked) return; try {
   const firstRender = (lastGameRendered == null);
-  if(firstRender){ try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ } }
+  if(firstRender){ window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; }
   liveDataset = payload; cachedLive = payload; const games=Object.keys(payload.gameStats||{}).map(Number).sort((a,b)=>a-b); const sig = games.join(','); if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; if(sig !== lastLiveGamesSig){ lastLiveGamesSig = sig; if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; }
   updateGameSelect(); renderLol(payload); } catch(e){} });
 
@@ -340,7 +307,6 @@ function clearLol(){
       c.classList.remove('wl-win','wl-lose');
       const key=id+':'+side;
       delete __prevValues[key];
-      delete firstEventFlags['fe:'+key];
       const row = c.parentElement;
       if(row && row.dataset) delete row.dataset.win;
     });
@@ -363,10 +329,10 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
   }
   buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); }
   if(document.getElementById('lolManualMode').checked){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
-  try { ipcRenderer.send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE }); } catch(_){ }
-  try { __setPanelSideUi(cfg && cfg.side); } catch(_){ }
+  ipcRenderer.send('lol-stats-settings',{ manualMode: document.getElementById('lolManualMode').checked, manualData, metricMarks: window.__LOL_CHECK_STATE });
+  __setPanelSideUi(cfg && cfg.side);
  } catch(e) {} });
-ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ try { if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); } catch(_){ } });
+ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); });
 
 // Team names from Excel K4/N4 (read-only, updates headers)
 ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
@@ -388,61 +354,49 @@ ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
 });
 
 function applyWinLose(){
-  try {
-    // Reset header classes
-    try {
-      const th1 = document.getElementById('lt-team1');
-      const th2 = document.getElementById('lt-team2');
-      if(th1) th1.classList.remove('wl-win','wl-lose');
-      if(th2) th2.classList.remove('wl-win','wl-lose');
-    } catch(_){ }
-    let win1 = 0, win2 = 0;
-    metricsOrder.forEach(id=>{
-      const row = document.querySelector(`tr[data-metric="${id}"]`);
-      if(!row) return;
-      const c1 = document.getElementById(`${id}-t1`);
-      const c2 = document.getElementById(`${id}-t2`);
-      if(!c1 || !c2) return;
-      c1.classList.remove('wl-win','wl-lose');
-      c2.classList.remove('wl-win','wl-lose');
-      row.removeAttribute('data-win');
-      const t1 = (c1.textContent||'').trim();
-      const t2 = (c2.textContent||'').trim();
-      let n1=0, n2=0;
-      if(BINARY_METRICS.includes(id)){
-        n1 = t1==='✓'?1:0; n2 = t2==='✓'?1:0;
-      } else if(COUNT_METRICS.includes(id)){
-        n1 = parseInt(t1,10); n2 = parseInt(t2,10); if(isNaN(n1)) n1=0; if(isNaN(n2)) n2=0;
-      } else if(id==='netWorth'){
-        n1 = parseFloat(t1)||0; n2 = parseFloat(t2)||0;
-      } else if(id==='dragonOrders'){
-        n1 = t1? t1.split(/\s+/).filter(Boolean).length:0; n2 = t2? t2.split(/\s+/).filter(Boolean).length:0;
-      } else {
-        n1 = parseFloat(t1)||0; n2 = parseFloat(t2)||0;
-      }
-      if(window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get().winLoseEnabled===false){ return; }
-      if(n1===0 && n2===0) return; // nothing to highlight
-      if(n1>n2){ c1.classList.add('wl-win'); if(n2>0) c2.classList.add('wl-lose'); row.dataset.win='1'; win1++; }
-      else if(n2>n1){ c2.classList.add('wl-win'); if(n1>0) c1.classList.add('wl-lose'); row.dataset.win='2'; win2++; }
-      else { row.dataset.win='tie'; }
-    });
-    // Apply header highlight ONLY if an explicit Winner row has ✓; otherwise, don't mark header at all.
-    if(!(window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get().winLoseEnabled===false)){
-      try {
-        const th1 = document.getElementById('lt-team1');
-        const th2 = document.getElementById('lt-team2');
-        const w1 = document.getElementById('winner-t1');
-        const w2 = document.getElementById('winner-t2');
-        const hasWinner = !!(w1 && w2 && ((w1.textContent||'').trim()==='✓' || (w2.textContent||'').trim()==='✓'));
-        if(th1 && th2 && hasWinner){
-          const t1won = (w1.textContent||'').trim()==='✓';
-          const t2won = (w2.textContent||'').trim()==='✓';
-          if(t1won){ th1.classList.add('wl-win'); th2.classList.add('wl-lose'); }
-          else if(t2won){ th2.classList.add('wl-win'); th1.classList.add('wl-lose'); }
-        }
-      } catch(_){ }
+  const wlCfg = window.__STATS_CONFIG__ && window.__STATS_CONFIG__.get && window.__STATS_CONFIG__.get();
+  const wlDisabled = wlCfg && wlCfg.winLoseEnabled === false;
+  // Reset header classes
+  const th1 = document.getElementById('lt-team1');
+  const th2 = document.getElementById('lt-team2');
+  if(th1) th1.classList.remove('wl-win','wl-lose');
+  if(th2) th2.classList.remove('wl-win','wl-lose');
+  metricsOrder.forEach(id=>{
+    const row = document.querySelector(`tr[data-metric="${id}"]`);
+    if(!row) return;
+    const c1 = document.getElementById(`${id}-t1`);
+    const c2 = document.getElementById(`${id}-t2`);
+    if(!c1 || !c2) return;
+    c1.classList.remove('wl-win','wl-lose');
+    c2.classList.remove('wl-win','wl-lose');
+    row.removeAttribute('data-win');
+    if(wlDisabled) return;
+    const t1 = (c1.textContent||'').trim();
+    const t2 = (c2.textContent||'').trim();
+    let n1=0, n2=0;
+    if(BINARY_METRICS.includes(id)){
+      n1 = t1==='✓'?1:0; n2 = t2==='✓'?1:0;
+    } else if(COUNT_METRICS.includes(id)){
+      n1 = parseInt(t1,10); n2 = parseInt(t2,10); if(isNaN(n1)) n1=0; if(isNaN(n2)) n2=0;
+    } else if(id==='dragonOrders'){
+      n1 = t1? t1.split(/\s+/).filter(Boolean).length:0; n2 = t2? t2.split(/\s+/).filter(Boolean).length:0;
+    } else {
+      n1 = parseFloat(t1)||0; n2 = parseFloat(t2)||0;
     }
-  } catch(_){ }
+    if(n1===0 && n2===0) return;
+    if(n1>n2){ c1.classList.add('wl-win'); if(n2>0) c2.classList.add('wl-lose'); row.dataset.win='1'; }
+    else if(n2>n1){ c2.classList.add('wl-win'); if(n1>0) c1.classList.add('wl-lose'); row.dataset.win='2'; }
+    else { row.dataset.win='tie'; }
+  });
+  // Apply header highlight ONLY if an explicit Winner row has ✓
+  if(!wlDisabled && th1 && th2){
+    const w1 = document.getElementById('winner-t1');
+    const w2 = document.getElementById('winner-t2');
+    const t1won = w1 && (w1.textContent||'').trim()==='✓';
+    const t2won = w2 && (w2.textContent||'').trim()==='✓';
+    if(t1won){ th1.classList.add('wl-win'); th2.classList.add('wl-lose'); }
+    else if(t2won){ th2.classList.add('wl-win'); th1.classList.add('wl-lose'); }
+  }
 }
 // (Heat bar listener lives in stats_theme.js)
 
@@ -458,16 +412,13 @@ function bindBasic(){
     const btnSplit = byId('modeSplit'); const btnVert = byId('modeVertical'); const btnA = byId('modeA'); const btnB = byId('modeB');
     const selA = byId('srcA'); const selB = byId('srcB');
     function applyUi(disable){
-      try {
-        if(btnSplit) btnSplit.disabled = !!disable;
-        if(btnVert) btnVert.disabled = !!disable;
-        if(btnA) btnA.disabled = !!disable;
-        if(btnB) btnB.disabled = !!disable;
-        // Optional: disable source selector of background slot in single-window, informative only
-        const layout = byId('dbgLayout')?.textContent;
-        if(selB) selB.disabled = !!disable && (layout==='focusA');
-        if(selA) selA.disabled = !!disable && (layout==='focusB');
-      } catch(_){ }
+      if(btnSplit) btnSplit.disabled = !!disable;
+      if(btnVert) btnVert.disabled = !!disable;
+      if(btnA) btnA.disabled = !!disable;
+      if(btnB) btnB.disabled = !!disable;
+      const layout = byId('dbgLayout')?.textContent;
+      if(selB) selB.disabled = !!disable && (layout==='focusA');
+      if(selA) selA.disabled = !!disable && (layout==='focusB');
     }
     chk.addEventListener('change', ()=>{
       const enabled = !!chk.checked;
@@ -481,12 +432,6 @@ function bindBasic(){
     safe(id, el=> el.onclick = ()=>{ send('stats-layout',{mode}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent=mode; });
   });
   safe('toggleSide', el=> el.onclick = ()=>{ send('stats-toggle-side'); const d=byId('dbgSide'); if(d) d.textContent = d.textContent==='left'?'right':'left'; });
-
-  // Observe global game changes (placeholder: console + optional badge later)
-  try {
-    ipcRenderer.invoke('game-get').then(g=>{ try { console.log('[stats_panel] game initial', g); } catch(_){ } }).catch(()=>{});
-    ipcRenderer.on('game-changed', (_e, g)=>{ try { console.log('[stats_panel] game changed ->', g); } catch(_){ } });
-  } catch(_){ }
 }
 
 function bindReset(){
@@ -499,7 +444,6 @@ function bindReset(){
       liveDataset = null; cachedLive=null; currentLiveGame=null; lastLiveGamesSig='';
       followLatestLiveGame = true;
       // Clear custom display overrides for live mode (reset requirement)
-      customTeamNames[1]=null; customTeamNames[2]=null;
       teamNamesSource = 'grid'; // reset source priority
       setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false);
       // Additional manual dataset reset if in manual mode
@@ -511,8 +455,8 @@ function bindReset(){
       }
       // Clear checkbox marks & persist
       window.__LOL_CHECK_STATE = {};
-      try { ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE); } catch(_){ }
-      try { ipcRenderer.send('lol-manual-data-set', manualData); } catch(_){ }
+      ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE);
+      ipcRenderer.send('lol-manual-data-set', manualData);
       // Reset aggregator in main (does not navigate)
       ipcRenderer.send('lol-stats-reset');
       // Request a reload of slot A ONLY (keep exact same URL; no cache-bust param added)
@@ -529,7 +473,7 @@ function bindReset(){
 function bindSettings(){
   const manualCb = document.getElementById('lolManualMode');
   function applyManualClass(){
-    try { document.body.classList.toggle('manual-mode', !!manualCb.checked); } catch(_){ }
+    document.body.classList.toggle('manual-mode', !!manualCb.checked);
   }
   manualCb.addEventListener('change', ()=>{ sendPersist(); applyManualClass(); });
   applyManualClass(); // initial
@@ -549,7 +493,7 @@ function attachManualHandlers(){
   });
 }
 function initDragAndDrop(){ const body=document.getElementById('lt-body'); if(!body) return; body.querySelectorAll('tr').forEach(tr=>{ tr.addEventListener('dragstart', ev=>{ tr.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; }); tr.addEventListener('dragend', ()=>{ tr.classList.remove('dragging'); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); }); }); body.addEventListener('dragover', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); if(after) after.classList.add('drop-target'); }); body.addEventListener('drop', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); const dragging=body.querySelector('tr.dragging'); if(!dragging) return; if(after) body.insertBefore(dragging, after); else body.appendChild(dragging); metricsOrderMutable=[...body.querySelectorAll('tr')].map(r=>r.dataset.metric); metricsOrder=[...metricsOrderMutable]; lastOrderSig = null; // Suppress animations briefly while DOM reshuffles
-  try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+  window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
   ensureRows(); if(document.getElementById('lolManualMode').checked) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
 function getAfterRow(body,y){ const rows=[...body.querySelectorAll('tr:not(.dragging)')]; return rows.find(r=> y <= r.getBoundingClientRect().top + r.getBoundingClientRect().height/2); }
 let addBtn; let gameSelect; let headerH1;
@@ -602,13 +546,13 @@ function renderLol(payload, manual=false){
     const t1Key = dispTeam1;
     const t2Key = dispTeam2;
     const th1=document.getElementById('lt-team1'); const th2=document.getElementById('lt-team2');
-    const headerDisp1 = (customTeamNames[1] && !manual) ? customTeamNames[1] : (dispTeam1||'Team 1');
-    const headerDisp2 = (customTeamNames[2] && !manual) ? customTeamNames[2] : (dispTeam2||'Team 2');
+    const headerDisp1 = dispTeam1 || 'Team 1';
+    const headerDisp2 = dispTeam2 || 'Team 2';
   setTeamHeader(1, headerDisp1, true);
   setTeamHeader(2, headerDisp2, true);
   function setBinary(field, filledSet){ const v=s[field]; if(!v) return; filledSet.add(field); const idx = v===t1Key?1:(v===t2Key?2:0); if(!idx) return; setText(field,'t1', idx===1 ? '✓' : '✗'); setText(field,'t2', idx===2 ? '✓' : '✗'); }
     const DEFAULT_ZERO_COUNT_FIELDS = ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
-    function setCount(field){ const bucket = s[field] || {}; const has1 = Object.prototype.hasOwnProperty.call(bucket, dispTeam1); const has2 = Object.prototype.hasOwnProperty.call(bucket, dispTeam2); if(!has1 && !has2){ if(DEFAULT_ZERO_COUNT_FIELDS.includes(field)){ ['t1','t2'].forEach(side=>{ const key=field+':'+side; if(!__prevValues[key]) __prevValues[key]='0'; firstEventFlags['fe:'+key]=true; setText(field, side, '0'); }); } else { setText(field,'t1',''); setText(field,'t2',''); } return; } let v1 = has1 ? bucket[dispTeam1] : 0; let v2 = has2 ? bucket[dispTeam2] : 0; if(v1 === undefined || v1 === null || isNaN(v1)) v1 = 0; if(v2 === undefined || v2 === null || isNaN(v2)) v2 = 0; setText(field,'t1', v1 === 0 ? '0' : v1); setText(field,'t2', v2 === 0 ? '0' : v2); }
+    function setCount(field){ const bucket = s[field] || {}; const has1 = Object.prototype.hasOwnProperty.call(bucket, dispTeam1); const has2 = Object.prototype.hasOwnProperty.call(bucket, dispTeam2); if(!has1 && !has2){ if(DEFAULT_ZERO_COUNT_FIELDS.includes(field)){ ['t1','t2'].forEach(side=>{ const key=field+':'+side; if(!__prevValues[key]) __prevValues[key]='0'; setText(field, side, '0'); }); } else { setText(field,'t1',''); setText(field,'t2',''); } return; } let v1 = has1 ? bucket[dispTeam1] : 0; let v2 = has2 ? bucket[dispTeam2] : 0; if(v1 === undefined || v1 === null || isNaN(v1)) v1 = 0; if(v2 === undefined || v2 === null || isNaN(v2)) v2 = 0; setText(field,'t1', v1 === 0 ? '0' : v1); setText(field,'t2', v2 === 0 ? '0' : v2); }
   // winner header highlight omitted
     const filledBinary = new Set();
     ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron'].forEach(f=> setBinary(f, filledBinary));
@@ -629,16 +573,16 @@ function renderLol(payload, manual=false){
 
 // ================= Startup =================
 (function init(){
-  try { console.log('[stats_panel] init()'); } catch(_){}
+  console.log('[stats_panel] init()');
   bindBasic();
   bindReset();
   bindSettings();
   buildMetricToggles();
   ensureRows();
-  try { console.log('[stats_panel] after ensureRows count=', document.querySelectorAll('#lt-body tr').length); } catch(_){}
-  try { activityModule && activityModule.init && activityModule.init(); } catch(_){ }
+  console.log('[stats_panel] after ensureRows count=', document.querySelectorAll('#lt-body tr').length);
+  if(activityModule && activityModule.init) activityModule.init();
   // Apply any pending heat bar config that arrived before DOM was ready
-  try { if(window.__applyPendingHeatBar) window.__applyPendingHeatBar(); } catch(_){ }
+  if(window.__applyPendingHeatBar) window.__applyPendingHeatBar();
   applyVisibility();
   // Setup game controls
   headerH1 = document.querySelector('#stats h1');
@@ -652,7 +596,7 @@ function renderLol(payload, manual=false){
   addBtn.onclick=()=>{
     if(addBtn.getAttribute('aria-disabled')==='true') return;
     try {
-      try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+      window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
       const rawKeys = Object.keys(manualData.gameStats||{});
       const keys = rawKeys.filter(k=>/^\d+$/.test(k));
       let maxN = 0; keys.forEach(k=>{ const n=Number(k); if(Number.isFinite(n) && n>maxN) maxN=n; });
@@ -662,13 +606,13 @@ function renderLol(payload, manual=false){
       currentGame = next;
       updateGameSelect();
       renderManual();
-      try { ipcRenderer.send('lol-manual-data-set', manualData); } catch(_){ }
+      ipcRenderer.send('lol-manual-data-set', manualData);
   } catch(err){ }
   };
   if(gameSelect){
-    gameSelect.onchange=()=>{ const manualOn=document.getElementById('lolManualMode').checked; const val=gameSelect.value; if(!val) return; try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+    gameSelect.onchange=()=>{ const manualOn=document.getElementById('lolManualMode').checked; const val=gameSelect.value; if(!val) return; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
       if(manualOn){ currentGame=val; renderManual(); } else { currentLiveGame=Number(val); const games=Object.keys(liveDataset?.gameStats||{}).map(Number).sort((a,b)=>a-b); const last=games[games.length-1]; followLatestLiveGame = (currentLiveGame===last); if(liveDataset) renderLol(liveDataset); }
-      try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ } };
+      if(activityModule && activityModule.recalc) activityModule.recalc(); };
   }
   document.addEventListener('mousedown', e=>{ const td=e.target.closest && e.target.closest('td.editable'); if(td) td.classList.add('pressing'); });
   document.addEventListener('mouseup', ()=>{ document.querySelectorAll('td.pressing').forEach(td=> td.classList.remove('pressing')); });
@@ -678,7 +622,7 @@ function renderLol(payload, manual=false){
     swapTeams=!swapTeams; 
     document.getElementById('swapTeamsBtn').classList.toggle('active', swapTeams); 
     // Suppress heatbar/cell bump animations briefly while values visually reshuffle
-    try { window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450; } catch(_){ }
+    window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
     if(document.getElementById('lolManualMode').checked) { 
       renderManual(); 
     } else { 
@@ -711,13 +655,13 @@ function renderLol(payload, manual=false){
     } else {
       updateGameSelect(); if(liveDataset) renderLol(liveDataset);
     }
-    try { activityModule && activityModule.recalc && activityModule.recalc(); } catch(_){ }
+    if(activityModule && activityModule.recalc) activityModule.recalc();
   });
   updateGameSelect(); if(addBtn){ addBtn.setAttribute('aria-disabled','true'); addBtn.disabled=true; }
   // Lightweight self-test sample (only if no data after short delay)
   // Removed mock Alpha/Beta injection sample.
   // Ensure headers initialized & dblclick bound immediately (before first data payload)
-  try { setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false); } catch(_){ }
+  setTeamHeader(1, 'Team 1', false); setTeamHeader(2, 'Team 2', false);
   // (embedded odds + reordering initialized by stats_boot.js)
 })();
 // (embedded odds board & section reordering in stats_embedded.js)
@@ -756,7 +700,7 @@ function renderLol(payload, manual=false){
     if(!cb) return;
     const metric = cb.getAttribute('data-metric');
     persistMetric(metric, cb.checked);
-    try { ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE); } catch(_){ }
+    ipcRenderer.send('lol-metric-marks-set', window.__LOL_CHECK_STATE);
   });
   // Hook into game select changes & manual/live toggle to refresh checkbox states
   const obs = new MutationObserver(()=> syncFromState());

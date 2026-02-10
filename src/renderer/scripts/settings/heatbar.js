@@ -53,7 +53,7 @@ function queueStatsConfigSend() {
 	}
 	if (anim.color1 && anim.color1.value) currentStatsConfig.animationPrimaryColor = anim.color1.value;
 	if (anim.color2 && anim.color2.value) currentStatsConfig.animationSecondaryColor = anim.color2.value;
-	try { console.log('[settings][send stats-config-set]', currentStatsConfig); } catch (_) { }
+	console.log('[settings][send stats-config-set]', currentStatsConfig);
 	try { ipcRenderer.send('stats-config-set', currentStatsConfig); } catch (_) { }
 }
 

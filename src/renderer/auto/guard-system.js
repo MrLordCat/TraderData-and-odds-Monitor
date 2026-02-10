@@ -18,54 +18,41 @@ export function createGuardSystem() {
   };
 
   function checkGuards(oddsSnapshot, mode) {
-    const result = { canTrade: true, reason: null, isHardBlock: false, isSoftSuspend: false, details: {} };
+    const hard = (reason) => ({ canTrade: false, reason, isHardBlock: true, isSoftSuspend: false, details: {} });
+    const soft = (reason, extra) => ({ canTrade: false, reason, isHardBlock: false, isSoftSuspend: true, details: {}, ...extra });
 
     // Excel process check (Excel mode only)
     if (mode === MODE.EXCEL) {
-      if (excelStatus.running === null) {
-        return { canTrade: false, reason: REASON.EXCEL_UNKNOWN, isHardBlock: true, isSoftSuspend: false, details: {} };
-      }
-      if (excelStatus.installing) {
-        return { canTrade: false, reason: REASON.EXCEL_INSTALLING, isHardBlock: true, isSoftSuspend: false, details: {} };
-      }
-      if (excelStatus.starting) {
-        return { canTrade: false, reason: REASON.EXCEL_STARTING, isHardBlock: true, isSoftSuspend: false, details: {} };
-      }
-      if (!excelStatus.running) {
-        return { canTrade: false, reason: REASON.EXCEL_OFF, isHardBlock: true, isSoftSuspend: false, details: {} };
-      }
+      if (excelStatus.running === null) return hard(REASON.EXCEL_UNKNOWN);
+      if (excelStatus.installing) return hard(REASON.EXCEL_INSTALLING);
+      if (excelStatus.starting) return hard(REASON.EXCEL_STARTING);
+      if (!excelStatus.running) return hard(REASON.EXCEL_OFF);
     }
 
     // DS connection check (DS mode only)
-    if (mode === MODE.DS && !dsState.connected) {
-      return { canTrade: false, reason: REASON.DS_NOT_CONNECTED, isHardBlock: true, isSoftSuspend: false, details: {} };
-    }
+    if (mode === MODE.DS && !dsState.connected) return hard(REASON.DS_NOT_CONNECTED);
 
     // Map mismatch (Excel mode only)
     if (mode === MODE.EXCEL && mapState.scriptMap !== null && mapState.boardMap !== null) {
       const effectiveBoardMap = mapState.boardMap === 0 ? 1 : mapState.boardMap;
-      if (mapState.scriptMap !== effectiveBoardMap) {
-        return { canTrade: false, reason: REASON.MAP_MISMATCH, isHardBlock: true, isSoftSuspend: false, details: {} };
-      }
+      if (mapState.scriptMap !== effectiveBoardMap) return hard(REASON.MAP_MISMATCH);
     }
 
     // Excel frozen - treated as USER-INITIATED suspend (user pressed ESC in Excel)
     if (mode === MODE.EXCEL && oddsSnapshot.excel && oddsSnapshot.excel.frozen) {
-      return { canTrade: false, reason: REASON.EXCEL_SUSPENDED, isHardBlock: false, isSoftSuspend: true, isUserSuspend: true, details: {} };
+      return soft(REASON.EXCEL_SUSPENDED, { isUserSuspend: true });
     }
 
     // No MID
-    if (settings.stopOnNoMid && !oddsSnapshot.derived.hasMid) {
-      return { canTrade: false, reason: REASON.NO_MID, isHardBlock: true, isSoftSuspend: true, details: {} };
-    }
+    if (settings.stopOnNoMid && !oddsSnapshot.derived.hasMid) return soft(REASON.NO_MID, { isHardBlock: true });
 
     // ARB spike
     const arbPct = oddsSnapshot.derived.arbProfitPct;
     if (typeof arbPct === 'number' && arbPct >= settings.shockThresholdPct) {
-      return { canTrade: false, reason: REASON.ARB_SPIKE, isHardBlock: false, isSoftSuspend: true, details: { arbProfitPct: arbPct } };
+      return soft(REASON.ARB_SPIKE, { details: { arbProfitPct: arbPct } });
     }
 
-    return result;
+    return { canTrade: true, reason: null, isHardBlock: false, isSoftSuspend: false, details: {} };
   }
 
   function canResume(oddsSnapshot, mode, suspendReason) {

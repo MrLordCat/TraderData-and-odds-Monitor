@@ -122,10 +122,6 @@ function createExtensionBridge(opts = {}) {
         onOddsUpdate?.(payload);
         break;
 
-      case 'auto-command-ack':
-        // Extension acknowledges auto command execution
-        break;
-
       case 'ping':
         ws.send(JSON.stringify({ type: 'pong' }));
         break;
@@ -247,16 +243,6 @@ function createExtensionBridge(opts = {}) {
     }
   }
 
-  // Notify extension about available update
-  function sendUpdateNotification() {
-    if (connectedClient?.readyState === WebSocket.OPEN) {
-      connectedClient.send(JSON.stringify({
-        type: 'update-available',
-        latestVersion: BUNDLED_EXTENSION_VERSION
-      }));
-    }
-  }
-
   // Check if extension is connected
   function isConnected() {
     return connectedClient?.readyState === WebSocket.OPEN;
@@ -310,7 +296,6 @@ function createExtensionBridge(opts = {}) {
     stop,
     sendCurrentMap,
     sendExcelOdds,
-    sendUpdateNotification,
     sendAutoCommand,
     getLastDsOdds,
     isConnected,

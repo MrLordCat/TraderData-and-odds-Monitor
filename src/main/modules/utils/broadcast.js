@@ -8,7 +8,7 @@
  * @param {*} [payload] - Optional payload
  */
 function broadcastToAll(ctx, channel, payload){
-  const { mainWindow, boardManager, statsManager, boardWindow } = ctx;
+  const { mainWindow, boardManager, statsManager } = ctx;
   
   // For auto-toggle-all, only send to board (which owns Auto logic)
   const isAutoToggle = channel === 'auto-toggle-all';
@@ -19,8 +19,7 @@ function broadcastToAll(ctx, channel, payload){
   
   // Board (docked or window) - always receives
   try {
-    const bwc = boardManager?.getWebContents?.() || 
-                (boardWindow && !boardWindow.isDestroyed() ? boardWindow.webContents : null);
+    const bwc = boardManager?.getWebContents?.();
     if(bwc && !bwc.isDestroyed()) bwc.send(channel, payload);
   } catch(e){ console.error('[broadcast] board error:', e); }
   
@@ -59,14 +58,13 @@ function createBroadcaster(ctx){
 
 /**
  * Get board webContents (docked or window)
- * @param {object} ctx - Context with boardManager, boardWindow
+ * @param {object} ctx - Context with boardManager
  * @returns {WebContents|null}
  */
 function getBoardWebContents(ctx){
   try {
-    const { boardManager, boardWindow } = ctx;
-    const bwc = boardManager?.getWebContents?.() ||
-                (boardWindow && !boardWindow.isDestroyed() ? boardWindow.webContents : null);
+    const { boardManager } = ctx;
+    const bwc = boardManager?.getWebContents?.();
     return (bwc && !bwc.isDestroyed()) ? bwc : null;
   } catch(_){ return null; }
 }

@@ -1,7 +1,7 @@
 // Auto-Update Manager for portable Electron app
 // Supports two channels: stable (GitHub Releases) and dev (latest commits)
 
-const { app, BrowserWindow } = require('electron');
+const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { checkForUpdates, getLatestRelease, getDevRelease } = require('./githubApi');

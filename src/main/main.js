@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, screen, Menu, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, globalShortcut, dialog } = require('electron');
 
 // Enable WebGL for addons (Power Towers TD)
 // v0.2.5 dev build - extractors modular, esbuild bundles
@@ -20,6 +20,8 @@ try {
 const path = require('path');
 const Store = require('electron-store');
 const store = new Store({ name: 'prefs' });
+// One-time migration: old gsHeatBar.decayPerSec values > 1 are seconds, convert to rate
+{ const hb = store.get('gsHeatBar'); if(hb && typeof hb.decayPerSec === 'number' && hb.decayPerSec > 1) { store.set('gsHeatBar', { ...hb, decayPerSec: 1 / hb.decayPerSec }); } }
 const fs = require('fs');
 const { exec } = require('child_process');
 // Centralized shared constants (direct import to avoid circular barrel dependency)
@@ -99,8 +101,8 @@ try {
 
 // Global safety nets for unexpected errors (prevent silent crashes)
 try {
-  process.on('unhandledRejection', (reason, p)=>{ try { console.warn('[unhandledRejection]', reason); } catch(_){} });
-  process.on('uncaughtException', (err)=>{ try { console.error('[uncaughtException]', err); } catch(_){} });
+  process.on('unhandledRejection', (reason, p)=>{ console.warn('[unhandledRejection]', reason); });
+  process.on('uncaughtException', (err)=>{ console.error('[uncaughtException]', err); });
 } catch(_){}
 
 // --- Handle --apply-update argument (run update script before app starts) ---
@@ -108,7 +110,6 @@ try {
   const updateArgIdx = process.argv.indexOf('--apply-update');
   if (updateArgIdx !== -1 && process.argv[updateArgIdx + 1]) {
     const updateScript = process.argv[updateArgIdx + 1];
-    const { exec } = require('child_process');
     console.log('[updater] Applying update via script:', updateScript);
     // Run batch file hidden using wscript
     const vbsPath = updateScript.replace('.bat', '.vbs');
@@ -130,7 +131,7 @@ function broadcastPlaceholderOdds(id){
     const payload = makePlaceholderOdds(id);
     broadcastToAll(getBroadcastCtx(), 'odds-update', payload);
     try { if(boardManager && boardManager.sendOdds) boardManager.sendOdds(payload); } catch(_){ }
-  } catch(err){ try { console.warn('broadcastPlaceholderOdds failed', err); } catch(_){} }
+  } catch(err){ console.warn('broadcastPlaceholderOdds failed', err); }
 }
 
 // Ensure single instance (prevents profile/partition LOCK conflicts)
@@ -214,7 +215,7 @@ const zoom = createZoomManager({ store, views });
 // Stats manager (initialized after stageBoundsRef defined; recreated once mainWindow exists)
 const { createStatsManager } = require('./modules/stats/');
 let statsManager; // temporary undefined until after stageBoundsRef creation
-let statsState = { mode: 'hidden', panelHidden: !!store.get('statsPanelHidden', false) }; // 'hidden' | 'embedded', plus panelHidden
+let statsState = { mode: 'hidden' }; // 'hidden' | 'embedded'
 let lastStatsToggleTs = 0; // throttle for space hotkey
 // Dev helper moved to dev/devCssWatcher.js
 const { initDevCssWatcher } = require('./modules/dev/devCssWatcher');
@@ -281,26 +282,15 @@ function createMainWindow() {
     y: saved ? saved.y : undefined,
     show: false, // Hidden initially, shown after splash warm-up
     autoHideMenuBar: true,
-    webPreferences: { preload: path.join(__dirname, 'preloads', 'main.js') }
+    webPreferences: { preload: path.join(__dirname, 'preloads', 'main.js'), sandbox: false }
   });
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'pages', 'index.html'));
   // Determine if we should maximize (but don't do it yet - splash will handle it)
-  let shouldMaximize = false;
-  try {
-    if (!saved) {
-      shouldMaximize = true;
-    } else {
-      // If saved size is significantly smaller than available work area (>85% rule), still respect user size; else maximize.
-      const primary = screen.getPrimaryDisplay().workArea;
-      if (saved.width < primary.width * 0.55 || saved.height < primary.height * 0.55) {
-        // Probably user used a small window intentionally; do nothing.
-        shouldMaximize = false;
-      } else if (saved.width >= primary.width * 0.90 && saved.height >= primary.height * 0.90) {
-        // Saved bounds already near full screen; just maximize to remove borders.
-        shouldMaximize = true;
-      }
-    }
-  } catch(_) {}
+  let shouldMaximize = !saved;
+  if(saved){
+    const wa = screen.getPrimaryDisplay().workArea;
+    if(saved.width >= wa.width * 0.90 && saved.height >= wa.height * 0.90) shouldMaximize = true;
+  }
   // Store maximize flag for splash to use
   mainWindow.__shouldMaximize = shouldMaximize;
   mainWindow.on('close', () => {
@@ -319,7 +309,6 @@ function createMainWindow() {
   statsManager = createStatsManager({ store, mainWindow, stageBoundsRef, quittingRef });
     // Keep previous mode only if window mode requested; embedded cannot be auto-restored yet
     statsState.mode = (prevMode === 'window') ? 'window' : 'hidden';
-    try { statsState.panelHidden = !!statsManager.getPanelHidden?.(); } catch(_){ }
   } catch(e){ console.warn('Failed to re-init statsManager with mainWindow', e); }
 }
 
@@ -407,7 +396,7 @@ function bootstrap() {
   // Initialize settings-related IPC now (requires settingsOverlay)
   initSettingsIpc({ ipcMain, store, settingsOverlay, statsManager });
   // Initialize theme IPC
-  initThemeIpc({ store });
+  initThemeIpc({ store, statsManager });
   brokerManager = createBrokerManager({
     BROKERS, store, views, zoom, layoutManager, scheduleMapReapply,
     broadcastPlaceholderOdds, SNAP, GAP, stageBoundsRef, activeBrokerIdsRef,
@@ -455,21 +444,6 @@ function bootstrap() {
   // Initialize boardManager after panel is created
   boardManager.init();
   
-  // Cleanup stray bilibili/generic views (removed from supported sources). Closes any broker ids containing 'bilibili'.
-  try {
-    const stray = activeBrokerIdsRef.value.filter(id=> /bilibili/i.test(id));
-    if(stray.length){
-      console.warn('[startup][cleanup] closing stray bilibili views', stray);
-      stray.forEach(id=>{ try { brokerManager.closeBroker(id); } catch(_){ } });
-    }
-    ipcMain.on('cleanup-foreign-views', ()=>{
-      try {
-        const toClose = activeBrokerIdsRef.value.filter(id=> /bilibili/i.test(id));
-        toClose.forEach(id=>{ try { brokerManager.closeBroker(id); } catch(_){ } });
-        console.log('[cleanup-foreign-views] closed', toClose);
-      } catch(err){ console.warn('[cleanup-foreign-views] error', err.message); }
-    });
-  } catch(_){ }
   // Initialize excel watcher after board manager so early odds push displays
   try {
     if(!global.__excelWatcher){
@@ -478,8 +452,6 @@ function bootstrap() {
         // Keep a global last Excel odds snapshot for stats panel late load replay
         try { global.__lastExcelOdds = p; } catch(_){ }
       };
-      // Annotate forward with a hint for template sync side-channel
-      try { Object.defineProperty(forward, '__acceptsTemplateSync', { value: false, enumerable:false }); } catch(_){ }
       global.__excelWatcher = createExcelWatcher({ win: mainWindow, store, sendOdds: forward, statsManager, boardManager, extensionBridgeRef, verbose: false });
     }
   } catch(e){ console.warn('[excel][watcher] init failed', e.message); }
@@ -595,11 +567,14 @@ function bootstrap() {
   // --- Splash Warm-up Tasks ---
   splashManager.updateProgress(60, 'Warming up UI...');
 
-  /** Wait for webContents to finish loading, then delay */
-  function waitForLoad(wc, delayMs) {
+  /** Wait for webContents to finish loading, then delay. maxMs caps wait for external sites. */
+  function waitForLoad(wc, delayMs, maxMs) {
     return new Promise(resolve => {
       if (!wc || !wc.isLoading()) return setTimeout(resolve, delayMs || 0);
-      wc.once('did-finish-load', () => setTimeout(resolve, delayMs || 0));
+      let done = false;
+      const finish = () => { if(done) return; done = true; setTimeout(resolve, delayMs || 0); };
+      wc.once('did-finish-load', finish);
+      if(maxMs > 0) setTimeout(finish, maxMs);
     });
   }
 
@@ -607,20 +582,61 @@ function bootstrap() {
 
   splashManager.registerTask('Preparing settings...', () => {
     try { if(settingsOverlay?.warmup) settingsOverlay.warmup(); } catch(e){ console.warn('[warmup] settings warmup failed', e.message); }
+    const sv = settingsOverlay?.getView?.();
+    if(sv?.webContents) return waitForLoad(sv.webContents, 100);
     return new Promise(resolve => setTimeout(resolve, 300));
   });
 
   const panelView = statsManager?.getPanelView?.();
   splashManager.registerTask('Initializing stats panel...', () => waitForLoad(panelView?.webContents, 200));
 
-  splashManager.registerTask('Warming up animations...', () => {
-    try {
-      const pv = statsManager?.getPanelView?.();
-      if (pv?.webContents && !pv.webContents.isDestroyed()) {
-        pv.webContents.executeJavaScript('if(window.__warmup) window.__warmup();').catch(() => {});
-      }
-    } catch(_){}
-    return new Promise(resolve => setTimeout(resolve, 300));
+  splashManager.registerTask('Warming up theme transitions...', () => {
+    // Collect ALL loaded webContents to warm up CSS transitions in each view
+    const targets = [];
+    try { if(mainWindow?.webContents && !mainWindow.webContents.isDestroyed()) targets.push(mainWindow.webContents); } catch(_){}
+    try { const pv = statsManager?.getPanelView?.(); if(pv?.webContents && !pv.webContents.isDestroyed()) targets.push(pv.webContents); } catch(_){}
+    try { const sv = settingsOverlay?.getView?.(); if(sv?.webContents && !sv.webContents.isDestroyed()) targets.push(sv.webContents); } catch(_){}
+    try { ['A','B'].forEach(k=>{ const v = statsManager?.views?.[k]; if(v?.webContents && !v.webContents.isDestroyed()) targets.push(v.webContents); }); } catch(_){}
+    // Collect slot views
+    try { Object.entries(views).forEach(([id, v])=>{ if(id.startsWith('slot-') && v?.webContents && !v.webContents.isDestroyed()) targets.push(v.webContents); }); } catch(_){}
+
+    if(!targets.length) return new Promise(r => setTimeout(r, 100));
+
+    // JS snippet: toggle theme with opacity:0 so user doesn't see the flash, wait for transition, toggle back
+    const warmupJS = `(function(){
+      var root = document.documentElement, body = document.body;
+      var cur = root.getAttribute('data-theme') || 'dark';
+      var opp = cur === 'dark' ? 'light' : 'dark';
+      body.style.opacity = '0'; body.style.pointerEvents = 'none';
+      root.classList.add('theme-transitioning');
+      root.setAttribute('data-theme', opp);
+      void root.offsetHeight;
+      return new Promise(function(resolve){
+        setTimeout(function(){
+          root.setAttribute('data-theme', cur);
+          root.classList.remove('theme-transitioning');
+          void root.offsetHeight;
+          setTimeout(function(){
+            body.style.opacity = ''; body.style.pointerEvents = '';
+            resolve();
+          }, 400);
+        }, 400);
+      });
+    })()`;
+
+    // Execute on all targets in parallel, then wait
+    const promises = targets.map(wc => wc.executeJavaScript(warmupJS).catch(() => {}));
+    return Promise.all(promises).then(() => new Promise(r => setTimeout(r, 50)));
+  });
+
+  splashManager.registerTask('Pre-loading stats views...', () => {
+    try { statsManager?.warmupViews?.(); } catch(e){ console.warn('[warmup] stats views failed', e.message); }
+    // Wait for both A/B to finish loading (cap 4s for external sites)
+    const vA = statsManager?.views?.A;
+    const vB = statsManager?.views?.B;
+    const loadA = vA?.webContents ? waitForLoad(vA.webContents, 0, 4000) : Promise.resolve();
+    const loadB = vB?.webContents ? waitForLoad(vB.webContents, 0, 4000) : Promise.resolve();
+    return Promise.all([loadA, loadB]).then(() => new Promise(r => setTimeout(r, 100)));
   });
   
   // Run all tasks and show main window when done
@@ -653,7 +669,7 @@ function toggleStatsEmbedded(){
   if(!isStatsActive){
     // Show stats views (A/B)
     const offsetY = stageBoundsRef && stageBoundsRef.value ? Number(stageBoundsRef.value.y) : 0;
-    try { console.log('[stats][toggle] createStatsViews with offsetY', offsetY); } catch(_){ }
+    console.log('[stats][toggle] createStatsViews with offsetY', offsetY);
     statsManager.createStatsViews(offsetY);
     statsState.mode = 'embedded';
   } else {
@@ -663,7 +679,6 @@ function toggleStatsEmbedded(){
   }
   
   try {
-    statsState.panelHidden = false; // Panel is always visible now
     mainWindow.webContents.send('stats-state-updated', statsState);
   } catch(_){ }
 }
@@ -684,7 +699,7 @@ app.whenReady().then(()=>{
       const handler = () => {
         try {
           broadcastAutoToggleAll();
-          try { console.log('[hotkey][global][Num5] broadcast auto-toggle-all'); } catch(_){ }
+          console.log('[hotkey][global][Num5] broadcast auto-toggle-all');
         } catch(err){ console.warn('[hotkey][global][Num5] failed', err); }
       };
       let registeredWith = null;
@@ -755,7 +770,7 @@ app.on('browser-window-created', (_e, win)=>{
               if(bwc && !bwc.isDestroyed()) bwc.send('auto-press', { side });
             }
             const ts = Date.now();
-            try { console.log('[auto-press][hotkey] attempt side', side, 'key', input.key, 'ts', ts); } catch(_){ }
+            console.log('[auto-press][hotkey] attempt side', side, 'key', input.key, 'ts', ts);
             let sent=false;
             // Send only F23/F24 (do not resend bracket)
             try {
@@ -763,12 +778,12 @@ app.on('browser-window-created', (_e, win)=>{
               if(typeof __sendInputScriptPath !== 'undefined' && __sendInputScriptPath){
                 const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File \"${__sendInputScriptPath}\" ${injVk}`;
                 exec(cmd, (err)=>{
-                  if(err){ try { console.warn('[auto-press][hotkey][si] FAIL', err.message); } catch(_){ } }
-                  else { try { console.log('[auto-press][hotkey][si] SENT injVk', injVk); } catch(_){ } }
+                  if(err){ console.warn('[auto-press][hotkey][si] FAIL', err.message); }
+                  else { console.log('[auto-press][hotkey][si] SENT injVk', injVk); }
                 });
                 sent=true;
               }
-            } catch(e){ try { console.warn('[auto-press][hotkey][si] unavailable', e.message); } catch(_){ } }
+            } catch(e){ console.warn('[auto-press][hotkey][si] unavailable', e.message); }
             if(!sent){
               try { fs.writeFileSync(path.join(__dirname,'auto_press_signal.json'), JSON.stringify({ side, ts })); } catch(_){ }
             }

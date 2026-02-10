@@ -15,7 +15,7 @@ function initTeamNamesIpc(ctx){
       }
       try { if(statsManager && statsManager.views && statsManager.views.panel){ statsManager.views.panel.webContents.send('lol-team-names-update', lolTeamNamesRef.value); } } catch(_){ }
       try { if(boardManager && boardManager.getWebContents){ const bwc = boardManager.getWebContents(); if(bwc && !bwc.isDestroyed()) bwc.send('lol-team-names-update', lolTeamNamesRef.value); } } catch(_){ }
-    } catch(err){ try { console.warn('lol-team-names-set failed', err); } catch(_){} }
+    } catch(err){ console.warn('lol-team-names-set failed', err); }
   });
   ipcMain.handle('lol-team-names-get', ()=> ({ ...lolTeamNamesRef.value }));
 }

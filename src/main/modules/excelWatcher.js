@@ -5,8 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { broadcastGlobal } = require('./utils/broadcast');
-let electronApp = null;
-try { ({ app: electronApp } = require('electron')); } catch(_){ }
+const { app: electronApp } = require('electron');
 
 function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, extensionBridgeRef, verbose=false }) {
   if(!win || win.isDestroyed()) return { dispose(){} };
@@ -25,24 +24,20 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
 
   function log(){
     if(!verbose) return;
-    try { console.log('[excel][watcher]', ...arguments); } catch(_){ }
+    console.log('[excel][watcher]', ...arguments);
   }
 
   function candidatePaths(){
     // Only support new extractor file current_state.json (plus optional custom override path)
     const out = [];
-    try {
-  const custom = store.get('excelDumpPath'); if(custom && typeof custom === 'string'){ out.push(custom); if(verbose) log('stored excelDumpPath', custom); }
-    } catch(_){ }
+    const custom = store.get('excelDumpPath'); if(custom && typeof custom === 'string'){ out.push(custom); if(verbose) log('stored excelDumpPath', custom); }
     const FILE = 'current_state.json';
     // Packaged app note: __dirname here is <appRoot>/src/main/modules. The Python script cwd is <appRoot>/Excel Extractor.
     // We resolve three levels up to get appRoot.
-    try {
-      const appRoot = path.resolve(__dirname, '..', '..', '..');
-      out.push(path.join(appRoot, FILE));
-      out.push(path.join(appRoot, 'Excel Extractor', FILE));
-    } catch(_){ }
-    try { if(electronApp){ const doc = electronApp.getPath('documents'); out.push(path.join(doc, FILE)); } } catch(_){ }
+    const appRoot = path.resolve(__dirname, '..', '..', '..');
+    out.push(path.join(appRoot, FILE));
+    out.push(path.join(appRoot, 'Excel Extractor', FILE));
+    try { const doc = electronApp.getPath('documents'); out.push(path.join(doc, FILE)); } catch(_){ }
     const up = process.env.USERPROFILE || process.env.HOME || '';
     if(up) out.push(path.join(up, 'Documents', FILE));
     out.push(path.join(process.cwd(), FILE));
@@ -245,7 +240,7 @@ function createExcelWatcher({ win, store, sendOdds, statsManager, boardManager, 
         try { win.webContents.send('excel-template-sync', payload); } catch(_){ }
       }
       // Optional: also forward via sendOdds callback path if provided and expects generic channel
-      try { if(typeof sendOdds === 'function' && sendOdds.__acceptsTemplateSync) sendOdds(payload); } catch(_){ }
+      if(typeof sendOdds === 'function') sendOdds(payload);
       // Write sync file next to current_state.json so external AHK can read
       if(activePath){
         const dir = path.dirname(activePath);

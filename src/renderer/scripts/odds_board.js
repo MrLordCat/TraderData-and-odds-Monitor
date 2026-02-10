@@ -20,77 +20,41 @@ function updateEmbeddedMapTag(){
 function applyMapValue(m){ currentMap=m; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue(); }
 function applyIsLast(cfg){ const b=document.getElementById('embeddedIsLast'); if(b && typeof cfg?.isLast!=='undefined') b.classList.toggle('active', !!cfg.isLast); }
 function initEmbeddedMapSync(){
-  try {
-    // Listen for atomic map config (preferred)
-    if(window.desktopAPI && window.desktopAPI.onMapConfig){
-      window.desktopAPI.onMapConfig(cfg=>{ 
-        try { 
-          if(cfg && typeof cfg.map !== 'undefined') applyMapValue(cfg.map);
-          applyIsLast(cfg);
-        } catch(_){} 
-      });
-    } else if(window.desktopAPI && window.desktopAPI.onMap){
-      window.desktopAPI.onMap(mapVal=>{ try { applyMapValue(mapVal); } catch(_){} });
-    } else {
-      // Fallback: direct IPC listener
-      try {
-        const { ipcRenderer } = require('electron');
-        ipcRenderer.on('set-map-config', (_e, cfg)=>{ 
-          try { 
-            if(cfg && typeof cfg.map !== 'undefined') applyMapValue(cfg.map);
-            applyIsLast(cfg);
-          } catch(_){} 
-        });
-      } catch(_){}
-    }
-    
-    // Initial fetch
-    if(window.desktopAPI && window.desktopAPI.getMapConfig){
-      window.desktopAPI.getMapConfig().then(cfg=>{ 
-        if(cfg && typeof cfg.map!=='undefined') applyMapValue(cfg.map);
-        applyIsLast(cfg);
-      }).catch(()=>{});
-    } else if(window.desktopAPI && window.desktopAPI.getLastMap){
-      window.desktopAPI.getLastMap().then(v=>{ if(typeof v!=='undefined') applyMapValue(v); }).catch(()=>{});
-    }
-    
-    bindEmbeddedMapSelect();
-    
-    // Bind 'Last' toggle button in Odds Board header
-    try {
-      const lastBtn = document.getElementById('embeddedIsLast');
-      if(lastBtn && !lastBtn.dataset.bound){
-        lastBtn.dataset.bound='1';
-        let isLast = lastBtn.classList.contains('active');
-        lastBtn.addEventListener('click', ()=>{
-          try {
-            isLast = !isLast;
-            lastBtn.classList.toggle('active', isLast);
-            if(window.desktopAPI && window.desktopAPI.setIsLast){ window.desktopAPI.setIsLast(isLast); }
-          } catch(_){ }
-        });
-        // Initial state already set from getMapConfig above, but keep legacy fallback
-        if(window.desktopAPI && window.desktopAPI.getIsLast && !lastBtn.classList.contains('active')){
-          window.desktopAPI.getIsLast().then(v=>{ 
-            try { isLast = !!v; lastBtn.classList.toggle('active', isLast); } catch(_){ } 
-          }).catch(()=>{});
-        }
-      }
-    } catch(_){ }
-  } catch(_){ }
+  // desktopAPI always available via shim (loaded before this file)
+  window.desktopAPI.onMapConfig(cfg=>{ 
+    if(cfg && typeof cfg.map !== 'undefined') applyMapValue(cfg.map);
+    applyIsLast(cfg);
+  });
+  // Initial fetch
+  window.desktopAPI.getMapConfig().then(cfg=>{ 
+    if(cfg && typeof cfg.map!=='undefined') applyMapValue(cfg.map);
+    applyIsLast(cfg);
+  }).catch(()=>{});
+  
+  bindEmbeddedMapSelect();
+  
+  // Bind 'Last' toggle button in Odds Board header
+  const lastBtn = document.getElementById('embeddedIsLast');
+  if(lastBtn && !lastBtn.dataset.bound){
+    lastBtn.dataset.bound='1';
+    let isLast = lastBtn.classList.contains('active');
+    lastBtn.addEventListener('click', ()=>{
+      isLast = !isLast;
+      lastBtn.classList.toggle('active', isLast);
+      window.desktopAPI.setIsLast(isLast);
+    });
+  }
 }
 function syncEmbeddedMapSelect(){
-  try {
-    const sel=document.getElementById('embeddedMapSelect');
-    if(!sel) return; const v = (currentMap==null?'' : String(currentMap));
-    if(v !== '' && sel.value!==v){ sel.value=v; }
-  } catch(_){ }
+  const sel=document.getElementById('embeddedMapSelect');
+  if(!sel) return; const v = (currentMap==null?'' : String(currentMap));
+  if(v !== '' && sel.value!==v){ sel.value=v; }
 }
 function forceMapSelectValue(){
   const desired = (currentMap==null?'' : String(currentMap));
   if(desired==='') return;
   [0,60,150,320,650].forEach(ms=> setTimeout(()=>{
-    try { const sel=document.getElementById('embeddedMapSelect'); if(sel && sel.value!==desired) sel.value=desired; } catch(_){ }
+    const sel=document.getElementById('embeddedMapSelect'); if(sel && sel.value!==desired) sel.value=desired;
   }, ms));
 }
 /** Compare two odds records numerically. Returns true if both valid and equal. */
@@ -100,85 +64,56 @@ function oddsMatch(a, b){
   return parseFloat(a.odds[0])===parseFloat(b.odds[0]) && parseFloat(a.odds[1])===parseFloat(b.odds[1]);
 }
 function bindEmbeddedMapSelect(){
-  try {
-    const sel=document.getElementById('embeddedMapSelect');
-    if(!sel || sel.dataset.bound) return; sel.dataset.bound='1';
-    sel.addEventListener('change', e=>{
-      try {
-        const v=e.target.value;
-        try { console.debug('[embeddedOdds] map change via stats select ->', v); } catch(_){ }
-        if(window.desktopAPI && window.desktopAPI.setMap){ window.desktopAPI.setMap('*', v); }
-  // update locally immediately
-        currentMap = v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag();
-      } catch(_){ }
+  const sel=document.getElementById('embeddedMapSelect');
+  if(!sel || sel.dataset.bound) return; sel.dataset.bound='1';
+  sel.addEventListener('change', e=>{
+    const v=e.target.value;
+    console.debug('[embeddedOdds] map change via stats select ->', v);
+    window.desktopAPI.setMap('*', v);
+    currentMap = v; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag();
+  });
+  // Refresh button handler (rebroadcast current map without changing selection)
+  const btn=document.getElementById('embeddedMapRefreshBtn');
+  if(btn && !btn.dataset.bound){
+    btn.dataset.bound='1';
+    btn.addEventListener('click', ()=>{
+      const v = sel.value;
+      window.desktopAPI.setMap('*', v);
+      console.debug('[embeddedOdds] manual map refresh ->', v);
     });
-    // Refresh button handler (rebroadcast current map without changing selection)
-    try {
-      const btn=document.getElementById('embeddedMapRefreshBtn');
-      if(btn && !btn.dataset.bound){
-        btn.dataset.bound='1';
-        btn.addEventListener('click', ()=>{
-          try {
-            const v = sel.value;
-            if(window.desktopAPI && window.desktopAPI.setMap){ window.desktopAPI.setMap('*', v); }
-            try { console.debug('[embeddedOdds] manual map refresh ->', v); } catch(_){ }
-          } catch(_){ }
-        });
-        // Right-click toggles shared auto mode
-        btn.addEventListener('contextmenu', (e)=>{
-          try { e.preventDefault(); if(window.desktopAPI && window.desktopAPI.toggleMapAutoRefresh){ window.desktopAPI.toggleMapAutoRefresh(); } else { const { ipcRenderer } = require('electron'); ipcRenderer.send('toggle-map-auto-refresh'); } } catch(_){ }
-        });
-      }
-    } catch(_){ }
-  } catch(_){ }
+    // Right-click toggles shared auto mode
+    btn.addEventListener('contextmenu', (e)=>{
+      e.preventDefault(); window.desktopAPI.toggleMapAutoRefresh();
+    });
+  }
 }
 const embeddedOddsData = {}; let embeddedBest1=NaN, embeddedBest2=NaN;
 // DS mismatch tracking
 let lastEmbeddedExcelOdds = null;
 let embeddedDsMismatchTimer = null;
 // Auto map rebroadcast status visual sync (shim guarantees desktopAPI)
-try {
-  function applyEmbeddedMapAutoRefreshVisual(p){
-    try {
-      const btn=document.getElementById('embeddedMapRefreshBtn'); if(!btn) return;
-      const enabled = !!(p && p.enabled);
-      btn.style.opacity = enabled ? '1' : '';
-      btn.style.background = enabled ? '#2f4b6a' : '';
-      btn.style.border = enabled ? '1px solid #3f6c90' : '';
-      btn.title = enabled ? 'Auto odds refresh: ON (right-click to disable)' : 'Re-broadcast current map (refresh odds) (right-click to enable auto)';
-    } catch(_){ }
-  }
-  if(window.desktopAPI?.onMapAutoRefreshStatus) window.desktopAPI.onMapAutoRefreshStatus(applyEmbeddedMapAutoRefreshVisual);
-  if(window.desktopAPI?.getMapAutoRefreshStatus) window.desktopAPI.getMapAutoRefreshStatus().then(p=>applyEmbeddedMapAutoRefreshVisual(p)).catch(()=>{});
-} catch(_){ }
+function applyEmbeddedMapAutoRefreshVisual(p){
+  const btn=document.getElementById('embeddedMapRefreshBtn'); if(!btn) return;
+  const enabled = !!(p && p.enabled);
+  btn.style.opacity = enabled ? '1' : '';
+  btn.style.background = enabled ? '#2f4b6a' : '';
+  btn.style.border = enabled ? '1px solid #3f6c90' : '';
+  btn.title = enabled ? 'Auto odds refresh: ON (right-click to disable)' : 'Re-broadcast current map (refresh odds) (right-click to enable auto)';
+}
+window.desktopAPI.onMapAutoRefreshStatus(applyEmbeddedMapAutoRefreshVisual);
+window.desktopAPI.getMapAutoRefreshStatus().then(p=>applyEmbeddedMapAutoRefreshVisual(p)).catch(()=>{});
 // Per-broker side swap (exclude excel). Centralized via IPC and synced across views.
-try {
-  if(!window.__swappedBrokers) window.__swappedBrokers = new Set();
-} catch(_){ }
+if(!window.__swappedBrokers) window.__swappedBrokers = new Set();
 
 async function initEmbeddedSwapSync(){
-  try {
-    const apply = (list)=>{
-      try {
-        if(!window.__swappedBrokers) window.__swappedBrokers = new Set();
-        window.__swappedBrokers.clear();
-        (list||[]).forEach(b=>{ try { const v=String(b||'').trim(); if(v) window.__swappedBrokers.add(v); } catch(_){ } });
-        renderEmbeddedOdds();
-      } catch(_){ }
-    };
-    // Use shim-provided desktopAPI (guaranteed by stats_panel.html script order)
-    if(window.desktopAPI?.getSwappedBrokers){
-      try { const list = await window.desktopAPI.getSwappedBrokers(); apply(list); } catch(_){ }
-      if(window.desktopAPI.onSwappedBrokersUpdated) window.desktopAPI.onSwappedBrokersUpdated(apply);
-      return;
-    }
-
-    // Fallback localStorage (won't sync across file:// origins)
-    try {
-      const list = (JSON.parse(localStorage.getItem('swappedBrokers')||'[]')||[]);
-      apply(list);
-    } catch(_){ }
-  } catch(_){ }
+  const apply = (list)=>{
+    if(!window.__swappedBrokers) window.__swappedBrokers = new Set();
+    window.__swappedBrokers.clear();
+    (list||[]).forEach(b=>{ const v=String(b||'').trim(); if(v) window.__swappedBrokers.add(v); });
+    renderEmbeddedOdds();
+  };
+  try { const list = await window.desktopAPI.getSwappedBrokers(); apply(list); } catch(_){ }
+  window.desktopAPI.onSwappedBrokersUpdated(apply);
 }
 try { initEmbeddedSwapSync(); } catch(_){ }
 function renderEmbeddedOdds(){
@@ -196,72 +131,55 @@ function renderEmbeddedOdds(){
     liveNums1 = out.liveNums1 || [];
     liveNums2 = out.liveNums2 || [];
   }
-  // Excel row update - simple display
-  try {
-    const excelCell=document.getElementById('embeddedExcelCell');
-    const excelRow=document.getElementById('embeddedExcelRow');
-    const hasExcelOdds = excelRec && Array.isArray(excelRec.odds) && excelRec.odds[0] !== '-';
-    
-    if(excelCell && excelRow){
-      let displayText = '- / -';
-      if(hasExcelOdds){
-        displayText = `${excelRec.odds[0]} / ${excelRec.odds[1]}`;
-      }
-      excelCell.textContent = displayText;
-      excelRow.classList.toggle('frozen', !!(excelRec && excelRec.frozen));
-    }
-    
-    // Track Excel odds changes for DS mismatch detection
-    // Compare as numbers to avoid 1.4 vs 1.40 mismatch
-    const excelNum1 = hasExcelOdds ? parseFloat(excelRec.odds[0]) : NaN;
-    const excelNum2 = hasExcelOdds ? parseFloat(excelRec.odds[1]) : NaN;
-    const excelOddsKey = hasExcelOdds ? `${excelNum1}|${excelNum2}` : null;
-    if(excelOddsKey && excelOddsKey !== lastEmbeddedExcelOdds){
-      lastEmbeddedExcelOdds = excelOddsKey;
-      // Clear previous timer and remove mismatch highlight
-      if(embeddedDsMismatchTimer){ clearTimeout(embeddedDsMismatchTimer); embeddedDsMismatchTimer = null; }
-      const dsRow = document.getElementById('embeddedDsRow');
-      if(dsRow) dsRow.classList.remove('ds-mismatch');
-      // Start 5s timer to check for mismatch
-      embeddedDsMismatchTimer = setTimeout(()=>{
-        try {
-          const dsRow = document.getElementById('embeddedDsRow');
-          if(!dsRow) return;
-          if(!oddsMatch(embeddedOddsData['ds'], embeddedOddsData['excel'])){
-            dsRow.classList.add('ds-mismatch');
-          }
-        } catch(_){ }
-      }, 5000);
-    }
-  } catch(_){ }
+  // Excel row update
+  const excelCell=document.getElementById('embeddedExcelCell');
+  const excelRow=document.getElementById('embeddedExcelRow');
+  const hasExcelOdds = excelRec && Array.isArray(excelRec.odds) && excelRec.odds[0] !== '-';
   
-  // DS row update - separate row for DS odds
-  try {
-    const dsCell=document.getElementById('embeddedDsCell');
-    const dsRow=document.getElementById('embeddedDsRow');
-    const dsRec = embeddedOddsData['ds'];
-    const hasDsOdds = dsRec && Array.isArray(dsRec.odds) && dsRec.odds[0] !== '-';
-    
-    if(dsCell && dsRow){
-      // DS row is always visible
-      if(hasDsOdds){
-        dsCell.textContent = `${dsRec.odds[0]} / ${dsRec.odds[1]}`;
-        dsRow.classList.toggle('frozen', !!dsRec.frozen);
-        dsRow.classList.remove('no-data');
-        
-        // If DS odds now match Excel, clear mismatch highlight and cancel timer
-        if(oddsMatch(dsRec, excelRec)){
-            dsRow.classList.remove('ds-mismatch');
-            if(embeddedDsMismatchTimer){ clearTimeout(embeddedDsMismatchTimer); embeddedDsMismatchTimer = null; }
-        }
-      } else {
-        // Show placeholder when no DS data
-        dsCell.textContent = '— / —';
-        dsRow.classList.remove('frozen', 'ds-mismatch');
-        dsRow.classList.add('no-data');
+  if(excelCell && excelRow){
+    excelCell.textContent = hasExcelOdds ? `${excelRec.odds[0]} / ${excelRec.odds[1]}` : '- / -';
+    excelRow.classList.toggle('frozen', !!(excelRec && excelRec.frozen));
+  }
+  
+  // Track Excel odds changes for DS mismatch detection (compare as numbers to avoid 1.4 vs 1.40 mismatch)
+  const excelNum1 = hasExcelOdds ? parseFloat(excelRec.odds[0]) : NaN;
+  const excelNum2 = hasExcelOdds ? parseFloat(excelRec.odds[1]) : NaN;
+  const excelOddsKey = hasExcelOdds ? `${excelNum1}|${excelNum2}` : null;
+  if(excelOddsKey && excelOddsKey !== lastEmbeddedExcelOdds){
+    lastEmbeddedExcelOdds = excelOddsKey;
+    if(embeddedDsMismatchTimer){ clearTimeout(embeddedDsMismatchTimer); embeddedDsMismatchTimer = null; }
+    const dsRow = document.getElementById('embeddedDsRow');
+    if(dsRow) dsRow.classList.remove('ds-mismatch');
+    embeddedDsMismatchTimer = setTimeout(()=>{
+      const dsRow = document.getElementById('embeddedDsRow');
+      if(dsRow && !oddsMatch(embeddedOddsData['ds'], embeddedOddsData['excel'])){
+        dsRow.classList.add('ds-mismatch');
       }
+    }, 5000);
+  }
+  
+  // DS row update
+  const dsCell=document.getElementById('embeddedDsCell');
+  const dsRow=document.getElementById('embeddedDsRow');
+  const dsRec = embeddedOddsData['ds'];
+  const hasDsOdds = dsRec && Array.isArray(dsRec.odds) && dsRec.odds[0] !== '-';
+  
+  if(dsCell && dsRow){
+    if(hasDsOdds){
+      dsCell.textContent = `${dsRec.odds[0]} / ${dsRec.odds[1]}`;
+      dsRow.classList.toggle('frozen', !!dsRec.frozen);
+      dsRow.classList.remove('no-data');
+      if(oddsMatch(dsRec, excelRec)){
+        dsRow.classList.remove('ds-mismatch');
+        if(embeddedDsMismatchTimer){ clearTimeout(embeddedDsMismatchTimer); embeddedDsMismatchTimer = null; }
+      }
+    } else {
+      dsCell.textContent = '— / —';
+      dsRow.classList.remove('frozen', 'ds-mismatch');
+      dsRow.classList.add('no-data');
     }
-  } catch(_){ }
+  }
+
   const midCell=document.getElementById('embeddedMidCell');
   if(midCell){
     const mid = (OddsBoardShared && OddsBoardShared.calcMidFromLiveNums)
@@ -271,60 +189,42 @@ function renderEmbeddedOdds(){
     else { midCell.textContent=`${mid.mid1.toFixed(2)} / ${mid.mid2.toFixed(2)}`; }
   }
   
-  // Arb calculation: margin = (1/best1 + 1/best2) * 100
-  // Only show if margin < 100% (real arbitrage opportunity)
-  try {
-    const arbCell = document.getElementById('embeddedArbCell');
-    const arbRow = document.getElementById('embeddedArbRow');
-    if(arbCell && arbRow){
-      if(!isNaN(embeddedBest1) && !isNaN(embeddedBest2) && embeddedBest1 > 0 && embeddedBest2 > 0){
-        const margin = (1/embeddedBest1 + 1/embeddedBest2) * 100;
-        const hasArb = margin < 100;
-        if(hasArb){
-          const arbPct = 100 - margin;
-          arbCell.textContent = `+${arbPct.toFixed(2)}% (${embeddedBest1.toFixed(2)} / ${embeddedBest2.toFixed(2)})`;
-          arbCell.classList.add('arb-positive');
-          arbRow.style.display = '';
-        } else {
-          arbRow.style.display = 'none';
-        }
+  // Arb calculation
+  const arbCell = document.getElementById('embeddedArbCell');
+  const arbRow = document.getElementById('embeddedArbRow');
+  if(arbCell && arbRow){
+    if(!isNaN(embeddedBest1) && !isNaN(embeddedBest2) && embeddedBest1 > 0 && embeddedBest2 > 0){
+      const margin = (1/embeddedBest1 + 1/embeddedBest2) * 100;
+      if(margin < 100){
+        arbCell.textContent = `+${(100-margin).toFixed(2)}% (${embeddedBest1.toFixed(2)} / ${embeddedBest2.toFixed(2)})`;
+        arbCell.classList.add('arb-positive');
+        arbRow.style.display = '';
       } else {
         arbRow.style.display = 'none';
       }
+    } else {
+      arbRow.style.display = 'none';
     }
-  } catch(_){ }
+  }
   
-  try {
-    const h1=document.querySelector('#lt-team1 .teamNameWrap')?.textContent || 'Side 1';
-    const h2=document.querySelector('#lt-team2 .teamNameWrap')?.textContent || 'Side 2';
-    const eo1=document.getElementById('eo-side1'); const eo2=document.getElementById('eo-side2');
-    if(eo1) eo1.textContent=h1; if(eo2) eo2.textContent=h2;
-  } catch(_){ }
+  const h1=document.querySelector('#lt-team1 .teamNameWrap')?.textContent || 'Side 1';
+  const h2=document.querySelector('#lt-team2 .teamNameWrap')?.textContent || 'Side 2';
+  const eo1=document.getElementById('eo-side1'); const eo2=document.getElementById('eo-side2');
+  if(eo1) eo1.textContent=h1; if(eo2) eo2.textContent=h2;
 
-  // Embedded auto rows (only indicators now) visibility update
-  try {
-    const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow');
-    const sim = window.__embeddedAutoSim;
-    const vis = (sim && sim.active) ? '' : 'none';
-    if(indRow) indRow.style.display = vis;
-  } catch(_){ }
-  // Auto guards moved to centralized AutoHub
+  // Embedded auto indicators visibility
+  const indRow=document.getElementById('embeddedExcelAutoIndicatorsRow');
+  const sim = window.__embeddedAutoSim;
+  if(indRow) indRow.style.display = (sim && sim.active) ? '' : 'none';
 }
-// Prepare for game-specific tweaks (just log for now)
-try {
-  const { ipcRenderer } = require('electron');
-  ipcRenderer.invoke('game-get').then(g=>{ try { console.log('[embeddedOdds] game initial', g); } catch(_){ } }).catch(()=>{});
-  ipcRenderer.on('game-changed', (_e,g)=>{ try { console.log('[embeddedOdds] game changed ->', g); } catch(_){ } });
-} catch(_){ }
-function handleEmbeddedOdds(p){ try {
+function handleEmbeddedOdds(p){
   if(!p||!p.broker) return;
   if(p.removed){ if(embeddedOddsData[p.broker]){ delete embeddedOddsData[p.broker]; renderEmbeddedOdds(); } return; }
-  // If map not initialized yet and payload carries map, adopt it
   if((currentMap===undefined || currentMap===null) && (p.map!==undefined && p.map!==null)){
     currentMap = p.map; window.__embeddedCurrentMap=currentMap; updateEmbeddedMapTag(); syncEmbeddedMapSelect(); forceMapSelectValue();
   }
   embeddedOddsData[p.broker]=p; renderEmbeddedOdds();
-} catch(_){ } }
+}
 
 // ======= Embedded derived + auto guard =======
 // Derived + market guards handled by AutoHub now
@@ -333,43 +233,33 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
   try {
     if(OddsCore && !window.__embeddedOddsHub){
       const hub = OddsCore.createOddsHub(); window.__embeddedOddsHub = hub;
-      try { console.log('[embeddedOdds][init] Using shared OddsCore hub'); } catch(_){ }
+      console.log('[embeddedOdds][init] Using shared OddsCore hub');
       let firstLogged=false;
       hub.subscribe(st=>{ try {
         if(!firstLogged){
           firstLogged=true;
           const cnt = Object.keys(st.records||{}).length;
-          try { console.log('[embeddedOdds][hub][first] records:', cnt, 'derived.hasMid:', !!(st && st.derived && st.derived.hasMid)); } catch(_){ }
+          console.log('[embeddedOdds][hub][first] records:', cnt, 'derived.hasMid:', !!(st && st.derived && st.derived.hasMid));
         }
-          let lastStatusSig = '';
-          let lastAutoToastTs = 0;
         Object.assign(embeddedOddsData, st.records||{}); renderEmbeddedOdds();
       } catch(_){ } });
       hub.start();
     } else {
-      try { console.log('[embeddedOdds][init] Fallback odds wiring (desktopAPI)'); } catch(_){ }
-      if(window.desktopAPI?.onOdds) window.desktopAPI.onOdds(p=>{ try { console.debug('[embeddedOdds] odds-update', p && p.broker); } catch(_){ } handleEmbeddedOdds(p); });
+      console.log('[embeddedOdds][init] Fallback odds wiring (desktopAPI)');
+      if(window.desktopAPI?.onOdds) window.desktopAPI.onOdds(p=>{ console.debug('[embeddedOdds] odds-update', p && p.broker); handleEmbeddedOdds(p); });
     }
   } catch(_){ }
-  try { if(window.desktopAPI?.onTeamNames) window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds()); } catch(_){ }
-  try { if(window.desktopAPI?.getTeamNames) window.desktopAPI.getTeamNames().then(()=>renderEmbeddedOdds()).catch(()=>{}); } catch(_){ }
+  window.desktopAPI.onTeamNames(()=> renderEmbeddedOdds());
+  window.desktopAPI.getTeamNames().then(()=>renderEmbeddedOdds()).catch(()=>{});
   // Remove broker rows when a broker is closed (mirror board behavior)
-  try {
-    if(window.desktopAPI?.onBrokerClosed){
-      window.desktopAPI.onBrokerClosed(id=>{ try { if(id && embeddedOddsData[id]){ delete embeddedOddsData[id]; renderEmbeddedOdds(); } } catch(_){ } });
-    }
-  } catch(_){ }
+  window.desktopAPI.onBrokerClosed(id=>{ if(id && embeddedOddsData[id]){ delete embeddedOddsData[id]; renderEmbeddedOdds(); } });
   // Sync with full active brokers list (drop any stale entries not present anymore)
-  try {
-    if(window.desktopAPI?.onBrokersSync){
-      // Don't remove 'excel' or 'ds' - they come from different sources
-      window.desktopAPI.onBrokersSync(ids=>{ try { const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); } catch(_){ } });
-    }
-  } catch(_){ }
+  // Don't remove 'excel' or 'ds' - they come from different sources
+  window.desktopAPI.onBrokersSync(ids=>{ const set=new Set(ids||[]); let changed=false; Object.keys(embeddedOddsData).forEach(k=>{ if(k==='excel' || k==='ds') return; if(!set.has(k)){ delete embeddedOddsData[k]; changed=true; } }); if(changed) renderEmbeddedOdds(); });
   // One-time attempt to fetch last Excel odds (if loaded after they were emitted) so user doesn't need to re-select map
   try {
     const ipc = (window.require? window.require('electron').ipcRenderer: null);
-    if(ipc && ipc.invoke){ ipc.invoke('excel-last-odds').then(p=>{ try { console.log('[embeddedOdds][excel-last-odds]', p? 'received':'none'); } catch(_){ } if(p && p.broker==='excel'){ handleEmbeddedOdds(p); } }).catch(()=>{}); }
+    if(ipc && ipc.invoke){ ipc.invoke('excel-last-odds').then(p=>{ console.log('[embeddedOdds][excel-last-odds]', p? 'received':'none'); if(p && p.broker==='excel'){ handleEmbeddedOdds(p); } }).catch(()=>{}); }
   } catch(_){ }
   // Excel extractor toggle + status (embedded panel)
   try {
@@ -378,13 +268,9 @@ function initEmbeddedOdds(){ const root=document.getElementById('embeddedOddsSec
     const statusCell = document.getElementById('embeddedExcelStatusCell');
     const scriptMapBadge = document.getElementById('embeddedScriptMapBadge');
     
-    // Get board map from embedded map selector
     function getEmbeddedBoardMap(){
-      try {
-        const sel = document.getElementById('embeddedMapSelect');
-        if(sel) return parseInt(sel.value, 10);
-      } catch(_){ }
-      return null;
+      const sel = document.getElementById('embeddedMapSelect');
+      return sel ? parseInt(sel.value, 10) : null;
     }
     
     if(ExcelStatusUI && btn){
@@ -414,7 +300,7 @@ function initSectionReorder(){
   const blocks=collectBlocks();
   // Attempt async restore via IPC first; fallback to localStorage legacy
   let restored=false; let appliedOrder=null; let pendingStoreOrder=null;
-  function debug(msg, extra){ try { console.debug('[stats-reorder]', msg, extra||''); } catch(_){ } }
+  function debug(msg, extra){ console.debug('[stats-reorder]', msg, extra||''); }
   // Apply order with id validation only once unless forced
   function applyIfValid(order, source){ if(!Array.isArray(order) || !order.length) return; const ids=collectBlocks().map(b=>b.id); const filtered=order.filter(id=>ids.includes(id)); if(!filtered.length) return; appliedOrder=filtered; applyOrder(filtered); restored=true; debug('applied from '+source, filtered); }
   // Request from store
@@ -463,136 +349,113 @@ window.initSectionReorder = initSectionReorder;
 initEmbeddedMapSync();
 updateEmbeddedMapTag();
 // Fallback: after full DOM ready, re-sync in case elements mounted after initial code ran
-window.addEventListener('DOMContentLoaded', ()=>{ try { syncEmbeddedMapSelect(); updateEmbeddedMapTag(); forceMapSelectValue(); } catch(_){ } });
-// Centralized tolerance badge (embedded header) – prefer IPC value, fallback to engine state
-try {
+window.addEventListener('DOMContentLoaded', ()=>{ syncEmbeddedMapSelect(); updateEmbeddedMapTag(); forceMapSelectValue(); });
+// Centralized tolerance badge (embedded header)
+{
   const { ipcRenderer } = require('electron');
-  let lastIpcTol = null; // Store last IPC value
-  function getEngTol(){ try { const st = window.__embeddedAutoSim; if(st && typeof st.tolerancePct==='number' && !isNaN(st.tolerancePct)) return st.tolerancePct; } catch(_){ } return null; }
+  let lastIpcTol = null;
+  function getEngTol(){ const st = window.__embeddedAutoSim; return (st && typeof st.tolerancePct==='number' && !isNaN(st.tolerancePct)) ? st.tolerancePct : null; }
   function setEmbTolBadge(v){
-    try {
-      const el=document.getElementById('embeddedTolBadge'); if(!el) return;
-      // Priority: IPC value > engine state > default
-      if (typeof v === 'number' && !isNaN(v)) lastIpcTol = v;
-      const val = lastIpcTol ?? getEngTol();
-      el.textContent = (val!=null) ? `${val.toFixed(1)}%` : '—%';
-    } catch(_){ }
+    const el=document.getElementById('embeddedTolBadge'); if(!el) return;
+    if (typeof v === 'number' && !isNaN(v)) lastIpcTol = v;
+    const val = lastIpcTol ?? getEngTol();
+    el.textContent = (val!=null) ? `${val.toFixed(1)}%` : '—%';
   }
-  if(ipcRenderer){
-    try { ipcRenderer.invoke('auto-tolerance-get').then(v=> setEmbTolBadge(v)).catch(()=> setEmbTolBadge(null)); } catch(_){ }
-    ipcRenderer.on('auto-tolerance-updated', (_e,v)=> setTimeout(()=> setEmbTolBadge(v), 0));
-    ipcRenderer.on('auto-active-set', ()=> setTimeout(()=> setEmbTolBadge(null), 0)); // Re-check with current lastIpcTol
-  }
-} catch(_){ }
+  ipcRenderer.invoke('auto-tolerance-get').then(v=> setEmbTolBadge(v)).catch(()=> setEmbTolBadge(null));
+  ipcRenderer.on('auto-tolerance-updated', (_e,v)=> setTimeout(()=> setEmbTolBadge(v), 0));
+  ipcRenderer.on('auto-active-set', ()=> setTimeout(()=> setEmbTolBadge(null), 0));
+}
 // Delegate click for swap buttons
 document.addEventListener('click', e=>{
   const btn = e.target.closest && e.target.closest('.eo-swapBtn');
   if(!btn) return;
   const broker = btn.getAttribute('data-broker');
   if(!broker || broker==='excel') return;
-  try {
-    const set = window.__swappedBrokers || (window.__swappedBrokers = new Set());
-    const next = !set.has(broker);
-    if(next) set.add(broker); else set.delete(broker);
-    if(window.desktopAPI?.setBrokerSwap){
-      window.desktopAPI.setBrokerSwap(broker, next);
-    } else {
-      // Fallback localStorage (won't sync)
-      try { localStorage.setItem('swappedBrokers', JSON.stringify(Array.from(set))); } catch(_){ }
-    }
-    renderEmbeddedOdds();
-  } catch(_){ }
+  const set = window.__swappedBrokers || (window.__swappedBrokers = new Set());
+  const next = !set.has(broker);
+  if(next) set.add(broker); else set.delete(broker);
+  window.desktopAPI.setBrokerSwap(broker, next);
+  renderEmbeddedOdds();
 });
 
 // ======= Unified panel toolbar bindings =======
 function initEmbeddedToolbar(){
-  try {
-    const addBtn = document.getElementById('embeddedAddBroker');
-    const layoutSel = document.getElementById('embeddedLayoutPreset');
-    const refreshBtn = document.getElementById('embeddedRefreshAll');
+  const addBtn = document.getElementById('embeddedAddBroker');
+  const layoutSel = document.getElementById('embeddedLayoutPreset');
+  const refreshBtn = document.getElementById('embeddedRefreshAll');
+  
+  if(addBtn){
+    let pickerEl = null;
+    let pickerOpen = false;
     
-    // Add broker
-    if(addBtn){
-      let pickerEl = null;
-      let pickerOpen = false;
-      
-      function closePicker(){ pickerOpen = false; try { if(pickerEl) pickerEl.classList.add('hidden'); } catch(_){ } }
-      
-      async function openPicker(){
-        try {
-          if(!pickerEl){
-            pickerEl = document.createElement('div');
-            pickerEl.id = 'embeddedBrokerPicker';
-            pickerEl.className = 'brokerPicker panel-base hidden';
-            pickerEl.innerHTML = '<div class="brokerPickerTitle">Add broker</div><div class="brokerPickerList" role="menu"></div>';
-            document.body.appendChild(pickerEl);
-          }
-          
-          const list = pickerEl.querySelector('.brokerPickerList');
-          if(list) list.innerHTML = '<div class="brokerPickerEmpty muted">Loading…</div>';
-          
-          const r = addBtn.getBoundingClientRect();
-          pickerEl.style.position = 'fixed';
-          pickerEl.style.left = Math.max(6, Math.min(window.innerWidth - 240, r.left)) + 'px';
-          pickerEl.style.top = (r.bottom + 6) + 'px';
-          pickerEl.classList.remove('hidden');
-          pickerOpen = true;
-          
-          const data = await (window.desktopAPI?.getBrokersForPicker ? window.desktopAPI.getBrokersForPicker() : Promise.resolve({ brokers:[], active:[] }));
-          const brokers = Array.isArray(data?.brokers) ? data.brokers : [];
-          const active = Array.isArray(data?.active) ? data.active : [];
-          const inactive = brokers.filter(b => b?.id && !active.includes(b.id));
-          
-          if(!list) return;
-          if(!inactive.length){
-            list.innerHTML = '<div class="brokerPickerEmpty muted">No available brokers</div>';
-            return;
-          }
-          
-          list.innerHTML = '';
-          inactive.forEach(b => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'brokerPickBtn';
-            btn.setAttribute('role', 'menuitem');
-            btn.textContent = b.title || b.name || b.id;
-            btn.title = b.id;
-            btn.addEventListener('click', ()=>{
-              try { window.desktopAPI?.addBroker(b.id); } catch(_){ }
-              // Switch from stats to brokers view so user sees the new broker
-              try {
-                if(window.desktopAPI?.getStatsState){
-                  window.desktopAPI.getStatsState().then(st => {
-                    if(st && st.mode === 'embedded') window.desktopAPI.statsToggle();
-                  }).catch(()=>{});
-                }
-              } catch(_){ }
-              closePicker();
-            });
-            list.appendChild(btn);
-          });
-        } catch(_){ }
+    function closePicker(){ pickerOpen = false; if(pickerEl) pickerEl.classList.add('hidden'); }
+    
+    async function openPicker(){
+      if(!pickerEl){
+        pickerEl = document.createElement('div');
+        pickerEl.id = 'embeddedBrokerPicker';
+        pickerEl.className = 'brokerPicker panel-base hidden';
+        pickerEl.innerHTML = '<div class="brokerPickerTitle">Add broker</div><div class="brokerPickerList" role="menu"></div>';
+        document.body.appendChild(pickerEl);
       }
       
-      addBtn.addEventListener('click', ()=>{ if(pickerOpen) closePicker(); else openPicker(); });
-      document.addEventListener('click', e=>{ if(pickerOpen && pickerEl && !pickerEl.contains(e.target) && e.target !== addBtn) closePicker(); });
-      window.addEventListener('keydown', e=>{ if(pickerOpen && e.key === 'Escape') closePicker(); });
+      const list = pickerEl.querySelector('.brokerPickerList');
+      if(list) list.innerHTML = '<div class="brokerPickerEmpty muted">Loading…</div>';
+      
+      const r = addBtn.getBoundingClientRect();
+      pickerEl.style.position = 'fixed';
+      pickerEl.style.left = Math.max(6, Math.min(window.innerWidth - 240, r.left)) + 'px';
+      pickerEl.style.top = (r.bottom + 6) + 'px';
+      pickerEl.classList.remove('hidden');
+      pickerOpen = true;
+      
+      try {
+        const data = await (window.desktopAPI?.getBrokersForPicker ? window.desktopAPI.getBrokersForPicker() : Promise.resolve({ brokers:[], active:[] }));
+        const brokers = Array.isArray(data?.brokers) ? data.brokers : [];
+        const active = Array.isArray(data?.active) ? data.active : [];
+        const inactive = brokers.filter(b => b?.id && !active.includes(b.id));
+        
+        if(!list) return;
+        if(!inactive.length){
+          list.innerHTML = '<div class="brokerPickerEmpty muted">No available brokers</div>';
+          return;
+        }
+        
+        list.innerHTML = '';
+        inactive.forEach(b => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'brokerPickBtn';
+          btn.setAttribute('role', 'menuitem');
+          btn.textContent = b.title || b.name || b.id;
+          btn.title = b.id;
+          btn.addEventListener('click', ()=>{
+            window.desktopAPI?.addBroker(b.id);
+            if(window.desktopAPI?.getStatsState){
+              window.desktopAPI.getStatsState().then(st => {
+                if(st && st.mode === 'embedded') window.desktopAPI.statsToggle();
+              }).catch(()=>{});
+            }
+            closePicker();
+          });
+          list.appendChild(btn);
+        });
+      } catch(_){ }
     }
     
-    // Layout preset
-    if(layoutSel){
-      window.desktopAPI?.getLayoutPreset?.().then(p=>{ try { if(p) layoutSel.value = p; } catch(_){ } }).catch(()=>{});
-      layoutSel.addEventListener('change', ()=>{ try { if(layoutSel.value) window.desktopAPI?.applyLayoutPreset(layoutSel.value); } catch(_){ } });
-    }
-    
-    // Refresh all
-    if(refreshBtn){
-      refreshBtn.addEventListener('click', ()=>{ try { window.desktopAPI?.refreshAll?.(); } catch(_){ } });
-    }
-  } catch(e){ console.warn('[embeddedToolbar] init error', e); }
+    addBtn.addEventListener('click', ()=>{ if(pickerOpen) closePicker(); else openPicker(); });
+    document.addEventListener('click', e=>{ if(pickerOpen && pickerEl && !pickerEl.contains(e.target) && e.target !== addBtn) closePicker(); });
+    window.addEventListener('keydown', e=>{ if(pickerOpen && e.key === 'Escape') closePicker(); });
+  }
+  
+  if(layoutSel){
+    window.desktopAPI?.getLayoutPreset?.().then(p=>{ if(p) layoutSel.value = p; }).catch(()=>{});
+    layoutSel.addEventListener('change', ()=>{ if(layoutSel.value) window.desktopAPI?.applyLayoutPreset(layoutSel.value); });
+  }
+  
+  if(refreshBtn){
+    refreshBtn.addEventListener('click', ()=>{ window.desktopAPI?.refreshAll?.(); });
+  }
 }
 
-// Initialize toolbar on DOMContentLoaded
-window.addEventListener('DOMContentLoaded', ()=>{
-  try { initEmbeddedToolbar(); } catch(_){ }
-});
+window.addEventListener('DOMContentLoaded', initEmbeddedToolbar);

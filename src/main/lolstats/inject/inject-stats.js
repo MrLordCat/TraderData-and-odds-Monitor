@@ -265,11 +265,10 @@
       return;
     }
     
-    // Series ended - notify parent
+    // Series ended
     if (RX_SERIES_END.test(head)) {
       console.log('[inject-stats] Series ended');
       seriesActive = false;
-      playSound('seriesEnd', entryKey);
       return;
     }
     
@@ -344,8 +343,8 @@
           if (!target.winner) {
             target.winner = candTeam;
             target.winAt = ts;
-            try { target.winnerSource = 'live-log-single-line'; } catch(_){ }
-            try { console.log('[lol][winner][inject]', candTeam, 'won Game', gNum, 'at', ts); } catch(_){ }
+            target.winnerSource = 'live-log-single-line';
+            console.log('[lol][winner][inject]', candTeam, 'won Game', gNum, 'at', ts);
           }
         }
       }
@@ -466,11 +465,6 @@
   window.addEventListener('message', (event) => {
     if (event.source !== window || !event.data) return;
     if (event.data.type === 'restart_data_collection') {
-      // Store current game stats before clearing (in case we want to preserve some data)
-      const existingGames = Object.keys(gameStats);
-      
-      // Reset collection state but preserve game stats temporarily
-      const preservedStats = { ...gameStats };
       mappingReady = false;
       backlog = [];
       // Don't clear processedEntries immediately - clear after a delay to prevent duplicate processing

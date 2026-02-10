@@ -110,7 +110,6 @@
     if (!soundsEnabled) { console.log('[stats-sounds] ⏸️ SKIPPED: sounds disabled'); return; }
 
     if (soundType === 'seriesStart') { currentGame = 0; return; }
-    if (soundType === 'seriesEnd') return;
     if (soundType === 'gameStart') {
       currentGame++;
       if (currentGame >= 1 && currentGame <= 5) playSound(SOUNDS.gameStart[currentGame]);

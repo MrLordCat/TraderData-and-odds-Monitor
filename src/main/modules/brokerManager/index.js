@@ -1,6 +1,6 @@
 const { BrowserView } = require('electron');
 const path = require('path');
-const { Menu, clipboard } = require('electron');
+const { attachContextMenu } = require('../utils/contextMenu');
 
 // Broker manager: creates/tears down bookmaker BrowserViews and exposes add/close dialog handling
 function createBrokerManager(ctx){
@@ -135,48 +135,10 @@ function createBrokerManager(ctx){
     });
 
     // Attach context menu (right-click) once
-    try {
-      if(!view.__ctxMenuAttached){
-        view.__ctxMenuAttached = true;
-        view.webContents.on('context-menu', (e, params)=>{
-          try {
-            const template = [];
-            // Navigation / reload
-            const nav = view.webContents.navigationHistory;
-            const canBack = nav ? nav.canGoBack() : (typeof view.webContents.canGoBack==='function' && view.webContents.canGoBack());
-            const canFwd  = nav ? nav.canGoForward() : (typeof view.webContents.canGoForward==='function' && view.webContents.canGoForward());
-            if(canBack) template.push({ label:'Back', click:()=>{ try { nav? nav.goBack(): view.webContents.goBack(); } catch(_){ } } });
-            if(canFwd) template.push({ label:'Forward', click:()=>{ try { nav? nav.goForward(): view.webContents.goForward(); } catch(_){ } } });
-            template.push({ label:'Reload', click:()=>{ try { view.webContents.reload(); } catch(_){ } } });
-            template.push({ label:'Hard Reload (ignore cache)', click:()=>{ try { view.webContents.reloadIgnoringCache(); } catch(_){ } } });
-            // URL helpers
-            try { const cur=view.webContents.getURL(); if(cur) template.push({ label:'Copy Page URL', click:()=>{ try { clipboard.writeText(cur); } catch(_){ } } }); } catch(_){ }
-            if(params.linkURL) template.push({ label:'Copy Link URL', click:()=>{ try { clipboard.writeText(params.linkURL); } catch(_){ } } });
-            template.push({ type:'separator' });
-            // Edit actions
-            if(params.isEditable) template.push({ role:'cut' });
-            template.push({ role:'copy' });
-            if(params.isEditable) template.push({ role:'paste' });
-            template.push({ role:'selectAll' });
-            template.push({ type:'separator' });
-            // DevTools / Inspect
-            template.push({ label:'Open DevTools', click:()=>{ try { view.webContents.openDevTools({ mode:'detach' }); } catch(_){ } } });
-            if(typeof params.x==='number' && typeof params.y==='number') template.push({ label:'Inspect Element', click:()=>{ try { view.webContents.inspectElement(params.x, params.y); } catch(_){ } } });
-            template.push({ type:'separator' });
-            template.push({ label:'Broker: '+brokerDef.id, enabled:false });
-            const menu = Menu.buildFromTemplate(template);
-            menu.popup({ window: mainWindow });
-          } catch(err){ try { console.warn('[brokerCtxMenu] build fail', err.message); } catch(_){ } }
-        });
-      }
-    } catch(_){ }
+    try { attachContextMenu(view, mainWindow, 'Broker: ' + brokerDef.id, { hardReload: true }); } catch(_){ }
 
     // If stats embedded panel is active, newly added broker might overlap z-order; re-assert panel topmost.
-    try {
-      if(ctx.statsManager && typeof ctx.statsManager.ensureTopmost === 'function'){
-        [0,60,180,360].forEach(delay=> setTimeout(()=>{ try { ctx.statsManager.ensureTopmost(); } catch(_){ } }, delay));
-      }
-    } catch(_){ }
+    try { ctx.statsManager?.deferEnsureTopmost?.(); } catch(_){ }
   }
 
   function addBroker(id, startUrlOverride){
@@ -207,11 +169,7 @@ function createBrokerManager(ctx){
     }
     if(layoutManager.getCurrentPresetId()) layoutManager.applyLayoutPreset(layoutManager.getCurrentPresetId()); else layoutManager.relayoutAll();
     // After layout reflow new slot-* views may have been added on top; reassert stats z-order
-    try {
-      if(ctx.statsManager && typeof ctx.statsManager.ensureTopmost==='function'){
-        [0,80,200].forEach(d=> setTimeout(()=>{ try { ctx.statsManager.ensureTopmost(); } catch(_){ } }, d));
-      }
-    } catch(_){ }
+    try { ctx.statsManager?.deferEnsureTopmost?.(); } catch(_){ }
   }
 
   function closeBroker(id){
@@ -226,11 +184,7 @@ function createBrokerManager(ctx){
     if(!dis.includes(id)){ dis.push(id); store.set('disabledBrokers', dis); }
     if(layoutManager.getCurrentPresetId()) layoutManager.applyLayoutPreset(layoutManager.getCurrentPresetId()); else layoutManager.relayoutAll();
     // Re-assert stats panel z-order after removal triggers preset reflow
-    try {
-      if(ctx.statsManager && typeof ctx.statsManager.ensureTopmost==='function'){
-        [0,80,200].forEach(d=> setTimeout(()=>{ try { ctx.statsManager.ensureTopmost(); } catch(_){ } }, d));
-      }
-    } catch(_){ }
+    try { ctx.statsManager?.deferEnsureTopmost?.(); } catch(_){ }
   }
 
   // Периодическое "пробуждение" broker views - борьба с Chromium throttling для фоновых вкладок

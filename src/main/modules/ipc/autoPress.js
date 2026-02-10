@@ -56,7 +56,7 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
       keyLabel = side === 1 ? 'F24' : 'F23';
     }
 
-    if (keyLabel === 'F22') { try { console.log('[auto-press][ipc] confirm request F22'); } catch (_) { } }
+    if (keyLabel === 'F22') { console.log('[auto-press][ipc] confirm request F22'); }
 
     // Normalize retry flag from direction suffix
     if (!isRetry && typeof direction === 'string' && direction.indexOf(':retry') !== -1) { isRetry = true; }
@@ -68,13 +68,13 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
       const retryWindowMs = 400;
       if (isRetry) {
         if (nowTs - __lastF21RetrySentAt < retryWindowMs) {
-          try { console.log('[auto-press][ipc][dedupe] suppress F21 retry', { direction, ts: nowTs }); } catch (_) { }
+          console.log('[auto-press][ipc][dedupe] suppress F21 retry', { direction, ts: nowTs });
           return true;
         }
         __lastF21RetrySentAt = nowTs;
       } else {
         if (nowTs - __lastF21SentAt < initialWindowMs) {
-          try { console.log('[auto-press][ipc][dedupe] suppress F21 initial', { direction, ts: nowTs }); } catch (_) { }
+          console.log('[auto-press][ipc][dedupe] suppress F21 initial', { direction, ts: nowTs });
           return true;
         }
         __lastF21SentAt = nowTs;
@@ -93,7 +93,7 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
     }
 
     // Broadcast to all views
-    try { broadcastToAll(getBroadcastCtx(), 'auto-press', { side, key: keyLabel, direction }); } catch (err) { try { console.warn('[auto-press][ipc] send fail', err); } catch (_) { } }
+    try { broadcastToAll(getBroadcastCtx(), 'auto-press', { side, key: keyLabel, direction }); } catch (err) { console.warn('[auto-press][ipc] send fail', err); }
 
     // Always write file signal for AHK
     writeAutoSignal({ side, key: keyLabel, direction, ts });
@@ -107,8 +107,8 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
         exec(cmd, (err) => {
           const dbg = { side, key: keyLabel, direction, diffPct, tsStart: ts, injVk, cmd, ok: !err, err: err ? err.message : null, tsDone: Date.now() };
           try { fs.writeFileSync(path.join(signalDir, 'auto_press_debug.json'), JSON.stringify(dbg)); } catch (_) { }
-          if (err) { try { console.warn('[auto-press][ipc][si] FAIL', err.message); } catch (_) { } }
-          else { try { console.log('[auto-press][ipc][si] SENT', keyLabel, 'injVk', injVk); } catch (_) { } }
+          if (err) { console.warn('[auto-press][ipc][si] FAIL', err.message); }
+          else { console.log('[auto-press][ipc][si] SENT', keyLabel, 'injVk', injVk); }
         });
         sent = true;
 
@@ -122,14 +122,14 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
               exec(confirmCmd, (cerr) => {
                 const cdbg = { kind: 'confirm', parentKey: keyLabel, confirmKey: 'F22', confirmVk, confirmCmd, ok: !cerr, err: cerr ? cerr.message : null, tsParent: ts, tsDone: Date.now() };
                 try { fs.writeFileSync(path.join(signalDir, 'auto_press_confirm_debug.json'), JSON.stringify(cdbg)); } catch (_) { }
-                if (cerr) { try { console.warn('[auto-press][ipc][confirm] FAIL', cerr.message); } catch (_) { } }
-                else { try { console.log('[auto-press][ipc][confirm] SENT F22 after', confirmDelayMs, 'ms'); } catch (_) { } }
+                if (cerr) { console.warn('[auto-press][ipc][confirm] FAIL', cerr.message); }
+                else { console.log('[auto-press][ipc][confirm] SENT F22 after', confirmDelayMs, 'ms'); }
               });
-            } catch (e2) { try { console.warn('[auto-press][ipc][confirm] schedule error', e2.message); } catch (_) { } }
+            } catch (e2) { console.warn('[auto-press][ipc][confirm] schedule error', e2.message); }
           }, confirmDelayMs);
         }
       }
-    } catch (e) { try { console.warn('[auto-press][ipc][si] unavailable', e.message); } catch (_) { } }
+    } catch (e) { console.warn('[auto-press][ipc][si] unavailable', e.message); }
 
     if (!sent) {
       writeAutoSignal({ side, key: keyLabel, direction, ts });
@@ -139,11 +139,11 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
 
   // Auto mode relay
   ipcMain.on('auto-mode-changed', (_e, payload) => {
-    try { console.log('[autoSim][mode]', payload); } catch (_) { }
+    console.log('[autoSim][mode]', payload);
     try { broadcastToAll(getBroadcastCtx(), 'auto-set-all', { on: !!(payload && payload.active) }); } catch (_) { }
   });
 
-  ipcMain.on('auto-fire-attempt', (_e, payload) => { try { console.log('[autoSim][fireAttempt]', payload); } catch (_) { } });
+  ipcMain.on('auto-fire-attempt', (_e, payload) => { console.log('[autoSim][fireAttempt]', payload); });
 
   // Store last auto states to serve late-loaded windows
   ipcMain.on('auto-active-set', (_e, p) => {
@@ -159,7 +159,7 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
       if (!payload || !payload.level) return;
       const line = '[renderer][fwd][' + payload.level + '] ' + (payload.args ? payload.args.join(' ') : '');
       console[payload.level] ? console[payload.level](line) : console.log(line);
-    } catch (err) { try { console.warn('[renderer-log-forward] fail', err.message); } catch (_) { } }
+    } catch (err) { console.warn('[renderer-log-forward] fail', err.message); }
   });
 }
 
