@@ -54,12 +54,20 @@ function httpsGet(url, options = {}) {
       // Log rate limit info
       const remaining = res.headers['x-ratelimit-remaining'];
       const reset = res.headers['x-ratelimit-reset'];
-      if (remaining) {
-        console.log(`[githubApi] Rate limit remaining: ${remaining}, resets at: ${reset ? new Date(reset * 1000).toLocaleTimeString() : 'unknown'}`);
+      if (remaining !== undefined) {
+        const resetTime = reset ? new Date(reset * 1000).toLocaleTimeString() : 'unknown';
+        console.log(`[githubApi] Rate limit remaining: ${remaining}, resets at: ${resetTime}`);
       }
 
       if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+        let errorMsg = `HTTP ${res.statusCode}: ${res.statusMessage}`;
+        // Enhanced rate limit error with reset time
+        if (res.statusCode === 403 && remaining === '0' && reset) {
+          const resetTime = new Date(reset * 1000);
+          const minutesUntil = Math.ceil((resetTime - Date.now()) / 60000);
+          errorMsg = `Rate limit exceeded. Resets in ${minutesUntil} minute(s) at ${resetTime.toLocaleTimeString()}`;
+        }
+        reject(new Error(errorMsg));
         return;
       }
 

@@ -111,7 +111,10 @@ function bindEvents() {
 				setStatus(`Update available: ${result.version}`);
 			} else if (result && result.error) {
 				let errorMsg = result.error;
-				if (result.error.includes('403') || result.error.includes('rate limit')) {
+				// Pass through detailed rate limit message if available
+				if (result.error.includes('Rate limit exceeded. Resets in')) {
+					errorMsg = result.error;  // Use detailed message from githubApi
+				} else if (result.error.includes('403') || result.error.includes('rate limit')) {
 					errorMsg = 'Rate limit exceeded. Try again in ~1 hour.';
 				} else if (result.error.includes('timeout')) {
 					errorMsg = 'Request timeout. Check internet connection.';
@@ -122,7 +125,10 @@ function bindEvents() {
 			} else {
 				pendingUpdate = null;
 				updateReady = false;
-				setStatus('Already up to date');
+				// Show current version when up to date
+				const versionInfo = await ipcRenderer.invoke('updater-get-version');
+				const currentVer = versionInfo?.version || '?';
+				setStatus(`✓ Current version ${currentVer} is up to date`);
 			}
 			updateButtonState();
 		} catch (e) {
