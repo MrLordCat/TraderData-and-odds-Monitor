@@ -13,12 +13,7 @@
   const { ipcRenderer } = require('electron');
   
   const container = document.getElementById('addonModulesContainer');
-  if (!container) {
-    console.warn('[addon-loader] Container not found');
-    return;
-  }
-  
-  console.log('[addon-loader] Starting...');
+  if (!container) return;
   
   // Track loaded modules
   const loadedModules = new Map();
@@ -67,9 +62,7 @@
       
       // Check if it's a factory function
       if (typeof exported === 'function' && !exported.id) {
-        // Call factory with base class
         ModuleClass = exported({ SidebarModule, registerModule: () => {} });
-        console.log(`[addon-loader] Loaded via factory: ${ModuleClass?.id || 'unknown'}`);
       } else {
         ModuleClass = exported;
       }
@@ -126,8 +119,6 @@
         ModuleClass
       });
       
-      console.log(`[addon-loader] Mounted addon: ${ModuleClass.id}`);
-      
       // Initialize collapse behavior
       initCollapseForSection(section);
       
@@ -159,12 +150,7 @@
   async function loadAllAddons() {
     try {
       const addonPaths = await ipcRenderer.invoke('addons-get-enabled-paths');
-      console.log('[addon-loader] Got addon paths:', addonPaths);
-      
-      if (!addonPaths || addonPaths.length === 0) {
-        console.log('[addon-loader] No enabled addons');
-        return;
-      }
+      if (!addonPaths || addonPaths.length === 0) return;
       
       for (const addon of addonPaths) {
         try {
@@ -174,11 +160,7 @@
         }
       }
       
-      console.log('[addon-loader] All addons loaded');
-      
-    } catch (e) {
-      console.error('[addon-loader] Failed to get addon paths:', e);
-    }
+    } catch (e) { /* swallow */ }
   }
 
   // Load addons after DOM is ready

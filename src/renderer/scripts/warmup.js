@@ -8,8 +8,7 @@
   const WARMUP_DELAY = 100; // Wait for initial render
   
   function warmup() {
-    console.log('[warmup] Starting animation warm-up...');
-    const startTime = performance.now();
+
     
     const root = document.documentElement;
     
@@ -24,7 +23,6 @@
     // 3. Theme transition warm-up is handled centrally by splash manager
     //    (toggles theme across ALL views simultaneously for full CSS compilation)
     
-    console.log(`[warmup] Complete in ${(performance.now() - startTime).toFixed(1)}ms`);
   }
   
   function warmupTabs() {

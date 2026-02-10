@@ -3,7 +3,6 @@ let ipcRenderer = window.ipcRenderer; // reuse if already present
 if(!ipcRenderer){
   try { ipcRenderer = require('electron').ipcRenderer; window.ipcRenderer = ipcRenderer; } catch(e){ /* fallback placeholder */ }
 }
-console.log('[stats_panel] script start');
 if(!ipcRenderer){
   // If preload/nodeIntegration unexpectedly off, attach minimal shim so later code won't crash
   window.ipcRenderer = ipcRenderer = { send: ()=>{}, on: ()=>{}, invoke: async()=>{} };
@@ -337,10 +336,8 @@ ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ if(cfg && window.__STATS_CONF
 // Team names from Excel K4/N4 (read-only, updates headers)
 ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
   try {
-    console.log('[stats_panel] Received excel-team-names IPC:', { team1, team2 });
     const t1 = (team1 || '').trim() || 'Team 1';
     const t2 = (team2 || '').trim() || 'Team 2';
-    console.log('[stats_panel] Parsed team names:', t1, '/', t2);
     // fromExcel: true prevents re-broadcasting via lol-team-names-set (Excel already broadcasts to board)
     setTeamHeader(1, t1, { fromExcel: true });
     setTeamHeader(2, t2, { fromExcel: true });
@@ -349,8 +346,7 @@ ipcRenderer.on('excel-team-names', (_e, { team1, team2 })=>{
       renameTeamInternal(1, t1);
       renameTeamInternal(2, t2);
     }
-    console.log('[stats_panel] Excel team names applied:', t1, '/', t2);
-  } catch(e){ console.error('[stats_panel] excel-team-names error:', e); }
+  } catch(e){ /* swallow */ }
 });
 
 function applyWinLose(){
@@ -573,13 +569,11 @@ function renderLol(payload, manual=false){
 
 // ================= Startup =================
 (function init(){
-  console.log('[stats_panel] init()');
   bindBasic();
   bindReset();
   bindSettings();
   buildMetricToggles();
   ensureRows();
-  console.log('[stats_panel] after ensureRows count=', document.querySelectorAll('#lt-body tr').length);
   if(activityModule && activityModule.init) activityModule.init();
   // Apply any pending heat bar config that arrived before DOM was ready
   if(window.__applyPendingHeatBar) window.__applyPendingHeatBar();

@@ -15,7 +15,6 @@
       const electron = require('electron');
       ipcRenderer = electron.ipcRenderer;
     } catch(e){
-      console.warn('[desktopAPI-shim] Cannot access ipcRenderer - nodeIntegration may be disabled');
       return null;
     }
 
@@ -33,7 +32,6 @@
     const api = buildDesktopAPI(ipcRenderer, withUnsub);
 
     global.desktopAPI = api;
-    console.log('[desktopAPI-shim] Installed minimal API bridge');
     return api;
   }
 

@@ -29,10 +29,6 @@ function configure(opts={}){
   if(typeof opts.decayPerSec === 'number' && opts.decayPerSec>0) state.decayPerSec = opts.decayPerSec;
   if(typeof opts.bumpAmount === 'number' && opts.bumpAmount>0) state.bumpAmount = opts.bumpAmount;
   
-  // Log heat bar settings for debugging
-  const fadeTimeSec = state.decayPerSec > 0 ? (1 / state.decayPerSec).toFixed(1) : 'Infinity';
-  console.log(`[heat-bar] configure: decayPerSec=${state.decayPerSec.toFixed(3)}, fadeTime=${fadeTimeSec}s (UI setting), bumpAmount=${state.bumpAmount}, enabled=${state.enabled}`);
-  
   // If decay speed changed, reset timestamp so effect is immediate & no big jump
   state.lastTs = performance.now();
   // If disabled -> stop loop & clear bars
@@ -108,7 +104,7 @@ function bump(teamIdx){
   if(!state.enabled) return;
   const i = teamIdx-1; if(i<0||i>1) return;
   ensureDom();
-  if(!state.layer){ console.warn('[activity] bump before layer; retry soon'); setTimeout(()=>{ ensureDom(); if(state.layer) bump(teamIdx); }, 80); return; }
+  if(!state.layer){ setTimeout(()=>{ ensureDom(); if(state.layer) bump(teamIdx); }, 80); return; }
   state.levels[i] = Math.min(1, state.levels[i] + state.bumpAmount);
   const el = state.els[i];
   if(el){
@@ -129,8 +125,6 @@ function loop(){
       // At level=1.0: 100% speed, at level=0.5: 36%, at level→0: 15% (85% slower)
       const easeMultiplier = 0.15 + 0.85 * prev * prev;
       const decayed = prev - state.decayPerSec * easeMultiplier * dt;
-      // Debug log every ~1 second
-      if(Math.random() < 0.02) console.log(`[heat-bar] level=${prev.toFixed(2)}, ease=${easeMultiplier.toFixed(2)}, decay=${(state.decayPerSec * easeMultiplier).toFixed(3)}/s`);
       state.levels[i] = decayed>state.minVisible? decayed : 0;
       if(state.levels[i]>0) any = true;
       const el = state.els[i];

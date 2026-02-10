@@ -290,7 +290,7 @@ function initSectionReorder(){
   const blocks=collectBlocks();
   // Attempt async restore via IPC first; fallback to localStorage legacy
   let restored=false; let appliedOrder=null; let pendingStoreOrder=null;
-  function debug(msg, extra){ console.debug('[stats-reorder]', msg, extra||''); }
+  function debug(){ }
   // Apply order with id validation only once unless forced
   function applyIfValid(order, source){ if(!Array.isArray(order) || !order.length) return; const ids=collectBlocks().map(b=>b.id); const filtered=order.filter(id=>ids.includes(id)); if(!filtered.length) return; appliedOrder=filtered; applyOrder(filtered); restored=true; debug('applied from '+source, filtered); }
   // Request from store

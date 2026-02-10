@@ -28,5 +28,3 @@ import '../auto/loader.js';
 
 // Addon loader
 import '../scripts/addon_loader.js';
-
-console.log('[stats-panel-bundle] Loaded');

@@ -56,7 +56,6 @@
   
   function getAudio(filePath) {
     if (!filePath || !fs.existsSync(filePath)) {
-      console.warn('[stats-sounds] Sound file not found:', filePath);
       return null;
     }
 
@@ -86,10 +85,7 @@
 
       audio.currentTime = 0;
       audio.play().catch(e => {
-        console.warn('[stats-sounds] Play failed:', e.message);
       });
-
-      console.log('[stats-sounds] ▶️ Played:', path.basename(filePath));
     } catch (e) {
       console.error('[stats-sounds] playSound error:', e);
     }
@@ -106,8 +102,7 @@
   };
 
   function triggerSound(soundType, _eventTimestamp) {
-    console.log(`[stats-sounds] 🔔 triggerSound: ${soundType}`);
-    if (!soundsEnabled) { console.log('[stats-sounds] ⏸️ SKIPPED: sounds disabled'); return; }
+    if (!soundsEnabled) return;
 
     if (soundType === 'seriesStart') { currentGame = 0; return; }
     if (soundType === 'gameStart') {
@@ -117,7 +112,6 @@
     }
     const key = SOUND_MAP[soundType];
     if (key) { playSound(SOUNDS[key]); return; }
-    console.warn(`[stats-sounds] Unknown sound type: ${soundType}`);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -126,13 +120,11 @@
 
   function reset() {
     currentGame = 0;
-    console.log('[stats-sounds] State reset');
   }
 
   function handleGameComplete(gameNumber) {
     if (gameNumber > currentGame) {
       currentGame = gameNumber;
-      console.log(`[stats-sounds] Game ${gameNumber} completed`);
     }
   }
 
@@ -148,17 +140,13 @@
       
       if (typeof enabled === 'boolean') soundsEnabled = enabled;
       if (typeof volume === 'number') soundsVolume = Math.max(0, Math.min(100, volume));
-      
-      console.log(`[stats-sounds] Settings: enabled=${soundsEnabled}, volume=${soundsVolume}`);
     } catch (e) {
-      console.warn('[stats-sounds] Failed to load settings:', e);
     }
   }
 
   function updateSettings(enabled, volume) {
     if (typeof enabled === 'boolean') soundsEnabled = enabled;
     if (typeof volume === 'number') soundsVolume = Math.max(0, Math.min(100, volume));
-    console.log(`[stats-sounds] Settings updated: enabled=${soundsEnabled}, volume=${soundsVolume}`);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -170,12 +158,9 @@
     try {
       const { ipcRenderer } = require('electron');
       ipcRenderer.on('lol-sound-event', (_e, { type, timestamp }) => {
-        console.log(`[stats-sounds] 📨 IPC: ${type}`);
         triggerSound(type, timestamp);
       });
-      console.log('[stats-sounds] IPC listener registered');
     } catch (err) {
-      console.warn('[stats-sounds] Failed to register IPC listener:', err);
     }
 
     // Listen to stats reset button
@@ -184,7 +169,7 @@
       resetBtn.addEventListener('click', reset);
     }
 
-    console.log('[stats-sounds] Initialized');
+
   }
 
   // ═══════════════════════════════════════════════════════════════════
