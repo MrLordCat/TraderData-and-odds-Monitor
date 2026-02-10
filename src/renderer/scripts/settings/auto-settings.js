@@ -11,7 +11,7 @@ const SLIDER_CONFIGS = [
   ['shockThresholdPct',       'auto-shock-threshold',  'auto-shock-threshold-val',  v => Math.max(40, Math.min(120, Math.round(v))),            '%',  'int',   'auto-shock-threshold-set',  'pct',           80,   null],
   ['fireCooldownMs',          'auto-fire-cooldown',    'auto-fire-cooldown-val',    v => Math.max(100, Math.min(3000, Math.floor(v))),          'ms', 'int',   'auto-fire-cooldown-set',    'ms',            900,  null],
   ['pulseGapMs',              'auto-pulse-gap',        'auto-pulse-gap-val',        v => Math.max(100, Math.min(1000, Math.floor(v))),          'ms', 'int',   'auto-pulse-gap-set',        'ms',            500,  null],
-  ['suspendRetryDelayMs',     'auto-suspend-retry-delay','auto-suspend-retry-delay-val', v => Math.max(100, Math.min(700, Math.floor(v))),       'ms', 'int',   'auto-suspend-retry-delay-set','ms',          500,  null],
+  ['suspendRetryDelayMs',     'auto-suspend-retry-delay','auto-suspend-retry-delay-val', v => Math.max(700, Math.min(1500, Math.floor(v))),      'ms', 'int',   'auto-suspend-retry-delay-set','ms',          800,  null],
 ];
 
 // Boolean toggle configs: [stateKey, inputId, ipcChannel, payloadKey, default]

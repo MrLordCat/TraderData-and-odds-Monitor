@@ -392,7 +392,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     if (typeof updates.pulseGapMs === 'number') config.pulseGapMs = updates.pulseGapMs;
     if (typeof updates.fireCooldownMs === 'number') config.fireCooldownMs = updates.fireCooldownMs;
     if (typeof updates.stepMs === 'number') config.intervalMs = updates.stepMs;
-    if (typeof updates.suspendRetryDelayMs === 'number') config.suspendRetryDelayMs = Math.max(100, Math.min(700, Math.floor(updates.suspendRetryDelayMs)));
+    if (typeof updates.suspendRetryDelayMs === 'number') config.suspendRetryDelayMs = Math.max(700, Math.min(1500, Math.floor(updates.suspendRetryDelayMs)));
 
     GuardSystem.setSettings({ tolerancePct: config.tolerancePct });
   }
