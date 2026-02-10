@@ -40,7 +40,8 @@ function triggerMapChange(host, map, opts={}){
       if(wrapper){
         let target;
         // NOTE: Russian literals ("Матч", "-я карта") required for matching current bookmaker tab labels.
-        if(map===0) target=[...wrapper.querySelectorAll('.tab--HvZxB')].find(t=>t.textContent.trim()==='Матч');
+        // Bo1 special case: if map 1 + isLast, stay on "Матч" tab (match-level odds)
+        if(map===0 || (map===1 && isLast)) target=[...wrapper.querySelectorAll('.tab--HvZxB')].find(t=>t.textContent.trim()==='Матч');
         else target=[...wrapper.querySelectorAll('.tab--HvZxB')].find(t=>t.textContent.trim()===map+'-я карта');
         if(!target && map!==0) target=[...wrapper.querySelectorAll('.tab--HvZxB')].find(t=>t.textContent.trim()==='Матч');
         if(target) target.click(); // Always click

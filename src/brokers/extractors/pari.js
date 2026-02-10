@@ -14,9 +14,11 @@ const { emptyResult } = require('./base');
  */
 function extractPari(mapNum = 0, game = 'lol', opts = {}) {
   try {
-    const wrapper = document.querySelector('.keyboard-navigator--Zb6nL');
+    // Bo1 handling: if mapNum === 1 && isLast, use match-level market ("Исход")
+    const useMatchLevel = mapNum <= 0 || (mapNum === 1 && opts.isLast);
     
-    if (mapNum > 0) {
+    if (!useMatchLevel && mapNum > 0) {
+      const wrapper = document.querySelector('.keyboard-navigator--Zb6nL');
       const label = mapNum + '-я карта';
       const tabExists = [...wrapper?.querySelectorAll?.('.tab--HvZxB') || []].some(t => t.textContent.trim() === label);
       if (!tabExists) return emptyResult();

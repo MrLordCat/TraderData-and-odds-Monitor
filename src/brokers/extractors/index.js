@@ -42,7 +42,7 @@ const EXTRACTOR_TABLE = [
   { test: /gg\.bet$/i, fn: extractGg },
   { test: /thunderpick\.io$/i, fn: extractThunder, passOpts: true },
   { test: /betboom\.ru$/i, fn: extractBetboom, passOpts: true },
-  { test: /pari\.ru$/i, fn: extractPari },
+  { test: /pari\.ru$/i, fn: extractPari, passOpts: true },
   { test: /marathonbet\./i, fn: extractMarathon },
   { test: /bet365\./i, fn: extractBet365 }
 ];
