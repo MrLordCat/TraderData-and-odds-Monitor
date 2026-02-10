@@ -150,6 +150,9 @@ function initSettingsIpc(ctx){
   createSettingIpc(ipcMain, store, 'autoResumeOnMid', 'auto-resume-on-mid', {
     type: 'boolean', default: true, payloadKey: 'enabled'
   });
+  createSettingIpc(ipcMain, store, 'autoSuspendRetryDelayMs', 'auto-suspend-retry-delay', {
+    clamp: v => Math.max(100, Math.min(700, Math.floor(v))), default: 500, payloadKey: 'ms'
+  });
 }
 
 module.exports = { initSettingsIpc };

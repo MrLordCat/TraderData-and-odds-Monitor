@@ -54,6 +54,7 @@ export const DEFAULTS = Object.freeze({
   dsCommitDelayMs: 200,
   confirmRetryDelayMs: 3000,
   f21RetryDelayMs: 1000,
+  suspendRetryDelayMs: 500,
 });
 
 export const KEYS = Object.freeze({

@@ -214,6 +214,13 @@
 							<input id="auto-pulse-gap" type="range" min="100" max="1000" step="50" />
 							<span id="auto-pulse-gap-val" class="rangeVal"></span>
 						</div>
+						<label for="auto-suspend-retry-delay">Suspend retry delay (ms)
+							<small class="labelHint">Backup signal delay if Excel didn't react</small>
+						</label>
+						<div class="rangeWrap">
+							<input id="auto-suspend-retry-delay" type="range" min="100" max="700" step="50" />
+							<span id="auto-suspend-retry-delay-val" class="rangeVal"></span>
+						</div>
 					</div>
 					<div class="hint">Tolerance: diff% below this considered aligned. Step interval: polling rate. Pulse step: each step adds one pulse (max 3). Suspend: pauses on large diff. Shock: ARB detection.</div>
 					<div class="hint"><strong>Note:</strong> Excel/DS mode selection is on the Odds Board (Excel and DS buttons).</div>

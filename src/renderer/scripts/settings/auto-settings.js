@@ -11,6 +11,7 @@ const SLIDER_CONFIGS = [
   ['shockThresholdPct',       'auto-shock-threshold',  'auto-shock-threshold-val',  v => Math.max(40, Math.min(120, Math.round(v))),            '%',  'int',   'auto-shock-threshold-set',  'pct',           80,   null],
   ['fireCooldownMs',          'auto-fire-cooldown',    'auto-fire-cooldown-val',    v => Math.max(100, Math.min(3000, Math.floor(v))),          'ms', 'int',   'auto-fire-cooldown-set',    'ms',            900,  null],
   ['pulseGapMs',              'auto-pulse-gap',        'auto-pulse-gap-val',        v => Math.max(100, Math.min(1000, Math.floor(v))),          'ms', 'int',   'auto-pulse-gap-set',        'ms',            500,  null],
+  ['suspendRetryDelayMs',     'auto-suspend-retry-delay','auto-suspend-retry-delay-val', v => Math.max(100, Math.min(700, Math.floor(v))),       'ms', 'int',   'auto-suspend-retry-delay-set','ms',          500,  null],
 ];
 
 // Boolean toggle configs: [stateKey, inputId, ipcChannel, payloadKey, default]
@@ -84,7 +85,7 @@ async function loadFromStore() {
   const sliderGetChannels = [
     'auto-tolerance-get', 'auto-interval-get', 'auto-pulse-step-get',
     'auto-suspend-threshold-get', 'auto-shock-threshold-get',
-    'auto-fire-cooldown-get', 'auto-pulse-gap-get'
+    'auto-fire-cooldown-get', 'auto-pulse-gap-get', 'auto-suspend-retry-delay-get'
   ];
   for (let i = 0; i < SLIDER_CONFIGS.length; i++) {
     const cfg = SLIDER_CONFIGS[i];

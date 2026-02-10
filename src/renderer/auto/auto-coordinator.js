@@ -29,6 +29,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     pulseGapMs: DEFAULTS.pulseGapMs,
     fireCooldownMs: DEFAULTS.fireCooldownMs,
     confirmDelayMs: DEFAULTS.confirmDelayMs,
+    suspendRetryDelayMs: DEFAULTS.suspendRetryDelayMs,
   };
 
   const SUSPEND_RESUME_COOLDOWN_MS = 3000;
@@ -42,6 +43,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   const subscribers = new Set();
   let stepTimer = null;
   let alignmentTimer = null;
+  let suspendRetryTimer = null;
   let alignmentAttempts = 0;
   let lastStatus = '';
   let isStepping = false;
@@ -251,6 +253,8 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       if (!pendingSkipResumeSignal) {
         lastResumeSentTs = Date.now();
         sendSignal('market:resume');
+        // Backup: retry resume signal once if Excel stayed suspended
+        scheduleSuspendRetry('resume', 'market:resume');
       }
       pendingSkipResumeSignal = false;
       broadcastState(true);
@@ -306,6 +310,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
     clearTimeout(stepTimer);
     clearTimeout(alignmentTimer);
+    clearTimeout(suspendRetryTimer);
 
     state.active = false;
     state.userWanted = false;
@@ -349,6 +354,8 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     } else {
       if (!canResumeFlag) state.userWanted = false;
       sendSignal(reason);
+      // Backup: retry suspend signal once if Excel didn't react
+      scheduleSuspendRetry('suspend', reason);
     }
 
     lastSuspendTs = Date.now();
@@ -378,6 +385,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     if (typeof updates.pulseGapMs === 'number') config.pulseGapMs = updates.pulseGapMs;
     if (typeof updates.fireCooldownMs === 'number') config.fireCooldownMs = updates.fireCooldownMs;
     if (typeof updates.stepMs === 'number') config.intervalMs = updates.stepMs;
+    if (typeof updates.suspendRetryDelayMs === 'number') config.suspendRetryDelayMs = Math.max(100, Math.min(700, Math.floor(updates.suspendRetryDelayMs)));
 
     GuardSystem.setSettings({ tolerancePct: config.tolerancePct });
   }
@@ -387,9 +395,30 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     return ipcInvoke(global, 'send-auto-press', payload);
   }
 
-  function sendSignal(reason) {
+  function sendSignal(reason, isRetry = false) {
     if (!isSignalSender) return;
-    sendKeyPress({ key: KEYS.SIGNAL, direction: reason, noConfirm: true });
+    sendKeyPress({ key: KEYS.SIGNAL, direction: reason, noConfirm: true, retry: isRetry });
+  }
+
+  /**
+   * Backup retry: sends one repeat signal after delay if Excel didn't react.
+   * @param {'suspend'|'resume'} type - suspend: expect excel.frozen=true; resume: expect frozen=false
+   * @param {string} signalReason - direction string to resend
+   */
+  function scheduleSuspendRetry(type, signalReason) {
+    clearTimeout(suspendRetryTimer);
+    const delay = config.suspendRetryDelayMs ?? DEFAULTS.suspendRetryDelayMs;
+    suspendRetryTimer = setTimeout(() => {
+      try {
+        const snap = OddsStore.getSnapshot();
+        const frozen = !!snap?.excel?.frozen;
+        if (type === 'suspend' && !frozen) {
+          sendSignal(signalReason, true);
+        } else if (type === 'resume' && frozen) {
+          sendSignal(signalReason, true);
+        }
+      } catch (_) { }
+    }, delay);
   }
 
   function broadcastState(active) {
@@ -545,6 +574,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         ['auto-resume-on-mid-updated',    'auto-resume-on-mid-get',    'boolean', v => GuardSystem.setSettings({ resumeOnMid: v })],
         ['auto-shock-threshold-updated',  'auto-shock-threshold-get',  'number',  v => GuardSystem.setSettings({ shockThresholdPct: v })],
         ['auto-suspend-threshold-updated','auto-suspend-threshold-get','number',  v => GuardSystem.setSettings({ suspendThresholdPct: v })],
+        ['auto-suspend-retry-delay-updated','auto-suspend-retry-delay-get','number',  v => setConfig({ suspendRetryDelayMs: v })],
       ];
       configSettings.forEach(([updCh, getCh, type, handler]) => {
         ipcRenderer.on(updCh, (_e, v) => { if (typeof v === type) handler(v); });
