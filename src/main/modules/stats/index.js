@@ -22,6 +22,8 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   // Side is unified with docked board side to avoid mismatches between modes.
   let side = store.get('boardSide') || store.get('statsPanelSide', 'right'); // left|right
   let panelWidth = store.get('boardWidth') || DEFAULT_PANEL_WIDTH; // unified panel width
+  // Migrate: if stored width matches old default (360), bump to new default
+  if(panelWidth === 360 && DEFAULT_PANEL_WIDTH !== 360){ panelWidth = DEFAULT_PANEL_WIDTH; store.set('boardWidth', panelWidth); }
   let embedOffsetY = 0;                                           // toolbar offset
   let singleWindow = !!store.get('statsSingleWindow', false);     // when true, only one slot is active
 
