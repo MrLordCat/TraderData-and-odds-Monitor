@@ -27,20 +27,24 @@ contextBridge.exposeInMainWorld('desktopAPI', {
 // Media elements get inverse compensation to display correctly.
 const GRID_LIGHT_CSS = `
   html.oddsmoni-light {
-    filter: invert(1) hue-rotate(180deg) contrast(0.7) brightness(1.15) saturate(1.2) !important;
+    filter: invert(1) hue-rotate(180deg) contrast(0.7) brightness(1.15) saturate(1.5) !important;
     background: #fff !important;
   }
+  /* Media: re-invert images/video/svg to original look */
   html.oddsmoni-light img,
   html.oddsmoni-light video,
-  html.oddsmoni-light canvas,
   html.oddsmoni-light svg image,
   html.oddsmoni-light [style*="background-image"] {
-    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.833) !important;
+    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.667) !important;
+  }
+  /* Canvas (charts): stronger re-inversion for vivid lines & fills */
+  html.oddsmoni-light canvas {
+    filter: invert(1) hue-rotate(180deg) contrast(1.7) brightness(0.82) saturate(1.1) !important;
   }
 
   /* Scoreboard: re-invert to preserve original team colors & round SVG icons */
   html.oddsmoni-light [data-testid="widget-series-scoreboard"] {
-    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.833) !important;
+    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.667) !important;
   }
   /* Images inside re-inverted scoreboard: skip double re-inversion */
   html.oddsmoni-light [data-testid="widget-series-scoreboard"] img {
