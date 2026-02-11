@@ -23,11 +23,11 @@ contextBridge.exposeInMainWorld('desktopAPI', {
 // Light theme via CSS filter inversion with aggressive softening:
 //   contrast(0.7)    — white text → dark gray #2c (not black), prevents eye strain
 //   brightness(1.15) — pushes backgrounds back to light range (#ddd-#eee)
-//   saturate(1.2)    — compensates color saturation loss from inversion
+//   saturate(2)      — compensates color saturation loss from inversion (gold bars need ≥2)
 // Media elements get inverse compensation to display correctly.
 const GRID_LIGHT_CSS = `
   html.oddsmoni-light {
-    filter: invert(1) hue-rotate(180deg) contrast(0.7) brightness(1.15) saturate(1.5) !important;
+    filter: invert(1) hue-rotate(180deg) contrast(0.7) brightness(1.15) saturate(2) !important;
     background: #fff !important;
   }
   /* Media: re-invert images/video/svg to original look */
@@ -35,7 +35,7 @@ const GRID_LIGHT_CSS = `
   html.oddsmoni-light video,
   html.oddsmoni-light svg image,
   html.oddsmoni-light [style*="background-image"] {
-    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.667) !important;
+    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.5) !important;
   }
   /* Canvas (charts): moderate re-inversion — low contrast keeps grid lines subtle */
   html.oddsmoni-light canvas {
@@ -44,7 +44,7 @@ const GRID_LIGHT_CSS = `
 
   /* Scoreboard: re-invert to preserve original team colors & round SVG icons */
   html.oddsmoni-light [data-testid="widget-series-scoreboard"] {
-    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.667) !important;
+    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.5) !important;
   }
   /* Images inside re-inverted scoreboard: skip double re-inversion */
   html.oddsmoni-light [data-testid="widget-series-scoreboard"] img {
