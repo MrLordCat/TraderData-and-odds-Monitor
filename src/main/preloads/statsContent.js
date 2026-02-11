@@ -20,11 +20,14 @@ contextBridge.exposeInMainWorld('desktopAPI', {
 
 // ================= Grid Theme Injection =================
 // Grid (portal.grid.gg) uses obfuscated CSS class names and hardcoded RGB colors.
-// Light theme is achieved via CSS filter inversion: invert(1) hue-rotate(180deg)
-// preserves hues while flipping lightness. Images/media are re-inverted.
+// Light theme via refined CSS filter inversion with softening adjustments:
+//   brightness(0.95) — prevents pure white glare
+//   contrast(0.9)    — reduces harsh black/white edges
+//   saturate(1.15)   — compensates color saturation loss from inversion
+// Media elements get inverse compensation to display correctly.
 const GRID_LIGHT_CSS = `
   html.oddsmoni-light {
-    filter: invert(1) hue-rotate(180deg) !important;
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(1.15) !important;
     background: #fff !important;
   }
   html.oddsmoni-light img,
@@ -32,7 +35,17 @@ const GRID_LIGHT_CSS = `
   html.oddsmoni-light canvas,
   html.oddsmoni-light svg image,
   html.oddsmoni-light [style*="background-image"] {
-    filter: invert(1) hue-rotate(180deg) !important;
+    filter: invert(1) hue-rotate(180deg) brightness(1.053) contrast(1.111) saturate(0.87) !important;
+  }
+  /* Scrollbar colors for light theme */
+  html.oddsmoni-light body {
+    scrollbar-color: #b0b4b8 #eef0f2 !important;
+  }
+  html.oddsmoni-light ::-webkit-scrollbar-thumb {
+    background: #b0b4b8 !important;
+  }
+  html.oddsmoni-light ::-webkit-scrollbar-track {
+    background: #eef0f2 !important;
   }
 `;
 
