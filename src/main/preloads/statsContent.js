@@ -52,8 +52,9 @@ const GRID_LIGHT_CSS = `
   }
 
   /* Video player: re-invert entire block to keep original look */
+  /* Filter order is REVERSED relative to parent for exact mathematical compensation */
   html.oddsmoni-light [data-testid="video-player"] {
-    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.5) !important;
+    filter: saturate(0.5) brightness(0.87) contrast(1.43) hue-rotate(180deg) invert(1) !important;
   }
   /* Children inside re-inverted player: no double filter */
   html.oddsmoni-light [data-testid="video-player"] img,
