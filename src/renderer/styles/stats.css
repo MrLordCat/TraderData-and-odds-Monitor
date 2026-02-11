@@ -628,7 +628,6 @@ small {
 	align-items: center;
 	gap: var(--md-sys-spacing-xs);
 	margin-left: auto;
-	font-size: var(--md-sys-typescale-label-small-size);
 }
 
 .oddsHeaderControls .mapLabel {
@@ -636,25 +635,23 @@ small {
 	align-items: center;
 	gap: 2px;
 	color: var(--md-sys-color-on-surface-variant);
-	font-size: 11px;
+	font-size: var(--md-sys-typescale-label-medium-size);
 }
 
-/* Unified button style for all controls */
+/* Unified button style for all odds controls — M3 tonal, matches btn-sm */
 .oddsToolBtn, .oddsToggleBtn, .oddsToolSelect, .oddsTolBadge {
-	height: 28px;
-	min-width: 28px;
-	padding: 0 8px;
-	font-size: 11px;
-	background: var(--md-sys-color-surface-container-highest);
-	border: 1px solid var(--md-sys-color-outline);
-	border-radius: 6px;
-	color: var(--md-sys-color-on-surface);
+	padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-md);
+	font-size: var(--md-sys-typescale-label-medium-size);
+	line-height: 1.15;
+	background: var(--md-sys-color-secondary-container);
+	color: var(--md-sys-color-on-secondary-container);
+	border: none;
+	border-radius: var(--md-sys-shape-corner-full);
 	cursor: pointer;
 	transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 	white-space: nowrap;
 	box-sizing: border-box;
 	position: relative;
-	line-height: 26px;
 	text-align: center;
 }
 
@@ -672,25 +669,21 @@ small {
 	opacity: 0.08;
 }
 
-.oddsToolBtn:hover, .oddsToggleBtn:hover {
-	border-color: var(--md-sys-color-outline);
-}
-
 /* Toggle button active state - M3 filled style */
 .oddsToggleBtn.active {
 	background: var(--md-sys-color-primary);
-	border-color: var(--md-sys-color-primary);
 	color: var(--md-sys-color-on-primary);
 }
 .oddsToggleBtn.active::before {
 	background: var(--md-sys-color-on-primary);
 }
 
-/* Tolerance badge - same style as buttons */
+/* Tolerance badge - tonal variant */
 .oddsTolBadge {
-	background: var(--md-sys-color-surface-container);
+	background: var(--md-sys-color-surface-container-high);
 	color: var(--md-sys-color-on-surface-variant);
 	font-weight: 500;
+	cursor: default;
 }
 
 /* ================= Unified Panel Toolbar - M3 ================= */
