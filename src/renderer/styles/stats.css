@@ -363,6 +363,8 @@ h1.statsHeader { text-shadow:none; }
 	padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-md);
 	font-size: var(--md-sys-typescale-label-medium-size);
 	line-height: 1.15;
+	height: 24px;
+	box-sizing: border-box;
 	background: var(--md-sys-color-secondary-container);
 	color: var(--md-sys-color-on-secondary-container);
 	border: none;
@@ -538,6 +540,8 @@ small {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  height: 24px;
+  box-sizing: border-box;
   padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-md);
   font-size: var(--md-sys-typescale-label-medium-size);
   font-weight: 600;
@@ -553,17 +557,24 @@ small {
 .gameBadge[data-game="cs2"]  { background: #ffb74d18; color: #ffb74d; }
 .gameBadge[data-game="dota2"]{ background: #e5737318; color: #e57373; }
 
+/* Light theme — darker game badge text for contrast */
+[data-theme="light"] .gameBadge[data-game="lol"]  { background: #0288d120; color: #01579b; }
+[data-theme="light"] .gameBadge[data-game="cs2"]  { background: #e6510020; color: #bf360c; }
+[data-theme="light"] .gameBadge[data-game="dota2"]{ background: #c6282820; color: #b71c1c; }
+
 /* Game select styled as btn-sm */
 .gsSelect {
   appearance: auto;
   cursor: pointer;
+  height: 24px;
+  box-sizing: border-box;
 }
 
 /* Reset icon button */
 .btn-icon-sm {
-  min-width: 28px;
-  padding: 3px 6px;
-  font-size: 13px;
+  min-width: 24px;
+  padding: 0 var(--md-sys-spacing-sm);
+  font-size: var(--md-sys-typescale-label-medium-size);
   line-height: 1;
   text-align: center;
 }
@@ -640,6 +651,10 @@ small {
 
 /* Unified button style for all odds controls — M3 tonal, matches btn-sm */
 .oddsToolBtn, .oddsToggleBtn, .oddsToolSelect, .oddsTolBadge {
+	height: 24px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-md);
 	font-size: var(--md-sys-typescale-label-medium-size);
 	line-height: 1.15;

@@ -178,12 +178,12 @@
 /* ===== Swap button (M3 chip style) ===== */
 .eo-swapBtn,
 .swapBtn {
-	background: var(--md-sys-color-surface-container-highest, #353d48);
-	border: 1px solid var(--md-sys-color-outline, #8b9198);
-	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
+	background: var(--md-sys-color-secondary-container, #3f4759);
+	border: none;
+	color: var(--md-sys-color-on-secondary-container, #dde1f0);
 	font-size: var(--md-sys-typescale-label-medium-size, 12px);
 	padding: var(--md-sys-spacing-xs, 4px) var(--md-sys-spacing-sm, 8px);
-	border-radius: var(--md-sys-shape-corner-small, 8px);
+	border-radius: var(--md-sys-shape-corner-full, 9999px);
 	cursor:pointer;
 	line-height:1;
 	position: relative;
@@ -191,14 +191,12 @@
 }
 .eo-swapBtn.on,
 .swapBtn.on {
-	background: var(--md-sys-color-secondary-container, #3f4759);
-	color: var(--md-sys-color-on-secondary-container, #dde1f0);
-	border-color: transparent;
+	background: var(--md-sys-color-primary, #a0c4ff);
+	color: var(--md-sys-color-on-primary, #003060);
 }
 .eo-swapBtn:hover,
 .swapBtn:hover { 
-	background: var(--md-sys-color-surface-container-highest, #353d48);
-	border-color: var(--md-sys-color-on-surface-variant, #c4c6cf);
+	filter: brightness(1.12);
 }
 
 .eo-swap-header { opacity:.55; }
@@ -224,7 +222,7 @@
 	white-space:nowrap; 
 }
 .excelControls > * {
-	height: 24px;
+	height: 22px;
 	box-sizing: border-box;
 }
 .excelControls .autoBtn { margin-left: var(--md-sys-spacing-sm, 8px); }
@@ -232,15 +230,15 @@
 
 /* Auto/Script buttons - M3 tonal chip style */
 .autoBtn, .autoSubBtn { 
-	background: var(--md-sys-color-surface-container-highest, #353d48);
-	border: 1px solid var(--md-sys-color-outline, #8b9198);
-	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
+	background: var(--md-sys-color-secondary-container, #3f4759);
+	border: none;
+	color: var(--md-sys-color-on-secondary-container, #dde1f0);
 	padding: 0 var(--md-sys-spacing-sm, 8px);
-	height: 24px;
-	min-width: 24px;
+	height: 22px;
+	min-width: 22px;
 	font-size: var(--md-sys-typescale-label-small-size, 11px);
-	line-height: 24px;
-	border-radius: var(--md-sys-shape-corner-small, 8px);
+	line-height: 22px;
+	border-radius: var(--md-sys-shape-corner-full, 9999px);
 	cursor:pointer;
 	position: relative;
 	box-sizing: border-box;
@@ -250,12 +248,10 @@
 .autoBtn.on, .autoSubBtn.on { 
 	background: var(--md-sys-color-primary, #a0c4ff);
 	color: var(--md-sys-color-on-primary, #003060);
-	border-color: transparent;
 }
 .autoBtn.waiting { 
 	background: var(--md-sys-color-warning-container, #ffd54f);
 	color: var(--md-sys-color-on-warning-container, #3e2723);
-	border-color: transparent;
 	animation: waitingPulse 1.5s ease-in-out infinite;
 }
 @keyframes waitingPulse {
@@ -265,27 +261,26 @@
 
 /* Mode buttons (Excel / DS mode selection) */
 .modeBtn {
-	background: var(--md-sys-color-surface-container-highest, #353d48);
-	border: 1px solid var(--md-sys-color-outline, #8b9198);
-	color: var(--md-sys-color-on-surface-variant, #c4c6cf);
-	padding: 0 var(--md-sys-spacing-xs, 4px);
+	background: var(--md-sys-color-secondary-container, #3f4759);
+	border: none;
+	color: var(--md-sys-color-on-secondary-container, #dde1f0);
+	padding: 0 var(--md-sys-spacing-sm, 6px);
 	height: 22px;
 	min-width: 28px;
 	font-size: var(--md-sys-typescale-label-small-size, 11px);
 	font-weight: var(--md-sys-typescale-label-large-weight, 500);
 	line-height: 22px;
-	border-radius: var(--md-sys-shape-corner-small, 6px);
+	border-radius: var(--md-sys-shape-corner-full, 9999px);
 	cursor: pointer;
 	box-sizing: border-box;
 	transition: all var(--md-sys-motion-duration-short2, 200ms) var(--md-sys-motion-easing-standard);
 }
 .modeBtn.on {
-	background: var(--md-sys-color-secondary-container, #3d5a80);
-	color: var(--md-sys-color-on-secondary-container, #d1e4ff);
-	border-color: var(--md-sys-color-secondary, #98c1d9);
+	background: var(--md-sys-color-primary, #a0c4ff);
+	color: var(--md-sys-color-on-primary, #003060);
 }
 .modeBtn:hover:not(.on) {
-	background: var(--md-sys-color-surface-container-high, #424b56);
+	filter: brightness(1.12);
 }
 
 /* DS controls row alignment */
@@ -293,7 +288,7 @@
 	display: flex;
 	align-items: center;
 	gap: var(--md-sys-spacing-xs, 4px);
-	height: 24px;
+	height: 22px;
 }
 
 /* Script map badge (shows Python hotkey controller current map) */
@@ -308,19 +303,17 @@
   font-size: var(--md-sys-typescale-label-small-size, 11px);
   font-weight: var(--md-sys-typescale-label-large-weight, 500);
   background: var(--md-sys-color-surface-container, #1d2530);
-  border: 1px solid var(--md-sys-color-outline-variant, #3c4553);
-  border-radius: var(--md-sys-shape-corner-small, 8px);
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full, 9999px);
   box-sizing: border-box;
   color: var(--md-sys-color-on-surface-variant, #c4c6cf);
 }
 .scriptMapBadge.mismatch {
   background: var(--md-sys-color-error-container, #93000a);
-  border-color: transparent;
   color: var(--md-sys-color-on-error-container, #ffdad6);
 }
 .scriptMapBadge.match {
   background: var(--md-sys-color-success, #4ade80);
-  border-color: transparent;
   color: var(--md-sys-color-on-success, #003912);
 }
 
@@ -335,7 +328,7 @@
   font-size: var(--md-sys-typescale-label-small-size, 10px);
   font-weight: var(--md-sys-typescale-label-large-weight, 500);
   background: var(--md-sys-color-error-container, #93000a);
-  border-radius: var(--md-sys-shape-corner-small, 8px);
+  border-radius: var(--md-sys-shape-corner-full, 9999px);
   box-sizing: border-box;
   color: var(--md-sys-color-on-error-container, #ffdad6);
   white-space: nowrap;
