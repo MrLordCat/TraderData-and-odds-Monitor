@@ -18,6 +18,67 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   }
 });
 
+// ================= Grid Theme Injection =================
+// Grid (portal.grid.gg) uses obfuscated CSS class names and hardcoded RGB colors.
+// Light theme is achieved via CSS filter inversion: invert(1) hue-rotate(180deg)
+// preserves hues while flipping lightness. Images/media are re-inverted.
+const GRID_LIGHT_CSS = `
+  html.oddsmoni-light {
+    filter: invert(1) hue-rotate(180deg) !important;
+    background: #fff !important;
+  }
+  html.oddsmoni-light img,
+  html.oddsmoni-light video,
+  html.oddsmoni-light canvas,
+  html.oddsmoni-light svg image,
+  html.oddsmoni-light [style*="background-image"] {
+    filter: invert(1) hue-rotate(180deg) !important;
+  }
+`;
+
+function isGridPage() {
+  try { return /grid\.gg$/i.test(location.hostname); } catch(_){ return false; }
+}
+
+function injectGridTheme(theme) {
+  if (!isGridPage()) return;
+  try {
+    let style = document.getElementById('oddsmoni-grid-theme');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'oddsmoni-grid-theme';
+      (document.head || document.documentElement).appendChild(style);
+    }
+    style.textContent = theme === 'light' ? GRID_LIGHT_CSS : '';
+    const html = document.documentElement;
+    if (theme === 'light') {
+      html.classList.add('oddsmoni-light');
+    } else {
+      html.classList.remove('oddsmoni-light');
+    }
+  } catch(_) {}
+}
+
+// Apply initial theme on DOMContentLoaded, listen for changes
+if (isGridPage()) {
+  ipcRenderer.invoke('theme-get').then(theme => {
+    // Pre-DOM: set class immediately if possible
+    try {
+      if (theme === 'light' && document.documentElement) {
+        document.documentElement.classList.add('oddsmoni-light');
+      }
+    } catch(_) {}
+    const onReady = () => injectGridTheme(theme);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', onReady, { once: true });
+    } else {
+      onReady();
+    }
+  }).catch(_=>{});
+  
+  ipcRenderer.on('theme-changed', (_, theme) => injectGridTheme(theme));
+}
+
 // Also passive listener: if extension uses window.postMessage with source markers
 // we trap them here and forward automatically (slot supplied later via identify message).
 let __slot = null;
