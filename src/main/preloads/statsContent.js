@@ -51,6 +51,18 @@ const GRID_LIGHT_CSS = `
     filter: none !important;
   }
 
+  /* Video player: re-invert entire block to keep original look */
+  html.oddsmoni-light [data-testid="video-player"] {
+    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.5) !important;
+  }
+  /* Children inside re-inverted player: no double filter */
+  html.oddsmoni-light [data-testid="video-player"] img,
+  html.oddsmoni-light [data-testid="video-player"] video,
+  html.oddsmoni-light [data-testid="video-player"] canvas,
+  html.oddsmoni-light [data-testid="video-player"] svg {
+    filter: none !important;
+  }
+
   /* Small item icons (weapons/equipment 16px): keep inverted = dark on light bg */
   html.oddsmoni-light img[height="16px"] {
     filter: none !important;
