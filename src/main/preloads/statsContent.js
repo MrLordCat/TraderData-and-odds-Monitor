@@ -37,6 +37,21 @@ const GRID_LIGHT_CSS = `
   html.oddsmoni-light [style*="background-image"] {
     filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.833) !important;
   }
+
+  /* Scoreboard: re-invert to preserve original team colors & round SVG icons */
+  html.oddsmoni-light [data-testid="widget-series-scoreboard"] {
+    filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.833) !important;
+  }
+  /* Images inside re-inverted scoreboard: skip double re-inversion */
+  html.oddsmoni-light [data-testid="widget-series-scoreboard"] img {
+    filter: none !important;
+  }
+
+  /* Small item icons (weapons/equipment 16px): keep inverted = dark on light bg */
+  html.oddsmoni-light img[height="16px"] {
+    filter: none !important;
+  }
+
   /* Scrollbar colors for light theme */
   html.oddsmoni-light body {
     scrollbar-color: #b0b4b8 #eef0f2 !important;
