@@ -251,13 +251,13 @@
   const chunks0 = raw.body?.entryToAdd?.sentenceChunks || [];
     const head = chunks0.map(c=>c.text).join(' ').trim();
     
-    // Series started - reset sound state for new series
+    // Series started - trigger Game 1 start sound (instead of ban phase detection)
     if (RX_SERIES_START.test(head)) {
-      console.log('[inject-stats] Series started - resetting sound state');
+      console.log('[inject-stats] Series started → Game 1 sound');
       lastCompletedGame = 0;
-      banPhaseTriggered = false;
-      seriesActive = true; // Mark series as active for first game ban detection
-      playSound('seriesStart', entryKey);
+      banPhaseTriggered = true; // Prevent ban phase from re-triggering Game 1
+      seriesActive = true;
+      playSound('gameStart', entryKey); // Game 1 sound
       return;
     }
     

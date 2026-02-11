@@ -106,6 +106,8 @@
 
     if (soundType === 'seriesStart') { currentGame = 0; return; }
     if (soundType === 'gameStart') {
+      // If currentGame >= 5, wrap around (series already ended, new series)
+      if (currentGame >= 5) currentGame = 0;
       currentGame++;
       if (currentGame >= 1 && currentGame <= 5) playSound(SOUNDS.gameStart[currentGame]);
       return;
