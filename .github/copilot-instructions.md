@@ -356,7 +356,9 @@ Hotkeys managed in `modules/hotkeys/index.js` via `before-input-event`. Avoid du
 - **modules/ipc/updater.js**: IPC handlers for update UI.
 - Channels: `dev` (dev-latest tag) and `release` (v* tags).
 - Silent background updates (no terminal window flash).
-- GitHub Actions: `.github/workflows/release.yml`, `dev-build.yml`.
+- **Patch detection**: same version but different GitHub asset ID → shows "Patch available". Asset ID saved in `installedAssetId` after download; seeded on first launch.
+- GitHub Actions: `.github/workflows/release.yml`, `dev-build.yml`, `patch-release.yml`.
+- **patch-release.yml**: Manual workflow_dispatch — rebuilds from main, replaces zip on existing release tag. Updater detects new asset ID.
 
 ## 12. Persistence & Safety
 electron-store keys:
@@ -367,7 +369,7 @@ electron-store keys:
 - `soundsEnabled`, `soundsVolume` - Sound notification settings
 - `lolStatsSettings` - Stats panel state (metricVisibility, metricOrder, template)
 - `appTheme` - Theme preference ('dark' | 'light')
-- Updater: `lastUpdateCheck`, `updateChannel`
+- Updater: `lastUpdateCheck`, `updateChannel`, `installedAssetId`
 - Addons: `enabledAddons` (array of addon IDs)
 - Broker refresh: `brokerRefreshSettings` (staleReloadEnabled, staleMissingTimeoutMin, staleUnchangedTimeoutMin)
 - Map auto refresh: `mapAutoRefreshEnabled`

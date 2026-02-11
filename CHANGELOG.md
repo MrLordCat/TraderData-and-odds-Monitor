@@ -2,45 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.4.2] - 2026-02-11
+## [0.4.3] - 2026-02-11
 
 ### ✨ New Features
 
 - **CS2 Pistol Round stats** — new `1st Pistol` / `2nd Pistol` rows in Game Stats table; parsed from Grid logs (`"TeamName won Round 1/13"`) as binary metrics (✓/✗) (`pistolRound1`, `pistolRound13`)
 - **Game-aware metrics filtering** — CS2 stats table now shows only relevant metrics (`killCount`, `pistolRound1`, `pistolRound13`); LoL/Dota2 show all metrics
-- **Changelog tab in Settings** — fetches CHANGELOG.md from GitHub with markdown rendering (`64ff869`)
+- **Changelog tab in Settings** — fetches CHANGELOG.md from GitHub with markdown rendering
+- **Patch update system** — updater detects re-uploaded release assets (same version, new asset ID) and shows "Patch available"; new `patch-release.yml` GitHub Actions workflow for manual patch deployment
 
 ### 🐛 Bug Fixes
 
-- **Animation suppression during Grid data load** — fixed animations still playing during initial log loading; empty snapshots no longer consume `_animSuppressFirstData` flag; added 12-second initial load phase with rolling +3s suppression extension on each update to cover Grid sending historical data in multiple WebSocket chunks
-- **Grid light theme video player** — excluded video player from CSS filter inversion, added JS fullscreen detection for proper filter handling (`116d15d`, `5eeda59`, `396eacc`)
-- **Sound system: gameStart bypasses burst detection** — game start sounds now reliably fire even during event bursts; CS2 plays only gameStart sounds (per-game filtering) (`65d4e60`)
-- **Game 1 sound trigger** — triggers on "Series started" log event instead of ban phase detection (`faabcf3`)
-- **Cell animation glow** — subtler glow effect + fix for suppression bug (lastGameRendered not reset, +2s not chaining) (`f73db8e`)
-- **Thunderpick Game/Round tabs** — support Game/Round tab names alongside Map (`9dd2d25`)
-- **Version comparison** — stable 0.4.1 now correctly detected as newer than dev 0.4.0 (`c4fc8e4`)
+- **Game start sound wrong number** — fixed off-by-one: Game 3 announced as "Game 2 Started", Game 2 as "Game 1"; root cause was `stats_sounds.js` counter desyncing during backlog replay; now passes explicit `gameNum` through the entire chain (inject-stats → preload → IPC → stats_sounds)
+- **Animation suppression during Grid data load** — fixed animations still playing during initial log loading; empty snapshots no longer consume `_animSuppressFirstData` flag; added 12-second initial load phase with rolling +3s suppression extension
+- **Grid light theme video player** — excluded video player from CSS filter inversion, added JS fullscreen detection for proper filter handling
+- **Sound system: gameStart bypasses burst detection** — game start sounds now reliably fire even during event bursts; CS2 plays only gameStart sounds (per-game filtering)
+- **Game 1 sound trigger** — triggers on "Series started" log event instead of ban phase detection
+- **Cell animation glow** — subtler glow effect + fix for suppression bug (lastGameRendered not reset, +2s not chaining)
+- **Thunderpick Game/Round tabs** — support Game/Round tab names alongside Map
+- **Version comparison** — stable 0.4.1 now correctly detected as newer than dev 0.4.0
 
 ### 🎨 UI Improvements
 
-- **M3 button/badge unification** — equalized heights, light badge contrast, table buttons pill shape (`f9e6a08`)
-- **Odds Board controls** — unified to match Game Stats M3 btn-sm (pill, tokens, no border) (`6be5aa1`)
-- **Game badge** — matches btn-sm M3 sizing (tokens, pill shape, no border) (`7c045b4`)
-- **Grid light theme** — multiple iterations (v3–v7): softer text, better card separation, brighter gold bars, vivid chart canvas, saturated golden-yellow bars, fixed media/scoreboard compensation
+- **M3 button/badge unification** — equalized heights, light badge contrast, table buttons pill shape
+- **Odds Board controls** — unified to match Game Stats M3 btn-sm (pill, tokens, no border)
+- **Game badge** — matches btn-sm M3 sizing (tokens, pill shape, no border)
+- **Grid light theme** — multiple iterations (v3–v7): softer text, better card separation, brighter gold bars, vivid chart canvas
 
 ### 🔧 Improvements
 
-- **Updater** — reduced API cache TTL from 5min to 30s for faster manual re-checks (`547a701`)
+- **Updater** — reduced API cache TTL from 5min to 30s for faster manual re-checks
+- **Patch detection** — `installedAssetId` seeded on first launch; compared with remote asset ID on check
 
 ### 📚 Documentation
 
-- **Grid log extraction pipeline** — new `docs/GRID_LOG_EXTRACTION.md` (328 lines): full documentation of WebSocket interception, data parsing, stats aggregation, sound notification system
-- **copilot-instructions.md** — updated sections: lolstats directory tree (6 inject scripts), Game-Aware Metrics (GAME_METRICS), CS2 Pistol Rounds, Template Presets, Sound System (burst detection, freshness/entryKey, per-game filtering)
-- **AUTO_MODE.md** — removed 516 lines of obsolete content referencing deleted AutoHub/AutoCore/auto_trader.js; replaced with current DS Auto Mode, Settings, Key Injection docs (703 → 188 lines)
+- **Grid log extraction pipeline** — new `docs/GRID_LOG_EXTRACTION.md`: full documentation of WebSocket interception, data parsing, stats aggregation, sound notification system
+- **copilot-instructions.md** — updated: lolstats inject tree, GAME_METRICS, CS2 Pistol Rounds, Template Presets, Sound System, patch detection, `installedAssetId`
+- **AUTO_MODE.md** — removed 516 lines of obsolete content; replaced with current DS Auto Mode docs
 
 ### 🧹 Cleanup
 
-- **Dead code removal** — removed pending game start sound logic, simplified sound playback (`cf959c4`)
-- **Debug cleanup** — removed dead dbgLayout/dbgSide refs, fixed single-window layout bug, deleted temp CSS, unified log prefix (`5dcee5f`)
+- **Dead code removal** — removed pending game start sound logic, simplified sound playback
+- **Debug cleanup** — removed dead dbgLayout/dbgSide refs, fixed single-window layout bug, deleted temp CSS
 
 ## [0.4.1] - 2026-02-10
 

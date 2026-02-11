@@ -104,7 +104,7 @@
   // Per-game sound filtering: CS2 = gameStart only, others = all sounds
   const CS2_ALLOWED = new Set(['gameStart']);
 
-  function triggerSound(soundType, _eventTimestamp) {
+  function triggerSound(soundType, _eventTimestamp, gameNum) {
     if (!soundsEnabled) return;
     // Filter by detected game
     const game = window.__gridGame; // set by stats_panel.js
@@ -112,10 +112,16 @@
 
     if (soundType === 'seriesStart') { currentGame = 0; return; }
     if (soundType === 'gameStart') {
-      // If currentGame >= 5, wrap around (series already ended, new series)
-      if (currentGame >= 5) currentGame = 0;
-      currentGame++;
-      if (currentGame >= 1 && currentGame <= 5) playSound(SOUNDS.gameStart[currentGame]);
+      // Use explicit game number from inject-stats.js (avoids counter desync after backlog)
+      if (typeof gameNum === 'number' && gameNum >= 1 && gameNum <= 5) {
+        currentGame = gameNum;
+        playSound(SOUNDS.gameStart[gameNum]);
+      } else {
+        // Fallback: increment counter (legacy path)
+        if (currentGame >= 5) currentGame = 0;
+        currentGame++;
+        if (currentGame >= 1 && currentGame <= 5) playSound(SOUNDS.gameStart[currentGame]);
+      }
       return;
     }
     const key = SOUND_MAP[soundType];
@@ -165,8 +171,8 @@
     // Listen to sound events via IPC from Grid BrowserView
     try {
       const { ipcRenderer } = require('electron');
-      ipcRenderer.on('lol-sound-event', (_e, { type, timestamp }) => {
-        triggerSound(type, timestamp);
+      ipcRenderer.on('lol-sound-event', (_e, { type, timestamp, gameNum }) => {
+        triggerSound(type, timestamp, gameNum);
       });
     } catch (err) {
     }

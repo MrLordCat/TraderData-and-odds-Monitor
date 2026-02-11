@@ -56,7 +56,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   if (!soundIpcRegistered) {
     soundIpcRegistered = true;
     const { ipcMain } = require('electron');
-    ipcMain.on('lol-sound-event', (_e, { type, timestamp }) => {
+    ipcMain.on('lol-sound-event', (_e, { type, timestamp, gameNum }) => {
       // Use module-level ref to get current instance's values
       const ref = currentStatsManagerRef;
       console.log('[stats] 📢 Sound event received:', type, 'panel=', !!ref.views?.panel, 'panelActive=', ref.panelActive, 'ready=', ref.panelReadyForSounds);
@@ -70,14 +70,14 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
       // If panel is ready, send immediately; otherwise queue
       if (ref.panelReadyForSounds && ref.views?.panel && !ref.views.panel.webContents.isDestroyed()) {
         try { 
-          ref.views.panel.webContents.send('lol-sound-event', { type, timestamp }); 
+          ref.views.panel.webContents.send('lol-sound-event', { type, timestamp, gameNum }); 
           console.log('[stats] 📢 Sound event sent to panel');
         } catch(err){ 
           console.error('[stats] send to panel failed:', err); 
         }
       } else if (ref.pendingSoundEvents) {
         // Queue the event for when panel is ready
-        ref.pendingSoundEvents.push({ type, timestamp });
+        ref.pendingSoundEvents.push({ type, timestamp, gameNum });
         console.log('[stats] 📢 Sound event queued, queue size:', ref.pendingSoundEvents.length);
       }
     });

@@ -64,22 +64,22 @@
     recentEventTimestamps.push(Date.now());
   }
   
-  function actuallyPlaySound(soundType) {
-    try { window.postMessage({ source: 'lol-sound-event', type: soundType, timestamp: Date.now() }, '*'); } catch(_){ }
+  function actuallyPlaySound(soundType, extra) {
+    try { window.postMessage({ source: 'lol-sound-event', type: soundType, timestamp: Date.now(), ...extra }, '*'); } catch(_){ }
   }
 
   // Sound notification helper - sends message to be picked up by preload/main
   // Always use Date.now() for timestamp - game timestamps are relative and unusable for freshness checks
   // gameStart sounds bypass burst detection — they have their own dedup via banPhaseTriggered
-  function playSound(soundType, entryKey = null) {
+  function playSound(soundType, entryKey = null, extra = null) {
     if (soundType !== 'gameStart' && isInEventBurst()) return;
     if (!soundsEnabled) {
       const receivedRecently = entryKey && eventReceiveTimestamps.has(entryKey) && 
         (Date.now() - eventReceiveTimestamps.get(entryKey)) < FRESH_EVENT_WINDOW_MS;
       if (!receivedRecently) return;
-      if (soundType === 'gameStart') { actuallyPlaySound('gameStart'); return; }
+      if (soundType === 'gameStart') { actuallyPlaySound('gameStart', extra); return; }
     }
-    actuallyPlaySound(soundType);
+    actuallyPlaySound(soundType, extra);
   }
 
   const gameStats = {};
@@ -246,7 +246,7 @@
       lastCompletedGame = 0;
       banPhaseTriggered = true; // Prevent ban phase from re-triggering Game 1
       seriesActive = true;
-      playSound('gameStart', entryKey); // Game 1 sound
+      playSound('gameStart', entryKey, { gameNum: 1 }); // Game 1 sound
       return;
     }
     
@@ -279,7 +279,7 @@
           const nextGame = lastCompletedGame + 1;
           console.log(`[inject-stats] 🎮 Ban phase detected - Game ${nextGame} starting!`);
           banPhaseTriggered = true;
-          playSound('gameStart', entryKey); // Uses freshness detection via entryKey
+          playSound('gameStart', entryKey, { gameNum: nextGame }); // Uses freshness detection via entryKey
         }
       }
       return; // Ban events don't need further processing
@@ -300,7 +300,7 @@
       // Also handles first game of series (lastCompletedGame=0) 
       if (!banPhaseTriggered) {
         console.log(`[inject-stats] 🎮 Game ${gameNum} started (via Grid event, no prior ban phase)`);
-        playSound('gameStart');
+        playSound('gameStart', null, { gameNum });
       } else {
         console.log(`[inject-stats] Game ${gameNum} started (sound already played via ban phase)`);
       }

@@ -119,6 +119,7 @@ async function getLatestRelease(owner, repo) {
       version: release.tag_name.replace(/^v/, ''),
       tagName: release.tag_name,
       downloadUrl: asset.browser_download_url,
+      assetId: asset.id,
       releaseUrl: release.html_url,
       publishedAt: release.published_at,
       body: release.body || ''

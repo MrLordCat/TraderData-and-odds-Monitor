@@ -113,11 +113,30 @@ function createUpdateManager({ store, mainWindow }) {
           availableUpdate = {
             version: release.version,
             downloadUrl: release.downloadUrl,
+            assetId: release.assetId,
             releaseUrl: release.releaseUrl,
             channel: 'stable',
             publishedAt: release.publishedAt,
             releaseNotes: release.body
           };
+        } else if (release && release.version === currentVersion && release.assetId) {
+          // Same version — check if the release asset was re-uploaded (patch)
+          const installedAssetId = store.get('installedAssetId');
+          if (installedAssetId && release.assetId !== installedAssetId) {
+            console.log(`[updater] Patch detected: same version ${currentVersion} but asset changed (${installedAssetId} → ${release.assetId})`);
+            availableUpdate = {
+              version: release.version,
+              downloadUrl: release.downloadUrl,
+              assetId: release.assetId,
+              releaseUrl: release.releaseUrl,
+              channel: 'stable',
+              publishedAt: release.publishedAt,
+              releaseNotes: release.body,
+              isPatch: true
+            };
+          } else {
+            availableUpdate = null;
+          }
         } else {
           availableUpdate = null;
         }
@@ -181,6 +200,12 @@ function createUpdateManager({ store, mainWindow }) {
 
       downloading = false;
       
+      // Save asset ID so patch detection works after install
+      if (update.assetId) {
+        store.set('installedAssetId', update.assetId);
+        console.log(`[updater] Saved installedAssetId: ${update.assetId}`);
+      }
+
       // Save pending update path for restart
       store.set('pendingUpdate', extractDir);
       console.log(`[updater] Broadcasting update-ready`);
@@ -292,6 +317,17 @@ del "%TEMP%\\oddsmoni-start.vbs" >nul 2>&1
     if (pendingScript && fs.existsSync(pendingScript)) {
       // Clear it
       store.delete('pendingUpdateScript');
+    }
+
+    // Seed installedAssetId on first run (so patch detection has a baseline)
+    if (!store.get('installedAssetId') && getChannel() === 'stable') {
+      try {
+        const rel = await getLatestRelease(REPO_OWNER, REPO_NAME);
+        if (rel && rel.assetId && rel.version === getCurrentVersion()) {
+          store.set('installedAssetId', rel.assetId);
+          console.log(`[updater] Seeded installedAssetId: ${rel.assetId}`);
+        }
+      } catch (_) { /* non-critical */ }
     }
 
     // Auto-check on startup after delay

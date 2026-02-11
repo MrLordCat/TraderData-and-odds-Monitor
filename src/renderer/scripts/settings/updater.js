@@ -3,6 +3,7 @@ const { ipcRenderer } = require('electron');
 
 let pendingUpdate = null;
 let updateReady = false;
+let isPatchUpdate = false;
 
 // ===== DOM elements =====
 let channelSel, autoChk, versionSpan, statusSpan, checkBtn, downloadBtn, progressDiv, progressBar;
@@ -57,7 +58,9 @@ async function loadUpdaterState() {
 
 			if (status.availableUpdate) {
 				pendingUpdate = { version: status.availableUpdate.version, url: status.availableUpdate.downloadUrl };
-				setStatus(`Update available: ${status.availableUpdate.version}`);
+				isPatchUpdate = !!status.availableUpdate.isPatch;
+				const label = isPatchUpdate ? 'Patch' : 'Update';
+				setStatus(`${label} available: ${status.availableUpdate.version}`);
 			} else if (status.checking) {
 				setStatus('Checking...');
 			} else if (status.downloading) {
@@ -108,7 +111,9 @@ function bindEvents() {
 			if (result && result.version) {
 				pendingUpdate = { version: result.version, url: result.downloadUrl };
 				updateReady = false;
-				setStatus(`Update available: ${result.version}`);
+				isPatchUpdate = !!result.isPatch;
+				const label = isPatchUpdate ? 'Patch' : 'Update';
+				setStatus(`${label} available: ${result.version}`);
 			} else if (result && result.error) {
 				let errorMsg = result.error;
 				// Pass through detailed rate limit message if available
@@ -180,7 +185,9 @@ function bindIpcEvents() {
 	ipcRenderer.on('updater-update-available', (_e, info) => {
 		pendingUpdate = { version: info.version, url: info.url };
 		updateReady = false;
-		setStatus(`Update available: ${info.version}`);
+		isPatchUpdate = !!info.isPatch;
+		const label = isPatchUpdate ? 'Patch' : 'Update';
+		setStatus(`${label} available: ${info.version}`);
 		updateButtonState();
 	});
 

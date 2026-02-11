@@ -179,7 +179,7 @@ window.addEventListener('message', (e) => {
   }
   // Forward sound events to main process for stats_panel
   if(d.source === 'lol-sound-event') {
-    ipcRenderer.send('lol-sound-event', { type: d.type, timestamp: d.timestamp });
+    ipcRenderer.send('lol-sound-event', { type: d.type, timestamp: d.timestamp, gameNum: d.gameNum });
   }
 });
 
