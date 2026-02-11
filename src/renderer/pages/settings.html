@@ -25,6 +25,7 @@
 			<button class="tab" role="tab" aria-selected="false" data-tab="control">Control</button>
 			<button class="tab" role="tab" aria-selected="false" data-tab="updates">Updates</button>
 			<button class="tab" role="tab" aria-selected="false" data-tab="help">Help</button>
+			<button class="tab" role="tab" aria-selected="false" data-tab="changelog">Changelog</button>
 			<button class="tab" role="tab" aria-selected="false" data-tab="about">About</button>
 		</nav>
 
@@ -403,6 +404,17 @@
 						<p><strong>DS Extension not connecting:</strong> Verify the extension is loaded in Edge (edge://extensions/, Developer mode) and OddsMoni's WebSocket bridge is running (port 9876).</p>
 						<p><strong>Stale odds / wrong map:</strong> Enable Map Reselect in <strong>Main → Broker Refresh</strong>. For BetBoom, a 3-second grace period after reload suppresses stale data automatically.</p>
 					</div>
+					</section>
+				</div>
+			</div>
+
+			<!-- ============ CHANGELOG TAB ============ -->
+			<div class="tab-content" data-tab="changelog" role="tabpanel" hidden>
+				<div class="segmentsScroll">
+					<section class="seg">
+						<div id="changelog-content" class="changelogBody">
+							<p class="changelogLoading">Loading changelog…</p>
+						</div>
 					</section>
 				</div>
 			</div>

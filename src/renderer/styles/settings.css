@@ -400,3 +400,58 @@ h1 {
 	color: var(--md-sys-color-on-primary-container);
 }
 
+/* Changelog tab */
+.changelogBody {
+	font-size: var(--md-sys-typescale-body-small-size);
+	line-height: 1.7;
+	color: var(--md-sys-color-on-surface-variant);
+}
+.changelogBody .clH1 {
+	font-size: var(--md-sys-typescale-headline-small-size);
+	color: var(--md-sys-color-primary);
+	border: none;
+	padding: 0;
+	margin: 0 0 var(--md-sys-spacing-lg);
+}
+.changelogBody .clH2 {
+	font-size: var(--md-sys-typescale-title-medium-size);
+	color: var(--md-sys-color-on-surface);
+	margin: var(--md-sys-spacing-lg) 0 var(--md-sys-spacing-sm);
+	padding-bottom: var(--md-sys-spacing-xs);
+	border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+.changelogBody .clH3 {
+	font-size: var(--md-sys-typescale-label-large-size);
+	color: var(--md-sys-color-secondary);
+	margin: var(--md-sys-spacing-md) 0 var(--md-sys-spacing-xs);
+}
+.changelogBody ul {
+	margin: 0 0 var(--md-sys-spacing-sm);
+	padding-left: var(--md-sys-spacing-lg);
+}
+.changelogBody li {
+	margin: var(--md-sys-spacing-xs) 0;
+}
+.changelogBody code {
+	background: var(--md-sys-color-surface-container-highest);
+	padding: 1px 5px;
+	border-radius: var(--md-sys-shape-corner-extra-small);
+	font-size: 0.9em;
+}
+.changelogBody strong {
+	color: var(--md-sys-color-on-surface);
+}
+.changelogBody .clLink {
+	color: var(--md-sys-color-primary);
+	text-decoration: none;
+}
+.changelogBody .clLink:hover {
+	text-decoration: underline;
+}
+.changelogLoading, .changelogEmpty {
+	text-align: center;
+	color: var(--md-sys-color-on-surface-variant);
+	padding: var(--md-sys-spacing-xl);
+	font-style: italic;
+}
+

@@ -16,6 +16,7 @@ import { init as initExtension } from '../scripts/settings/extension.js';
 import { init as initGameSelector } from '../scripts/settings/game-selector.js';
 import { init as initAddons } from '../scripts/settings/addons.js';
 import { initSounds, gatherSettings as gatherSoundsSettings, resetToDefaults as resetSounds } from '../scripts/settings/sounds.js';
+import { init as initChangelog } from '../scripts/settings/changelog.js';
 
 // Buffer for config that arrives before DOM ready
 let pendingConfig = null;
@@ -118,6 +119,7 @@ function initAll() {
   try { initGameSelector(); } catch (e) { console.error('[settings] gameSelector init failed:', e); }
   try { initAddons(); } catch (e) { console.error('[settings] addons init failed:', e); }
   try { initSounds(); } catch (e) { console.error('[settings] sounds init failed:', e); }
+  try { initChangelog(); } catch (e) { console.error('[settings] changelog init failed:', e); }
   try { initAboutVersion(); } catch (e) { console.error('[settings] about init failed:', e); }
 
   // ===== Main buttons =====
