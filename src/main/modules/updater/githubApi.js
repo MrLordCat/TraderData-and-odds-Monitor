@@ -8,7 +8,7 @@ const USER_AGENT = 'OddsMoni-Updater/1.0';
 // Simple in-memory cache to avoid rate limits (60 req/hour unauthenticated)
 const cache = {
   data: {},
-  ttl: 5 * 60 * 1000, // 5 minutes cache TTL
+  ttl: 30 * 1000, // 30 seconds cache TTL (allows manual re-checks)
   get(key) {
     const entry = this.data[key];
     if (entry && Date.now() - entry.time < this.ttl) {
