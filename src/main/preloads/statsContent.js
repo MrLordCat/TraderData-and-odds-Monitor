@@ -37,9 +37,9 @@ const GRID_LIGHT_CSS = `
   html.oddsmoni-light [style*="background-image"] {
     filter: invert(1) hue-rotate(180deg) contrast(1.43) brightness(0.87) saturate(0.667) !important;
   }
-  /* Canvas (charts): stronger re-inversion for vivid lines & fills */
+  /* Canvas (charts): moderate re-inversion — low contrast keeps grid lines subtle */
   html.oddsmoni-light canvas {
-    filter: invert(1) hue-rotate(180deg) contrast(1.7) brightness(0.82) saturate(1.1) !important;
+    filter: invert(1) hue-rotate(180deg) contrast(1.15) brightness(0.9) saturate(1.3) !important;
   }
 
   /* Scoreboard: re-invert to preserve original team colors & round SVG icons */
