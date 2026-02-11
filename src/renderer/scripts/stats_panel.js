@@ -69,7 +69,7 @@ ipcRenderer.on('settings-updated', ()=>{
 
 // ================= Runtime State =================
 let metricVisibility = {}; // runtime copy controlling row visibility
-const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta'];
+const BINARY_METRICS = ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','pistolRound1','pistolRound13'];
 const COUNT_METRICS = ['killCount','towerCount','inhibitorCount','baronCount','dragonCount'];
 function parseTs(raw){ if(raw==null) return Infinity; if(typeof raw==='number'&&!isNaN(raw)) return raw>36000?Math.floor(raw/1000):raw; if(typeof raw==='string'){ const v=raw.trim(); if(/^\d+$/.test(v)){ const n=Number(v); return n>36000?Math.floor(n/1000):n; } if(/^(\d{1,2}:){1,2}\d{1,2}$/.test(v)){ const p=v.split(':').map(n=>Number(n)||0); if(p.length===2) return p[0]*60+p[1]; if(p.length===3) return p[0]*3600+p[1]*60+p[2]; } } return Infinity; }
 let prevMatchUrls = { A: null, B: null };
@@ -77,9 +77,9 @@ let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
 let teamNamesSource = 'grid'; // 'grid' or 'excel' - Excel has priority
 let _animSuppressFirstData = true; // extend suppression +2s on first data after reset/load
-let metricsOrder = ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta'];
+let metricsOrder = ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta','pistolRound1','pistolRound13'];
 let metricsOrderMutable = [...metricsOrder];
-const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', quadra:'Quadra', penta:'Penta' };
+const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', quadra:'Quadra', penta:'Penta', pistolRound1:'1st Pistol', pistolRound13:'2nd Pistol' };
 let lastOrderSig = null;
 let __prevValues = {}; // cell previous values
 let lastGameRendered = null;
@@ -146,7 +146,7 @@ function renderManual(){ renderLol(manualSnapshotCurrent(), true); applyWinLose(
 
 // Team names are now read-only from Excel (K4/N4)
 // Manual mode team renaming functions preserved for internal bucket renaming only
-function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const old=cur; if(idx===1) manualData.team1Name=v; else manualData.team2Name=v; Object.values(manualData.gameStats).forEach(gs=>{ ['killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonTimes'].forEach(f=>{ const bucket=gs[f]; if(!bucket) return; if(bucket[old]!=null){ bucket[v]=bucket[old]; delete bucket[old]; } }); if(gs.firstKill===old) gs.firstKill=v; ['race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','winner'].forEach(b=>{ if(gs[b]===old) gs[b]=v; }); }); renderManual(); }
+function renameTeamInternal(idx,v){ const cur = idx===1? manualData.team1Name: manualData.team2Name; const old=cur; if(idx===1) manualData.team1Name=v; else manualData.team2Name=v; Object.values(manualData.gameStats).forEach(gs=>{ ['killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonTimes'].forEach(f=>{ const bucket=gs[f]; if(!bucket) return; if(bucket[old]!=null){ bucket[v]=bucket[old]; delete bucket[old]; } }); if(gs.firstKill===old) gs.firstKill=v; ['race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','pistolRound1','pistolRound13','winner'].forEach(b=>{ if(gs[b]===old) gs[b]=v; }); }); renderManual(); }
 
 function applyRaceFromKills(gs){ const bucket = gs.killCount||{}; [ ['race5',5], ['race10',10], ['race15',15], ['race20',20] ].forEach(([key,n])=>{ if(!gs[key]){ const t1=bucket[manualData.team1Name]||0; const t2=bucket[manualData.team2Name]||0; if(t1===n || t2===n) gs[key]= t1===n? manualData.team1Name: manualData.team2Name; } }); }
 
@@ -182,7 +182,7 @@ let currentGridGame = null; // 'lol' | 'cs2' | 'dota2' | null
 const GAME_LABELS = { lol: 'LoL', cs2: 'CS2', dota2: 'Dota 2' };
 const GAME_METRICS = {
   lol: null, // null = all metrics (default full set)
-  cs2: ['killCount'],
+  cs2: ['killCount','pistolRound1','pistolRound13'],
   dota2: null, // null = all metrics (same as LoL for now)
 };
 function updateGameBadge(game){
@@ -629,7 +629,8 @@ function renderLol(payload, manual=false){
     // Dragon orders
     (function(){ let orders1=[], orders2=[]; if(s.dragonOrders){ orders1 = s.dragonOrders[dispTeam1]||[]; orders2 = s.dragonOrders[dispTeam2]||[]; } else if(s.dragonTimes){ const map = dragonTimesToOrders(s.dragonTimes, team1Name, team2Name); orders1 = map[dispTeam1]||[]; orders2 = map[dispTeam2]||[]; } setText('dragonOrders','t1', orders1.join(' ')); setText('dragonOrders','t2', orders2.join(' ')); })();
     if(s.quadra) setBinary('quadra', filledBinary); if(s.penta) setBinary('penta', filledBinary);
-  ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta'].forEach(m=>{ if(!filledBinary.has(m)){ setText(m,'t1','✗'); setText(m,'t2','✗'); } });
+    if(s.pistolRound1) setBinary('pistolRound1', filledBinary); if(s.pistolRound13) setBinary('pistolRound13', filledBinary);
+  ['firstKill','race5','race10','race15','race20','firstTower','firstInhibitor','firstBaron','quadra','penta','pistolRound1','pistolRound13'].forEach(m=>{ if(!filledBinary.has(m)){ setText(m,'t1','✗'); setText(m,'t2','✗'); } });
     // Store winner info from game data for header coloring
     window.__CURRENT_GAME_WINNER = s.winner || null;
     window.__CURRENT_GAME_TEAMS = { t1: dispTeam1, t2: dispTeam2 };

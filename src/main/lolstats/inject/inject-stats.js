@@ -21,6 +21,8 @@
   const RX_GAME_END   = /^Game\s+(\d+)\s+ended$/i; // Game end detection for ban phase logic
   // Strict single-line winner detection: "<Team Name> won Game <N>"
   const RX_GAME_WIN_SINGLE = /^\s*(.*?)\s+won\s+Game\s+(\d+)\s*$/i;
+  // Round win detection (CS2 pistol rounds): "<Team Name> won Round <N>"
+  const RX_ROUND_WIN = /^\s*(.*?)\s+won\s+Round\s+(\d+)\s*$/i;
   // Multi-kill timing thresholds
   const MULTI_INTER_GAP = 10_000; // ms between kills for double/triple/quadra
   const MULTI_PENTA_GAP = 30_000; // ms allowed between 4th and 5th
@@ -108,6 +110,9 @@
   // Multi-kills (injected via separate multikill parser then merged in main process)
   quadra: null, quadraAt: '',
   penta: null, pentaAt: '',
+  // CS2 pistol rounds
+  pistolRound1: null, pistolRound1At: '',
+  pistolRound13: null, pistolRound13At: '',
   // game result
   winner: null, winAt: ''
     };
@@ -326,6 +331,22 @@
             target.winnerSource = 'live-log-single-line';
             console.log('[inject-stats] 🏆', candTeam, 'won Game', gNum, 'at', ts);
           }
+        }
+      }
+    }
+
+    // Pistol round detection (CS2): "<Team Name> won Round <N>"
+    const mRound = RX_ROUND_WIN.exec(head);
+    if (mRound) {
+      const roundTeam = mRound[1].trim();
+      const roundNum = parseInt(mRound[2], 10);
+      if (roundTeam === team1Name || roundTeam === team2Name) {
+        if (roundNum === 1 && !stats.pistolRound1) {
+          stats.pistolRound1 = roundTeam;
+          stats.pistolRound1At = ts;
+        } else if (roundNum === 13 && !stats.pistolRound13) {
+          stats.pistolRound13 = roundTeam;
+          stats.pistolRound13At = ts;
         }
       }
     }

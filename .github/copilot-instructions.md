@@ -27,8 +27,17 @@ src/
 │   │   ├── main.js            # Main window preload (desktopAPI)
 │   │   ├── broker.js          # Broker view preload (odds extraction, reload grace)
 │   │   ├── credentials.js     # Credential auto-fill & capture helpers
-│   │   ├── statsContent.js    # Stats panel preload (IPC forwarding)
+│   │   ├── statsContent.js    # Stats panel preload (IPC forwarding, Grid theme CSS)
 │   │   └── slot.js            # Empty slot placeholder preload
+│   ├── lolstats/              # Grid stats module
+│   │   ├── index.js           # createLolStatsModule() — injection, aggregation, history
+│   │   └── inject/            # Scripts injected into Grid page (executeJavaScript)
+│   │       ├── pako.min.js    # zlib inflate for WebSocket binary frames
+│   │       ├── inject-map.js  # Roster/team mapping from Grid WebSocket
+│   │       ├── inject-live-log.js  # WebSocket intercept, decompress, emit events
+│   │       ├── inject-stats.js     # Event parsing, per-game stats, sound triggers (~485 lines)
+│   │       ├── inject-multikill.js # (Legacy, logic merged into inject-stats.js)
+│   │       └── inject-spa-watch.js # URL change detection for SPA navigation
 │   └── modules/               # Feature managers and IPC submodules
 │       ├── addonManager/      # Addon/plugin system (install, enable, load)
 │       ├── board/             # Board panel manager
@@ -72,6 +81,7 @@ src/
 │   │       ├── updater.js     # Updates section
 │   │       ├── extension.js   # Edge Extension section
 │   │       ├── game-selector.js # Game selector
+│   │       ├── changelog.js   # Changelog tab (fetches from GitHub)
 │   │       └── addons.js      # Addons management
 │   ├── styles/                # CSS files
 │   ├── auto/                   # Auto trading system (modular)
@@ -113,6 +123,8 @@ Excel Extractor/               # Python integration (outside src/)
 
 docs/                          # Documentation
 ├── ADDON_SYSTEM.md            # Addon system guide
+├── AUTO_MODE.md               # Auto trading system docs
+├── GRID_LOG_EXTRACTION.md     # Grid log extraction pipeline (stats, sounds)
 └── addon-manifest-template.json
 ```
 
@@ -189,6 +201,28 @@ To add a bookmaker:
 - Stats modes: `hidden|embedded|window` in `statsState.mode`.
 - Board docking manipulates stage via `layoutManager.setDockOffsets`.
 - Stats panel receives odds via IPC, supports manual mode with stored game data.
+- Full extraction pipeline documented in `docs/GRID_LOG_EXTRACTION.md`.
+
+**Game-Aware Metrics (GAME_METRICS):**
+- Stats table adapts to detected game (LoL, CS2, Dota 2) via URL detection on portal.grid.gg
+- `detectGameFromUrl()` parses `/lol/`, `/cs2/`, `/dota2/` from Grid URL
+- `GAME_METRICS = { lol: null, cs2: ['killCount','pistolRound1','pistolRound13'], dota2: null }`
+- `null` = all metrics visible; array = only listed metrics shown
+- Game badge in toolbar shows detected game with M3 colors
+- `window.__gridGame` exposed for per-game sound filtering
+
+**CS2 Pistol Rounds:**
+- `pistolRound1` = winner of Round 1 (1st pistol round)
+- `pistolRound13` = winner of Round 13 (2nd pistol round)
+- Parsed from Grid logs: `"TeamName won Round N"` via `RX_ROUND_WIN` regex
+- Binary metrics — displayed as ✓/✗ like firstKill
+- Labels: `'1st Pistol'` / `'2nd Pistol'`
+
+**Template Presets:**
+- `All` — all metrics visible (default)
+- `Mini` — hides firstKill, towers, races, dragonOrders for compact view
+- `TEMPLATE_MINI_HIDE` array controls which metrics Mini hides
+- Persisted in `lolStatsSettings` (electron-store)
 
 **Activity Heat Bar:**
 - Visual indicator of team activity in LoL stats table
@@ -331,6 +365,7 @@ electron-store keys:
 - `autoTolerancePct`, `autoSuspendThresholdPct`, `autoBurstLevels`
 - `gsHeatBar`, `statsConfig`, `lolManualData`
 - `soundsEnabled`, `soundsVolume` - Sound notification settings
+- `lolStatsSettings` - Stats panel state (metricVisibility, metricOrder, template)
 - `appTheme` - Theme preference ('dark' | 'light')
 - Updater: `lastUpdateCheck`, `updateChannel`
 - Addons: `enabledAddons` (array of addon IDs)
@@ -340,24 +375,24 @@ electron-store keys:
 Always wrap fragile calls in `try/catch`.
 
 ## 12.1 Sound Notifications
-Audio notifications for LoL match events (stats_panel only).
+Audio notifications for game events (stats_panel only). Supports LoL, CS2, Dota 2.
 
-**Architecture (Simplified 03.02.2026):**
-- `src/main/lolstats/inject/inject-stats.js` - Event detection, ban phase tracking, backlog protection
+**Architecture:**
+- `src/main/lolstats/inject/inject-stats.js` (~485 lines) - Event detection, ban phase tracking, backlog protection
 - `src/main/preloads/statsContent.js` - IPC forwarding (`lol-sound-event`)
 - `src/main/modules/stats/index.js` - Routes sound events to stats_panel (with pending queue)
-- `src/renderer/scripts/stats_sounds.js` - Audio playback (~200 lines, simplified)
+- `src/renderer/scripts/stats_sounds.js` - Audio playback (~207 lines)
 - `src/renderer/scripts/settings/sounds.js` - Settings UI module
 
 **Sound Assets (`src/assets/`):**
-- `GameOneStarted.mp3` - `GameFiveStarted.mp3` (game start per map)
+- `GameOneStarted.mp3` — `GameFiveStarted.mp3` (game start per map)
 - `FirstBlood.mp3`, `FirstTower.mp3` (early game events)
 - `FirstBaron.mp3`, `FirstInhibitor.mp3` (late game objectives)
 - `QuadraKill.mp3`, `PentaKill.mp3` (multi-kills)
 
 **Event Flow:**
 1. inject-stats.js parses Grid live logs → detects event (ban phase, kills, objectives)
-2. `playSound(type)` → postMessage to statsContent.js preload
+2. `playSound(type, entryKey)` → postMessage to statsContent.js preload
 3. statsContent.js → IPC `lol-sound-event` → main process stats/index.js
 4. If panel not ready → queue in `pendingSoundEvents`, create panel
 5. stats_panel webContents.send → stats_sounds.js `triggerSound()`
@@ -368,10 +403,26 @@ Audio notifications for LoL match events (stats_panel only).
 - `banPhaseTriggered` prevents duplicate sounds within same phase
 - When ban detected after game end → triggers next game start sound
 
+**Burst Detection:**
+- `isInEventBurst()`: 5+ events in 500ms = suppress (backlog replay)
+- `gameStart` sounds **bypass** burst detection (have own dedup via `banPhaseTriggered`)
+- `recentEventTimestamps[]` tracks arrival times, cleaned each check
+
+**Freshness Check (entryKey):**
+- `eventReceiveTimestamps` maps `entryKey → Date.now()` on arrival
+- `FRESH_EVENT_WINDOW_MS = 3000` — sound plays only if event arrived recently
+- Allows sounds during initial `soundsEnabled=false` period if event is genuinely fresh
+
 **Backlog Protection:**
 - `soundsEnabled = false` during initial Grid load
 - Enabled after 2-second delay (`SOUND_ENABLE_DELAY_MS`)
 - Prevents spam from historical events when loading match in progress
+
+**Per-Game Sound Filtering:**
+- `window.__gridGame` set by stats_panel.js when game detected from Grid URL
+- `CS2_ALLOWED = new Set(['gameStart'])` — CS2 plays only gameStart sounds
+- LoL / Dota 2: all sounds enabled (no filter)
+- Check in `triggerSound()`: if cs2 && !CS2_ALLOWED.has(type) → skip
 
 **Settings (electron-store):**
 - `soundsEnabled` (boolean, default: true)
