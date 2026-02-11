@@ -10,8 +10,8 @@
   --gs-anim-enabled: 1;
   --gs-anim-dur: 450ms;
   --gs-anim-scale: 1;
-  --gs-anim-color1: #3b82f6;
-  --gs-anim-color2: #f59e0b;
+  --gs-anim-color1: rgba(59,130,246,.6);
+  --gs-anim-color2: rgba(245,158,11,.4);
   --gs-heatbar-alpha: .55;
   /* win/lose highlight base colors */
   --wl-win-bg: rgba(60,160,80,.25);
@@ -141,9 +141,9 @@ tr[data-win="tie"] td.metricLabel { box-shadow: 0 0 0 1px rgba(255,255,255,.05) 
 /* Optimized glow - uses opacity only instead of expensive filter:blur in animation */
 @keyframes gs-cell-glow {
   0% { opacity: 0; }
-  10% { opacity: .85; }
-  35% { opacity: .7; }
-  65% { opacity: .3; }
+  12% { opacity: .45; }
+  30% { opacity: .35; }
+  60% { opacity: .15; }
   100% { opacity: 0; }
 }
 
@@ -157,10 +157,10 @@ td.gs-animating::after {
   content: "";
   position: absolute; inset: -2px;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 50%, var(--gs-anim-color1) 0%, var(--gs-anim-color2) 60%, transparent 75%);
-  mix-blend-mode: screen;
+  background: radial-gradient(circle at 50% 50%, var(--gs-anim-color1) 0%, var(--gs-anim-color2) 55%, transparent 70%);
+  mix-blend-mode: normal;
   opacity: 0;
-  filter: blur(2px); /* Static blur - GPU can cache this */
+  filter: blur(3px); /* Static blur - GPU can cache this */
   animation: gs-cell-glow calc(var(--gs-anim-dur) * 1.05) ease-out forwards;
   border-radius: 6px;
 }

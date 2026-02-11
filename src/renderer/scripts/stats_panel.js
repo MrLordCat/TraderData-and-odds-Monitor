@@ -302,8 +302,12 @@ function setText(id, side, val){
 ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(isManualOn()) return; try {
   const firstRender = (lastGameRendered == null);
   if(firstRender){ window.__SUPPRESS_STATS_ANIM_UNTIL = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, performance.now() + 5000); }
-  // Extend suppression +2s on first data arriving after grid load/reset
-  if(_animSuppressFirstData){ _animSuppressFirstData = false; window.__SUPPRESS_STATS_ANIM_UNTIL = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, performance.now() + 2000); }
+  // Extend suppression +2s AFTER first data arrives (chains on top of existing deadline)
+  if(_animSuppressFirstData){
+    _animSuppressFirstData = false;
+    const base = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, performance.now());
+    window.__SUPPRESS_STATS_ANIM_UNTIL = base + 2000;
+  }
   liveDataset = payload; cachedLive = payload; const games=Object.keys(payload.gameStats||{}).map(Number).sort((a,b)=>a-b); const sig = games.join(','); if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; if(sig !== lastLiveGamesSig){ lastLiveGamesSig = sig; if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; }
   updateGameSelect(); renderLol(payload); } catch(e){} });
 
@@ -330,7 +334,7 @@ function clearLol(){
   });
 }
 
-ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); _animSuppressFirstData = true; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
+ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; lastGameRendered=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); _animSuppressFirstData = true; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
 
 // ================= Credentials =================
 
