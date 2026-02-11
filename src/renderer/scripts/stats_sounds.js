@@ -101,8 +101,14 @@
     firstInhibitor: 'firstInhibitor', quadraKill: 'quadraKill', pentaKill: 'pentaKill'
   };
 
+  // Per-game sound filtering: CS2 = gameStart only, others = all sounds
+  const CS2_ALLOWED = new Set(['gameStart']);
+
   function triggerSound(soundType, _eventTimestamp) {
     if (!soundsEnabled) return;
+    // Filter by detected game
+    const game = window.__gridGame; // set by stats_panel.js
+    if (game === 'cs2' && !CS2_ALLOWED.has(soundType)) return;
 
     if (soundType === 'seriesStart') { currentGame = 0; return; }
     if (soundType === 'gameStart') {

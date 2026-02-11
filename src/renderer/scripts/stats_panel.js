@@ -213,6 +213,7 @@ function applyGameMetrics(game){
 function setGridGame(game){
   if(currentGridGame === game) return;
   currentGridGame = game;
+  window.__gridGame = game; // expose for stats_sounds.js
   updateGameBadge(game);
   applyGameMetrics(game);
 }
