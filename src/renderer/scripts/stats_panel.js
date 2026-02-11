@@ -174,6 +174,48 @@ function syncDragonCounts(g){ const t1=manualData.team1Name, t2=manualData.team2
 
 // ================= Helpers =================
 function isLolMatchUrl(u){ try { const url=new URL(u); if(!/portal\.grid\.gg/.test(url.hostname)) return false; return /lol/.test(url.pathname); } catch(_){ return false; } }
+function isGridMatchUrl(u){ try { const url=new URL(u); return /portal\.grid\.gg/.test(url.hostname) && /\/(lol|cs2|dota2)\//.test(url.pathname); } catch(_){ return false; } }
+function detectGameFromUrl(u){ try { const m = new URL(u).pathname.match(/\/(lol|cs2|dota2)\//); return m ? m[1] : null; } catch(_){ return null; } }
+
+// ================= Game-Aware Metrics =================
+let currentGridGame = null; // 'lol' | 'cs2' | 'dota2' | null
+const GAME_LABELS = { lol: 'LoL', cs2: 'CS2', dota2: 'Dota 2' };
+const GAME_METRICS = {
+  lol: null, // null = all metrics (default full set)
+  cs2: ['killCount'],
+  dota2: null, // null = all metrics (same as LoL for now)
+};
+function updateGameBadge(game){
+  const el = document.getElementById('gameBadge');
+  if(!el) return;
+  const label = game ? (GAME_LABELS[game] || game.toUpperCase()) : '—';
+  el.textContent = label;
+  el.dataset.game = game || '';
+}
+function applyGameMetrics(game){
+  const allowed = game ? GAME_METRICS[game] : null;
+  if(!allowed){
+    // Show all (use current metricVisibility / template)
+    applyVisibility();
+    return;
+  }
+  // Hide metrics not in allowed list, show those that are
+  metricsOrder.forEach(id=>{
+    const row = document.querySelector(`tr[data-metric="${id}"]`);
+    if(!row) return;
+    if(allowed.includes(id)){
+      row.style.display = metricVisibility[id] === false ? 'none' : '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+function setGridGame(game){
+  if(currentGridGame === game) return;
+  currentGridGame = game;
+  updateGameBadge(game);
+  applyGameMetrics(game);
+}
 function cell(id, side){ return document.getElementById(`${id}-${side}`); }
 // Helper: Manual mode is now a toggle button with data-active attribute
 function isManualOn(){ const el=document.getElementById('lolManualMode'); return el && el.getAttribute('data-active')==='true'; }
@@ -333,7 +375,11 @@ function clearLol(){
   });
 }
 
-ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevMatchUrls[slot]; const nowIs = isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; lastGameRendered=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); _animSuppressFirstData = true; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
+ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try {
+  // Detect game type from Grid URL
+  const detectedGame = detectGameFromUrl(url);
+  if(detectedGame) setGridGame(detectedGame);
+  const was = prevMatchUrls[slot]; const nowIs = isGridMatchUrl(url) || isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; lastGameRendered=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); _animSuppressFirstData = true; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
 
 // ================= Credentials =================
 
@@ -548,6 +594,7 @@ function renderLol(payload, manual=false){
   try {
     ensureRows();
     applyVisibility();
+    applyGameMetrics(currentGridGame);
   if(!payload){ return; }
     const { team1Name, team2Name, gameStats } = payload;
   if(!gameStats || typeof gameStats!=='object'){ return; }

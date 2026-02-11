@@ -533,6 +533,29 @@ small {
 /* Section header right group */
 .sectionHeader__right { margin-left:auto; display:flex; gap:6px; align-items:center; }
 
+/* Game badge (LoL / CS2 / Dota 2) */
+.gameBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  border-radius: var(--md-sys-shape-corner-small, 6px);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  border: 1px solid var(--gs-border);
+  line-height: 1.4;
+  user-select: none;
+  white-space: nowrap;
+  min-width: 30px;
+  text-align: center;
+  justify-content: center;
+}
+.gameBadge[data-game="lol"]  { color: #4fc3f7; border-color: #4fc3f755; }
+.gameBadge[data-game="cs2"]  { color: #ffb74d; border-color: #ffb74d55; }
+.gameBadge[data-game="dota2"]{ color: #e57373; border-color: #e5737355; }
+
 /* Game select styled as btn-sm */
 .gsSelect {
   appearance: auto;
