@@ -17,23 +17,29 @@ function extractThunder(mapNum = 1, game = 'lol', opts = {}) {
   // Bo1 handling: if mapNum === 1 && isLast, use match winner
   const useMatchWinner = mapNum <= 0 || (mapNum === 1 && opts.isLast);
   
+  // Helper: find header element inside market block
+  const getHeader = (m) => m.querySelector('.text-gray-light, .mr-auto');
+  
   if (useMatchWinner) {
     // Match Winner
     const matchRe = /Match\s+Winner/i;
     t = markets.find(m => {
-      const header = m.querySelector('.text-gray-light, .mr-auto');
-      return header && matchRe.test(header.textContent);
+      const h = getHeader(m);
+      return h && matchRe.test(h.textContent);
     });
   } else {
-    // Specific map
-    const mapRe = new RegExp(`Map\\s*${mapNum}\\s+Winner`, 'i');
-    t = markets.find(m => mapRe.test(m.textContent));
-    // Fallback to match winner if map not found
+    // Specific map/game — handle: "Map 1 Winner", "Map 1 - Winner", "Game 1 - Winner", "Round 1 - Winner"
+    const mapRe = new RegExp(`(?:Map|Game|Round)\\s*${mapNum}\\s*[-–—]?\\s*Winner`, 'i');
+    t = markets.find(m => {
+      const h = getHeader(m);
+      return h && mapRe.test(h.textContent);
+    });
+    // Fallback to match winner if map-specific not found
     if (!t) {
       const matchRe = /Match\s+Winner/i;
       t = markets.find(m => {
-        const header = m.querySelector('.text-gray-light, .mr-auto');
-        return header && matchRe.test(header.textContent);
+        const h = getHeader(m);
+        return h && matchRe.test(h.textContent);
       });
     }
   }

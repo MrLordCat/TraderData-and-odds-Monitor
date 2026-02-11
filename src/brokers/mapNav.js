@@ -17,13 +17,16 @@ function triggerMapChange(host, map, opts={}){
         const mainTab = document.querySelector('[data-testid="MainTab"]');
         if(mainTab) mainTab.click(); // Always click
       } else {
-        const targetTestId=`Map ${map}Tab`;
-        const tab=document.querySelector(`[data-testid="${targetTestId}"]`);
+        // Try both "Map NTab" and "Game NTab" data-testid formats (LoL uses "Game", CS uses "Map")
+        const tab = document.querySelector(`[data-testid="Map ${map}Tab"]`)
+                 || document.querySelector(`[data-testid="Game ${map}Tab"]`);
         if(tab){
           tab.click(); // Always click
         }
         else {
-          const fallback=[...document.querySelectorAll('[role="tab"]')].find(t=>t.textContent.trim()==='Map '+map);
+          // Broader fallback: any tab with "Map N" or "Game N" text
+          const mapN = new RegExp(`^(?:Map|Game)\\s*${map}$`, 'i');
+          const fallback=[...document.querySelectorAll('[role="tab"]')].find(t=>mapN.test(t.textContent.trim()));
           if(fallback) fallback.click();
         }
       }
