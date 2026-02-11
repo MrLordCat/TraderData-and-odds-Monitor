@@ -340,7 +340,7 @@
             target.winner = candTeam;
             target.winAt = ts;
             target.winnerSource = 'live-log-single-line';
-            console.log('[lol][winner][inject]', candTeam, 'won Game', gNum, 'at', ts);
+            console.log('[inject-stats] 🏆', candTeam, 'won Game', gNum, 'at', ts);
           }
         }
       }

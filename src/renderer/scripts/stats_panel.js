@@ -56,8 +56,6 @@ else bindStatsTopbar();
 ipcRenderer.on('stats-side-updated', (_e, p)=>{
   const side = p && p.side;
   __setPanelSideUi(side);
-  const dbg = document.getElementById('dbgSide');
-  if(dbg) dbg.textContent = __statsPanelSide;
 });
 
 // Listen for settings updates to reload sound preferences
@@ -88,6 +86,7 @@ let lastGameRendered = null;
 
 let liveDataset = null, cachedLive = null, currentLiveGame = null, currentGame = null; // game selection
 let swapTeams = false; // manual mode swap
+let __currentLayoutMode = 'split'; // tracks layout mode for single-window disable logic
 // Manual mode data
 let manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats: { '1': makeEmptyGame() } };
 
@@ -341,7 +340,7 @@ ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try { const was = prevM
 function ensureOption(select, value){ if(![...select.options].some(o=>o.value===value)){ const opt=document.createElement('option'); opt.value=value; opt.textContent=value.replace(/^https?:\/\/(www\.)?/,'').slice(0,40); select.appendChild(opt); } }
 
 // ================= Init From Main (stats-init) =================
-ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); if(sa){ ensureOption(sa, cfg.urls.A); sa.value = cfg.urls.A; } if(sb){ ensureOption(sb, cfg.urls.B); sb.value = cfg.urls.B; } const dbgL=document.getElementById('dbgLayout'); if(dbgL) dbgL.textContent = cfg.mode; const dbgS=document.getElementById('dbgSide'); if(dbgS) dbgS.textContent = cfg.side; setManualOn(!!cfg.lolManualMode); const sw=!!cfg.singleWindow; const swEl=document.getElementById('singleWindowMode'); if(swEl){ swEl.checked=sw; if(typeof window.__applySingleWindowUi==='function') window.__applySingleWindowUi(sw); } metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
+ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementById('srcA'); const sb=document.getElementById('srcB'); if(sa){ ensureOption(sa, cfg.urls.A); sa.value = cfg.urls.A; } if(sb){ ensureOption(sb, cfg.urls.B); sb.value = cfg.urls.B; } if(cfg.mode) __currentLayoutMode = cfg.mode; setManualOn(!!cfg.lolManualMode); const sw=!!cfg.singleWindow; const swEl=document.getElementById('singleWindowMode'); if(swEl){ swEl.checked=sw; if(typeof window.__applySingleWindowUi==='function') window.__applySingleWindowUi(sw); } metricVisibility = cfg.lolMetricVisibility || {}; if(Array.isArray(cfg.lolMetricOrder) && cfg.lolMetricOrder.length){ const defaults = [...metricsOrder]; const known = new Set(defaults); const filtered = cfg.lolMetricOrder.filter(m=> known.has(m)); if(filtered.length){ const missing = defaults.filter(m=> !filtered.includes(m)); metricsOrder = filtered.concat(missing); metricsOrderMutable = metricsOrder.slice(); } }
   if(cfg.lolManualData && typeof cfg.lolManualData==='object'){
     try { manualData = JSON.parse(JSON.stringify(cfg.lolManualData)); } catch(_){ }
   }
@@ -435,9 +434,8 @@ function bindBasic(){
       if(btnVert) btnVert.disabled = !!disable;
       if(btnA) btnA.disabled = !!disable;
       if(btnB) btnB.disabled = !!disable;
-      const layout = byId('dbgLayout')?.textContent;
-      if(selB) selB.disabled = !!disable && (layout==='focusA');
-      if(selA) selA.disabled = !!disable && (layout==='focusB');
+      if(selB) selB.disabled = !!disable && (__currentLayoutMode==='focusA');
+      if(selA) selA.disabled = !!disable && (__currentLayoutMode==='focusB');
     }
     chk.addEventListener('change', ()=>{
       const enabled = !!chk.checked;
@@ -448,9 +446,9 @@ function bindBasic(){
     window.__applySingleWindowUi = applyUi;
   })();
   [['modeSplit','split'],['modeVertical','vertical'],['modeA','focusA'],['modeB','focusB']].forEach(([id,mode])=>{
-    safe(id, el=> el.onclick = ()=>{ send('stats-layout',{mode}); const dbg=byId('dbgLayout'); if(dbg) dbg.textContent=mode; });
+    safe(id, el=> el.onclick = ()=>{ send('stats-layout',{mode}); __currentLayoutMode = mode; });
   });
-  safe('toggleSide', el=> el.onclick = ()=>{ send('stats-toggle-side'); const d=byId('dbgSide'); if(d) d.textContent = d.textContent==='left'?'right':'left'; });
+  safe('toggleSide', el=> el.onclick = ()=>{ send('stats-toggle-side'); });
 }
 
 function bindReset(){
