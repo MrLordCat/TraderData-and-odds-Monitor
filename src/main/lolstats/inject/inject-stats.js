@@ -47,8 +47,6 @@
   // Burst detection: suppress if many events in quick succession (backlog replay)
   const BURST_WINDOW_MS = 500, BURST_THRESHOLD = 5;
   let recentEventTimestamps = [];
-  let pendingGameStartSound = null; // { timeout, gameNum }
-  const GAME_START_DEFER_MS = 400;
   const FRESH_EVENT_WINDOW_MS = 3000;
   const eventReceiveTimestamps = new Map(); // entryKey -> receiveTimestamp
   
@@ -62,21 +60,6 @@
   // Record event arrival for burst detection
   function recordEventArrival() {
     recentEventTimestamps.push(Date.now());
-    // Cancel pending gameStart on burst
-    if (isInEventBurst() && pendingGameStartSound) {
-      clearTimeout(pendingGameStartSound.timeout);
-      pendingGameStartSound = null;
-    }
-  }
-  
-  // Schedule gameStart sound with delay (to detect if burst follows)
-  function scheduleGameStartSound(gameNum, entryKey) {
-    if (pendingGameStartSound) clearTimeout(pendingGameStartSound.timeout);
-    const timeout = setTimeout(() => {
-      pendingGameStartSound = null;
-      if (!isInEventBurst()) actuallyPlaySound('gameStart');
-    }, GAME_START_DEFER_MS);
-    pendingGameStartSound = { timeout, gameNum };
   }
   
   function actuallyPlaySound(soundType) {
@@ -85,13 +68,14 @@
 
   // Sound notification helper - sends message to be picked up by preload/main
   // Always use Date.now() for timestamp - game timestamps are relative and unusable for freshness checks
+  // gameStart sounds bypass burst detection — they have their own dedup via banPhaseTriggered
   function playSound(soundType, entryKey = null) {
-    if (isInEventBurst()) return;
+    if (soundType !== 'gameStart' && isInEventBurst()) return;
     if (!soundsEnabled) {
       const receivedRecently = entryKey && eventReceiveTimestamps.has(entryKey) && 
         (Date.now() - eventReceiveTimestamps.get(entryKey)) < FRESH_EVENT_WINDOW_MS;
       if (!receivedRecently) return;
-      if (soundType === 'gameStart') { scheduleGameStartSound(lastCompletedGame + 1, entryKey); return; }
+      if (soundType === 'gameStart') { actuallyPlaySound('gameStart'); return; }
     }
     actuallyPlaySound(soundType);
   }
