@@ -63,11 +63,8 @@ const GRID_LIGHT_CSS = `
   html.oddsmoni-light [data-testid="video-player"] svg {
     filter: none !important;
   }
-  /* Fullscreen: player escapes html filter, so remove re-inversion */
-  [data-testid="video-player"]:fullscreen,
-  [data-testid="video-player"]:-webkit-full-screen,
-  :fullscreen [data-testid="video-player"],
-  :-webkit-full-screen [data-testid="video-player"] {
+  /* Fullscreen: JS adds this class when player escapes html filter */
+  html.oddsmoni-light [data-testid="video-player"].oddsmoni-fs {
     filter: none !important;
   }
 
@@ -129,6 +126,23 @@ if (isGridPage()) {
   }).catch(_=>{});
   
   ipcRenderer.on('theme-changed', (_, theme) => injectGridTheme(theme));
+
+  // Fullscreen toggle: when video player enters/exits fullscreen,
+  // it escapes html filter so we must remove/restore the re-inversion
+  document.addEventListener('fullscreenchange', () => {
+    try {
+      const fsEl = document.fullscreenElement;
+      // Find video-player inside or as fullscreen element
+      const players = document.querySelectorAll('[data-testid="video-player"]');
+      for (const p of players) {
+        if (fsEl && (fsEl === p || fsEl.contains(p) || p.contains(fsEl))) {
+          p.classList.add('oddsmoni-fs');
+        } else {
+          p.classList.remove('oddsmoni-fs');
+        }
+      }
+    } catch(_) {}
+  });
 }
 
 // Also passive listener: if extension uses window.postMessage with source markers
