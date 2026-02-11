@@ -77,6 +77,8 @@ let followLatestLiveGame = true;
 let lastLiveGamesSig = '';
 let teamNamesSource = 'grid'; // 'grid' or 'excel' - Excel has priority
 let _animSuppressFirstData = true; // extend suppression +2s on first data after reset/load
+let _firstRealRenderTime = 0; // perf timestamp of first render with real game data
+const _INITIAL_LOAD_PHASE_MS = 12000; // extend suppress during this window after first real render
 let metricsOrder = ['firstKill','firstTower','firstBaron','firstInhibitor','race5','race10','race15','race20','killCount','towerCount','inhibitorCount','baronCount','dragonCount','dragonOrders','quadra','penta','pistolRound1','pistolRound13'];
 let metricsOrderMutable = [...metricsOrder];
 const metricLabels = { firstKill:'First Blood', killCount:'Kills', race5:'Race 5', race10:'Race 10', race15:'Race 15', race20:'Race 20', firstTower:'First Tower', firstInhibitor:'First Inhib', firstBaron:'First Baron', towerCount:'Towers', inhibitorCount:'Inhibitors', baronCount:'Barons', dragonCount:'Dragons', dragonOrders:'Dragon Orders', quadra:'Quadra', penta:'Penta', pistolRound1:'1st Pistol', pistolRound13:'2nd Pistol' };
@@ -343,12 +345,20 @@ function setText(id, side, val){
 // ================= LoL Update Handling =================
 ipcRenderer.on('lol-stats-update', (_, payload)=>{ if(isManualOn()) return; try {
   const firstRender = (lastGameRendered == null);
-  if(firstRender){ window.__SUPPRESS_STATS_ANIM_UNTIL = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, performance.now() + 5000); }
-  // Extend suppression +2s AFTER first data arrives (chains on top of existing deadline)
-  if(_animSuppressFirstData){
+  const now = performance.now();
+  const hasGames = Object.keys(payload.gameStats || {}).length > 0;
+  if(firstRender){ window.__SUPPRESS_STATS_ANIM_UNTIL = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, now + 5000); }
+  // Extend suppression +2s AFTER first data with actual games arrives (not empty snapshots)
+  if(_animSuppressFirstData && hasGames){
     _animSuppressFirstData = false;
-    const base = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, performance.now());
+    _firstRealRenderTime = now;
+    const base = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, now);
     window.__SUPPRESS_STATS_ANIM_UNTIL = base + 2000;
+  }
+  // During initial load phase, keep extending suppress on every update
+  // Covers Grid sending historical data in multiple WebSocket chunks over several seconds
+  if(_firstRealRenderTime && (now - _firstRealRenderTime < _INITIAL_LOAD_PHASE_MS)){
+    window.__SUPPRESS_STATS_ANIM_UNTIL = Math.max(window.__SUPPRESS_STATS_ANIM_UNTIL||0, now + 3000);
   }
   liveDataset = payload; cachedLive = payload; const games=Object.keys(payload.gameStats||{}).map(Number).sort((a,b)=>a-b); const sig = games.join(','); if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; if(sig !== lastLiveGamesSig){ lastLiveGamesSig = sig; if(followLatestLiveGame && games.length) currentLiveGame = games[games.length-1]; }
   updateGameSelect(); renderLol(payload); } catch(e){} });
@@ -380,7 +390,7 @@ ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try {
   // Detect game type from Grid URL
   const detectedGame = detectGameFromUrl(url);
   if(detectedGame) setGridGame(detectedGame);
-  const was = prevMatchUrls[slot]; const nowIs = isGridMatchUrl(url) || isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; lastGameRendered=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); _animSuppressFirstData = true; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
+  const was = prevMatchUrls[slot]; const nowIs = isGridMatchUrl(url) || isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; lastGameRendered=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); _animSuppressFirstData = true; _firstRealRenderTime = 0; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
 
 // ================= Credentials =================
 
