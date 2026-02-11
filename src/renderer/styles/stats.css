@@ -533,28 +533,25 @@ small {
 /* Section header right group */
 .sectionHeader__right { margin-left:auto; display:flex; gap:6px; align-items:center; }
 
-/* Game badge (LoL / CS2 / Dota 2) */
+/* Game badge (LoL / CS2 / Dota 2) — M3 tonal chip, matches btn-sm sizing */
 .gameBadge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  font-size: 10px;
+  justify-content: center;
+  padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-md);
+  font-size: var(--md-sys-typescale-label-medium-size);
   font-weight: 600;
-  letter-spacing: .03em;
-  border-radius: var(--md-sys-shape-corner-small, 6px);
-  background: var(--md-sys-color-surface-container-high);
-  color: var(--md-sys-color-on-surface-variant);
-  border: 1px solid var(--gs-border);
-  line-height: 1.4;
+  line-height: 1.15;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border: none;
   user-select: none;
   white-space: nowrap;
-  min-width: 30px;
-  text-align: center;
-  justify-content: center;
 }
-.gameBadge[data-game="lol"]  { color: #4fc3f7; border-color: #4fc3f755; }
-.gameBadge[data-game="cs2"]  { color: #ffb74d; border-color: #ffb74d55; }
-.gameBadge[data-game="dota2"]{ color: #e57373; border-color: #e5737355; }
+.gameBadge[data-game="lol"]  { background: #4fc3f718; color: #4fc3f7; }
+.gameBadge[data-game="cs2"]  { background: #ffb74d18; color: #ffb74d; }
+.gameBadge[data-game="dota2"]{ background: #e5737318; color: #e57373; }
 
 /* Game select styled as btn-sm */
 .gsSelect {
