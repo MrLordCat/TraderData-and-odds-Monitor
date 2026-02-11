@@ -454,4 +454,9 @@ h1 {
 	padding: var(--md-sys-spacing-xl);
 	font-style: italic;
 }
+.clRetry {
+	color: var(--md-sys-color-primary);
+	cursor: pointer;
+	margin-left: 4px;
+}
 

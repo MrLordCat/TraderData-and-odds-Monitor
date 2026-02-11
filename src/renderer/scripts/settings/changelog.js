@@ -1,9 +1,10 @@
 /**
- * Changelog tab — loads CHANGELOG.md from app root and renders as HTML
+ * Changelog tab — fetches CHANGELOG.md from GitHub and renders as HTML
  */
 const { ipcRenderer } = require('electron');
 
 let loaded = false;
+let loading = false;
 
 /** Minimal Markdown → HTML converter (covers CHANGELOG.md patterns) */
 function mdToHtml(md) {
@@ -13,6 +14,13 @@ function mdToHtml(md) {
 
   for (const raw of lines) {
     const line = raw;
+
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) {
+      if (inList) { out.push('</ul>'); inList = false; }
+      out.push('<hr>');
+      continue;
+    }
 
     // Headings
     if (/^### /.test(line)) {
@@ -56,17 +64,13 @@ function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 
 function inlineFormat(s) {
   let r = esc(s);
-  // Bold **text**
   r = r.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  // Inline code `text`
   r = r.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // Links [text](url)
   r = r.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="clLink">$1</a>');
   return r;
 }
 
 export function init() {
-  // Lazy-load when tab is clicked
   const tabBar = document.querySelector('.tab-bar');
   if (!tabBar) return;
 
@@ -78,20 +82,34 @@ export function init() {
 }
 
 async function loadChangelog() {
-  if (loaded) return;
-  loaded = true;
+  if (loaded || loading) return;
+  loading = true;
 
   const container = document.getElementById('changelog-content');
-  if (!container) return;
+  if (!container) { loading = false; return; }
+
+  container.innerHTML = '<p class="changelogLoading">Loading changelog from GitHub…</p>';
 
   try {
     const md = await ipcRenderer.invoke('get-changelog');
     if (md) {
       container.innerHTML = mdToHtml(md);
+      loaded = true;
     } else {
-      container.innerHTML = '<p class="changelogEmpty">Changelog not available.</p>';
+      container.innerHTML = '<p class="changelogEmpty">Changelog not available. <a href="#" class="clRetry">Retry</a></p>';
     }
   } catch (e) {
-    container.innerHTML = '<p class="changelogEmpty">Failed to load changelog.</p>';
+    container.innerHTML = '<p class="changelogEmpty">Failed to load changelog. <a href="#" class="clRetry">Retry</a></p>';
+  }
+  loading = false;
+
+  // Retry link handler
+  const retry = container.querySelector('.clRetry');
+  if (retry) {
+    retry.addEventListener('click', (e) => {
+      e.preventDefault();
+      loaded = false;
+      loadChangelog();
+    });
   }
 }
