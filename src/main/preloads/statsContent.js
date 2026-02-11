@@ -63,6 +63,13 @@ const GRID_LIGHT_CSS = `
   html.oddsmoni-light [data-testid="video-player"] svg {
     filter: none !important;
   }
+  /* Fullscreen: player escapes html filter, so remove re-inversion */
+  [data-testid="video-player"]:fullscreen,
+  [data-testid="video-player"]:-webkit-full-screen,
+  :fullscreen [data-testid="video-player"],
+  :-webkit-full-screen [data-testid="video-player"] {
+    filter: none !important;
+  }
 
   /* Small item icons (weapons/equipment 16px): keep inverted = dark on light bg */
   html.oddsmoni-light img[height="16px"] {
