@@ -48,37 +48,38 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   let lastStatus = '';
   let isStepping = false;
 
-  // === PULSE-WAIT MECHANISM ===
-  let waitingForExcelUpdate = false;
-  let excelOddsBeforePulse = null;
-  let waitStartTs = 0;
-  const EXCEL_UPDATE_TIMEOUT_MS = 3000;
-  const EXCEL_UPDATE_CHECK_INTERVAL_MS = 100;
+  // === SMART PULSE-WAIT MECHANISM ===
+  // Each pulse waits for Excel update (max 1s) before sending next pulse
+  // This prevents overshoot by reacting to actual Excel speed
 
-  function startWaitingForExcelUpdate() {
-    const currentExcel = OddsStore.getExcelOdds();
-    excelOddsBeforePulse = currentExcel ? [...currentExcel] : null;
-    waitingForExcelUpdate = true;
-    waitStartTs = Date.now();
-  }
-
-  function checkExcelUpdated() {
-    if (!waitingForExcelUpdate) return true;
-    const elapsed = Date.now() - waitStartTs;
-    if (elapsed > EXCEL_UPDATE_TIMEOUT_MS) {
-      waitingForExcelUpdate = false;
-      excelOddsBeforePulse = null;
-      return true;
-    }
-    const currentExcel = OddsStore.getExcelOdds();
-    if (!currentExcel || !excelOddsBeforePulse) return false;
-    const changed = currentExcel[0] !== excelOddsBeforePulse[0] || currentExcel[1] !== excelOddsBeforePulse[1];
-    if (changed) {
-      waitingForExcelUpdate = false;
-      excelOddsBeforePulse = null;
-      return true;
-    }
-    return false;
+  function waitForExcelUpdate(timeoutMs) {
+    return new Promise((resolve) => {
+      const startOdds = OddsStore.getExcelOdds();
+      const startSnapshot = startOdds ? [...startOdds] : null;
+      const startTs = Date.now();
+      
+      const checkInterval = setInterval(() => {
+        const elapsed = Date.now() - startTs;
+        if (elapsed >= timeoutMs) {
+          clearInterval(checkInterval);
+          resolve(false); // timeout
+          return;
+        }
+        
+        const currentOdds = OddsStore.getExcelOdds();
+        if (!currentOdds || !startSnapshot) {
+          clearInterval(checkInterval);
+          resolve(false);
+          return;
+        }
+        
+        const changed = currentOdds[0] !== startSnapshot[0] || currentOdds[1] !== startSnapshot[1];
+        if (changed) {
+          clearInterval(checkInterval);
+          resolve(true); // Excel updated
+        }
+      }, 50); // Check every 50ms
+    });
   }
 
   // Track alignment after NO_MID recovery and skip-resume-signal flag
@@ -102,7 +103,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     return 'ok';
   }
 
-  function step() {
+  async function step() {
     if (!state.active) return;
     if (!isSignalSender) return;
     if (isStepping) return;
@@ -137,12 +138,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         return;
       }
 
-      if (!checkExcelUpdated()) {
-        updateStatus('Waiting Excel...');
-        if (state.phase !== STATE.ALIGNING) scheduleStep(EXCEL_UPDATE_CHECK_INTERVAL_MS);
-        return;
-      }
-
       const cooldownMs = action.cooldownMs || config.fireCooldownMs;
       if (engine.isOnCooldown(action, cooldownMs)) {
         updateStatus('Cooldown...');
@@ -151,10 +146,9 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       }
 
       if (action.type === 'pulse') {
-        executeAction(action);
-        startWaitingForExcelUpdate();
         const mode = action.diffPct > 30 ? '⚠' : action.diffPct > 15 ? '⚡' : '';
         updateStatus(`${mode}${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
+        await executeAction(action);
       }
 
       if (state.phase !== STATE.ALIGNING) scheduleStep();
@@ -169,17 +163,39 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     stepTimer = setTimeout(step, delayMs ?? config.intervalMs);
   }
 
-  function executeAction(action) {
+  async function executeAction(action) {
     if (action.type !== 'pulse') return;
     const { key, pulses, side, direction, diffPct } = action;
 
+    let sentPulses = 0;
     for (let i = 0; i < pulses; i++) {
-      const delay = i * config.pulseGapMs;
-      setTimeout(() => sendKeyPress({ key, side, direction, diffPct, noConfirm: true }), delay);
+      // Send pulse
+      sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
+      sentPulses++;
+
+      // Wait for Excel response (max 1000ms)
+      const updated = await waitForExcelUpdate(1000);
+
+      // Check if already aligned (no need for more pulses)
+      const mid = OddsStore.getMid();
+      const target = state.mode === MODE.EXCEL ? OddsStore.getExcelOdds() : OddsStore.getDsOdds();
+      if (mid && target) {
+        const check = engine.checkAlignment({ mid, target });
+        if (check.aligned) {
+          autoLog(`✓ Aligned after ${sentPulses} pulse(s)`);
+          break;
+        }
+      }
+
+      // Gap before next pulse (if not last one)
+      if (i < pulses - 1) {
+        await new Promise(resolve => setTimeout(resolve, config.pulseGapMs));
+      }
     }
 
-    const confirmDelay = (pulses - 1) * config.pulseGapMs + config.confirmDelayMs;
-    setTimeout(() => sendKeyPress({ key: KEYS.CONFIRM, side, direction, diffPct, noConfirm: true }), confirmDelay);
+    // Confirm after all pulses
+    await new Promise(resolve => setTimeout(resolve, config.confirmDelayMs));
+    sendKeyPress({ key: KEYS.CONFIRM, side, direction, diffPct, noConfirm: true });
 
     engine.recordFire(action);
   }
