@@ -208,12 +208,20 @@
     setTimeout(() => {
       soundsEnabled = true;
       console.log('[inject-stats] 🔊 Sounds enabled (backlog processing complete)');
-      // Play deferred gameStart ONLY if no game has started and none completed.
-      // This means the series is truly fresh (ban phase of Game 1 happening now).
-      // If any game has already started/ended in the backlog, the event is historical.
-      if (_deferredGameStart && !currentGame && lastCompletedGame === 0) {
-        console.log(`[inject-stats] 🔊 Playing deferred gameStart: Game ${_deferredGameStart.gameNum || '?'}`);
-        actuallyPlaySound('gameStart', _deferredGameStart);
+      // Play deferred gameStart if no game has completed AND no significant
+      // game activity occurred.  This covers the scenario where the backlog
+      // contains "Series started" + "Game 1 started" but no kills yet —
+      // the match literally just began and the user should hear the sound.
+      // If kills/events already happened, the match is well underway → suppress.
+      if (_deferredGameStart && lastCompletedGame === 0) {
+        const gs = currentGame ? gameStats[currentGame] : null;
+        const hasActivity = gs && (gs.firstKill || Object.keys(gs.killCount || {}).length > 0);
+        if (!hasActivity) {
+          console.log(`[inject-stats] 🔊 Playing deferred gameStart: Game ${_deferredGameStart.gameNum || '?'}`);
+          actuallyPlaySound('gameStart', _deferredGameStart);
+        } else {
+          console.log(`[inject-stats] 🔇 Suppressed deferred gameStart: Game ${_deferredGameStart.gameNum || '?'} (game already has activity)`);
+        }
       }
       _deferredGameStart = null;
     }, SOUND_ENABLE_DELAY_MS);
@@ -261,7 +269,7 @@
     
     // Series started - trigger Game 1 start sound (instead of ban phase detection)
     if (RX_SERIES_START.test(head)) {
-      console.log('[inject-stats] Series started → Game 1 sound');
+      console.log('[inject-stats] Series started → Game 1 sound | ts=' + JSON.stringify(ts) + ' | gameTime=' + JSON.stringify(raw.body?.entryToAdd?.gameTime || raw.body?.gameTime || null) + ' | raw.body keys=' + JSON.stringify(Object.keys(raw.body || {})));
       lastCompletedGame = 0;
       banPhaseTriggered = true; // Prevent ban phase from re-triggering Game 1
       seriesActive = true;
@@ -307,6 +315,7 @@
     
     const mStart = RX_GAME_START.exec(head);
     if (mStart) {
+      console.log('[inject-stats] Game ' + mStart[1] + ' started | ts=' + JSON.stringify(ts) + ' | gameTime=' + JSON.stringify(raw.body?.entryToAdd?.gameTime || raw.body?.gameTime || null) + ' | raw.body keys=' + JSON.stringify(Object.keys(raw.body || {})));
       currentGame = mStart[1];
       const gameNum = parseInt(currentGame, 10);
       gameStats[currentGame] = makeStats();
