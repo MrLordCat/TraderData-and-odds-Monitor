@@ -37,18 +37,16 @@ export const MODE = Object.freeze({
 
 export const DEFAULTS = Object.freeze({
   tolerancePct: 1.5,
-  intervalMs: 0, // TEMP: disabled for testing
+  intervalMs: 0,
   pulseStepPct: 10,
-  pulseGapMs: 500,
   maxPulses: 3,
   suspendThresholdPct: 40,
   shockThresholdPct: 80,
   arbSpikeThresholdPct: 80,
   alignmentThresholdPct: 15,
-  fireCooldownMs: 900,
   confirmDelayMs: 100,
   alignmentTimeoutMs: 15000,
-  alignmentCheckIntervalMs: 0, // TEMP: disabled for testing
+  alignmentCheckIntervalMs: 0,
   dsStepMs: 800,
   dsCooldownMs: 1200,
   dsCommitDelayMs: 200,

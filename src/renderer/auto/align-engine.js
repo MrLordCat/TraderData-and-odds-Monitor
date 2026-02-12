@@ -11,7 +11,7 @@ export function createAlignEngine(config) {
     maxPulses: config?.maxPulses ?? DEFAULTS.maxPulses,
   };
 
-  const state = { phase: STATE.IDLE, lastFireKey: null, lastFireSide: null, lastFireTs: 0 };
+  const state = { phase: STATE.IDLE };
 
   function getKey(side, direction) {
     if (side === 0) return direction === 'raise' ? KEYS.RAISE_SIDE0 : KEYS.LOWER_SIDE0;
@@ -36,34 +36,10 @@ export function createAlignEngine(config) {
     return { type: 'pulse', key, pulses, side: minSide, direction, diffPct };
   }
 
-  function isOnCooldown(action, cooldownMs) {
-    if (action.type !== 'pulse') return false;
-    const elapsed = Date.now() - state.lastFireTs;
-    return elapsed < cooldownMs;
-  }
-
-  function recordFire(action) {
-    if (action.type === 'pulse') {
-      state.lastFireKey = action.key;
-      state.lastFireSide = action.side;
-      state.lastFireTs = Date.now();
-    }
-  }
-
   function setConfig(updates) {
     if (typeof updates.tolerancePct === 'number') cfg.tolerancePct = updates.tolerancePct;
     if (typeof updates.pulseStepPct === 'number') cfg.pulseStepPct = updates.pulseStepPct;
     if (typeof updates.maxPulses === 'number') cfg.maxPulses = updates.maxPulses;
-  }
-
-  function resetCooldown() {
-    state.lastFireKey = null;
-    state.lastFireSide = null;
-    state.lastFireTs = 0;
-  }
-
-  function getLastFireTs() {
-    return state.lastFireTs;
   }
 
   function checkAlignment(input) {
@@ -75,11 +51,7 @@ export function createAlignEngine(config) {
 
   return {
     computeAction,
-    isOnCooldown,
-    recordFire,
     setConfig,
-    resetCooldown,
-    getLastFireTs,
     checkAlignment,
     get state() { return { ...state }; },
     getConfig: () => ({ ...cfg }),

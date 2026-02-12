@@ -26,8 +26,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     tolerancePct: DEFAULTS.tolerancePct,
     intervalMs: DEFAULTS.intervalMs,
     pulseStepPct: DEFAULTS.pulseStepPct,
-    pulseGapMs: DEFAULTS.pulseGapMs,
-    fireCooldownMs: DEFAULTS.fireCooldownMs,
     confirmDelayMs: DEFAULTS.confirmDelayMs,
     suspendRetryDelayMs: DEFAULTS.suspendRetryDelayMs,
   };
@@ -147,13 +145,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         return;
       }
 
-      // TEMP: Cooldown disabled for testing
-      // if (engine.isOnCooldown(action, 100)) {
-      //   updateStatus('Cooldown...');
-      //   if (state.phase !== STATE.ALIGNING) scheduleStep();
-      //   return;
-      // }
-
       if (action.type === 'pulse') {
         console.log('[AUTO] step: executing pulse action');
         updateStatus(`${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
@@ -211,7 +202,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     await new Promise(resolve => setTimeout(resolve, config.confirmDelayMs));
     sendKeyPress({ key: KEYS.CONFIRM, side, direction, diffPct, noConfirm: true });
 
-    engine.recordFire(action);
     console.log('[AUTO] executeAction: DONE');
   }
 
@@ -229,7 +219,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     state.reason = REASON.ALIGNING;
     alignmentAttempts = 0;
 
-    engine.resetCooldown();
     autoLog('⚙ ALIGNING' + (afterNoMid ? ' (after NO_MID)' : '') + (skipResumeSignal ? ' (skip resume signal)' : ''));
     updateStatus('Aligning...');
     notify();
@@ -322,7 +311,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     state.active = true;
     state.userWanted = true;
     state.reason = null;
-    engine.resetCooldown();
 
     if (guardResult.canTrade) {
       state.phase = STATE.TRADING;
@@ -421,8 +409,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       config.pulseStepPct = Math.max(8, Math.min(15, updates.pulseStepPct));
       engine.setConfig({ pulseStepPct: config.pulseStepPct });
     }
-    if (typeof updates.pulseGapMs === 'number') config.pulseGapMs = updates.pulseGapMs;
-    if (typeof updates.fireCooldownMs === 'number') config.fireCooldownMs = updates.fireCooldownMs;
     if (typeof updates.stepMs === 'number') config.intervalMs = updates.stepMs;
     if (typeof updates.suspendRetryDelayMs === 'number') config.suspendRetryDelayMs = Math.max(700, Math.min(1500, Math.floor(updates.suspendRetryDelayMs)));
 
@@ -619,8 +605,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       const configSettings = [
         ['auto-tolerance-updated',        'auto-tolerance-get',        'number',  v => setConfig({ tolerancePct: v })],
         ['auto-interval-updated',         'auto-interval-get',         'number',  v => setConfig({ intervalMs: v })],
-        ['auto-fire-cooldown-updated',    'auto-fire-cooldown-get',    'number',  v => setConfig({ fireCooldownMs: v })],
-        ['auto-pulse-gap-updated',        'auto-pulse-gap-get',        'number',  v => setConfig({ pulseGapMs: v })],
         ['auto-pulse-step-updated',       'auto-pulse-step-get',       'number',  v => setConfig({ pulseStepPct: v })],
         ['auto-stop-no-mid-updated',      'auto-stop-no-mid-get',      'boolean', v => GuardSystem.setSettings({ stopOnNoMid: v })],
         ['auto-resume-on-mid-updated',    'auto-resume-on-mid-get',    'boolean', v => GuardSystem.setSettings({ resumeOnMid: v })],
