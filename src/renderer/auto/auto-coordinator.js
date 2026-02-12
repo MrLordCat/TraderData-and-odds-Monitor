@@ -155,12 +155,16 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     const { key, pulses, side, direction, diffPct } = action;
 
     let sentPulses = 0;
+    let lastPulseTs = 0;
     for (let i = 0; i < pulses; i++) {
       let attempts = 0;
       let excelUpdated = false;
       
       while (attempts < 3 && !excelUpdated) {
         attempts++;
+        const nowTs = Date.now();
+        if (lastPulseTs) console.log('[AUTO] Между пульсами:', nowTs - lastPulseTs, 'ms');
+        lastPulseTs = nowTs;
         sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
         sentPulses++;
 
