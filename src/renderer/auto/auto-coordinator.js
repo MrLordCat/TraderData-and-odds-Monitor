@@ -138,16 +138,15 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         return;
       }
 
-      const cooldownMs = action.cooldownMs || config.fireCooldownMs;
-      if (engine.isOnCooldown(action, cooldownMs)) {
+      // Minimal cooldown (200ms) only to prevent immediate re-fire, Excel wait handles the rest
+      if (engine.isOnCooldown(action, 200)) {
         updateStatus('Cooldown...');
         if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
       }
 
       if (action.type === 'pulse') {
-        const mode = action.diffPct > 30 ? '⚠' : action.diffPct > 15 ? '⚡' : '';
-        updateStatus(`${mode}${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
+        updateStatus(`${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
         await executeAction(action);
       }
 
@@ -173,7 +172,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
       sentPulses++;
 
-      // Wait for Excel response (max 1000ms)
+      // Wait for Excel response (max 1000ms) — this replaces pulseGapMs
       const updated = await waitForExcelUpdate(1000);
 
       // Check if already aligned (no need for more pulses)
@@ -185,11 +184,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
           autoLog(`✓ Aligned after ${sentPulses} pulse(s)`);
           break;
         }
-      }
-
-      // Gap before next pulse (if not last one)
-      if (i < pulses - 1) {
-        await new Promise(resolve => setTimeout(resolve, config.pulseGapMs));
       }
     }
 
@@ -250,9 +244,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       finishAlignment(true, 'timeout-forced');
     } else {
       step();
-      const lastCooldown = engine.getLastCooldownMs();
-      const alignInterval = Math.max(DEFAULTS.alignmentCheckIntervalMs, lastCooldown + 100);
-      alignmentTimer = setTimeout(checkAlignmentProgress, alignInterval);
+      alignmentTimer = setTimeout(checkAlignmentProgress, DEFAULTS.alignmentCheckIntervalMs);
     }
   }
 
