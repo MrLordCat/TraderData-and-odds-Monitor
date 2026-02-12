@@ -192,6 +192,8 @@
     // Ensure sounds are disabled during backlog processing
     soundsEnabled = false;
     
+    // Track max game time across backlog to decide if game just started
+    let maxGameTimeMs = 0;
     let processedCount = 0;
   backlog.forEach(entry => {
       const entryKey = `${entry.text}-${entry.ts}`;
@@ -200,27 +202,29 @@
         processedEntries.add(entryKey);
         processedCount++;
       }
+      // Track latest game time for deferred sound decision
+      if (entry.ts) { const ms = parseTsToMs(entry.ts); if (ms > maxGameTimeMs) maxGameTimeMs = ms; }
     });
     
     publish();
     
+    // Threshold: if max game time in backlog exceeds this, the game is
+    // well underway and deferred gameStart sound should be suppressed.
+    const DEFERRED_MAX_GAME_TIME_MS = 60_000; // 60 seconds of in-game time
+    
     // Enable sounds after a delay (to skip any remaining queued events)
     setTimeout(() => {
       soundsEnabled = true;
-      console.log('[inject-stats] 🔊 Sounds enabled (backlog processing complete)');
-      // Play deferred gameStart if no game has completed AND no significant
-      // game activity occurred.  This covers the scenario where the backlog
-      // contains "Series started" + "Game 1 started" but no kills yet —
-      // the match literally just began and the user should hear the sound.
-      // If kills/events already happened, the match is well underway → suppress.
+      console.log('[inject-stats] 🔊 Sounds enabled (backlog complete, maxGameTime=' + (maxGameTimeMs/1000).toFixed(0) + 's)');
+      // Play deferred gameStart if:
+      // 1) No game has completed (the deferred game is still active)
+      // 2) Max game time in backlog < threshold (game just started)
       if (_deferredGameStart && lastCompletedGame === 0) {
-        const gs = currentGame ? gameStats[currentGame] : null;
-        const hasActivity = gs && (gs.firstKill || Object.keys(gs.killCount || {}).length > 0);
-        if (!hasActivity) {
+        if (maxGameTimeMs < DEFERRED_MAX_GAME_TIME_MS) {
           console.log(`[inject-stats] 🔊 Playing deferred gameStart: Game ${_deferredGameStart.gameNum || '?'}`);
           actuallyPlaySound('gameStart', _deferredGameStart);
         } else {
-          console.log(`[inject-stats] 🔇 Suppressed deferred gameStart: Game ${_deferredGameStart.gameNum || '?'} (game already has activity)`);
+          console.log(`[inject-stats] 🔇 Suppressed deferred gameStart: Game ${_deferredGameStart.gameNum || '?'} (gameTime ${(maxGameTimeMs/1000).toFixed(0)}s > threshold)`);
         }
       }
       _deferredGameStart = null;
@@ -331,7 +335,7 @@
         console.log(`[inject-stats] 🎮 Game ${gameNum} started (via Grid event, no prior ban phase)`);
         playSound('gameStart', null, { gameNum });
       } else {
-        console.log(`[inject-stats] Game ${gameNum} started (sound already played via ban phase)`);
+        console.log(`[inject-stats] Game ${gameNum} started (sound ${soundsEnabled ? 'already played' : 'deferred'} via Series/ban phase)`);
       }
       // Update state: this game is now "in progress", so next bans will be for game N+1
       lastCompletedGame = gameNum - 1; // Set to current-1 so ban detection works correctly for NEXT game
