@@ -9,6 +9,7 @@ const { extractBetboom } = require('./betboom');
 const { extractPari } = require('./pari');
 const { extractMarathon } = require('./marathon');
 const { extractBet365 } = require('./bet365');
+const { extractSimulator } = require('./simulator');
 
 /**
  * Get broker ID from hostname
@@ -16,6 +17,8 @@ const { extractBet365 } = require('./bet365');
  * @returns {string}
  */
 function getBrokerId(host) {
+  // File-based simulators: check before URL stripping (file:// has no host)
+  if (/simulator\.html/i.test(host)) return 'simulator';
   try {
     host = (host || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
   } catch (_) { }
@@ -44,7 +47,8 @@ const EXTRACTOR_TABLE = [
   { test: /betboom\.ru$/i, fn: extractBetboom, passOpts: true },
   { test: /pari\.ru$/i, fn: extractPari, passOpts: true },
   { test: /marathonbet\./i, fn: extractMarathon },
-  { test: /bet365\./i, fn: extractBet365 }
+  { test: /bet365\./i, fn: extractBet365 },
+  { test: /simulator\.html/i, fn: extractSimulator }
 ];
 
 /**
@@ -97,6 +101,7 @@ module.exports = {
   extractPari,
   extractMarathon,
   extractBet365,
+  extractSimulator,
   // Registry (for dynamic extension)
   EXTRACTOR_TABLE
 };

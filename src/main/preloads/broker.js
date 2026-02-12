@@ -4,7 +4,7 @@ const { ipcRenderer } = require('electron');
 let desiredMap = 1;
 let isLast = false; // global flag from main indicating final map should use match market for certain brokers
 let mapConfigInitialized = false; // tracks if we've received the first set-map-config from main
-const HOST = location.host;
+const HOST = location.host || location.href;
 const { collectOdds: collectOddsExt, getBrokerId } = require('../../brokers/extractors/index');
 const { triggerMapChange } = require('../../brokers/mapNav');
 // Allow main process to inject a forced broker id before DOM load

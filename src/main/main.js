@@ -156,7 +156,8 @@ const BROKERS = [
   { id: 'betboom', url: 'https://betboom.ru/esport/league-of-legends?type=live' },
   { id: 'pari', url: 'https://pari.ru/esports/category/lol?dateInterval=2' },
   { id: 'marathon', url: 'https://www.marathonbet.dk/en/live/1372932' },
-  { id: 'bet365', url: 'https://www.bet365.ee/?_h=YWr28275L1TkpH0FsQpP8g%3D%3D&btsffd=1#/IP/B151' }
+  { id: 'bet365', url: 'https://www.bet365.ee/?_h=YWr28275L1TkpH0FsQpP8g%3D%3D&btsffd=1#/IP/B151' },
+  { id: 'simulator', url: 'file://' + path.join(__dirname, '..', 'renderer', 'pages', 'simulator.html').replace(/\\/g, '/') }
 ];
 const INITIAL_URLS = BROKERS.reduce((acc,b)=>{acc[b.id]=b.url;return acc;},{});
 

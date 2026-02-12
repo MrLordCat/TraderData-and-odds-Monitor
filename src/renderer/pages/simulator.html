@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en" data-simulator>
+<head>
+  <meta charset="UTF-8">
+  <title>Odds Simulator</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --card: #0f3460;
+      --accent: #e94560;
+      --accent2: #53d8fb;
+      --text: #eee;
+      --text2: #aab;
+      --odd-color: #53d8fb;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      user-select: none;
+      overflow: hidden;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .odds-display {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+    .team-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+    }
+    .team-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text2);
+    }
+    .odds-value {
+      font-size: 40px;
+      font-weight: 700;
+      color: var(--odd-color);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 20px rgba(83, 216, 251, 0.3);
+      transition: color 0.15s;
+    }
+    .vs {
+      font-size: 18px;
+      color: var(--text2);
+      font-weight: 300;
+      margin-top: 18px;
+    }
+    .slider-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: 90%;
+      max-width: 420px;
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-row label {
+      font-size: 11px;
+      width: 52px;
+      text-align: right;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--surface);
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(233, 69, 96, 0.5);
+      transition: box-shadow 0.15s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 14px rgba(233, 69, 96, 0.8);
+    }
+    .slider-val {
+      font-size: 13px;
+      width: 48px;
+      text-align: center;
+      color: var(--odd-color);
+      font-variant-numeric: tabular-nums;
+    }
+    .frozen-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .frozen-toggle label {
+      font-size: 11px;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+    .switch input { display: none; }
+    .switch .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--surface);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .switch .slider::before {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--text2);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .switch input:checked + .slider {
+      background: var(--accent);
+    }
+    .switch input:checked + .slider::before {
+      transform: translateX(16px);
+      background: #fff;
+    }
+    .status {
+      font-size: 10px;
+      color: var(--text2);
+      letter-spacing: 0.5px;
+    }
+    .status.frozen-on { color: var(--accent); }
+
+    /* Data attributes for extractor to read */
+    #sim-data { display: none; }
+  </style>
+</head>
+<body>
+  <!-- Hidden data element for extractor -->
+  <div id="sim-data" data-odds1="1.50" data-odds2="2.50" data-frozen="false"></div>
+
+  <h1>⚡ Odds Simulator</h1>
+
+  <div class="odds-display">
+    <div class="team-block">
+      <span class="team-label">Team 1</span>
+      <span class="odds-value" id="display1">1.50</span>
+    </div>
+    <span class="vs">vs</span>
+    <div class="team-block">
+      <span class="team-label">Team 2</span>
+      <span class="odds-value" id="display2">2.50</span>
+    </div>
+  </div>
+
+  <div class="slider-section">
+    <div class="slider-row">
+      <label>Team 1</label>
+      <input type="range" id="slider1" min="100" max="5000" value="150" step="1">
+      <span class="slider-val" id="val1">1.50</span>
+    </div>
+    <div class="slider-row">
+      <label>Team 2</label>
+      <input type="range" id="slider2" min="100" max="5000" value="250" step="1">
+      <span class="slider-val" id="val2">2.50</span>
+    </div>
+  </div>
+
+  <div class="frozen-toggle">
+    <label>Frozen</label>
+    <div class="switch">
+      <input type="checkbox" id="frozenCheck">
+      <span class="slider"></span>
+    </div>
+    <span class="status" id="frozenStatus">LIVE</span>
+  </div>
+
+  <script>
+    const simData = document.getElementById('sim-data');
+    const slider1 = document.getElementById('slider1');
+    const slider2 = document.getElementById('slider2');
+    const display1 = document.getElementById('display1');
+    const display2 = document.getElementById('display2');
+    const val1 = document.getElementById('val1');
+    const val2 = document.getElementById('val2');
+    const frozenCheck = document.getElementById('frozenCheck');
+    const frozenStatus = document.getElementById('frozenStatus');
+
+    function formatOdds(raw) {
+      return (raw / 100).toFixed(2);
+    }
+
+    function update() {
+      const o1 = formatOdds(slider1.value);
+      const o2 = formatOdds(slider2.value);
+      const frozen = frozenCheck.checked;
+
+      display1.textContent = o1;
+      display2.textContent = o2;
+      val1.textContent = o1;
+      val2.textContent = o2;
+
+      // Update data attributes for extractor
+      simData.dataset.odds1 = o1;
+      simData.dataset.odds2 = o2;
+      simData.dataset.frozen = String(frozen);
+
+      frozenStatus.textContent = frozen ? 'FROZEN' : 'LIVE';
+      frozenStatus.className = 'status' + (frozen ? ' frozen-on' : '');
+    }
+
+    slider1.addEventListener('input', update);
+    slider2.addEventListener('input', update);
+    frozenCheck.addEventListener('change', update);
+
+    // Initialize
+    update();
+  </script>
+</body>
+</html>
