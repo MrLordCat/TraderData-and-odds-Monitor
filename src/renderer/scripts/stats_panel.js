@@ -187,6 +187,8 @@ const GAME_METRICS = {
   cs2: ['killCount','pistolRound1','pistolRound13'],
   dota2: null, // null = all metrics (same as LoL for now)
 };
+// Metrics that only belong to a specific game — hidden for all other games
+const GAME_EXCLUSIVE = { pistolRound1: 'cs2', pistolRound13: 'cs2' };
 function updateGameBadge(game){
   const el = document.getElementById('gameBadge');
   if(!el) return;
@@ -197,8 +199,17 @@ function updateGameBadge(game){
 function applyGameMetrics(game){
   const allowed = game ? GAME_METRICS[game] : null;
   if(!allowed){
-    // Show all (use current metricVisibility / template)
-    applyVisibility();
+    // Show all — but hide game-exclusive metrics that belong to a different game
+    metricsOrder.forEach(id=>{
+      const row = document.querySelector(`tr[data-metric="${id}"]`);
+      if(!row) return;
+      const owner = GAME_EXCLUSIVE[id];
+      if(owner && game && owner !== game){
+        row.style.display = 'none';
+      } else {
+        row.style.display = metricVisibility[id] === false ? 'none' : '';
+      }
+    });
     return;
   }
   // Hide metrics not in allowed list, show those that are
@@ -247,7 +258,11 @@ function applyVisibility(){
   let hidden=0; let total=0;
   metricsOrder.forEach(id=>{
     const row = document.querySelector(`tr[data-metric="${id}"]`);
-    if(!row) return; total++; const off = (metricVisibility[id] === false); if(off) hidden++; row.style.display = off?'none':'';
+    if(!row) return; total++;
+    // Hide game-exclusive metrics that belong to a different game
+    const owner = GAME_EXCLUSIVE[id];
+    if(owner && currentGridGame && owner !== currentGridGame){ row.style.display='none'; hidden++; return; }
+    const off = (metricVisibility[id] === false); if(off) hidden++; row.style.display = off?'none':'';
   });
   // Ensure any newly introduced metrics default to visible
   metricsOrder.forEach(id=>{ if(!(id in metricVisibility)) metricVisibility[id] = true; });
