@@ -72,7 +72,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         
         const changed = currentOdds[0] !== startSnapshot[0] || currentOdds[1] !== startSnapshot[1];
         if (changed) {
-          console.log('[AUTO] Excel ответил за', elapsed, 'ms');
           clearInterval(checkInterval);
           resolve(true);
         }
@@ -155,30 +154,19 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     const { key, pulses, side, direction, diffPct } = action;
 
     let sentPulses = 0;
-    let lastPulseTs = 0;
     for (let i = 0; i < pulses; i++) {
       let attempts = 0;
       let excelUpdated = false;
       
       while (attempts < 3 && !excelUpdated) {
         attempts++;
-        const nowTs = Date.now();
-        if (lastPulseTs) console.log('[AUTO] Между пульсами:', nowTs - lastPulseTs, 'ms');
-        lastPulseTs = nowTs;
         sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
         sentPulses++;
-
-        console.log('[AUTO] Pulse', sentPulses, '→ ждём Excel (попытка', attempts, '/3)...');
         excelUpdated = await waitForExcelUpdate(1000);
-
-        if (!excelUpdated && attempts < 3) {
-          console.log('[AUTO] Excel не ответил, повтор...');
-        }
       }
 
       if (!excelUpdated) {
         autoLog('⚠️ Excel не отвечает после 3 попыток - отключение Auto');
-        console.log('[AUTO] Excel не отвечает после 3 попыток — отключение');
         state.active = false;
         state.userWanted = false;
         setSuspendedByUser(false);

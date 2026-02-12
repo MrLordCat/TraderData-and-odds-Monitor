@@ -97,7 +97,7 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
       keyLabel = side === 1 ? 'F24' : 'F23';
     }
 
-    if (keyLabel === 'F22') { console.log('[auto-press][ipc] confirm request F22'); }
+
 
     // Normalize retry flag from direction suffix
     if (!isRetry && typeof direction === 'string' && direction.indexOf(':retry') !== -1) { isRetry = true; }
@@ -109,13 +109,11 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
       const retryWindowMs = 400;
       if (isRetry) {
         if (nowTs - __lastF21RetrySentAt < retryWindowMs) {
-          console.log('[auto-press][ipc][dedupe] suppress F21 retry', { direction, ts: nowTs });
           return true;
         }
         __lastF21RetrySentAt = nowTs;
       } else {
         if (nowTs - __lastF21SentAt < initialWindowMs) {
-          console.log('[auto-press][ipc][dedupe] suppress F21 initial', { direction, ts: nowTs });
           return true;
         }
         __lastF21SentAt = nowTs;
@@ -146,16 +144,11 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
       if (injVk != null) {
         sendVk(injVk);
         sent = true;
-        console.log('[auto-press][ipc][si] SENT', keyLabel, 'injVk', injVk);
 
         // AUTO CONFIRM: directional key (F23/F24) → schedule F22 after 100ms
         if (!noConfirm && (keyLabel === 'F23' || keyLabel === 'F24')) {
-          const confirmDelayMs = 100;
           const confirmVk = 0x85; // F22
-          setTimeout(() => {
-            sendVk(confirmVk);
-            console.log('[auto-press][ipc][confirm] SENT F22 after', confirmDelayMs, 'ms');
-          }, confirmDelayMs);
+          setTimeout(() => { sendVk(confirmVk); }, 100);
         }
       }
     } catch (e) { console.warn('[auto-press][ipc][si] unavailable', e.message); }
@@ -168,11 +161,8 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
 
   // Auto mode relay
   ipcMain.on('auto-mode-changed', (_e, payload) => {
-    console.log('[autoSim][mode]', payload);
     try { broadcastToAll(getBroadcastCtx(), 'auto-set-all', { on: !!(payload && payload.active) }); } catch (_) { }
   });
-
-  ipcMain.on('auto-fire-attempt', (_e, payload) => { console.log('[autoSim][fireAttempt]', payload); });
 
   // Store last auto states to serve late-loaded windows
   ipcMain.on('auto-active-set', (_e, p) => {

@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.4] - 2026-02-12
+
+### ⚡ Performance
+
+- **Persistent PowerShell daemon** — replaced per-keypress `exec("powershell ...")` (~400ms overhead) with a persistent stdin-pipe daemon (`sendKeyDaemon.ps1`); keystroke delivery now ~1-2ms instead of 300-500ms
+- **Removed all artificial delays** — deleted `intervalMs`, `fireCooldownMs`, `pulseGapMs`, `alignmentCheckIntervalMs` and their associated cooldown tracking (`isOnCooldown`, `recordFire`, `resetCooldown`); auto-mode speed is now purely driven by Excel response time
+
+### 🔧 Auto Mode Improvements
+
+- **Excel-wait pulse system** — each pulse waits for Excel odds to change (polling every 20ms, max 1s timeout); next pulse fires immediately when Excel responds
+- **3-retry failsafe** — if Excel doesn't respond to a pulse within 1s, retries up to 3 times; disables Auto mode if Excel remains unresponsive
+- **Odds simulator** — new local broker page (`simulator.html`) with unified balance slider (2%-98% probability) for auto-mode calibration without live bookmakers
+
+### 🧹 Cleanup
+
+- **Removed cooldown settings from UI** — deleted Fire Cooldown, Pulse Gap, and Step Interval sliders from Settings
+- **Removed dead code** — deleted 100+ lines of cooldown/delay logic, unused IPC handlers, stale comments
+- **Cleaned debug logs** — removed all verbose console.log from auto-mode; only `autoLog()` UI messages remain
+
+### 📦 Dependencies
+
+- **esbuild** 0.27.2 → 0.27.3
+- **electron** 38.0.0 → 38.8.1
+- **@electron/packager** 18.4.4 → 19.0.3
+
 ## [0.4.3] - 2026-02-11
 
 ### ✨ New Features
