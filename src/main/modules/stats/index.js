@@ -345,6 +345,10 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     } catch(e){ console.error('[stats] Injection error:', e); }
   }
   
+  function sendGridLifecycle(slot, event, url){
+    try { if(views.panel) views.panel.webContents.send('grid-lifecycle', { slot, event, url, ts: Date.now() }); } catch(_){}
+  }
+
   function attachNavTracking(slot, view){
     if(!view || slotInit[slot]) return;
     slotInit[slot] = true;
@@ -357,14 +361,15 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
         if(views.panel) views.panel.webContents.send('stats-url-update',{ slot, url:u });
       } catch(_){}
     };
-    view.webContents.on('did-navigate', (_e,u)=>{ update(u); });
-    view.webContents.on('did-navigate-in-page', (_e,u)=>{ update(u); });
+    view.webContents.on('did-navigate', (_e,u)=>{ update(u); sendGridLifecycle(slot, 'did-navigate', u); });
+    view.webContents.on('did-navigate-in-page', (_e,u)=>{ update(u); sendGridLifecycle(slot, 'did-navigate-in-page', u); });
     
     // CRITICAL: Inject on dom-ready (BEFORE did-finish-load) to intercept WebSocket
     view.webContents.on('dom-ready', ()=>{
       try {
         const cur = view.webContents.getURL();
         console.log(`[stats] dom-ready for slot ${slot}: ${cur}`);
+        sendGridLifecycle(slot, 'dom-ready', cur);
         maybeEarlyInject(slot, view, cur);
       } catch(e){ console.error('[stats] dom-ready error:', e); }
     });
@@ -372,6 +377,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
     view.webContents.on('did-finish-load', ()=>{
       try {
         const cur = view.webContents.getURL();
+        sendGridLifecycle(slot, 'did-finish-load', cur);
         update(cur);
         const credsAll = store.get('siteCredentials')||{};
         const host = new URL(cur).hostname;

@@ -43,53 +43,14 @@
   function schedulePublish(){ if(__publishTimer) return; __publishTimer = setTimeout(()=>{ __publishTimer=null; try { publish(); } catch(_){ } }, PUBLISH_DEBOUNCE_MS); }
   // Note: multi-line/block-based winner inference removed to prevent false positives.
 
-  // Sound suppression: don't play sounds during initial backlog processing
-  let soundsEnabled = false;
-  const SOUND_ENABLE_DELAY_MS = 2000;
-  // Burst detection: suppress if many events in quick succession (backlog replay)
-  const BURST_WINDOW_MS = 500, BURST_THRESHOLD = 5;
-  let recentEventTimestamps = [];
-  const FRESH_EVENT_WINDOW_MS = 3000;
-  const eventReceiveTimestamps = new Map(); // entryKey -> receiveTimestamp
-  // Deferred gameStart: when a gameStart event fires during backlog (soundsEnabled=false),
-  // defer the sound to play after soundsEnabled=true. Overwritten by later gameStarts so
-  // only the most recent (current) game plays.
-  let _deferredGameStart = null;
-  
-  function isInEventBurst() {
-    const now = Date.now();
-    // Clean old timestamps
-    recentEventTimestamps = recentEventTimestamps.filter(t => now - t < BURST_WINDOW_MS);
-    return recentEventTimestamps.length >= BURST_THRESHOLD;
-  }
-  
-  // Record event arrival for burst detection
-  function recordEventArrival() {
-    recentEventTimestamps.push(Date.now());
-  }
-  
-  function actuallyPlaySound(soundType, extra) {
-    try { window.postMessage({ source: 'lol-sound-event', type: soundType, timestamp: Date.now(), ...extra }, '*'); } catch(_){ }
-  }
+  // --- Sound system (simplified) ---
+  // Stub for future filtering logic. Return false to suppress, true to allow.
+  // Currently allows all sounds unconditionally.
+  function shouldPlaySound(/* soundType, extra */) { return true; }
 
-  // Sound notification helper - sends message to be picked up by preload/main
-  // Always use Date.now() for timestamp - game timestamps are relative and unusable for freshness checks
-  // Important one-time sounds that bypass burst detection (like gameStart)
-  const BURST_IMMUNE_SOUNDS = new Set(['gameStart','firstBlood','firstTower','firstBaron','firstInhibitor']);
-  // gameStart sounds bypass burst detection — they have their own dedup via banPhaseTriggered
   function playSound(soundType, entryKey = null, extra = null) {
-    if (!BURST_IMMUNE_SOUNDS.has(soundType) && isInEventBurst()) return;
-    if (!soundsEnabled) {
-      // Defer gameStart sounds during backlog — will play after soundsEnabled=true
-      if (soundType === 'gameStart') {
-        _deferredGameStart = extra ? { ...extra } : {};
-        return;
-      }
-      const receivedRecently = entryKey && eventReceiveTimestamps.has(entryKey) && 
-        (Date.now() - eventReceiveTimestamps.get(entryKey)) < FRESH_EVENT_WINDOW_MS;
-      if (!receivedRecently) return;
-    }
-    actuallyPlaySound(soundType, extra);
+    if (!shouldPlaySound(soundType, extra)) return;
+    try { window.postMessage({ source: 'lol-sound-event', type: soundType, timestamp: Date.now(), ...extra }, '*'); } catch(_){ }
   }
 
   const gameStats = {};
@@ -185,63 +146,24 @@
     Object.keys(gameStats).forEach(key => delete gameStats[key]);
     processedEntries.clear();
     dragonTimestamps.clear();
-    eventReceiveTimestamps.clear(); // Clear freshness timestamps for backlog
-    _deferredGameStart = null; // Reset deferred sound before processing
     currentGame = null;
     
-    // Ensure sounds are disabled during backlog processing
-    soundsEnabled = false;
-    
-    // Track max game time across backlog to decide if game just started
-    let maxGameTimeMs = 0;
     let processedCount = 0;
   backlog.forEach(entry => {
       const entryKey = `${entry.text}-${entry.ts}`;
       if (!processedEntries.has(entryKey)) {
-        handleEntry(entry, entryKey); // Pass entryKey for freshness check
+        handleEntry(entry, entryKey);
         processedEntries.add(entryKey);
         processedCount++;
       }
-      // Track latest game time for deferred sound decision
-      if (entry.ts) { const ms = parseTsToMs(entry.ts); if (ms > maxGameTimeMs) maxGameTimeMs = ms; }
     });
     
     publish();
-    
-    // Threshold: if max game time in backlog exceeds this, the game is
-    // well underway and deferred gameStart sound should be suppressed.
-    const DEFERRED_MAX_GAME_TIME_MS = 60_000; // 60 seconds of in-game time
-    
-    // Enable sounds after a delay (to skip any remaining queued events)
-    setTimeout(() => {
-      soundsEnabled = true;
-      console.log('[inject-stats] 🔊 Sounds enabled (backlog complete, maxGameTime=' + (maxGameTimeMs/1000).toFixed(0) + 's)');
-      // Play deferred gameStart if:
-      // 1) No game has completed (the deferred game is still active)
-      // 2) Max game time in backlog < threshold (game just started)
-      if (_deferredGameStart && lastCompletedGame === 0) {
-        if (maxGameTimeMs < DEFERRED_MAX_GAME_TIME_MS) {
-          console.log(`[inject-stats] 🔊 Playing deferred gameStart: Game ${_deferredGameStart.gameNum || '?'}`);
-          actuallyPlaySound('gameStart', _deferredGameStart);
-        } else {
-          console.log(`[inject-stats] 🔇 Suppressed deferred gameStart: Game ${_deferredGameStart.gameNum || '?'} (gameTime ${(maxGameTimeMs/1000).toFixed(0)}s > threshold)`);
-        }
-      }
-      _deferredGameStart = null;
-    }, SOUND_ENABLE_DELAY_MS);
   }
 
   // 2) live-log entry
   window.addEventListener('lol-live-log-update', e => {
     const entryKey = `${e.detail.text}-${e.detail.ts}`;
-    
-    // Record event arrival for burst detection (backlog vs real-time)
-    recordEventArrival();
-    
-    // Record when this event was received (for freshness detection)
-    if (!eventReceiveTimestamps.has(entryKey)) {
-      eventReceiveTimestamps.set(entryKey, Date.now());
-    }
     
     // Always add to backlog first
     backlog.push(e.detail);
@@ -285,7 +207,6 @@
     if (RX_SERIES_END.test(head)) {
       console.log('[inject-stats] Series ended');
       seriesActive = false;
-      _deferredGameStart = null; // Don't play deferred sound for completed series
       return;
     }
     
@@ -335,7 +256,7 @@
         console.log(`[inject-stats] 🎮 Game ${gameNum} started (via Grid event, no prior ban phase)`);
         playSound('gameStart', null, { gameNum });
       } else {
-        console.log(`[inject-stats] Game ${gameNum} started (sound ${soundsEnabled ? 'already played' : 'deferred'} via Series/ban phase)`);
+        console.log(`[inject-stats] Game ${gameNum} started (sound already triggered via Series/ban phase)`);
       }
       // Update state: this game is now "in progress", so next bans will be for game N+1
       lastCompletedGame = gameNum - 1; // Set to current-1 so ban detection works correctly for NEXT game

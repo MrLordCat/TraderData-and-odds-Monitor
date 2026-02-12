@@ -407,6 +407,13 @@ ipcRenderer.on('stats-url-update', (_, { slot, url })=>{ try {
   if(detectedGame) setGridGame(detectedGame);
   const was = prevMatchUrls[slot]; const nowIs = isGridMatchUrl(url) || isLolMatchUrl(url); if(nowIs){ if(was && was!==url){ liveDataset = null; cachedLive=null; currentLiveGame=null; lastGameRendered=null; followLatestLiveGame=true; lastLiveGamesSig=''; teamNamesSource = 'grid'; clearLol(); updateGameSelect(); _animSuppressFirstData = true; _firstRealRenderTime = 0; window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 5000; ipcRenderer.send('lol-stats-reset'); } prevMatchUrls[slot]=url; } } catch(_){ } });
 
+// ================= Grid Lifecycle Logging =================
+ipcRenderer.on('grid-lifecycle', (_, { slot, event, url, ts })=>{
+  const time = new Date(ts).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const short = (url||'').replace(/^https?:\/\//, '').slice(0, 80);
+  console.log(`[Grid ${slot}] ${time}  ${event}  ${short}`);
+});
+
 // ================= Credentials =================
 
 function ensureOption(select, value){ if(![...select.options].some(o=>o.value===value)){ const opt=document.createElement('option'); opt.value=value; opt.textContent=value.replace(/^https?:\/\/(www\.)?/,'').slice(0,40); select.appendChild(opt); } }
