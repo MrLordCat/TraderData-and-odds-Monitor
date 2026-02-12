@@ -52,7 +52,7 @@ function buildDesktopAPI(ipcRenderer, withUnsub) {
     'onAutoStateSet auto-state-set', 'onAutoToggleAll auto-toggle-all',
     'onAutoSetAll auto-set-all', 'onAutoDisableAll auto-disable-all',
     'onAutoActiveSet auto-active-set', 'onAutoToleranceUpdated auto-tolerance-updated',
-    'onAutoIntervalUpdated auto-interval-updated', 'onAutoAdaptiveUpdated auto-adaptive-updated',
+    'onAutoAdaptiveUpdated auto-adaptive-updated',
     'onAutoBurstLevelsUpdated auto-burst-levels-updated',
     'onSwappedBrokersUpdated swapped-brokers-updated',
     'onUIBlurOn ui-blur-on', 'onUIBlurOff ui-blur-off',

@@ -1,5 +1,5 @@
 /**
- * AlignEngine — computes alignment actions and manages cooldowns.
+ * AlignEngine — computes alignment actions.
  */
 
 import { STATE, KEYS, DEFAULTS } from './constants.js';
