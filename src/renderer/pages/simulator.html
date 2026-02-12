@@ -177,32 +177,27 @@
 </head>
 <body>
   <!-- Hidden data element for extractor -->
-  <div id="sim-data" data-odds1="1.50" data-odds2="2.50" data-frozen="false"></div>
+  <div id="sim-data" data-odds1="2.50" data-odds2="1.67" data-frozen="false"></div>
 
   <h1>⚡ Odds Simulator</h1>
 
   <div class="odds-display">
     <div class="team-block">
       <span class="team-label">Team 1</span>
-      <span class="odds-value" id="display1">1.50</span>
+      <span class="odds-value" id="display1">2.50</span>
     </div>
     <span class="vs">vs</span>
     <div class="team-block">
       <span class="team-label">Team 2</span>
-      <span class="odds-value" id="display2">2.50</span>
+      <span class="odds-value" id="display2">1.67</span>
     </div>
   </div>
 
   <div class="slider-section">
     <div class="slider-row">
-      <label>Team 1</label>
-      <input type="range" id="slider1" min="100" max="5000" value="150" step="1">
-      <span class="slider-val" id="val1">1.50</span>
-    </div>
-    <div class="slider-row">
-      <label>Team 2</label>
-      <input type="range" id="slider2" min="100" max="5000" value="250" step="1">
-      <span class="slider-val" id="val2">2.50</span>
+      <label>Balance</label>
+      <input type="range" id="slider" min="2" max="98" value="40" step="0.1">
+      <span class="slider-val" id="probVal">40%</span>
     </div>
   </div>
 
@@ -217,28 +212,27 @@
 
   <script>
     const simData = document.getElementById('sim-data');
-    const slider1 = document.getElementById('slider1');
-    const slider2 = document.getElementById('slider2');
+    const slider = document.getElementById('slider');
     const display1 = document.getElementById('display1');
     const display2 = document.getElementById('display2');
-    const val1 = document.getElementById('val1');
-    const val2 = document.getElementById('val2');
+    const probVal = document.getElementById('probVal');
     const frozenCheck = document.getElementById('frozenCheck');
     const frozenStatus = document.getElementById('frozenStatus');
 
-    function formatOdds(raw) {
-      return (raw / 100).toFixed(2);
-    }
-
     function update() {
-      const o1 = formatOdds(slider1.value);
-      const o2 = formatOdds(slider2.value);
+      // Probability of Team 1 (0.02 - 0.98)
+      const p1 = slider.value / 100;
+      const p2 = 1 - p1;
+
+      // Calculate odds (odds = 1 / probability)
+      const o1 = (1 / p1).toFixed(2);
+      const o2 = (1 / p2).toFixed(2);
+
       const frozen = frozenCheck.checked;
 
       display1.textContent = o1;
       display2.textContent = o2;
-      val1.textContent = o1;
-      val2.textContent = o2;
+      probVal.textContent = Math.round(p1 * 100) + '%';
 
       // Update data attributes for extractor
       simData.dataset.odds1 = o1;
@@ -249,8 +243,7 @@
       frozenStatus.className = 'status' + (frozen ? ' frozen-on' : '');
     }
 
-    slider1.addEventListener('input', update);
-    slider2.addEventListener('input', update);
+    slider.addEventListener('input', update);
     frozenCheck.addEventListener('change', update);
 
     // Initialize
