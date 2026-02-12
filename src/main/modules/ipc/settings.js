@@ -117,9 +117,6 @@ function initSettingsIpc(ctx){
   createSettingIpc(ipcMain, store, 'autoTolerancePct', 'auto-tolerance', {
     clamp: v => Math.max(0.5, Math.min(10, v)), default: 1.5, payloadKey: 'tolerancePct'
   });
-  createSettingIpc(ipcMain, store, 'autoIntervalMs', 'auto-interval', {
-    clamp: v => Math.max(120, Math.min(10000, Math.floor(v))), default: null, payloadKey: 'intervalMs'
-  });
   createSettingIpc(ipcMain, store, 'autoAdaptiveEnabled', 'auto-adaptive', {
     type: 'boolean', default: null, payloadKey: 'enabled'
   });
@@ -129,14 +126,8 @@ function initSettingsIpc(ctx){
   createSettingIpc(ipcMain, store, 'autoShockThresholdPct', 'auto-shock-threshold', {
     clamp: v => Math.max(40, Math.min(120, Math.round(v))), default: 80, payloadKey: 'pct'
   });
-  createSettingIpc(ipcMain, store, 'autoFireCooldownMs', 'auto-fire-cooldown', {
-    clamp: v => Math.max(100, Math.min(5000, Math.floor(v))), default: 900, payloadKey: 'ms'
-  });
   createSettingIpc(ipcMain, store, 'autoMaxExcelWaitMs', 'auto-max-excel-wait', {
     clamp: v => Math.max(500, Math.min(5000, Math.floor(v))), default: 1600, payloadKey: 'ms'
-  });
-  createSettingIpc(ipcMain, store, 'autoPulseGapMs', 'auto-pulse-gap', {
-    clamp: v => Math.max(100, Math.min(1000, Math.floor(v))), default: 500, payloadKey: 'ms'
   });
   createSettingIpc(ipcMain, store, 'autoBurst3Enabled', 'auto-burst3-enabled', {
     type: 'boolean', default: true, payloadKey: 'enabled'

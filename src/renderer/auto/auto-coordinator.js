@@ -24,7 +24,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   const state = { active: false, phase: STATE.IDLE, mode: MODE.EXCEL, reason: null, userWanted: false };
   const config = {
     tolerancePct: DEFAULTS.tolerancePct,
-    intervalMs: DEFAULTS.intervalMs,
     pulseStepPct: DEFAULTS.pulseStepPct,
     confirmDelayMs: DEFAULTS.confirmDelayMs,
     suspendRetryDelayMs: DEFAULTS.suspendRetryDelayMs,
@@ -55,20 +54,17 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       const startOdds = OddsStore.getExcelOdds();
       const startSnapshot = startOdds ? [...startOdds] : null;
       const startTs = Date.now();
-      console.log('[AUTO] waitForExcelUpdate: START, snapshot=', startSnapshot, 'timeout=', timeoutMs);
       
       const checkInterval = setInterval(() => {
         const elapsed = Date.now() - startTs;
         if (elapsed >= timeoutMs) {
-          console.log('[AUTO] waitForExcelUpdate: TIMEOUT after', elapsed, 'ms');
           clearInterval(checkInterval);
-          resolve(false); // timeout
+          resolve(false);
           return;
         }
         
         const currentOdds = OddsStore.getExcelOdds();
         if (!currentOdds || !startSnapshot) {
-          console.log('[AUTO] waitForExcelUpdate: no odds, aborting');
           clearInterval(checkInterval);
           resolve(false);
           return;
@@ -76,11 +72,11 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         
         const changed = currentOdds[0] !== startSnapshot[0] || currentOdds[1] !== startSnapshot[1];
         if (changed) {
-          console.log('[AUTO] waitForExcelUpdate: CHANGED after', elapsed, 'ms, new=', currentOdds);
+          console.log('[AUTO] Excel ответил за', elapsed, 'ms');
           clearInterval(checkInterval);
-          resolve(true); // Excel updated
+          resolve(true);
         }
-      }, 50); // Check every 50ms
+      }, 20);
     });
   }
 
@@ -106,98 +102,79 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   }
 
   async function step() {
-    if (!state.active) { console.log('[AUTO] step: not active'); return; }
-    if (!isSignalSender) { console.log('[AUTO] step: not signal sender'); return; }
-    if (isStepping) { console.log('[AUTO] step: already stepping'); return; }
+    if (!state.active || !isSignalSender || isStepping) return;
     isStepping = true;
-    console.log('[AUTO] step: START, phase:', state.phase);
 
     try {
       const odds = OddsStore.getSnapshot();
 
       const gr = runGuardCheck(odds, { graceCheck: true });
-      if (gr === 'suspended') { console.log('[AUTO] step: suspended by guard'); return; }
-      if (gr === 'grace') { console.log('[AUTO] step: grace period'); scheduleStep(); return; }
+      if (gr === 'suspended' || gr === 'grace') { if (gr === 'grace') scheduleStep(); return; }
 
       if (state.phase === STATE.IDLE && state.reason) {
-        console.log('[AUTO] step: starting alignment');
         startAlignment();
         return;
       }
 
       const mid = OddsStore.getMid();
       const target = state.mode === MODE.EXCEL ? OddsStore.getExcelOdds() : OddsStore.getDsOdds();
-      console.log('[AUTO] step: mid=', mid, 'target=', target);
 
       if (!mid || !target) {
-        console.log('[AUTO] step: no data');
         updateStatus('Нет данных');
         if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
       }
 
       const action = engine.computeAction({ mid, target });
-      console.log('[AUTO] step: action=', action);
 
       if (action.type === 'none') {
-        if (action.aligned) { console.log('[AUTO] step: aligned'); updateStatus('Aligned ✓'); }
+        if (action.aligned) updateStatus('Aligned ✓');
         if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
       }
 
       if (action.type === 'pulse') {
-        console.log('[AUTO] step: executing pulse action');
         updateStatus(`${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
         await executeAction(action);
-        console.log('[AUTO] step: pulse action DONE');
       }
 
       if (state.phase !== STATE.ALIGNING) scheduleStep();
     } finally {
       isStepping = false;
-      console.log('[AUTO] step: END');
     }
   }
 
   function scheduleStep(delayMs) {
     clearTimeout(stepTimer);
     if (!state.active) return;
-    const delay = delayMs ?? config.intervalMs;
-    console.log('[AUTO] scheduleStep: delay=', delay, 'ms');
-    stepTimer = setTimeout(step, delay);
+    stepTimer = setTimeout(step, delayMs ?? 0);
   }
 
   async function executeAction(action) {
     if (action.type !== 'pulse') return;
     const { key, pulses, side, direction, diffPct } = action;
-    console.log('[AUTO] executeAction: START, pulses=', pulses);
 
     let sentPulses = 0;
     for (let i = 0; i < pulses; i++) {
       let attempts = 0;
       let excelUpdated = false;
       
-      // Try up to 3 times to get Excel response
       while (attempts < 3 && !excelUpdated) {
         attempts++;
-        console.log('[AUTO] executeAction: sending pulse', i + 1, '/', pulses, '(attempt', attempts, '/3)');
         sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
         sentPulses++;
 
-        // Wait for Excel response (max 1000ms)
-        console.log('[AUTO] executeAction: waiting for Excel update (1s timeout)...');
+        console.log('[AUTO] Pulse', sentPulses, '→ ждём Excel (попытка', attempts, '/3)...');
         excelUpdated = await waitForExcelUpdate(1000);
-        console.log('[AUTO] executeAction: Excel updated=', excelUpdated);
 
         if (!excelUpdated && attempts < 3) {
-          console.log('[AUTO] executeAction: Excel did not respond, retrying...');
+          console.log('[AUTO] Excel не ответил, повтор...');
         }
       }
 
-      // If Excel didn't respond after 3 attempts, disable Auto
       if (!excelUpdated) {
         autoLog('⚠️ Excel не отвечает после 3 попыток - отключение Auto');
-        console.log('[AUTO] executeAction: Excel not responding after 3 attempts, disabling Auto');
+        console.log('[AUTO] Excel не отвечает после 3 попыток — отключение');
         state.active = false;
         state.userWanted = false;
         setSuspendedByUser(false);
@@ -206,12 +183,10 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         return;
       }
 
-      // Excel responded, check if already aligned
       const mid = OddsStore.getMid();
       const target = state.mode === MODE.EXCEL ? OddsStore.getExcelOdds() : OddsStore.getDsOdds();
       if (mid && target) {
         const check = engine.checkAlignment({ mid, target });
-        console.log('[AUTO] executeAction: alignment check: aligned=', check.aligned, 'diffPct=', check.diffPct);
         if (check.aligned) {
           autoLog(`✓ Aligned after ${sentPulses} pulse(s)`);
           break;
@@ -219,12 +194,8 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       }
     }
 
-    // Confirm after all pulses
-    console.log('[AUTO] executeAction: sending confirm');
     await new Promise(resolve => setTimeout(resolve, config.confirmDelayMs));
     sendKeyPress({ key: KEYS.CONFIRM, side, direction, diffPct, noConfirm: true });
-
-    console.log('[AUTO] executeAction: DONE');
   }
 
   function startAlignment(skipResumeSignal = false, afterNoMid = false) {
@@ -261,7 +232,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
     if (!mid || !target) {
       if (alignmentAttempts < 30) {
-        alignmentTimer = setTimeout(checkAlignmentProgress, DEFAULTS.alignmentCheckIntervalMs);
+        alignmentTimer = setTimeout(checkAlignmentProgress, 0);
       } else {
         finishAlignment(false, 'timeout-nodata');
       }
@@ -276,7 +247,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       finishAlignment(true, 'timeout-forced');
     } else {
       step();
-      alignmentTimer = setTimeout(checkAlignmentProgress, DEFAULTS.alignmentCheckIntervalMs);
+      alignmentTimer = setTimeout(checkAlignmentProgress, 0);
     }
   }
 
@@ -426,12 +397,10 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       engine.setConfig({ tolerancePct: config.tolerancePct });
       if (global.__embeddedAutoSim) global.__embeddedAutoSim.tolerancePct = config.tolerancePct;
     }
-    if (typeof updates.intervalMs === 'number') config.intervalMs = Math.max(120, Math.min(10000, updates.intervalMs));
     if (typeof updates.pulseStepPct === 'number') {
       config.pulseStepPct = Math.max(8, Math.min(15, updates.pulseStepPct));
       engine.setConfig({ pulseStepPct: config.pulseStepPct });
     }
-    if (typeof updates.stepMs === 'number') config.intervalMs = updates.stepMs;
     if (typeof updates.suspendRetryDelayMs === 'number') config.suspendRetryDelayMs = Math.max(700, Math.min(1500, Math.floor(updates.suspendRetryDelayMs)));
 
     GuardSystem.setSettings({ tolerancePct: config.tolerancePct });
@@ -513,7 +482,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       config: { ...config },
       lastDisableReason: state.reason,
       tolerancePct: config.tolerancePct,
-      stepMs: config.intervalMs,
     };
   }
 
@@ -626,7 +594,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       // Config settings: [updatedChannel, getChannel, type, handler]
       const configSettings = [
         ['auto-tolerance-updated',        'auto-tolerance-get',        'number',  v => setConfig({ tolerancePct: v })],
-        ['auto-interval-updated',         'auto-interval-get',         'number',  v => setConfig({ intervalMs: v })],
         ['auto-pulse-step-updated',       'auto-pulse-step-get',       'number',  v => setConfig({ pulseStepPct: v })],
         ['auto-stop-no-mid-updated',      'auto-stop-no-mid-get',      'boolean', v => GuardSystem.setSettings({ stopOnNoMid: v })],
         ['auto-resume-on-mid-updated',    'auto-resume-on-mid-get',    'boolean', v => GuardSystem.setSettings({ resumeOnMid: v })],

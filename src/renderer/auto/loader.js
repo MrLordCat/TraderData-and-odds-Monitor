@@ -45,7 +45,6 @@ import { createAutoCoordinator } from './auto-coordinator.js';
             userWanted: st.userWanted,
             lastDisableReason: st.reason,
             tolerancePct: st.config.tolerancePct,
-            stepMs: st.config.intervalMs,
             adaptive: true,
             burstLevels: [],
           };
@@ -125,7 +124,6 @@ import { createAutoCoordinator } from './auto-coordinator.js';
         userWanted: st.userWanted,
         lastDisableReason: st.reason,
         tolerancePct: st.config.tolerancePct,
-        stepMs: st.config.intervalMs,
       };
 
       ['autoBtn', 'embeddedAutoBtn'].forEach(id => {

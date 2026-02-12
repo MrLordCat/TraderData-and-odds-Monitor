@@ -5,12 +5,9 @@ const { ipcRenderer } = require('electron');
 // Each entry: [stateKey, inputId, valueId, clampFn, suffix, parseType, ipcChannel, payloadKey]
 const SLIDER_CONFIGS = [
   ['autoTolerancePct',        'auto-tolerance',        'auto-tolerance-val',        v => Math.max(0.5, Math.min(10, Math.round(v * 10) / 10)), '%',  'float', 'auto-tolerance-set',        'tolerancePct',  1.5,  v => v.toFixed(1) + '%'],
-  ['autoIntervalMs',          'auto-interval',         'auto-interval-val',         v => Math.max(120, Math.min(2000, Math.floor(v))),          'ms', 'int',   'auto-interval-set',         'intervalMs',    500,  null],
   ['pulseStepPct',            'auto-pulse-step',       'auto-pulse-step-val',       v => Math.max(8, Math.min(15, Math.round(v))),              '%',  'int',   'auto-pulse-step-set',       'pct',           10,   null],
   ['autoSuspendThresholdPct', 'auto-suspend-threshold','auto-suspend-threshold-val',v => Math.max(15, Math.min(80, Math.round(v))),             '%',  'float', 'auto-suspend-threshold-set', 'pct',           40,   null],
   ['shockThresholdPct',       'auto-shock-threshold',  'auto-shock-threshold-val',  v => Math.max(40, Math.min(120, Math.round(v))),            '%',  'int',   'auto-shock-threshold-set',  'pct',           80,   null],
-  ['fireCooldownMs',          'auto-fire-cooldown',    'auto-fire-cooldown-val',    v => Math.max(100, Math.min(3000, Math.floor(v))),          'ms', 'int',   'auto-fire-cooldown-set',    'ms',            900,  null],
-  ['pulseGapMs',              'auto-pulse-gap',        'auto-pulse-gap-val',        v => Math.max(100, Math.min(1000, Math.floor(v))),          'ms', 'int',   'auto-pulse-gap-set',        'ms',            500,  null],
   ['suspendRetryDelayMs',     'auto-suspend-retry-delay','auto-suspend-retry-delay-val', v => Math.max(700, Math.min(1500, Math.floor(v))),      'ms', 'int',   'auto-suspend-retry-delay-set','ms',          800,  null],
 ];
 
@@ -83,9 +80,9 @@ function bindEvents() {
 async function loadFromStore() {
   // Load sliders
   const sliderGetChannels = [
-    'auto-tolerance-get', 'auto-interval-get', 'auto-pulse-step-get',
+    'auto-tolerance-get', 'auto-pulse-step-get',
     'auto-suspend-threshold-get', 'auto-shock-threshold-get',
-    'auto-fire-cooldown-get', 'auto-pulse-gap-get', 'auto-suspend-retry-delay-get'
+    'auto-suspend-retry-delay-get'
   ];
   for (let i = 0; i < SLIDER_CONFIGS.length; i++) {
     const cfg = SLIDER_CONFIGS[i];

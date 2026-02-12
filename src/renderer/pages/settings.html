@@ -159,13 +159,6 @@
 							<input id="auto-tolerance" type="range" min="0.5" max="10" step="0.1" />
 							<span id="auto-tolerance-val" class="rangeVal"></span>
 						</div>
-						<label for="auto-interval">Step interval (ms)
-							<small class="labelHint">How often Auto checks alignment</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-interval" type="range" min="120" max="2000" step="10" />
-							<span id="auto-interval-val" class="rangeVal"></span>
-						</div>
 						<label for="auto-pulse-step">Pulse step (%)
 							<small class="labelHint">Diff % per burst pulse (8-15); capped at 3 pulses</small>
 						</label>
@@ -201,20 +194,6 @@
 
 						<!-- Timing Settings -->
 						<h3 class="subsectionTitle">⏱️ Timing</h3>
-						<label for="auto-fire-cooldown">Fire cooldown (ms)
-							<small class="labelHint">Min delay between keypresses</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-fire-cooldown" type="range" min="100" max="3000" step="50" />
-							<span id="auto-fire-cooldown-val" class="rangeVal"></span>
-						</div>
-						<label for="auto-pulse-gap">Pulse gap (ms)
-							<small class="labelHint">Delay between burst pulses</small>
-						</label>
-						<div class="rangeWrap">
-							<input id="auto-pulse-gap" type="range" min="100" max="1000" step="50" />
-							<span id="auto-pulse-gap-val" class="rangeVal"></span>
-						</div>
 						<label for="auto-suspend-retry-delay">Suspend retry delay (ms)
 							<small class="labelHint">Backup signal delay if Excel didn't react</small>
 						</label>
