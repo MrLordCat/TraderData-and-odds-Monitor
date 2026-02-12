@@ -407,7 +407,7 @@ ipcRenderer.on('stats-init', (_, cfg) => { try { const sa=document.getElementByI
   if(cfg.lolTemplate && cfg.lolTemplate !== currentTemplate){ applyTemplate(cfg.lolTemplate); }
   buildMetricToggles(); ensureRows(); applyVisibility(); if(cfg.statsConfig && window.__STATS_CONFIG__){ window.__STATS_CONFIG__.set(cfg.statsConfig); }
   if(isManualOn()){ currentGame = Object.keys(manualData?.gameStats||{'1':1})[0] || '1'; updateGameSelect(); renderManual(); }
-  ipcRenderer.send('lol-stats-settings',{ manualMode: isManualOn(), manualData, metricMarks: window.__LOL_CHECK_STATE });
+  ipcRenderer.send('lol-stats-settings',{ manualMode: isManualOn(), manualData, metricMarks: window.__LOL_CHECK_STATE, metricOrder: metricsOrderMutable, metricVisibility, template: currentTemplate });
   __setPanelSideUi(cfg && cfg.side);
  } catch(e) {} });
 ipcRenderer.on('stats-config-applied', (_e,cfg)=>{ if(cfg && window.__STATS_CONFIG__) window.__STATS_CONFIG__.set(cfg); applyWinLose(); });
@@ -570,9 +570,15 @@ function attachManualHandlers(){
     });
   });
 }
-function initDragAndDrop(){ const body=document.getElementById('lt-body'); if(!body) return; body.querySelectorAll('tr').forEach(tr=>{ tr.addEventListener('dragstart', ev=>{ tr.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; }); tr.addEventListener('dragend', ()=>{ tr.classList.remove('dragging'); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); }); }); body.addEventListener('dragover', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); if(after) after.classList.add('drop-target'); }); body.addEventListener('drop', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); const dragging=body.querySelector('tr.dragging'); if(!dragging) return; if(after) body.insertBefore(dragging, after); else body.appendChild(dragging); metricsOrderMutable=[...body.querySelectorAll('tr')].map(r=>r.dataset.metric); metricsOrder=[...metricsOrderMutable]; lastOrderSig = null; // Suppress animations briefly while DOM reshuffles
+let _dndAbort = null; // AbortController for tbody listeners (prevents accumulation)
+function initDragAndDrop(){ const body=document.getElementById('lt-body'); if(!body) return;
+  // Abort previous tbody listeners to prevent accumulation across ensureRows() calls
+  if(_dndAbort) _dndAbort.abort(); _dndAbort = new AbortController(); const sig = { signal: _dndAbort.signal };
+  body.querySelectorAll('tr').forEach(tr=>{ tr.addEventListener('dragstart', ev=>{ tr.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; }); tr.addEventListener('dragend', ()=>{ tr.classList.remove('dragging'); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); }); });
+  body.addEventListener('dragover', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); body.querySelectorAll('.drop-target').forEach(r=>r.classList.remove('drop-target')); if(after) after.classList.add('drop-target'); }, sig);
+  body.addEventListener('drop', ev=>{ ev.preventDefault(); const after=getAfterRow(body, ev.clientY); const dragging=body.querySelector('tr.dragging'); if(!dragging) return; if(after) body.insertBefore(dragging, after); else body.appendChild(dragging); metricsOrderMutable=[...body.querySelectorAll('tr')].map(r=>r.dataset.metric); metricsOrder=[...metricsOrderMutable]; lastOrderSig = null; // Suppress animations briefly while DOM reshuffles
   window.__SUPPRESS_STATS_ANIM_UNTIL = performance.now() + 450;
-  ensureRows(); if(isManualOn()) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }); }
+  ensureRows(); if(isManualOn()) renderManual(); else if(liveDataset) renderLol(liveDataset); sendPersist(); }, sig); }
 function getAfterRow(body,y){ const rows=[...body.querySelectorAll('tr:not(.dragging)')]; return rows.find(r=> y <= r.getBoundingClientRect().top + r.getBoundingClientRect().height/2); }
 let addBtn; let gameSelect; let headerH1;
 /** Convert dragonTimes to ordered indices per team */

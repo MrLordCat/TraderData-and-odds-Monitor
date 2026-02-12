@@ -21,10 +21,10 @@
         const raw = JSON.parse(pako.inflate(arr, { to: 'string' }));
         const chunks = raw.sentenceChunks || raw.body?.entryToAdd?.sentenceChunks || [];
         const text = chunks.map(c=>c.text).join(' ').trim(); if(!text) return;
-        const ts = raw.body?.entryToAdd?.gameTime || raw.body?.gameTime || raw.gameTime || ''; if(!ts) return;
-        const key = text+'|'+ts; const now = Date.now(); const last = seen.get(key)||0; if(now-last < DEDUPE_MS) return; seen.set(key, now);
+        const ts = raw.body?.entryToAdd?.gameTime || raw.body?.gameTime || raw.gameTime || '';
+        const key = text+'|'+(ts||'no-ts'); const now = Date.now(); const last = seen.get(key)||0; if(now-last < DEDUPE_MS) return; seen.set(key, now);
         for(const [k,t] of seen){ if(now - t > DEDUPE_MS) seen.delete(k); }
-        window.dispatchEvent(new CustomEvent('lol-live-log-update', { detail: { text, ts, raw } }));
+        window.dispatchEvent(new CustomEvent('lol-live-log-update', { detail: { text, ts, raw, receivedAt: now } }));
       } catch(_){}
     }
     ws.addEventListener('message', ev => {

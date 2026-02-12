@@ -51,6 +51,10 @@
   let recentEventTimestamps = [];
   const FRESH_EVENT_WINDOW_MS = 3000;
   const eventReceiveTimestamps = new Map(); // entryKey -> receiveTimestamp
+  // Deferred gameStart: when a gameStart event fires during backlog (soundsEnabled=false),
+  // defer the sound to play after soundsEnabled=true. Overwritten by later gameStarts so
+  // only the most recent (current) game plays.
+  let _deferredGameStart = null;
   
   function isInEventBurst() {
     const now = Date.now();
@@ -74,10 +78,14 @@
   function playSound(soundType, entryKey = null, extra = null) {
     if (soundType !== 'gameStart' && isInEventBurst()) return;
     if (!soundsEnabled) {
+      // Defer gameStart sounds during backlog — will play after soundsEnabled=true
+      if (soundType === 'gameStart') {
+        _deferredGameStart = extra ? { ...extra } : {};
+        return;
+      }
       const receivedRecently = entryKey && eventReceiveTimestamps.has(entryKey) && 
         (Date.now() - eventReceiveTimestamps.get(entryKey)) < FRESH_EVENT_WINDOW_MS;
       if (!receivedRecently) return;
-      if (soundType === 'gameStart') { actuallyPlaySound('gameStart', extra); return; }
     }
     actuallyPlaySound(soundType, extra);
   }
@@ -176,6 +184,7 @@
     processedEntries.clear();
     dragonTimestamps.clear();
     eventReceiveTimestamps.clear(); // Clear freshness timestamps for backlog
+    _deferredGameStart = null; // Reset deferred sound before processing
     currentGame = null;
     
     // Ensure sounds are disabled during backlog processing
@@ -197,6 +206,12 @@
     setTimeout(() => {
       soundsEnabled = true;
       console.log('[inject-stats] 🔊 Sounds enabled (backlog processing complete)');
+      // Play deferred gameStart sound (detected during backlog but sound was disabled)
+      if (_deferredGameStart) {
+        console.log(`[inject-stats] 🔊 Playing deferred gameStart: Game ${_deferredGameStart.gameNum || '?'}`);
+        actuallyPlaySound('gameStart', _deferredGameStart);
+        _deferredGameStart = null;
+      }
     }, SOUND_ENABLE_DELAY_MS);
   }
 
@@ -254,6 +269,7 @@
     if (RX_SERIES_END.test(head)) {
       console.log('[inject-stats] Series ended');
       seriesActive = false;
+      _deferredGameStart = null; // Don't play deferred sound for completed series
       return;
     }
     
