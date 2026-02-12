@@ -138,12 +138,12 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         return;
       }
 
-      // Minimal cooldown (100ms) only to prevent immediate re-fire, Excel wait handles the rest
-      if (engine.isOnCooldown(action, 100)) {
-        updateStatus('Cooldown...');
-        if (state.phase !== STATE.ALIGNING) scheduleStep();
-        return;
-      }
+      // TEMP: Cooldown disabled for testing
+      // if (engine.isOnCooldown(action, 100)) {
+      //   updateStatus('Cooldown...');
+      //   if (state.phase !== STATE.ALIGNING) scheduleStep();
+      //   return;
+      // }
 
       if (action.type === 'pulse') {
         updateStatus(`${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
