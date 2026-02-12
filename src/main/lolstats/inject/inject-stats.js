@@ -74,9 +74,11 @@
 
   // Sound notification helper - sends message to be picked up by preload/main
   // Always use Date.now() for timestamp - game timestamps are relative and unusable for freshness checks
+  // Important one-time sounds that bypass burst detection (like gameStart)
+  const BURST_IMMUNE_SOUNDS = new Set(['gameStart','firstBlood','firstTower','firstBaron','firstInhibitor']);
   // gameStart sounds bypass burst detection — they have their own dedup via banPhaseTriggered
   function playSound(soundType, entryKey = null, extra = null) {
-    if (soundType !== 'gameStart' && isInEventBurst()) return;
+    if (!BURST_IMMUNE_SOUNDS.has(soundType) && isInEventBurst()) return;
     if (!soundsEnabled) {
       // Defer gameStart sounds during backlog — will play after soundsEnabled=true
       if (soundType === 'gameStart') {

@@ -433,11 +433,12 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   }
 
   function autoLog(msg) {
-    try {
-      const ts = new Date();
-      const hms = String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0') + ':' + String(ts.getSeconds()).padStart(2,'0');
-      console.log('[Auto] ' + hms + ' ' + msg);
-    } catch (_) { }
+    // Production: silent. Uncomment console.log for debugging.
+    // try {
+    //   const ts = new Date();
+    //   const hms = String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0') + ':' + String(ts.getSeconds()).padStart(2,'0');
+    //   console.log('[Auto] ' + hms + ' ' + msg);
+    // } catch (_) { }
   }
 
   function broadcastState(active) {
