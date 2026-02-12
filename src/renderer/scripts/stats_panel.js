@@ -412,6 +412,8 @@ ipcRenderer.on('grid-lifecycle', (_, { slot, event, url, ts })=>{
   const time = new Date(ts).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
   const short = (url||'').replace(/^https?:\/\//, '').slice(0, 80);
   console.log(`[Grid ${slot}] ${time}  ${event}  ${short}`);
+  // Mute sounds for 10s after any Grid page lifecycle event (suppresses backlog on load)
+  window.__GRID_MUTE_UNTIL = Date.now() + 10000;
 });
 
 // ================= Credentials =================

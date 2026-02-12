@@ -106,6 +106,8 @@
 
   function triggerSound(soundType, _eventTimestamp, gameNum) {
     if (!soundsEnabled) return;
+    // Suppress sounds for 10s after Grid page load/navigate (backlog mute)
+    if (window.__GRID_MUTE_UNTIL && Date.now() < window.__GRID_MUTE_UNTIL) return;
     // Filter by detected game
     const game = window.__gridGame; // set by stats_panel.js
     if (game === 'cs2' && !CS2_ALLOWED.has(soundType)) return;
