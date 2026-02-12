@@ -206,12 +206,14 @@
     setTimeout(() => {
       soundsEnabled = true;
       console.log('[inject-stats] 🔊 Sounds enabled (backlog processing complete)');
-      // Play deferred gameStart sound (detected during backlog but sound was disabled)
-      if (_deferredGameStart) {
+      // Play deferred gameStart ONLY if no game has started and none completed.
+      // This means the series is truly fresh (ban phase of Game 1 happening now).
+      // If any game has already started/ended in the backlog, the event is historical.
+      if (_deferredGameStart && !currentGame && lastCompletedGame === 0) {
         console.log(`[inject-stats] 🔊 Playing deferred gameStart: Game ${_deferredGameStart.gameNum || '?'}`);
         actuallyPlaySound('gameStart', _deferredGameStart);
-        _deferredGameStart = null;
       }
+      _deferredGameStart = null;
     }, SOUND_ENABLE_DELAY_MS);
   }
 
