@@ -57,10 +57,12 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       const startOdds = OddsStore.getExcelOdds();
       const startSnapshot = startOdds ? [...startOdds] : null;
       const startTs = Date.now();
+      console.log('[AUTO] waitForExcelUpdate: START, snapshot=', startSnapshot, 'timeout=', timeoutMs);
       
       const checkInterval = setInterval(() => {
         const elapsed = Date.now() - startTs;
         if (elapsed >= timeoutMs) {
+          console.log('[AUTO] waitForExcelUpdate: TIMEOUT after', elapsed, 'ms');
           clearInterval(checkInterval);
           resolve(false); // timeout
           return;
@@ -68,6 +70,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         
         const currentOdds = OddsStore.getExcelOdds();
         if (!currentOdds || !startSnapshot) {
+          console.log('[AUTO] waitForExcelUpdate: no odds, aborting');
           clearInterval(checkInterval);
           resolve(false);
           return;
@@ -75,6 +78,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         
         const changed = currentOdds[0] !== startSnapshot[0] || currentOdds[1] !== startSnapshot[1];
         if (changed) {
+          console.log('[AUTO] waitForExcelUpdate: CHANGED after', elapsed, 'ms, new=', currentOdds);
           clearInterval(checkInterval);
           resolve(true); // Excel updated
         }
@@ -104,36 +108,41 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   }
 
   async function step() {
-    if (!state.active) return;
-    if (!isSignalSender) return;
-    if (isStepping) return;
+    if (!state.active) { console.log('[AUTO] step: not active'); return; }
+    if (!isSignalSender) { console.log('[AUTO] step: not signal sender'); return; }
+    if (isStepping) { console.log('[AUTO] step: already stepping'); return; }
     isStepping = true;
+    console.log('[AUTO] step: START, phase:', state.phase);
 
     try {
       const odds = OddsStore.getSnapshot();
 
       const gr = runGuardCheck(odds, { graceCheck: true });
-      if (gr === 'suspended') return;
-      if (gr === 'grace') { scheduleStep(); return; }
+      if (gr === 'suspended') { console.log('[AUTO] step: suspended by guard'); return; }
+      if (gr === 'grace') { console.log('[AUTO] step: grace period'); scheduleStep(); return; }
 
       if (state.phase === STATE.IDLE && state.reason) {
+        console.log('[AUTO] step: starting alignment');
         startAlignment();
         return;
       }
 
       const mid = OddsStore.getMid();
       const target = state.mode === MODE.EXCEL ? OddsStore.getExcelOdds() : OddsStore.getDsOdds();
+      console.log('[AUTO] step: mid=', mid, 'target=', target);
 
       if (!mid || !target) {
+        console.log('[AUTO] step: no data');
         updateStatus('Нет данных');
         if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
       }
 
       const action = engine.computeAction({ mid, target });
+      console.log('[AUTO] step: action=', action);
 
       if (action.type === 'none') {
-        if (action.aligned) updateStatus('Aligned ✓');
+        if (action.aligned) { console.log('[AUTO] step: aligned'); updateStatus('Aligned ✓'); }
         if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
       }
@@ -146,40 +155,50 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       // }
 
       if (action.type === 'pulse') {
+        console.log('[AUTO] step: executing pulse action');
         updateStatus(`${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
         await executeAction(action);
+        console.log('[AUTO] step: pulse action DONE');
       }
 
       if (state.phase !== STATE.ALIGNING) scheduleStep();
     } finally {
       isStepping = false;
+      console.log('[AUTO] step: END');
     }
   }
 
   function scheduleStep(delayMs) {
     clearTimeout(stepTimer);
     if (!state.active) return;
-    stepTimer = setTimeout(step, delayMs ?? config.intervalMs);
+    const delay = delayMs ?? config.intervalMs;
+    console.log('[AUTO] scheduleStep: delay=', delay, 'ms');
+    stepTimer = setTimeout(step, delay);
   }
 
   async function executeAction(action) {
     if (action.type !== 'pulse') return;
     const { key, pulses, side, direction, diffPct } = action;
+    console.log('[AUTO] executeAction: START, pulses=', pulses);
 
     let sentPulses = 0;
     for (let i = 0; i < pulses; i++) {
       // Send pulse
+      console.log('[AUTO] executeAction: sending pulse', i + 1, '/', pulses);
       sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
       sentPulses++;
 
       // Wait for Excel response (max 300ms) — this replaces pulseGapMs
+      console.log('[AUTO] executeAction: waiting for Excel update...');
       const updated = await waitForExcelUpdate(300);
+      console.log('[AUTO] executeAction: Excel updated=', updated);
 
       // Check if already aligned (no need for more pulses)
       const mid = OddsStore.getMid();
       const target = state.mode === MODE.EXCEL ? OddsStore.getExcelOdds() : OddsStore.getDsOdds();
       if (mid && target) {
         const check = engine.checkAlignment({ mid, target });
+        console.log('[AUTO] executeAction: alignment check: aligned=', check.aligned, 'diffPct=', check.diffPct);
         if (check.aligned) {
           autoLog(`✓ Aligned after ${sentPulses} pulse(s)`);
           break;
@@ -188,10 +207,12 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     }
 
     // Confirm after all pulses
+    console.log('[AUTO] executeAction: sending confirm');
     await new Promise(resolve => setTimeout(resolve, config.confirmDelayMs));
     sendKeyPress({ key: KEYS.CONFIRM, side, direction, diffPct, noConfirm: true });
 
     engine.recordFire(action);
+    console.log('[AUTO] executeAction: DONE');
   }
 
   function startAlignment(skipResumeSignal = false, afterNoMid = false) {
