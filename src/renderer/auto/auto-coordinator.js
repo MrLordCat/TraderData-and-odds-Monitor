@@ -143,7 +143,8 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         return;
       }
 
-      if (engine.isOnCooldown(action, config.fireCooldownMs)) {
+      const cooldownMs = action.cooldownMs || config.fireCooldownMs;
+      if (engine.isOnCooldown(action, cooldownMs)) {
         updateStatus('Cooldown...');
         if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
@@ -152,7 +153,8 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       if (action.type === 'pulse') {
         executeAction(action);
         startWaitingForExcelUpdate();
-        updateStatus(`${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
+        const mode = action.diffPct > 30 ? '⚠' : action.diffPct > 15 ? '⚡' : '';
+        updateStatus(`${mode}${action.direction} S${action.side + 1} ${action.diffPct.toFixed(1)}%`);
       }
 
       if (state.phase !== STATE.ALIGNING) scheduleStep();
@@ -232,7 +234,8 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       finishAlignment(true, 'timeout-forced');
     } else {
       step();
-      const alignInterval = Math.max(DEFAULTS.alignmentCheckIntervalMs, config.fireCooldownMs + 100);
+      const lastCooldown = engine.getLastCooldownMs();
+      const alignInterval = Math.max(DEFAULTS.alignmentCheckIntervalMs, lastCooldown + 100);
       alignmentTimer = setTimeout(checkAlignmentProgress, alignInterval);
     }
   }
