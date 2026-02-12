@@ -174,17 +174,39 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
     let sentPulses = 0;
     for (let i = 0; i < pulses; i++) {
-      // Send pulse
-      console.log('[AUTO] executeAction: sending pulse', i + 1, '/', pulses);
-      sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
-      sentPulses++;
+      let attempts = 0;
+      let excelUpdated = false;
+      
+      // Try up to 3 times to get Excel response
+      while (attempts < 3 && !excelUpdated) {
+        attempts++;
+        console.log('[AUTO] executeAction: sending pulse', i + 1, '/', pulses, '(attempt', attempts, '/3)');
+        sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
+        sentPulses++;
 
-      // Wait for Excel response (max 300ms) — this replaces pulseGapMs
-      console.log('[AUTO] executeAction: waiting for Excel update...');
-      const updated = await waitForExcelUpdate(300);
-      console.log('[AUTO] executeAction: Excel updated=', updated);
+        // Wait for Excel response (max 1000ms)
+        console.log('[AUTO] executeAction: waiting for Excel update (1s timeout)...');
+        excelUpdated = await waitForExcelUpdate(1000);
+        console.log('[AUTO] executeAction: Excel updated=', excelUpdated);
 
-      // Check if already aligned (no need for more pulses)
+        if (!excelUpdated && attempts < 3) {
+          console.log('[AUTO] executeAction: Excel did not respond, retrying...');
+        }
+      }
+
+      // If Excel didn't respond after 3 attempts, disable Auto
+      if (!excelUpdated) {
+        autoLog('⚠️ Excel не отвечает после 3 попыток - отключение Auto');
+        console.log('[AUTO] executeAction: Excel not responding after 3 attempts, disabling Auto');
+        state.active = false;
+        state.userWanted = false;
+        setSuspendedByUser(false);
+        setState(STATE.IDLE);
+        broadcastState();
+        return;
+      }
+
+      // Excel responded, check if already aligned
       const mid = OddsStore.getMid();
       const target = state.mode === MODE.EXCEL ? OddsStore.getExcelOdds() : OddsStore.getDsOdds();
       if (mid && target) {
