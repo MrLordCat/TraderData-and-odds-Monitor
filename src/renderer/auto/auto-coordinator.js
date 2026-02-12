@@ -138,8 +138,8 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         return;
       }
 
-      // Minimal cooldown (200ms) only to prevent immediate re-fire, Excel wait handles the rest
-      if (engine.isOnCooldown(action, 200)) {
+      // Minimal cooldown (100ms) only to prevent immediate re-fire, Excel wait handles the rest
+      if (engine.isOnCooldown(action, 100)) {
         updateStatus('Cooldown...');
         if (state.phase !== STATE.ALIGNING) scheduleStep();
         return;
@@ -172,8 +172,8 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       sendKeyPress({ key, side, direction, diffPct, noConfirm: true });
       sentPulses++;
 
-      // Wait for Excel response (max 1000ms) — this replaces pulseGapMs
-      const updated = await waitForExcelUpdate(1000);
+      // Wait for Excel response (max 300ms) — this replaces pulseGapMs
+      const updated = await waitForExcelUpdate(300);
 
       // Check if already aligned (no need for more pulses)
       const mid = OddsStore.getMid();
