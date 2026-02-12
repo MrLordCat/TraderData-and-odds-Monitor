@@ -2,12 +2,53 @@
 // Handles send-auto-press, auto-mode-changed, auto-active-set, renderer-log-forward
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 
 function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __autoLast, __sendInputScriptPath, broadcastAutoToggleAll }) {
   if (!ipcMain) return;
   if (app.__autoPressHandlerRegistered) return;
   app.__autoPressHandlerRegistered = true;
+
+  // === Persistent PowerShell daemon for instant SendInput ===
+  const daemonScriptPath = path.resolve(__dirname, '..', '..', 'sendKeyDaemon.ps1');
+  let daemon = null;
+  let daemonReady = false;
+
+  function ensureDaemon() {
+    if (daemon && daemonReady) return;
+    try {
+      daemon = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', daemonScriptPath], {
+        stdio: ['pipe', 'pipe', 'ignore'],
+        windowsHide: true,
+      });
+      daemonReady = true;
+      daemon.stdout.on('data', () => {}); // drain
+      daemon.on('exit', () => { daemon = null; daemonReady = false; });
+      daemon.on('error', () => { daemon = null; daemonReady = false; });
+      console.log('[auto-press] daemon started');
+    } catch (e) {
+      console.warn('[auto-press] daemon spawn failed', e.message);
+      daemon = null;
+      daemonReady = false;
+    }
+  }
+
+  function sendVk(vkCode) {
+    ensureDaemon();
+    if (daemon && daemon.stdin && !daemon.stdin.destroyed) {
+      daemon.stdin.write(vkCode + '\n');
+    }
+  }
+
+  // Cleanup on app quit
+  app.on('will-quit', () => {
+    if (daemon && daemon.stdin && !daemon.stdin.destroyed) {
+      try { daemon.stdin.write('EXIT\n'); } catch (_) {}
+    }
+  });
+
+  // Start daemon immediately
+  ensureDaemon();
 
   // Centralized de-duplication for F21 (suspend) presses across windows
   let __lastF21SentAt = 0;
@@ -98,34 +139,22 @@ function initAutoPressIpc({ ipcMain, app, broadcastToAll, getBroadcastCtx, __aut
     // Always write file signal for AHK
     writeAutoSignal({ side, key: keyLabel, direction, ts });
 
-    // SendInput via PowerShell helper script
+    // SendInput via persistent PowerShell daemon (instant, no process spawn)
     let sent = false;
     try {
       const injVk = vk;
-      if (__sendInputScriptPath && injVk != null) {
-        const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${__sendInputScriptPath}" ${injVk}`;
-        exec(cmd, (err) => {
-          const dbg = { side, key: keyLabel, direction, diffPct, tsStart: ts, injVk, cmd, ok: !err, err: err ? err.message : null, tsDone: Date.now() };
-          try { fs.writeFileSync(path.join(signalDir, 'auto_press_debug.json'), JSON.stringify(dbg)); } catch (_) { }
-          if (err) { console.warn('[auto-press][ipc][si] FAIL', err.message); }
-          else { console.log('[auto-press][ipc][si] SENT', keyLabel, 'injVk', injVk); }
-        });
+      if (injVk != null) {
+        sendVk(injVk);
         sent = true;
+        console.log('[auto-press][ipc][si] SENT', keyLabel, 'injVk', injVk);
 
         // AUTO CONFIRM: directional key (F23/F24) → schedule F22 after 100ms
         if (!noConfirm && (keyLabel === 'F23' || keyLabel === 'F24')) {
           const confirmDelayMs = 100;
           const confirmVk = 0x85; // F22
           setTimeout(() => {
-            try {
-              const confirmCmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${__sendInputScriptPath}" ${confirmVk}`;
-              exec(confirmCmd, (cerr) => {
-                const cdbg = { kind: 'confirm', parentKey: keyLabel, confirmKey: 'F22', confirmVk, confirmCmd, ok: !cerr, err: cerr ? cerr.message : null, tsParent: ts, tsDone: Date.now() };
-                try { fs.writeFileSync(path.join(signalDir, 'auto_press_confirm_debug.json'), JSON.stringify(cdbg)); } catch (_) { }
-                if (cerr) { console.warn('[auto-press][ipc][confirm] FAIL', cerr.message); }
-                else { console.log('[auto-press][ipc][confirm] SENT F22 after', confirmDelayMs, 'ms'); }
-              });
-            } catch (e2) { console.warn('[auto-press][ipc][confirm] schedule error', e2.message); }
+            sendVk(confirmVk);
+            console.log('[auto-press][ipc][confirm] SENT F22 after', confirmDelayMs, 'ms');
           }, confirmDelayMs);
         }
       }

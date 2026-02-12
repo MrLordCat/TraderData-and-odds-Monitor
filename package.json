@@ -60,9 +60,9 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
-    "electron": "^38.0.0",
+    "@electron/packager": "^19.0.3",
+    "electron": "^38.8.1",
     "electron-builder": "^26.0.0",
-    "@electron/packager": "^18.3.5",
-    "esbuild": "^0.27.2"
+    "esbuild": "^0.27.3"
   }
 }
