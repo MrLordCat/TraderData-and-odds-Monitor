@@ -4,27 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [0.5.0] - 2026-02-13
 
-### ✨ DS Auto Mode — полная поддержка
+### ✨ DS Auto Mode — Full Support
 
-- **Suspend/Resume через расширение** — Auto mode в DS режиме теперь отправляет `suspend`/`trade` команды напрямую в Edge extension (ESC/Shift+ESC), а не F21 виртуальную клавишу Excel
-- **Горячие клавиши на DS странице** — Numpad0 = commit, Numpad1 = toggle suspend/trade, Numpad+/- = spinner
-- **Side-aware команды** — adjust-up/down правильно нацеливаются на нужную сторону (Team 1 / Team 2)
-- **Статус подключения** — Auto guard проверяет что расширение подключено перед включением
+- **Suspend/Resume via extension** — Auto mode in DS mode now sends `suspend`/`trade` commands directly to Edge extension (ESC/Shift+ESC) instead of F21 virtual key for Excel
+- **DS page hotkeys** — Numpad0 = commit, Numpad1 = toggle suspend/trade, Numpad+/- = spinner
+- **Side-aware commands** — adjust-up/down correctly targets the right side (Team 1 / Team 2)
+- **Connection status** — Auto guard checks extension is connected before enabling
 
-### 🔧 Улучшения
+### 🔧 Improvements
 
-- **Extension v1.5.0** — обновлены горячие клавиши, suspend/trade через keyboard dispatch, cache-bust для проверки обновлений
-- **10s Sound Mute** — звуки отключаются на 10 секунд после перезагрузки Grid страницы (предотвращает спам)
-- **Deferred Game Start** — улучшена логика определения начала игры (game time threshold, подавление при backlog)
-- **Toast уведомления** — при блокировке Auto показывается причина рядом с кнопкой
+- **Extension v1.5.0** — updated hotkeys, suspend/trade via keyboard dispatch, cache-bust for update checks
+- **10s Sound Mute** — sounds muted for 10 seconds after Grid page reload (prevents spam)
+- **Deferred Game Start** — improved game start detection (game time threshold, backlog suppression)
+- **Toast notifications** — Auto block reason shown next to button
 
-### 🐛 Исправления
+### 🐛 Bug Fixes
 
-- Baron sound подавлялся burst detection
-- Pistol round метрики показывались для не-CS2 игр
-- Table metric order не сохранялся
-- Extension update check кэшировался (добавлен cache-bust)
-- `setSuspendedByUser` ReferenceError при suspend
+- Baron sound suppressed by burst detection
+- Pistol round metrics shown for non-CS2 games
+- Table metric order not persisted
+- Extension update check was cached (added cache-bust)
+- `setSuspendedByUser` ReferenceError on suspend
 
 ## [0.4.4] - 2026-02-12
 
