@@ -143,49 +143,31 @@ class OddsBridge {
     
     try {
       switch (command) {
-        case 'suspend':
-          // ESC key to suspend
-          document.dispatchEvent(new KeyboardEvent('keydown', {
-            key: 'Escape',
-            code: 'Escape',
-            keyCode: 27,
-            which: 27,
-            bubbles: true
-          }));
-          success = true;
+        case 'suspend': {
+          // Click S button to suspend
+          const suspBtn = document.getElementById('trading-state-suspend-all-button');
+          if (suspBtn) { suspBtn.click(); success = true; }
           break;
+        }
 
-        case 'trade':
-          // Shift+ESC to trade
-          document.dispatchEvent(new KeyboardEvent('keydown', {
-            key: 'Escape',
-            code: 'Escape',
-            keyCode: 27,
-            which: 27,
-            shiftKey: true,
-            bubbles: true
-          }));
-          success = true;
+        case 'trade': {
+          // Click T button to resume trading
+          const trBtn = document.getElementById('trading-state-trade-all-button');
+          if (trBtn) { trBtn.click(); success = true; }
           break;
+        }
 
         case 'toggle-suspend': {
-          // Toggle: determine current state from CSS flags, then suspend or trade
+          // Toggle: determine current state from CSS flags, then click S or T
           const market = document.querySelector('.multisport-market');
           const isSuspended = market?.classList.contains('flags-UserSuspensionStatus-Suspended');
           if (isSuspended) {
-            // Resume trading: Shift+ESC
-            document.dispatchEvent(new KeyboardEvent('keydown', {
-              key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
-              shiftKey: true, bubbles: true
-            }));
+            const trBtnT = document.getElementById('trading-state-trade-all-button');
+            if (trBtnT) { trBtnT.click(); success = true; }
           } else {
-            // Suspend: ESC
-            document.dispatchEvent(new KeyboardEvent('keydown', {
-              key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
-              bubbles: true
-            }));
+            const sBtnT = document.getElementById('trading-state-suspend-all-button');
+            if (sBtnT) { sBtnT.click(); success = true; }
           }
-          success = true;
           break;
         }
 
@@ -472,22 +454,18 @@ document.addEventListener('keydown', (e) => {
     }
 
     // Numpad 1 -> Toggle suspend/trade (like F21 in Excel mode)
-    // If currently Trading → ESC (suspend); if Suspended → Shift+ESC (trade)
+    // Clicks T/S buttons directly (keyboard dispatch unreliable with Angular)
     if (e.code === 'Numpad1') {
         const market = document.querySelector('.multisport-market');
         const isSuspended = market?.classList.contains('flags-UserSuspensionStatus-Suspended');
         if (isSuspended) {
-            // Resume trading: Shift+ESC
-            document.dispatchEvent(new KeyboardEvent('keydown', {
-                key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
-                shiftKey: true, bubbles: true
-            }));
+            // Resume trading: click T button
+            const tradeBtn = document.getElementById('trading-state-trade-all-button');
+            if (tradeBtn) tradeBtn.click();
         } else {
-            // Suspend: ESC
-            document.dispatchEvent(new KeyboardEvent('keydown', {
-                key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
-                bubbles: true
-            }));
+            // Suspend: click S button
+            const suspendBtn = document.getElementById('trading-state-suspend-all-button');
+            if (suspendBtn) suspendBtn.click();
         }
         e.preventDefault();
     }
