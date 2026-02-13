@@ -166,7 +166,6 @@ class OddsBridge {
         }
 
         case 'toggle-suspend': {
-          // Toggle: if suspended → Shift+ESC (resume), else → ESC (suspend)
           const market = document.querySelector('.multisport-market');
           const isSusp = market?.classList.contains('flags-MarketTradingStatus-Suspended');
           const kbToggle = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, shiftKey: isSusp, cancelable: true, bubbles: true };
@@ -174,7 +173,6 @@ class OddsBridge {
             t.dispatchEvent(new KeyboardEvent('keydown', kbToggle));
             t.dispatchEvent(new KeyboardEvent('keyup', kbToggle));
           });
-          console.log('[upTime] toggle-suspend:', isSusp ? 'Shift+ESC (resume)' : 'ESC (suspend)');
           success = true;
           break;
         }
@@ -461,29 +459,19 @@ document.addEventListener('keydown', (e) => {
         }
     }
 
-    // Numpad 1 -> Toggle suspend/trade (like F21 in Excel mode)
-    // DS native hotkeys: ESC = suspend, Shift+ESC = resume
+    // Numpad 1 -> Toggle suspend/trade (ESC / Shift+ESC)
     if (e.code === 'Numpad1') {
         const market = document.querySelector('.multisport-market');
         const isSuspended = market?.classList.contains('flags-MarketTradingStatus-Suspended');
-        console.log('[upTime] Numpad1 pressed, isSuspended:', isSuspended,
-            'classes:', market?.className?.match(/flags-\w+-\w+/g)?.join(', '));
-
         const kbOpts = {
             key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
             cancelable: true, bubbles: true,
-            shiftKey: isSuspended  // Shift+ESC to resume, plain ESC to suspend
+            shiftKey: isSuspended
         };
-
-        // Try multiple dispatch targets — Angular may listen on different elements
-        const targets = [window, document, document.body, market].filter(Boolean);
-        for (const target of targets) {
-            target.dispatchEvent(new KeyboardEvent('keydown', kbOpts));
-            target.dispatchEvent(new KeyboardEvent('keyup', kbOpts));
-        }
-
-        console.log('[upTime] Dispatched', isSuspended ? 'Shift+ESC (resume)' : 'ESC (suspend)',
-            'to', targets.length, 'targets');
+        [window, document, document.body, market].filter(Boolean).forEach(t => {
+            t.dispatchEvent(new KeyboardEvent('keydown', kbOpts));
+            t.dispatchEvent(new KeyboardEvent('keyup', kbOpts));
+        });
         e.preventDefault();
     }
 }, true);
