@@ -204,7 +204,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     autoLog(`⌨ DS ${dsCommand} x${pulses} S${side + 1} diff=${diffPct.toFixed(1)}%`);
 
     for (let i = 0; i < pulses; i++) {
-      const res = await sendDsCommand(dsCommand);
+      const res = await sendDsCommand(dsCommand, { side });
       if (!res?.success) {
         autoLog('⚠️ DS command failed — stopping');
         state.active = false;
@@ -459,13 +459,13 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   }
 
   /** Send DS auto command (adjust-up / adjust-down / commit) via desktopAPI or raw IPC */
-  function sendDsCommand(command) {
+  function sendDsCommand(command, opts = {}) {
     if (!isSignalSender) return Promise.resolve({ success: false });
     try {
-      if (global.desktopAPI?.dsAutoCommand) return global.desktopAPI.dsAutoCommand(command);
+      if (global.desktopAPI?.dsAutoCommand) return global.desktopAPI.dsAutoCommand(command, opts);
       if (global.require) {
         const { ipcRenderer } = global.require('electron');
-        return ipcRenderer.invoke('ds-auto-command', command);
+        return ipcRenderer.invoke('ds-auto-command', command, opts);
       }
     } catch (_) {}
     return Promise.resolve({ success: false });

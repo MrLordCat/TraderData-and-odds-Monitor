@@ -167,9 +167,12 @@ class OddsBridge {
           success = true;
           break;
 
-        case 'adjust-up':
-          // Click spinner up button (same as Numpad+)
-          const upBtn = document.querySelector('button.spinner-up');
+        case 'adjust-up': {
+          // Click spinner up button for the target selection (side 0 or 1)
+          const sideIdx = typeof opts.side === 'number' ? opts.side : 0;
+          const selContainers = document.querySelectorAll('table.selections-container');
+          const upContainer = selContainers[sideIdx] || selContainers[0];
+          const upBtn = upContainer?.querySelector('button.spinner-up');
           if (upBtn) {
             upBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
             upBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
@@ -177,10 +180,14 @@ class OddsBridge {
             success = true;
           }
           break;
+        }
 
-        case 'adjust-down':
-          // Click spinner down button (same as Numpad-)
-          const downBtn = document.querySelector('button.spinner-down');
+        case 'adjust-down': {
+          // Click spinner down button for the target selection (side 0 or 1)
+          const sideIdxD = typeof opts.side === 'number' ? opts.side : 0;
+          const selContainersD = document.querySelectorAll('table.selections-container');
+          const downContainer = selContainersD[sideIdxD] || selContainersD[0];
+          const downBtn = downContainer?.querySelector('button.spinner-down');
           if (downBtn) {
             downBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
             downBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
@@ -188,6 +195,7 @@ class OddsBridge {
             success = true;
           }
           break;
+        }
 
         case 'commit':
           // Click commit prices button (same as Enter)
