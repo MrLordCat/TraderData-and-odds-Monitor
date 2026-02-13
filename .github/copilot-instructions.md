@@ -284,8 +284,8 @@ Auto Mode is split into ES modules under `src/renderer/auto/`.
 - **odds-store.js** (~130 lines): `createOddsStore()` — subscribes to OddsCore, tracks all broker odds, derives MID/ARB
 - **guard-system.js** (~100 lines): `createGuardSystem()` — guard logic with priority: Excel > Market > Frozen > NoMID > ARB
 - **align-engine.js** (~85 lines): `createAlignEngine()` — computes alignment actions and manages cooldowns
-- **auto-coordinator.js** (~610 lines): `createAutoCoordinator()` — state machine (idle → aligning → trading), step loop, suspend/resume
-- **loader.js** (~175 lines): Entry point — imports modules, wires them, registers globals, compat shims (AutoHub), UI init
+- **auto-coordinator.js** (~727 lines): `createAutoCoordinator()` — state machine (idle → aligning → trading), step loop, suspend/resume, mode-aware DS commands
+- **loader.js** (~172 lines): Entry point — imports modules, wires them, registers globals, compat shims (AutoHub), UI init
 - **AutoHub shim**: `setScriptMap` / `setBoardMap` used by `excel_status.js` (kept for compatibility)
 
 ### IPC (main process)
@@ -332,6 +332,9 @@ When Excel is not available, Auto can work directly with DS extension:
 - Requires DS extension connected (green status indicator)
 - Compares MID (from brokers) with DS odds
 - Sends `adjust-up`/`adjust-down` + `commit` commands to extension
+- **suspend/resume mode-aware**: `suspend()` sends `sendDsCommand('suspend')` (not F21); `finishAlignment()` sends `sendDsCommand('trade')` (not `sendSignal('market:resume')`)
+- `scheduleSuspendRetry` skipped for DS mode (no Excel frozen check needed)
+- `disable()` sends DS suspend to clean up trading state
 
 ## 9. Excel / Python Integration
 - **excel_watcher.py**: Reads Excel cells (including K4/N4 for team names), writes `current_state.json`.
@@ -447,8 +450,19 @@ WebSocket bridge for Edge extension communication:
 
 **DS Auto Mode Commands:**
 - `auto-command` message from OddsMoni triggers `executeAutoCommand()` in extension
-- Supported commands: `adjust-up`, `adjust-down`, `commit`, `suspend`, `trade`
-- Extension simulates mouse clicks on DS page buttons or keyboard events
+- Supported commands: `adjust-up`, `adjust-down`, `commit`, `suspend`, `trade`, `toggle-suspend`
+- `adjust-up`/`adjust-down`: side-aware spinner clicks (opts.side → querySelectorAll index)
+- `suspend`: dispatches ESC KeyboardEvent to window/document/body (keydown+keyup)
+- `trade`: dispatches Shift+ESC KeyboardEvent to window/document/body
+- `toggle-suspend`: checks `flags-MarketTradingStatus-Suspended` CSS class → suspend or trade
+- `commit`: clicks commit button (Numpad0 equivalent)
+
+**Extension Hotkeys (on DS page):**
+- Numpad+ / Numpad- : Spinner up/down
+- Numpad0 : Commit prices
+- Numpad1 : Toggle suspend/trade (ESC / Shift+ESC)
+
+**Extension Version:** 1.5.0 (`BUNDLED_EXTENSION_VERSION` in extensionBridge)
 
 **DS Mismatch Detection:**
 - `stats_embedded.js` tracks Excel odds changes

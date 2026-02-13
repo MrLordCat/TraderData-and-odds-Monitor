@@ -150,13 +150,30 @@ When Excel is not available, Auto can work directly with the DS extension:
 - Sends `adjust-up`/`adjust-down` + `commit` commands to extension via WebSocket bridge
 
 ### DS Auto Commands
-| Command | Action |
-|---------|--------|
-| `adjust-up` | Increase DS odds |
-| `adjust-down` | Decrease DS odds |
-| `commit` | Confirm current DS odds |
-| `suspend` | Suspend DS trading |
-| `trade` | Execute trade |
+| Command | Action | Implementation |
+|---------|--------|----------------|
+| `adjust-up` | Increase DS odds | Side-aware spinner click (opts.side index) |
+| `adjust-down` | Decrease DS odds | Side-aware spinner click (opts.side index) |
+| `commit` | Confirm current DS odds | Click commit button |
+| `suspend` | Suspend DS trading | Dispatch ESC KeyboardEvent |
+| `trade` | Resume DS trading | Dispatch Shift+ESC KeyboardEvent |
+| `toggle-suspend` | Toggle suspend/trade | Check MarketTradingStatus → ESC or Shift+ESC |
+
+### Mode-Aware Signal Routing
+
+Auto-coordinator checks `state.mode` before sending signals:
+- **Excel mode**: `sendSignal(reason)` → F21 virtual key via PowerShell SendInput + `scheduleSuspendRetry` backup
+- **DS mode**: `sendDsCommand('suspend')`/`sendDsCommand('trade')` → WebSocket → Extension → keyboard dispatch
+
+`disable()` also sends DS suspend to prevent orphaned trading state.
+
+### Extension Hotkeys (DS page)
+| Key | Action |
+|-----|--------|
+| Numpad+ | Spinner up |
+| Numpad- | Spinner down |
+| Numpad0 | Commit prices |
+| Numpad1 | Toggle suspend/trade |
 
 ---
 
