@@ -387,12 +387,6 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     state.reason = REASON.MANUAL;
     userSuspended = false;
 
-    // Suspend DS trading on manual disable
-    if (state.mode === MODE.DS) {
-      autoLog('■ DISABLE → DS suspend');
-      sendDsCommand('suspend');
-    }
-
     autoLog('■ DISABLE manual');
     notify();
     broadcastState(false);
