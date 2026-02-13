@@ -151,6 +151,12 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
   async function executeAction(action) {
     if (action.type !== 'pulse') return;
+
+    if (state.mode === MODE.DS) {
+      await executeDsAction(action);
+      return;
+    }
+
     const { key, pulses, side, direction, diffPct } = action;
 
     let sentPulses = 0;
@@ -169,14 +175,14 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
         autoLog('⚠️ Excel не отвечает после 3 попыток - отключение Auto');
         state.active = false;
         state.userWanted = false;
-        setSuspendedByUser(false);
-        setState(STATE.IDLE);
-        broadcastState();
+        userSuspended = false;
+        state.phase = STATE.IDLE;
+        broadcastState(false);
         return;
       }
 
       const mid = OddsStore.getMid();
-      const target = state.mode === MODE.EXCEL ? OddsStore.getExcelOdds() : OddsStore.getDsOdds();
+      const target = OddsStore.getExcelOdds();
       if (mid && target) {
         const check = engine.checkAlignment({ mid, target });
         if (check.aligned) {
@@ -188,6 +194,46 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
 
     await new Promise(resolve => setTimeout(resolve, config.confirmDelayMs));
     sendKeyPress({ key: KEYS.CONFIRM, side, direction, diffPct, noConfirm: true });
+  }
+
+  /** DS mode: send adjust-up/adjust-down + commit via extension bridge */
+  async function executeDsAction(action) {
+    const { pulses, side, direction, diffPct } = action;
+    const dsCommand = direction === 'lower' ? 'adjust-down' : 'adjust-up';
+
+    autoLog(`⌨ DS ${dsCommand} x${pulses} S${side + 1} diff=${diffPct.toFixed(1)}%`);
+
+    for (let i = 0; i < pulses; i++) {
+      const res = await sendDsCommand(dsCommand);
+      if (!res?.success) {
+        autoLog('⚠️ DS command failed — stopping');
+        state.active = false;
+        state.userWanted = false;
+        userSuspended = false;
+        state.phase = STATE.IDLE;
+        broadcastState(false);
+        return;
+      }
+
+      // Wait between steps for DS page to react
+      await new Promise(r => setTimeout(r, DEFAULTS.dsStepMs));
+
+      // Check alignment after each step
+      const mid = OddsStore.getMid();
+      const target = OddsStore.getDsOdds();
+      if (mid && target) {
+        const check = engine.checkAlignment({ mid, target });
+        if (check.aligned) {
+          autoLog(`✓ DS aligned after ${i + 1} step(s)`);
+          break;
+        }
+      }
+    }
+
+    // Commit the adjustment
+    await new Promise(r => setTimeout(r, DEFAULTS.dsCommitDelayMs));
+    const commitRes = await sendDsCommand('commit');
+    autoLog('⌨ DS commit ' + (commitRes?.success ? '✓' : '✗'));
   }
 
   function startAlignment(skipResumeSignal = false, afterNoMid = false) {
@@ -412,6 +458,19 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     return ipcInvoke(global, 'send-auto-press', payload);
   }
 
+  /** Send DS auto command (adjust-up / adjust-down / commit) via desktopAPI or raw IPC */
+  function sendDsCommand(command) {
+    if (!isSignalSender) return Promise.resolve({ success: false });
+    try {
+      if (global.desktopAPI?.dsAutoCommand) return global.desktopAPI.dsAutoCommand(command);
+      if (global.require) {
+        const { ipcRenderer } = global.require('electron');
+        return ipcRenderer.invoke('ds-auto-command', command);
+      }
+    } catch (_) {}
+    return Promise.resolve({ success: false });
+  }
+
   function sendSignal(reason, isRetry = false) {
     if (!isSignalSender) return;
     autoLog('⌨ F21 signal=' + reason + (isRetry ? ' (RETRY)' : ''));
@@ -442,12 +501,11 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
   }
 
   function autoLog(msg) {
-    // Production: silent. Uncomment console.log for debugging.
-    // try {
-    //   const ts = new Date();
-    //   const hms = String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0') + ':' + String(ts.getSeconds()).padStart(2,'0');
-    //   console.log('[Auto] ' + hms + ' ' + msg);
-    // } catch (_) { }
+    try {
+      const ts = new Date();
+      const hms = String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0') + ':' + String(ts.getSeconds()).padStart(2,'0');
+      console.log('[Auto] ' + hms + ' ' + msg);
+    } catch (_) { }
   }
 
   function broadcastState(active) {
