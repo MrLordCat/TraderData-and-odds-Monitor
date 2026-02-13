@@ -59,6 +59,9 @@ function clearToast(){
  */
 function getActiveToast(){ return _activeToast; }
 
+// Global exposure for cross-module access (auto-coordinator toast)
+if (typeof window !== 'undefined') window.showMiniToastNear = showMiniToastNear;
+
 // ES module exports
 export { showMiniToastNear, clearToast, getActiveToast };
 

@@ -283,10 +283,19 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     const odds = OddsStore.getSnapshot();
     const guardResult = GuardSystem.checkGuards(odds, state.mode);
 
+    console.log('[Auto] enable() mode=' + state.mode + ' guard:', guardResult.reason || 'OK', 'canTrade:', guardResult.canTrade, 'hardBlock:', guardResult.isHardBlock, 'hasMid:', odds?.derived?.hasMid, 'ds:', !!odds?.ds, 'excel:', !!odds?.excel);
+
     if (guardResult.isHardBlock) {
       state.reason = guardResult.reason;
       updateStatus('Blocked: ' + guardResult.reason);
       notify();
+      // Show toast near autoBtn so user sees WHY it's blocked
+      try {
+        const anchor = global.document?.getElementById('autoBtn') || global.document?.getElementById('embeddedAutoBtn');
+        if (anchor && global.showMiniToastNear) {
+          global.showMiniToastNear(anchor, ['Auto blocked: ' + (guardResult.reason || 'unknown')], 'err', { ttl: 3000 });
+        }
+      } catch (_) {}
       return false;
     }
 
