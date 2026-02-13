@@ -518,7 +518,7 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       if (global.desktopAPI.extensionBridgeStatus) global.desktopAPI.extensionBridgeStatus().then(s => {
         console.log('[Auto] extension-bridge-status initial (desktopAPI):', s);
         if (s) GuardSystem.setDsConnected(!!s.connected);
-      }).catch(() => {});
+      }).catch(e => { console.warn('[Auto] extension-bridge-status failed (desktopAPI):', e); });
     } else if (global.require) {
       console.log('[Auto] attachExternalListeners: using require(electron) path');
       try {

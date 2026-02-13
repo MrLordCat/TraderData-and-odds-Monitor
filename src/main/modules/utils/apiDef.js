@@ -65,6 +65,7 @@ function buildDesktopAPI(ipcRenderer, withUnsub) {
     'onAddonInstallStatus addon-install-status', 'onAddonDownloadProgress addon-download-progress',
     'onAddonUninstalled addon-uninstalled', 'onAddonEnabledChanged addon-enabled-changed',
     'onAddonUpdated addon-updated', 'onDsAutoModeUpdated ds-auto-mode-updated',
+    'onDsConnectedChanged ds-connected-changed',
     'onLolSoundEvent lol-sound-event', 'onThemeChanged theme-changed',
     'onStatsState stats-state-updated', 'onMapConfig set-map-config',
     'onExcelLog excel-extractor-log',
