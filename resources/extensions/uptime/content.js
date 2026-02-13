@@ -158,9 +158,9 @@ class OddsBridge {
         }
 
         case 'toggle-suspend': {
-          // Toggle: determine current state from CSS flags, then click S or T
+          // Toggle: determine current state from MarketTradingStatus (effective state)
           const market = document.querySelector('.multisport-market');
-          const isSuspended = market?.classList.contains('flags-UserSuspensionStatus-Suspended');
+          const isSuspended = market?.classList.contains('flags-MarketTradingStatus-Suspended');
           if (isSuspended) {
             const trBtnT = document.getElementById('trading-state-trade-all-button');
             if (trBtnT) { trBtnT.click(); success = true; }
@@ -457,7 +457,9 @@ document.addEventListener('keydown', (e) => {
     // Clicks T/S buttons directly (keyboard dispatch unreliable with Angular)
     if (e.code === 'Numpad1') {
         const market = document.querySelector('.multisport-market');
-        const isSuspended = market?.classList.contains('flags-UserSuspensionStatus-Suspended');
+        // Check effective market state (MarketTradingStatus reflects actual state;
+        // UserSuspensionStatus can stay "Trading" even when globally suspended)
+        const isSuspended = market?.classList.contains('flags-MarketTradingStatus-Suspended');
         if (isSuspended) {
             // Resume trading: click T button
             const tradeBtn = document.getElementById('trading-state-trade-all-button');
