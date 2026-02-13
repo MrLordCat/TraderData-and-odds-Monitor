@@ -131,10 +131,11 @@ class OddsBridge {
    * Execute auto trading command by simulating DS hotkeys
    * Commands:
    *   'suspend' - Press ESC to suspend trading
-   *   'trade' - Press Shift+ESC to execute trade
-   *   'adjust-up' - Press spinner up button (Numpad+)
-   *   'adjust-down' - Press spinner down button (Numpad-)
-   *   'commit' - Press commit button (Enter)
+   *   'trade' - Press Shift+ESC to resume trading
+   *   'toggle-suspend' - Toggle: if Trading → suspend (ESC), if Suspended → trade (Shift+ESC)
+   *   'adjust-up' - Press spinner up button for given side
+   *   'adjust-down' - Press spinner down button for given side
+   *   'commit' - Press commit button (Numpad0)
    */
   executeAutoCommand(command, opts = {}) {
     console.log('[upTime] Auto command received:', command, opts);
@@ -167,6 +168,27 @@ class OddsBridge {
           success = true;
           break;
 
+        case 'toggle-suspend': {
+          // Toggle: determine current state from CSS flags, then suspend or trade
+          const market = document.querySelector('.multisport-market');
+          const isSuspended = market?.classList.contains('flags-UserSuspensionStatus-Suspended');
+          if (isSuspended) {
+            // Resume trading: Shift+ESC
+            document.dispatchEvent(new KeyboardEvent('keydown', {
+              key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+              shiftKey: true, bubbles: true
+            }));
+          } else {
+            // Suspend: ESC
+            document.dispatchEvent(new KeyboardEvent('keydown', {
+              key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+              bubbles: true
+            }));
+          }
+          success = true;
+          break;
+        }
+
         case 'adjust-up': {
           // Click spinner up button for the target selection (side 0 or 1)
           const sideIdx = typeof opts.side === 'number' ? opts.side : 0;
@@ -197,14 +219,15 @@ class OddsBridge {
           break;
         }
 
-        case 'commit':
-          // Click commit prices button (same as Enter)
+        case 'commit': {
+          // Click commit prices button (Numpad0)
           const commitBtn = document.querySelector('button#commit-prices');
           if (commitBtn && !commitBtn.disabled) {
             commitBtn.click();
             success = true;
           }
           break;
+        }
 
         default:
           console.warn('[upTime] Unknown auto command:', command);
@@ -411,10 +434,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep channel open for async response
 });
 
-// Hotkeys for spinner buttons (Numpad +/-) and Commit (Enter)
-// Numpad - : Decrease odd team 1
-// Numpad + : Decrease odd team 2
-// Enter   : Commit prices
+// Hotkeys for spinner buttons (Numpad +/-), Commit (Numpad0), and Suspend/Trade toggle (Numpad1)
+// Numpad -  : Decrease odd team 1 (spinner down)
+// Numpad +  : Increase odd team 1 (spinner up)
+// Numpad 0  : Commit prices
+// Numpad 1  : Toggle suspend ↔ trade (ESC / Shift+ESC based on current state)
 document.addEventListener('keydown', (e) => {
     // Numpad Subtract (-) -> Decrease odd team 1
     if (e.code === 'NumpadSubtract') {
@@ -427,7 +451,7 @@ document.addEventListener('keydown', (e) => {
         }
     }
     
-    // Numpad Add (+) -> Decrease odd team 2
+    // Numpad Add (+) -> Increase odd team 1
     if (e.code === 'NumpadAdd') {
         const upBtn = document.querySelector('button.spinner-up');
         if (upBtn) {
@@ -438,12 +462,33 @@ document.addEventListener('keydown', (e) => {
         }
     }
     
-    // Enter -> Commit prices
-    if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+    // Numpad 0 -> Commit prices
+    if (e.code === 'Numpad0') {
         const commitBtn = document.querySelector('button#commit-prices');
         if (commitBtn && !commitBtn.disabled) {
             commitBtn.click();
             e.preventDefault();
         }
+    }
+
+    // Numpad 1 -> Toggle suspend/trade (like F21 in Excel mode)
+    // If currently Trading → ESC (suspend); if Suspended → Shift+ESC (trade)
+    if (e.code === 'Numpad1') {
+        const market = document.querySelector('.multisport-market');
+        const isSuspended = market?.classList.contains('flags-UserSuspensionStatus-Suspended');
+        if (isSuspended) {
+            // Resume trading: Shift+ESC
+            document.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+                shiftKey: true, bubbles: true
+            }));
+        } else {
+            // Suspend: ESC
+            document.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+                bubbles: true
+            }));
+        }
+        e.preventDefault();
     }
 }, true);
