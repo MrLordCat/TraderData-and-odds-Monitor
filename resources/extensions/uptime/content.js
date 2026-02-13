@@ -144,30 +144,38 @@ class OddsBridge {
     try {
       switch (command) {
         case 'suspend': {
-          // Click S button to suspend
-          const suspBtn = document.getElementById('trading-state-suspend-all-button');
-          if (suspBtn) { suspBtn.click(); success = true; }
+          // ESC to suspend — dispatch to multiple targets
+          const kbSusp = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, cancelable: true, bubbles: true };
+          [window, document, document.body].forEach(t => {
+            t.dispatchEvent(new KeyboardEvent('keydown', kbSusp));
+            t.dispatchEvent(new KeyboardEvent('keyup', kbSusp));
+          });
+          success = true;
           break;
         }
 
         case 'trade': {
-          // Click T button to resume trading
-          const trBtn = document.getElementById('trading-state-trade-all-button');
-          if (trBtn) { trBtn.click(); success = true; }
+          // Shift+ESC to resume trading — dispatch to multiple targets
+          const kbTrade = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, shiftKey: true, cancelable: true, bubbles: true };
+          [window, document, document.body].forEach(t => {
+            t.dispatchEvent(new KeyboardEvent('keydown', kbTrade));
+            t.dispatchEvent(new KeyboardEvent('keyup', kbTrade));
+          });
+          success = true;
           break;
         }
 
         case 'toggle-suspend': {
-          // Toggle: determine current state from MarketTradingStatus (effective state)
+          // Toggle: if suspended → Shift+ESC (resume), else → ESC (suspend)
           const market = document.querySelector('.multisport-market');
-          const isSuspended = market?.classList.contains('flags-MarketTradingStatus-Suspended');
-          if (isSuspended) {
-            const trBtnT = document.getElementById('trading-state-trade-all-button');
-            if (trBtnT) { trBtnT.click(); success = true; }
-          } else {
-            const sBtnT = document.getElementById('trading-state-suspend-all-button');
-            if (sBtnT) { sBtnT.click(); success = true; }
-          }
+          const isSusp = market?.classList.contains('flags-MarketTradingStatus-Suspended');
+          const kbToggle = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, shiftKey: isSusp, cancelable: true, bubbles: true };
+          [window, document, document.body].forEach(t => {
+            t.dispatchEvent(new KeyboardEvent('keydown', kbToggle));
+            t.dispatchEvent(new KeyboardEvent('keyup', kbToggle));
+          });
+          console.log('[upTime] toggle-suspend:', isSusp ? 'Shift+ESC (resume)' : 'ESC (suspend)');
+          success = true;
           break;
         }
 
@@ -454,21 +462,28 @@ document.addEventListener('keydown', (e) => {
     }
 
     // Numpad 1 -> Toggle suspend/trade (like F21 in Excel mode)
-    // Clicks T/S buttons directly (keyboard dispatch unreliable with Angular)
+    // DS native hotkeys: ESC = suspend, Shift+ESC = resume
     if (e.code === 'Numpad1') {
         const market = document.querySelector('.multisport-market');
-        // Check effective market state (MarketTradingStatus reflects actual state;
-        // UserSuspensionStatus can stay "Trading" even when globally suspended)
         const isSuspended = market?.classList.contains('flags-MarketTradingStatus-Suspended');
-        if (isSuspended) {
-            // Resume trading: click T button
-            const tradeBtn = document.getElementById('trading-state-trade-all-button');
-            if (tradeBtn) tradeBtn.click();
-        } else {
-            // Suspend: click S button
-            const suspendBtn = document.getElementById('trading-state-suspend-all-button');
-            if (suspendBtn) suspendBtn.click();
+        console.log('[upTime] Numpad1 pressed, isSuspended:', isSuspended,
+            'classes:', market?.className?.match(/flags-\w+-\w+/g)?.join(', '));
+
+        const kbOpts = {
+            key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+            cancelable: true, bubbles: true,
+            shiftKey: isSuspended  // Shift+ESC to resume, plain ESC to suspend
+        };
+
+        // Try multiple dispatch targets — Angular may listen on different elements
+        const targets = [window, document, document.body, market].filter(Boolean);
+        for (const target of targets) {
+            target.dispatchEvent(new KeyboardEvent('keydown', kbOpts));
+            target.dispatchEvent(new KeyboardEvent('keyup', kbOpts));
         }
+
+        console.log('[upTime] Dispatched', isSuspended ? 'Shift+ESC (resume)' : 'ESC (suspend)',
+            'to', targets.length, 'targets');
         e.preventDefault();
     }
 }, true);
