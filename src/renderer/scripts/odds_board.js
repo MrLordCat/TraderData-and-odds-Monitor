@@ -178,6 +178,26 @@ function renderEmbeddedOdds(){
     }
   }
 
+  // DS game phase badge
+  const phaseBadge = document.getElementById('dsGamePhaseBadge');
+  if(phaseBadge){
+    const phase = dsRec?.gamePhase || '';
+    if(phase){
+      const short = phase === 'In-Play' ? 'LIVE' : phase === 'Pre-Game' ? 'PRE' : phase === 'Post-Game' ? 'POST' : phase === 'Break In Play' ? 'BRK' : phase.substring(0,4).toUpperCase();
+      phaseBadge.textContent = short;
+      phaseBadge.className = 'dsGamePhaseBadge';
+      if(phase === 'In-Play') phaseBadge.classList.add('phase-live');
+      else if(phase === 'Pre-Game') phaseBadge.classList.add('phase-pre');
+      else if(phase === 'Post-Game') phaseBadge.classList.add('phase-post');
+      else phaseBadge.classList.add('phase-other');
+      phaseBadge.style.display = '';
+      phaseBadge.title = 'DS: ' + phase;
+    } else {
+      phaseBadge.style.display = 'none';
+      phaseBadge.textContent = '';
+    }
+  }
+
   const midCell=document.getElementById('embeddedMidCell');
   if(midCell){
     const mid = (OddsBoardShared && OddsBoardShared.calcMidFromLiveNums)

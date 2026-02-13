@@ -114,6 +114,7 @@ function createExtensionBridge(opts = {}) {
           map: msg.map || currentMap,
           odds: msg.odds || ['-', '-'],
           frozen: !!msg.frozen,
+          gamePhase: msg.gamePhase || '',
           ts: Date.now(),
           source: 'extension'
         };

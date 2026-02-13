@@ -291,6 +291,43 @@
 	height: 22px;
 }
 
+/* DS game phase badge */
+.dsGamePhaseBadge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border-radius: var(--md-sys-shape-corner-full, 9999px);
+  box-sizing: border-box;
+  line-height: 18px;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+.dsGamePhaseBadge.phase-live {
+  display: inline-flex;
+  background: #16a34a;
+  color: #fff;
+}
+.dsGamePhaseBadge.phase-pre {
+  display: inline-flex;
+  background: #ca8a04;
+  color: #fff;
+}
+.dsGamePhaseBadge.phase-post {
+  display: inline-flex;
+  background: #6b7280;
+  color: #e5e7eb;
+}
+.dsGamePhaseBadge.phase-other {
+  display: inline-flex;
+  background: #7c3aed;
+  color: #fff;
+}
+
 /* Script map badge (shows Python hotkey controller current map) */
 .scriptMapBadge {
   display:inline-flex;

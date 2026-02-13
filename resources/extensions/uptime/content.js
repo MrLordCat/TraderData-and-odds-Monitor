@@ -257,12 +257,15 @@ class OddsBridge {
     
     const data = window.extractMapOdds?.(this.currentMap, this.isLast);
     if (data) {
+      // Include game phase from uptime engine
+      const phase = uptimeEngine?.state?.currentPhase || '';
       this.ws.send(JSON.stringify({
         type: 'odds-update',
         map: data.map,
         odds: data.odds,
         frozen: data.frozen,
-        teams: data.teams
+        teams: data.teams,
+        gamePhase: phase
       }));
     }
   }
