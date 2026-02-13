@@ -306,9 +306,14 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
       autoLog('✓ ALIGNED → TRADING (' + reason + ')');
       if (!pendingSkipResumeSignal) {
         lastResumeSentTs = Date.now();
-        sendSignal('market:resume');
-        // Backup: retry resume signal once if Excel stayed suspended
-        scheduleSuspendRetry('resume', 'market:resume');
+        if (state.mode === MODE.DS) {
+          autoLog('▶ DS trade command');
+          sendDsCommand('trade');
+        } else {
+          sendSignal('market:resume');
+          // Backup: retry resume signal once if Excel stayed suspended
+          scheduleSuspendRetry('resume', 'market:resume');
+        }
       }
       pendingSkipResumeSignal = false;
       broadcastState(true);
@@ -382,6 +387,12 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     state.reason = REASON.MANUAL;
     userSuspended = false;
 
+    // Suspend DS trading on manual disable
+    if (state.mode === MODE.DS) {
+      autoLog('■ DISABLE → DS suspend');
+      sendDsCommand('suspend');
+    }
+
     autoLog('■ DISABLE manual');
     notify();
     broadcastState(false);
@@ -420,9 +431,14 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     } else {
       if (!canResumeFlag) state.userWanted = false;
       autoLog('⏸ SUSPEND auto reason=' + reason);
-      sendSignal(reason);
-      // Backup: retry suspend signal once if Excel didn't react
-      scheduleSuspendRetry('suspend', reason);
+      if (state.mode === MODE.DS) {
+        autoLog('⏸ DS suspend command');
+        sendDsCommand('suspend');
+      } else {
+        sendSignal(reason);
+        // Backup: retry suspend signal once if Excel didn't react
+        scheduleSuspendRetry('suspend', reason);
+      }
     }
 
     lastSuspendTs = Date.now();
