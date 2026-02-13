@@ -139,8 +139,9 @@ function createExtensionBridge(opts = {}) {
   // Check GitHub for updates and download if available
   async function checkAndUpdateExtension(ws, currentVersion) {
     try {
-      // Fetch manifest.json from GitHub main branch
-      const manifestUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${EXTENSION_PATH}/manifest.json`;
+      // Fetch manifest.json from GitHub main branch (cache-bust to avoid CDN stale data)
+      const cacheBust = Date.now();
+      const manifestUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${EXTENSION_PATH}/manifest.json?cb=${cacheBust}`;
       
       const manifest = await fetchJSON(manifestUrl);
       const latestVersion = manifest.version;
@@ -180,7 +181,7 @@ function createExtensionBridge(opts = {}) {
       let updatedCount = 0;
       for (const file of filesToUpdate) {
         try {
-          const fileUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${EXTENSION_PATH}/${file}`;
+          const fileUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${EXTENSION_PATH}/${file}?cb=${cacheBust}`;
           const content = await fetchText(fileUrl);
           const filePath = path.join(extDir, file);
           
