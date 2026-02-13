@@ -533,10 +533,12 @@ function bootstrap() {
         if(global.__lastExcelOdds){
           extensionBridge.sendExcelOdds(global.__lastExcelOdds.odds, global.__lastExcelOdds.map);
         }
-        // Update dialog removed - user can manually update extension from Settings
+        // Broadcast DS connected status to all renderer windows
+        broadcastToAll(getBroadcastCtx(), 'ds-connected-changed', true);
       },
       onDisconnect: () => {
         console.log('[extensionBridge] Extension disconnected');
+        broadcastToAll(getBroadcastCtx(), 'ds-connected-changed', false);
       }
     });
     extensionBridge.start();

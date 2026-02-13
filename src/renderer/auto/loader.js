@@ -77,7 +77,7 @@ import { createAutoCoordinator } from './auto-coordinator.js';
     setAutoResumeOnMid: (v) => GuardSystem.setSettings({ resumeOnMid: v }),
     setDsAutoMode: (v) => AutoCoordinator.setMode(v ? MODE.DS : MODE.EXCEL),
     getDsAutoMode: () => AutoCoordinator.getMode() === MODE.DS,
-    isDsConnected: () => false,
+    isDsConnected: () => false, // actual state tracked by GuardSystem via ds-connected-changed IPC
   };
 
   // ============ Attach to Window ============

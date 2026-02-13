@@ -509,6 +509,9 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
           ipcRenderer.on('auto-state-set', (_e, p) => handleStateSet(p));
           ipcRenderer.on('auto-toggle-all', () => toggle());
           ipcRenderer.on('auto-active-set', (_e, p) => handleActiveSet(p));
+          // DS extension connected status
+          ipcRenderer.on('ds-connected-changed', (_e, connected) => GuardSystem.setDsConnected(connected));
+          ipcRenderer.invoke('extension-bridge-status').then(s => { if (s) GuardSystem.setDsConnected(!!s.connected); }).catch(() => {});
         }
       } catch (_) {}
     }
