@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Uptime Tracker",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Tracks uptime based on trading state changes and sends odds to OddsMoni. Supports DS Auto Mode.",
   "permissions": [
     "activeTab",

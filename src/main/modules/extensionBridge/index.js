@@ -11,7 +11,7 @@ const { isNewer } = require('../utils/version');
 const { fetchJSON, fetchText } = require('../utils/fetch');
 
 // Version of bundled extension (update when shipping new version)
-const BUNDLED_EXTENSION_VERSION = '1.4.0';
+const BUNDLED_EXTENSION_VERSION = '1.5.0';
 
 // GitHub repo info for auto-update
 const GITHUB_OWNER = 'MrLordCat';

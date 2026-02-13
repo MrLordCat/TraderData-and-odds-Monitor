@@ -26,7 +26,7 @@ class OddsBridge {
     this.currentMap = 1;
     this.isLast = false;  // Bo1 mode: use Match Up Winner for map 1
     this.connected = false;
-    this.version = '1.4.0'; // Extension version (DS Auto Mode support)
+    this.version = '1.5.0'; // Extension version (Numpad hotkeys, side-aware adjust)
     this.connect();
   }
 
