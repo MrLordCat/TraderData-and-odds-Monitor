@@ -20,7 +20,8 @@ function buildDesktopAPI(ipcRenderer, withUnsub) {
     'addonsGetEnabledPaths addons-get-enabled-paths', 'addonsGetDir addons-get-dir',
     'addonsCheckUpdates addons-check-updates', 'addonsGetChannel addons-get-channel',
     'dsAutoModeGet ds-auto-mode-get', 'dsConnectionStatus ds-connection-status',
-    'dsGetLastOdds ds-get-last-odds', 'themeGet theme-get', 'themeToggle theme-toggle',
+    'dsGetLastOdds ds-get-last-odds', 'extensionBridgeStatus extension-bridge-status',
+    'themeGet theme-get', 'themeToggle theme-toggle',
   ].forEach(e => { const [n, c] = e.split(' '); api[n] = () => ipcRenderer.invoke(c); });
 
   // ── invoke() — single arg passthrough ──

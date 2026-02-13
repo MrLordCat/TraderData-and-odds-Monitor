@@ -504,12 +504,23 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
     };
 
     if (global.desktopAPI) {
+      console.log('[Auto] attachExternalListeners: using desktopAPI path');
       if (global.desktopAPI.onExcelExtractorStatus) global.desktopAPI.onExcelExtractorStatus(GuardSystem.setExcelStatus);
       if (global.desktopAPI.getExcelExtractorStatus) global.desktopAPI.getExcelExtractorStatus().then(GuardSystem.setExcelStatus).catch(() => {});
       if (global.desktopAPI.onAutoStateSet) global.desktopAPI.onAutoStateSet(handleStateSet);
       if (global.desktopAPI.onAutoToggleAll) global.desktopAPI.onAutoToggleAll(() => toggle());
       if (global.desktopAPI.onAutoActiveSet) global.desktopAPI.onAutoActiveSet(handleActiveSet);
+      // DS extension connected status
+      if (global.desktopAPI.onDsConnectedChanged) global.desktopAPI.onDsConnectedChanged((connected) => {
+        console.log('[Auto] ds-connected-changed received (desktopAPI):', connected);
+        GuardSystem.setDsConnected(connected);
+      });
+      if (global.desktopAPI.extensionBridgeStatus) global.desktopAPI.extensionBridgeStatus().then(s => {
+        console.log('[Auto] extension-bridge-status initial (desktopAPI):', s);
+        if (s) GuardSystem.setDsConnected(!!s.connected);
+      }).catch(() => {});
     } else if (global.require) {
+      console.log('[Auto] attachExternalListeners: using require(electron) path');
       try {
         const { ipcRenderer } = global.require('electron');
         if (ipcRenderer) {
@@ -519,8 +530,14 @@ export function createAutoCoordinator({ OddsStore, GuardSystem, isSignalSender, 
           ipcRenderer.on('auto-toggle-all', () => toggle());
           ipcRenderer.on('auto-active-set', (_e, p) => handleActiveSet(p));
           // DS extension connected status
-          ipcRenderer.on('ds-connected-changed', (_e, connected) => GuardSystem.setDsConnected(connected));
-          ipcRenderer.invoke('extension-bridge-status').then(s => { if (s) GuardSystem.setDsConnected(!!s.connected); }).catch(() => {});
+          ipcRenderer.on('ds-connected-changed', (_e, connected) => {
+            console.log('[Auto] ds-connected-changed received:', connected);
+            GuardSystem.setDsConnected(connected);
+          });
+          ipcRenderer.invoke('extension-bridge-status').then(s => {
+            console.log('[Auto] extension-bridge-status initial:', s);
+            if (s) GuardSystem.setDsConnected(!!s.connected);
+          }).catch((err) => { console.warn('[Auto] extension-bridge-status failed:', err); });
         }
       } catch (_) {}
     }
