@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.5.0] - 2026-02-13
+## [0.5.0] - 2026-02-14
 
 ### ✨ DS Auto Mode — Full Support
 
@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **DS page hotkeys** — Numpad0 = commit, Numpad1 = toggle suspend/trade, Numpad+/- = spinner
 - **Side-aware commands** — adjust-up/down correctly targets the right side (Team 1 / Team 2)
 - **Connection status** — Auto guard checks extension is connected before enabling
+- **DS game phase badge** — Odds Board shows Pre-Game / LIVE / Post-Game / BRK status from DS extension
 
 ### 🔧 Improvements
 
@@ -17,9 +18,14 @@ All notable changes to this project will be documented in this file.
 - **10s Sound Mute** — sounds muted for 10 seconds after Grid page reload (prevents spam)
 - **Deferred Game Start** — improved game start detection (game time threshold, backlog suppression)
 - **Toast notifications** — Auto block reason shown next to button
+- **Grid team name tooltip** — hover over team headers to see full Grid names when Excel names are displayed
+- **Manual game selector** — click game badge to cycle LoL / CS2 / Dota 2 when Grid is not active
+- **Per-broker proxy IPC** — proxy settings management for individual brokers
 
 ### 🐛 Bug Fixes
 
+- Grid team names blocked by Excel defaults ("Team 1"/"Team 2") — Grid names now come through when Excel K4/N4 are empty
+- Disable Auto in DS mode no longer sends suspend command to DS
 - Baron sound suppressed by burst detection
 - Pistol round metrics shown for non-CS2 games
 - Table metric order not persisted
