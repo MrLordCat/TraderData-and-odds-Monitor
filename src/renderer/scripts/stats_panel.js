@@ -94,10 +94,14 @@ let manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats: { '1': mak
 
 // ================= Team Header Utilities =================
 const DEFAULT_TEAM_NAMES = new Set(['Team 1', 'Team 2']);
+// Always store Grid team names separately for hover tooltip
+const gridTeamNames = { 1: '', 2: '' };
 function setTeamHeader(idx, rawText, opts = {}){
   const source = opts.fromExcel ? 'excel' : 'grid';
   const text = (rawText||'').trim() || ('Team '+idx);
   const isDefault = DEFAULT_TEAM_NAMES.has(text);
+  // Always remember Grid names (for hover mini-toast even when Excel has priority)
+  if(source === 'grid' && !isDefault) gridTeamNames[idx] = text;
   // Excel names have priority — but only when they are real names, not defaults
   if(source === 'excel' && !isDefault){
     teamNamesSource = 'excel';
@@ -750,6 +754,29 @@ function renderLol(payload, manual=false){
   // Manual game badge cycling (when Grid is not controlling)
   const _gameBadge = document.getElementById('gameBadge');
   if(_gameBadge) _gameBadge.addEventListener('click', cycleGameManual);
+  // Grid team name mini-toast on hover over team headers
+  (function initGridNameToast(){
+    let toast = null;
+    function show(ev, idx){
+      const gn = gridTeamNames[idx];
+      if(!gn) return;
+      const displayed = document.querySelector(`#lt-team${idx} .teamNameWrap`)?.textContent || '';
+      if(gn === displayed) return; // same as displayed — no need
+      if(!toast){ toast = document.createElement('div'); toast.className = 'gridNameToast'; document.body.appendChild(toast); }
+      toast.textContent = gn;
+      const rect = ev.currentTarget.getBoundingClientRect();
+      toast.style.left = rect.left + rect.width / 2 + 'px';
+      toast.style.top  = rect.bottom + 4 + 'px';
+      toast.classList.add('visible');
+    }
+    function hide(){ if(toast) toast.classList.remove('visible'); }
+    [1,2].forEach(idx=>{
+      const th = document.getElementById('lt-team'+idx);
+      if(!th) return;
+      th.addEventListener('mouseenter', ev => show(ev, idx));
+      th.addEventListener('mouseleave', hide);
+    });
+  })();
   document.getElementById('swapTeamsBtn').onclick=()=>{ 
     swapTeams=!swapTeams; 
     document.getElementById('swapTeamsBtn').classList.toggle('active', swapTeams); 
