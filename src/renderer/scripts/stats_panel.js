@@ -93,13 +93,22 @@ let __currentLayoutMode = 'split'; // tracks layout mode for single-window disab
 let manualData = { team1Name:'Team 1', team2Name:'Team 2', gameStats: { '1': makeEmptyGame() } };
 
 // ================= Team Header Utilities =================
+const DEFAULT_TEAM_NAMES = new Set(['Team 1', 'Team 2']);
 function setTeamHeader(idx, rawText, opts = {}){
   const source = opts.fromExcel ? 'excel' : 'grid';
-  // Excel имена имеют приоритет - не перезаписываем если уже есть Excel
-  if(source === 'grid' && teamNamesSource === 'excel'){
-    return; // skip grid updates once Excel names are set
+  const text = (rawText||'').trim() || ('Team '+idx);
+  const isDefault = DEFAULT_TEAM_NAMES.has(text);
+  // Excel names have priority — but only when they are real names, not defaults
+  if(source === 'excel' && !isDefault){
+    teamNamesSource = 'excel';
+  } else if(source === 'excel' && isDefault){
+    // Excel sent default names — don't lock source, allow Grid to overwrite
+    if(teamNamesSource === 'excel') teamNamesSource = 'grid';
   }
-  if(source === 'excel') teamNamesSource = 'excel';
+  // Skip grid updates only if Excel has real (non-default) names
+  if(source === 'grid' && teamNamesSource === 'excel'){
+    return;
+  }
   
   const th = document.getElementById(idx===1? 'lt-team1':'lt-team2');
   if(!th) return;
@@ -113,7 +122,6 @@ function setTeamHeader(idx, rawText, opts = {}){
     th.appendChild(wrap);
   }
   // Team names are now read-only (sourced from Excel K4/N4) - no dblclick edit
-  const text = (rawText||'').trim() || ('Team '+idx);
   if(wrap.textContent === text) return; // no change
   wrap.textContent = text;
   wrap.title = text; // tooltip full name
@@ -227,8 +235,21 @@ function setGridGame(game){
   if(currentGridGame === game) return;
   currentGridGame = game;
   window.__gridGame = game; // expose for stats_sounds.js
+  if(game) gameAutoDetected = true; // Grid controls the badge
   updateGameBadge(game);
   applyGameMetrics(game);
+}
+// Manual game cycle: null → lol → cs2 → dota2 → null
+const GAME_CYCLE = [null, 'lol', 'cs2', 'dota2'];
+let gameAutoDetected = false; // true when Grid URL set the game
+function cycleGameManual(){
+  if(gameAutoDetected) return; // don't cycle when Grid is controlling
+  const idx = GAME_CYCLE.indexOf(currentGridGame);
+  const next = GAME_CYCLE[(idx + 1) % GAME_CYCLE.length];
+  currentGridGame = next;
+  window.__gridGame = next;
+  updateGameBadge(next);
+  applyGameMetrics(next);
 }
 function cell(id, side){ return document.getElementById(`${id}-${side}`); }
 // Helper: Manual mode is now a toggle button with data-active attribute
@@ -726,6 +747,9 @@ function renderLol(payload, manual=false){
   document.addEventListener('mouseup', ()=>{ document.querySelectorAll('td.pressing').forEach(td=> td.classList.remove('pressing')); });
   // (per-section collapse handlers consolidated in stats_collapse.js)
   // Swap teams
+  // Manual game badge cycling (when Grid is not controlling)
+  const _gameBadge = document.getElementById('gameBadge');
+  if(_gameBadge) _gameBadge.addEventListener('click', cycleGameManual);
   document.getElementById('swapTeamsBtn').onclick=()=>{ 
     swapTeams=!swapTeams; 
     document.getElementById('swapTeamsBtn').classList.toggle('active', swapTeams); 

@@ -553,6 +553,9 @@ small {
   user-select: none;
   white-space: nowrap;
 }
+.gameBadge--clickable { cursor: pointer; transition: opacity .15s; }
+.gameBadge--clickable:hover { opacity: .8; }
+.gameBadge--clickable:active { opacity: .6; }
 .gameBadge[data-game="lol"]  { background: #4fc3f718; color: #4fc3f7; }
 .gameBadge[data-game="cs2"]  { background: #ffb74d18; color: #ffb74d; }
 .gameBadge[data-game="dota2"]{ background: #e5737318; color: #e57373; }
