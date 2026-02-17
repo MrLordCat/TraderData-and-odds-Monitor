@@ -1,6 +1,7 @@
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { shell } = require('electron');
 const { broadcastGlobal } = require('./utils/broadcast');
 
 function createExcelExtractorController({
@@ -428,22 +429,31 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
             ? 'Excel is not running.'
             : 'Workbook not found in Excel.';
           try { store.delete('excelWorkbookPath'); } catch (_) { }
-          // Show dialog asking to pick a new file
+          // Show file picker directly
           const mainWindow = getMainWindow && getMainWindow();
           const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
-          const choice = dialog && dialog.showMessageBoxSync
-            ? dialog.showMessageBoxSync(parent, {
-                type: 'warning',
-                title: 'Excel Watcher',
-                message: reason + '\nSelect a different Excel file?',
-                buttons: ['Select File', 'Cancel'],
-                defaultId: 0,
-                cancelId: 1,
+          const picked = dialog && dialog.showOpenDialogSync
+            ? dialog.showOpenDialogSync(parent, {
+                title: reason + ' Select Excel workbook:',
+                properties: ['openFile'],
+                filters: [
+                  { name: 'Excel', extensions: ['xlsm', 'xlsx', 'xls'] },
+                  { name: 'All Files', extensions: ['*'] },
+                ],
               })
-            : 1;
-          if (choice === 0) {
-            // Restart — will show file picker since we cleared excelWorkbookPath
-            startExcelExtractor();
+            : null;
+          if (picked && picked.length) {
+            const newPath = String(picked[0] || '').trim();
+            if (newPath) {
+              store.set('excelWorkbookPath', newPath);
+              // Open the file in Excel (shell.openPath launches default app)
+              shell.openPath(newPath).then(() => {
+                // Wait for Excel to load the file, then restart watcher
+                setTimeout(() => startExcelExtractor(), 3000);
+              }).catch(() => {
+                setTimeout(() => startExcelExtractor(), 3000);
+              });
+            }
           }
         }
       });

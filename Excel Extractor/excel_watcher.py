@@ -69,7 +69,7 @@ def attach_excel_app():
 
 
 def find_workbook(app, path: Path):
-    """Find open workbook."""
+    """Find already-open workbook (does NOT auto-open files)."""
     for wb in app.Workbooks:
         try:
             if Path(wb.FullName).resolve().samefile(path):
@@ -77,14 +77,7 @@ def find_workbook(app, path: Path):
         except:
             continue
     
-    # Try to open if exists
-    try:
-        if path.exists():
-            return app.Workbooks.Open(str(path))
-    except:
-        pass
-    
-    print(f"[ERROR] Workbook not found: {path}", flush=True)
+    print(f"[ERROR] Workbook not found among open files: {path}", flush=True)
     raise SystemExit(EXIT_WORKBOOK_NOT_FOUND)
 
 
