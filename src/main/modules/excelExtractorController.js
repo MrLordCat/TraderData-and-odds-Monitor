@@ -271,6 +271,10 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
   function pySpawnEnv() { return Object.assign({}, process.env, PYTHON_ENV); }
   function abortStart(msg) { state.excelProcError = msg; state.excelProcStarting = false; broadcastExcelStatus(); }
 
+  // Exit codes from excel_watcher.py for structured error handling
+  const PY_EXIT_EXCEL_NOT_RUNNING = 2;
+  const PY_EXIT_WORKBOOK_NOT_FOUND = 3;
+
   function startExcelExtractor() {
     if (state.excelProc || state.excelProcStarting || state.excelDepsInstalling) return;
 
@@ -417,6 +421,31 @@ print('MISSING:' + ','.join(missing) if missing else 'OK')
         stopHotkeyController();
         
         broadcastExcelStatus();
+
+        // Excel not running or workbook not found → clear saved path, ask user to pick file and retry
+        if (code === PY_EXIT_EXCEL_NOT_RUNNING || code === PY_EXIT_WORKBOOK_NOT_FOUND) {
+          const reason = code === PY_EXIT_EXCEL_NOT_RUNNING
+            ? 'Excel is not running.'
+            : 'Workbook not found in Excel.';
+          try { store.delete('excelWorkbookPath'); } catch (_) { }
+          // Show dialog asking to pick a new file
+          const mainWindow = getMainWindow && getMainWindow();
+          const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+          const choice = dialog && dialog.showMessageBoxSync
+            ? dialog.showMessageBoxSync(parent, {
+                type: 'warning',
+                title: 'Excel Watcher',
+                message: reason + '\nSelect a different Excel file?',
+                buttons: ['Select File', 'Cancel'],
+                defaultId: 0,
+                cancelId: 1,
+              })
+            : 1;
+          if (choice === 0) {
+            // Restart — will show file picker since we cleared excelWorkbookPath
+            startExcelExtractor();
+          }
+        }
       });
 
       // Start hotkey controller after watcher is running

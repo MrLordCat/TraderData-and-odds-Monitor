@@ -51,6 +51,11 @@ def ts() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# Exit codes for structured error handling (Electron reads these)
+EXIT_EXCEL_NOT_RUNNING = 2
+EXIT_WORKBOOK_NOT_FOUND = 3
+
+
 def attach_excel_app():
     """Connect to running Excel."""
     if win32com is None:
@@ -59,7 +64,8 @@ def attach_excel_app():
         app = win32com.client.GetObject(Class="Excel.Application")
         return app
     except Exception:
-        raise SystemExit("Excel not found. Open the workbook and try again.")
+        print("[ERROR] Excel is not running.", flush=True)
+        raise SystemExit(EXIT_EXCEL_NOT_RUNNING)
 
 
 def find_workbook(app, path: Path):
@@ -78,7 +84,8 @@ def find_workbook(app, path: Path):
     except:
         pass
     
-    raise SystemExit(f"Workbook {path} not found. Open it in Excel.")
+    print(f"[ERROR] Workbook not found: {path}", flush=True)
+    raise SystemExit(EXIT_WORKBOOK_NOT_FOUND)
 
 
 def parse_args() -> argparse.Namespace:
