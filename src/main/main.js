@@ -366,6 +366,13 @@ function bootstrap() {
       // If it's truly first run OR legacy prefs are missing/invalid, start with 0 active brokers.
       try { store.set('disabledBrokers', BROKERS.map(b => b.id)); } catch(_) {}
       try { store.set('hasLaunched', true); } catch(_) {}
+    } else {
+      // Migration: new brokers added after first run should start as disabled
+      const knownIds = new Set(disabledRaw);
+      const newBrokers = BROKERS.filter(b => !knownIds.has(b.id) && b.id !== 'simulator');
+      if (newBrokers.length > 0) {
+        try { store.set('disabledBrokers', [...disabledRaw, ...newBrokers.map(b => b.id)]); } catch(_) {}
+      }
     }
   } catch(_) {}
   
