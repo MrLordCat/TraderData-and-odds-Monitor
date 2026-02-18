@@ -41,7 +41,12 @@ function extractParimatch(mapNum = 1, game = 'lol', opts = {}) {
       let side1 = null, side2 = null;
       for (const el of outcomes) {
         const label = el.querySelector('.caption-2-medium-caps');
-        const oddsEl = el.querySelector('[data-id="odds-value"]');
+        // Odds value: prefer [data-id="odds-value"], fallback to [data-id="animated-odds-value"] inner span
+        let oddsEl = el.querySelector('[data-id="odds-value"]');
+        if (!oddsEl || !oddsEl.textContent.trim()) {
+          const animated = el.querySelector('[data-id="animated-odds-value"]');
+          if (animated) oddsEl = animated.querySelector('span') || animated;
+        }
         if (!label || !oddsEl) continue;
         const lbl = label.textContent.trim();
         const val = parsePrice(oddsEl.textContent.trim());
@@ -50,10 +55,9 @@ function extractParimatch(mapNum = 1, game = 'lol', opts = {}) {
       }
       if (!side1 || !side2) return null;
 
-      // Frozen detection: check if outcomes lack the "available" marker
+      // Frozen detection: "outcome-unavailable" means market is suspended
       const frozen = outcomes.some(o =>
-        !o.hasAttribute('data-onboarding') ||
-        o.getAttribute('data-onboarding') !== 'outcome-available'
+        o.getAttribute('data-onboarding') === 'outcome-unavailable'
       );
 
       return { odds: [side1.val, side2.val], frozen };
@@ -114,7 +118,11 @@ function extractParimatch(mapNum = 1, game = 'lol', opts = {}) {
           const jsonStr = raw.replace(/^outcome_/, '');
           const obj = JSON.parse(jsonStr);
           if (obj.marketType === 1 && obj.period === mapNum) {
-            const oddsEl = el.querySelector('[data-id="odds-value"]');
+            let oddsEl = el.querySelector('[data-id="odds-value"]');
+            if (!oddsEl || !oddsEl.textContent.trim()) {
+              const animated = el.querySelector('[data-id="animated-odds-value"]');
+              if (animated) oddsEl = animated.querySelector('span') || animated;
+            }
             const labelEl = el.querySelector('.caption-2-medium-caps');
             if (oddsEl && labelEl) {
               candidates.push({
@@ -131,8 +139,7 @@ function extractParimatch(mapNum = 1, game = 'lol', opts = {}) {
         const s2 = candidates.find(c => c.label === '2');
         if (s1 && s2) {
           const frozen = [s1.el, s2.el].some(o =>
-            !o.hasAttribute('data-onboarding') ||
-            o.getAttribute('data-onboarding') !== 'outcome-available'
+            o.getAttribute('data-onboarding') === 'outcome-unavailable'
           );
           return { odds: [s1.val, s2.val], frozen };
         }
