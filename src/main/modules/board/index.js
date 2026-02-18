@@ -7,13 +7,12 @@ const path = require('path');
 
 function createBoardManager({ mainWindow, store, layoutManager, latestOddsRef, activeBrokerIdsRef, replayOddsFn, stageBoundsRef, hotkeys }){
   // State: side + width persisted for the unified side panel
+  const { STATS_PANEL_WIDTH: DEFAULT_PANEL_WIDTH, STATS_PANEL_MIN_WIDTH: MIN_W, STATS_PANEL_MAX_WIDTH: MAX_W } = require('../utils/constants');
   let state = { 
     mode: 'docked', 
     side: store.get('boardSide') || 'right', 
-    width: store.get('boardWidth') || 361  // Default + 1px for border
+    width: store.get('boardWidth') || DEFAULT_PANEL_WIDTH
   };
-  const MIN_W = 281; 
-  const MAX_W = 600;
   
   // Reference to stats panel BrowserView (set by statsManager after creation)
   let statsPanelRef = { value: null };

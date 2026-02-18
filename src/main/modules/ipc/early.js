@@ -12,12 +12,13 @@ function initEarlyIpc({ ipcMain, store, boardManagerRef }){
       } catch(_){ }
       // Fallback while bootstrapping
       try {
+        const { STATS_PANEL_WIDTH } = require('../utils/constants');
         return {
           side: store.get('boardSide') || 'right',
-          width: store.get('boardWidth') || 320
+          width: store.get('boardWidth') || STATS_PANEL_WIDTH
         };
       } catch(_){
-        return { side: 'right', width: 320 };
+        return { side: 'right', width: 385 };
       }
     });
   } catch(_){ }

@@ -2,6 +2,29 @@ html, body { height:100%; overflow:hidden; }
 
 /* Top toolbar removed (controls live in docked board panel). */
 
+/* Side panel resize splitter */
+#boardSplitter {
+  display: none;
+  position: fixed;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  z-index: 9999;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+#boardSplitter:hover,
+#boardSplitter.dragging {
+  background: var(--md-sys-color-primary, #3b82f6);
+  opacity: 0.5;
+}
+#boardSplitter.dragging { opacity: 0.7; }
+
+/* Position splitter on panel edge based on side */
+body.board-docked-right #boardSplitter { right: 0; left: auto; }
+body.board-docked-left #boardSplitter { left: 0; right: auto; }
+
 /* Overlay blur state for main content */
 body.overlay-blur #stageOutline,
 body.overlay-blur #boardSplitter {

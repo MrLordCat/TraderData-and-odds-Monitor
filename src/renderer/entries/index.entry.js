@@ -74,6 +74,14 @@ function applyPanelState(st) {
   document.body.classList.toggle('board-docked-left', st.side === 'left');
   document.body.classList.toggle('board-docked-right', st.side !== 'left');
   splitter.style.display = 'block';
+  // Position splitter at panel edge
+  if (st.side === 'left') {
+    splitter.style.left = st.width + 'px';
+    splitter.style.right = 'auto';
+  } else {
+    splitter.style.right = st.width + 'px';
+    splitter.style.left = 'auto';
+  }
   computeStage();
 }
 

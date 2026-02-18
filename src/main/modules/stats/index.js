@@ -22,8 +22,9 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   // Side is unified with docked board side to avoid mismatches between modes.
   let side = store.get('boardSide') || store.get('statsPanelSide', 'right'); // left|right
   let panelWidth = store.get('boardWidth') || DEFAULT_PANEL_WIDTH; // unified panel width
-  // Migrate: if stored width matches old default (360), bump to new default
-  if(panelWidth === 360 && DEFAULT_PANEL_WIDTH !== 360){ panelWidth = DEFAULT_PANEL_WIDTH; store.set('boardWidth', panelWidth); }
+  // Migrate: if stored width matches outdated defaults (320, 360, 361), bump to current default
+  const OUTDATED_DEFAULTS = [320, 360, 361];
+  if(OUTDATED_DEFAULTS.includes(panelWidth) && panelWidth !== DEFAULT_PANEL_WIDTH){ panelWidth = DEFAULT_PANEL_WIDTH; store.set('boardWidth', panelWidth); }
   let embedOffsetY = 0;                                           // toolbar offset
   let singleWindow = !!store.get('statsSingleWindow', false);     // when true, only one slot is active
 
@@ -243,7 +244,7 @@ function createStatsManager({ store, mainWindow, stageBoundsRef, hotkeys, boardM
   }
   
   function setWidth(w){
-    const MIN_W = 280, MAX_W = 600;
+    const { STATS_PANEL_MIN_WIDTH: MIN_W, STATS_PANEL_MAX_WIDTH: MAX_W } = require('../utils/constants');
     const nw = Math.max(MIN_W, Math.min(MAX_W, Math.round(w)));
     if(nw === panelWidth) return;
     panelWidth = nw;
