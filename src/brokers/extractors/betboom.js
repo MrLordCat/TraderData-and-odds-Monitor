@@ -28,13 +28,21 @@ function extractBetboom(mapNum = 1, game = 'lol', opts = {}) {
   
   // Bo1 handling: if mapNum === 1 && isLast, use match-level market
   const useMatchLevel = mapNum <= 0 || (mapNum === 1 && opts.isLast);
-  // Check if map tabs exist (normal tabbed mode vs flat list mode like Bo2)
-  const hasTabs = document.querySelectorAll('button[role="radio"]').length > 0;
+  // Check if real map tabs exist (e.g. "Матч", "Карта 1") vs filter radios ("Все", "Исход", "Тотал")
+  const radios = [...document.querySelectorAll('button[role="radio"]')];
+  const hasTabs = radios.some(b => /^(Матч|Карта\s*\d+)$/i.test(b.textContent.trim()));
   
   if (useMatchLevel) {
-    // Explicit match-level (do NOT coerce to map1)
+    // Try 1: "Исход матча" (tabbed mode with explicit header)
     target = sections.find(s => /Исход\s+матча/i.test(s.textContent));
-    // Fallback (no-tabs / Bo2 mode): section titled exactly "Исход"
+    // Try 2: section with .bb-zm "Матч" sibling to .bb-ym "Исход" (no-tabs / Bo2 mode)
+    if (!target) {
+      target = sections.find(s => {
+        const zm = s.querySelector('.bb-zm');
+        return zm && /Матч/i.test(zm.textContent) && /^Исход$/i.test(sectionTitle(s));
+      });
+    }
+    // Try 3: section titled exactly "Исход" (pure 3-way, no "Матч" badge — last resort)
     if (!target) {
       target = sections.find(s => /^Исход$/i.test(sectionTitle(s)));
     }

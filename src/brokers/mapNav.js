@@ -34,6 +34,9 @@ function triggerMapChange(host, map, opts={}){
       const buttons=[...document.querySelectorAll('button[role="radio"]')];
       let target;
       // NOTE: Russian textContent comparisons ("Матч", "Карта") intentionally kept for site UI.
+      // Only click if real map tabs exist (not filter radios like "Все"/"Исход"/"Тотал")
+      const hasMapTabs = buttons.some(b => /^(Матч|Карта\s*\d+)$/i.test(b.textContent.trim()));
+      if (!hasMapTabs) return; // No-tabs mode (Bo2) — extractor handles sections directly
       // Bo1 special case: if map 1 + isLast, stay on "Матч" tab (match-level odds)
       if(map===0 || (map===1 && isLast)) target=buttons.find(b=>b.textContent.trim()==='Матч');
       else target=buttons.find(b=>b.textContent.trim()==='Карта '+map);
