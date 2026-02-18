@@ -367,12 +367,15 @@ function bootstrap() {
       try { store.set('disabledBrokers', BROKERS.map(b => b.id)); } catch(_) {}
       try { store.set('hasLaunched', true); } catch(_) {}
     } else {
-      // Migration: new brokers added after first run should start as disabled
-      const knownIds = new Set(disabledRaw);
-      const newBrokers = BROKERS.filter(b => !knownIds.has(b.id) && b.id !== 'simulator');
+      // Migration: new brokers added after first run should start as disabled.
+      // Compare against all known broker IDs (both enabled and disabled), not just disabled list.
+      const allKnownIds = new Set(store.get('knownBrokerIds') || disabledRaw);
+      const newBrokers = BROKERS.filter(b => !allKnownIds.has(b.id) && b.id !== 'simulator');
       if (newBrokers.length > 0) {
         try { store.set('disabledBrokers', [...disabledRaw, ...newBrokers.map(b => b.id)]); } catch(_) {}
       }
+      // Always persist full broker ID list so next launch knows what's "new"
+      try { store.set('knownBrokerIds', BROKERS.map(b => b.id)); } catch(_) {}
     }
   } catch(_) {}
   
