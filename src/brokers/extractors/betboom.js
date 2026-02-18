@@ -17,8 +17,11 @@ function extractBetboom(mapNum = 1, game = 'lol', opts = {}) {
   const sections = [...document.querySelectorAll('section')];
   let target = null;
   
-  // Helper: extract clean section title from trigger element
+  // Helper: extract clean section title — prefer .bb-ym (most specific), fallback to full trigger text
   const sectionTitle = s => {
+    // .bb-ym is the dedicated title element inside the trigger (avoids SVG whitespace noise)
+    const ym = s.querySelector('.bb-ym');
+    if (ym) return ym.textContent.replace(/\s+/g, ' ').trim();
     const el = s.querySelector('[data-id="trigger"]');
     return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
   };
