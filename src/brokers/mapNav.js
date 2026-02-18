@@ -49,6 +49,20 @@ function triggerMapChange(host, map, opts={}){
         if(!target && map!==0) target=[...wrapper.querySelectorAll('.tab--HvZxB')].find(t=>t.textContent.trim()==='Матч');
         if(target) target.click(); // Always click
       }
+    } else if(/pm-bet\./i.test(host)) {
+      // PariMatch (pm-bet.kz): tab buttons with modulor_tabs framework
+      // All map Winner markets are visible on Main tab, but clicking specific tabs
+      // helps filter the view for the user.
+      const tabs=[...document.querySelectorAll('[data-testid="marketTabs-button"]')];
+      let target;
+      if(map===0 || (map===1 && isLast)){
+        target=tabs.find(t=>/^Main$/i.test(t.textContent.trim()));
+      } else {
+        const mapRe=new RegExp(`^Map\\s*${map}$`,'i');
+        target=tabs.find(t=>mapRe.test(t.textContent.trim()));
+        if(!target) target=tabs.find(t=>/^Main$/i.test(t.textContent.trim()));
+      }
+      if(target) target.click();
     }
   } catch(_){}
 }

@@ -104,6 +104,7 @@ src/
 │   │   ├── thunderpick.js     # Thunderpick extractor (Bo1 support)
 │   │   ├── betboom.js         # Betboom extractor (Russian, Bo1)
 │   │   ├── pari.js            # Pari.ru extractor (Russian)
+│   │   ├── parimatch.js       # PariMatch (pm-bet.kz) extractor
 │   │   └── marathon.js        # Marathon extractor
 │   └── mapNav.js              # Map navigation helpers
 └── assets/                    # Fonts, images, sounds
