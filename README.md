@@ -78,6 +78,7 @@ Download the portable `.zip`, extract anywhere, and run `OddsMoni.exe`. No insta
 Prerequisites:
 
 - Node.js 18+
+- Python 3.8+ (required for Excel Extractor scripts)
 - Windows 10/11
 
 ```powershell
@@ -144,6 +145,8 @@ Installation:
 ## Excel Extractor
 
 Python script that feeds odds from your Excel workbook to the app.
+
+> **Requires Python 3.8+** installed and available in PATH. Download from [python.org](https://www.python.org/downloads/). Make sure to check **"Add Python to PATH"** during installation.
 
 - Auto-installs dependencies on first run (pywin32, openpyxl, watchdog, keyboard)
 - Hotkey controller for quick cell navigation (Numpad 0/1, F21-F24)
