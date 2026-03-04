@@ -1,5 +1,8 @@
 # OddsMoni Desktop
 
+> **⚠️ Project Status: Archived**  
+> This project is no longer being actively developed. I was laid off from the position this tool was built for, so there is no further need to maintain or update it. The source code remains available as-is for anyone who finds it useful or wants to build on top of it.
+
 A desktop application for live esports trading workflows — specifically designed for **CS2** and **League of Legends** match monitoring.
 
 Built to solve the daily pain of juggling multiple bookmaker tabs, Excel spreadsheets, and game stats during fast-paced matches. Everything you need is consolidated into one window with real-time updates.
@@ -20,6 +23,35 @@ Assistant tool that tracks mid/average odds across bookmakers and helps you stay
 
 **🎮 LoL Live Stats**  
 Collects key game data from portal.grid.gg (gold diff, kills, towers, dragons, barons) for faster game state assessment without switching windows.
+
+## Screenshots & Demo
+
+### Multi-Bookmaker View
+All bookmakers open side-by-side in one window with real-time odds extraction:
+
+![Multi-Bookmaker View](docs/media/multistream.png)
+
+### Stream Panel
+Watch live matches while monitoring odds — embedded Twitch streams and game stats:
+
+![Stream Panel](docs/media/stream.png)
+
+### Settings
+Configure brokers, layout presets, auto mode parameters, and more:
+
+![Settings](docs/media/settings.png)
+
+### Auto Mode
+Automatic odds tracking and alignment with market movements:
+
+![Auto Mode Demo](docs/media/auto-mode.gif)
+
+### Theme Switching
+Switch between light and dark themes on the fly:
+
+![Theme Switching](docs/media/switch-themes.gif)
+
+---
 
 ## Key Features
 
